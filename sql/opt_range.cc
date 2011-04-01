@@ -331,6 +331,12 @@ public:
   /* Number of ranges in the last checked tree->key */
   uint n_ranges;
   uint8 first_null_comp; /* first null component if any, 0 - otherwise */
+
+  /* 
+     The sort order the range access method must be able
+     to provide. Three-value logic: asc/desc/don't care
+  */
+  ORDER::enum_order order_direction;
 };
 
 
@@ -1230,8 +1236,7 @@ SQL_SELECT::SQL_SELECT() :quick(0),cond(0),pre_idx_push_select_cond(NULL),free_c
 
 void SQL_SELECT::cleanup()
 {
-  delete quick;
-  quick= 0;
+  set_quick(NULL);
   if (free_cond)
   {
     free_cond=0;
@@ -2596,6 +2601,8 @@ static int fill_used_fields_bitmap(PARAM *param)
       limit             Query limit
       force_quick_range Prefer to use range (instead of full table scan) even
                         if it is more expensive.
+      interesting_order The sort order the range access method must be able
+                        to provide. Three-value logic: asc/desc/don't care
       remove_false_parts_of_where  Remove parts of OR-clauses for which range
                                    analysis produced SEL_TREE(IMPOSSIBLE)
       only_single_index_range_scan Evaluate only single index range scans
@@ -2656,6 +2663,7 @@ static int fill_used_fields_bitmap(PARAM *param)
 int SQL_SELECT::test_quick_select(THD *thd, key_map keys_to_use,
 				  table_map prev_tables,
 				  ha_rows limit, bool force_quick_range, 
+                                  const ORDER::enum_order interesting_order,
                                   bool ordered_output,
                                   bool remove_false_parts_of_where,
                                   bool only_single_index_range_scan)
@@ -2667,8 +2675,7 @@ int SQL_SELECT::test_quick_select(THD *thd, key_map keys_to_use,
 		      (ulong) keys_to_use.to_ulonglong(), (ulong) prev_tables,
 		      (ulong) const_tables));
   DBUG_PRINT("info", ("records: %lu", (ulong) head->stat_records()));
-  delete quick;
-  quick=0;
+  set_quick(NULL);
   needed_reg.clear_all();
   quick_keys.clear_all();
   head->with_impossible_ranges.clear_all();
@@ -2732,8 +2739,9 @@ int SQL_SELECT::test_quick_select(THD *thd, key_map keys_to_use,
     param.remove_jump_scans= TRUE;
     param.max_key_parts= 0;
     param.remove_false_where_parts= remove_false_parts_of_where;
-    param.force_default_mrr= ordered_output;
     param.possible_keys.clear_all();
+    param.force_default_mrr= (interesting_order != ORDER::ORDER_NOT_RELEVANT);
+    param.order_direction= interesting_order;
 
     thd->no_errors=1;				// Don't warn about NULL
     init_sql_alloc(&alloc, "test_quick_select",
@@ -2939,7 +2947,8 @@ int SQL_SELECT::test_quick_select(THD *thd, key_map keys_to_use,
       */
       if ((thd->lex->sql_command != SQLCOM_DELETE) && 
            optimizer_flag(thd, OPTIMIZER_SWITCH_INDEX_MERGE) &&
-          !only_single_index_range_scan)
+          !only_single_index_range_scan &&
+	  interesting_order != ORDER::ORDER_DESC)
       {
         /*
           Get best non-covering ROR-intersection plan and prepare data for
@@ -2968,7 +2977,8 @@ int SQL_SELECT::test_quick_select(THD *thd, key_map keys_to_use,
       if (param.table->covering_keys.is_clear_all() &&
           optimizer_flag(thd, OPTIMIZER_SWITCH_INDEX_MERGE) &&
           optimizer_flag(thd, OPTIMIZER_SWITCH_INDEX_MERGE_SORT_INTERSECT) &&
-          !only_single_index_range_scan)
+          !only_single_index_range_scan &&
+	  interesting_order != ORDER::ORDER_DESC)
       {
         if ((intersect_trp= get_best_index_intersect(&param, tree,
                                                     best_read_time)))
@@ -3018,10 +3028,7 @@ force_plan:
     {
       records= best_trp->records;
       if (!(quick= best_trp->make_quick(&param, TRUE)) || quick->init())
-      {
-        delete quick;
-        quick= NULL;
-      }
+        set_quick(NULL);
     }
     possible_keys= param.possible_keys;
 
@@ -7014,6 +7021,9 @@ TRP_ROR_INTERSECT *get_best_ror_intersect(const PARAM *param, SEL_TREE *tree,
         trace_ror.add("cause", "too few roworder scans");
       DBUG_RETURN(NULL);
     }
+
+  if (param->order_direction == ORDER::ORDER_DESC)
+    DBUG_RETURN(NULL);
 
   /*
     Step1: Collect ROR-able SEL_ARGs and create ROR_SCAN_INFO for each of 
@@ -13269,6 +13279,10 @@ get_best_group_min_max(PARAM *param, SEL_TREE *tree, double read_time)
     trace_group.add("chosen", false).add("cause", cause);
     DBUG_RETURN(NULL);
   }
+
+  /* Cannot do reverse ordering */
+  if (param->order_direction == ORDER::ORDER_DESC)
+    DBUG_RETURN(NULL);
 
   /* Check (SA1,SA4) and store the only MIN/MAX argument - the C attribute.*/
   List_iterator<Item> select_items_it(join->fields_list);

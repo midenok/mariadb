@@ -2308,11 +2308,8 @@ enum_nested_loop_state JOIN_CACHE::join_matching_records(bool skip_last)
     put_record();     
  
   if (join_tab->use_quick == 2 && join_tab->select->quick)
-  { 
     /* A dynamic range access was used last. Clean up after it */
-    delete join_tab->select->quick;
-    join_tab->select->quick= 0;
-  }
+    join_tab->select->set_quick(NULL);
 
   if ((rc= join_tab_execution_startup(join_tab)) < 0)
     goto finish2;

@@ -1724,9 +1724,11 @@ bool JOIN::make_range_rowid_filters()
     filter_map.merge(tab->table->with_impossible_ranges);
     bool force_index_save= tab->table->force_index;
     tab->table->force_index= true;
+    ORDER::enum_order direction= order ? order->direction : ORDER::ORDER_NOT_RELEVANT;
     int rc= sel->test_quick_select(thd, filter_map, (table_map) 0,
                                    (ha_rows) HA_POS_ERROR,
-                                   true, false, true, true);
+                                   true, direction,
+                                   false, true, true);
     tab->table->force_index= force_index_save;
     if (thd->is_error())
       goto no_filter;
@@ -4777,19 +4779,22 @@ static ha_rows get_quick_record_count(THD *thd, SQL_SELECT *select,
 				      TABLE *table,
 				      const key_map *keys,ha_rows limit)
 {
-  int error;
   DBUG_ENTER("get_quick_record_count");
   uchar buff[STACK_BUFF_ALLOC];
   if (unlikely(check_stack_overrun(thd, STACK_MIN_SIZE, buff)))
     DBUG_RETURN(0);                           // Fatal error flag is set
   if (select)
   {
+    int error;
     select->head=table;
     table->reginfo.impossible_range=0;
     if (likely((error=
                 select->test_quick_select(thd, *(key_map *)keys,
                                           (table_map) 0,
-                                          limit, 0, FALSE,
+                                          limit,
+					  false,  //don't force quick range
+					  ORDER::ORDER_NOT_RELEVANT,
+					  FALSE,
                                           TRUE,     /* remove_where_parts*/
                                           FALSE)) ==
                1))
@@ -11707,7 +11712,9 @@ make_join_select(JOIN *join,SQL_SELECT *select,COND *cond)
 				       (join->select_options &
 					OPTION_FOUND_ROWS ?
 					HA_POS_ERROR :
-					join->unit->select_limit_cnt), 0,
+                                        join->unit->select_limit_cnt),
+                                       false,   // don't force quick range
+                                       ORDER::ORDER_NOT_RELEVANT,
                                        FALSE, FALSE, FALSE) < 0)
             {
 	      /*
@@ -11721,7 +11728,9 @@ make_join_select(JOIN *join,SQL_SELECT *select,COND *cond)
                                          (join->select_options &
                                           OPTION_FOUND_ROWS ?
                                           HA_POS_ERROR :
-                                          join->unit->select_limit_cnt),0,
+                                          join->unit->select_limit_cnt),
+                                         false,   //don't force quick range
+                                         ORDER::ORDER_NOT_RELEVANT,
                                          FALSE, FALSE, FALSE) < 0)
 		DBUG_RETURN(1);			// Impossible WHERE
             }
@@ -13150,10 +13159,7 @@ make_join_readinfo(JOIN *join, ulonglong options, uint no_jbuf_after)
     case JT_REF_OR_NULL:
     case JT_REF:
       if (tab->select)
-      {
-	delete tab->select->quick;
-	tab->select->quick=0;
-      }
+        tab->select->set_quick(NULL);
       delete tab->quick;
       tab->quick=0;
       if (table->covering_keys.is_set(tab->ref.key) && !table->no_keyread)
@@ -21419,15 +21425,15 @@ test_if_quick_select(JOIN_TAB *tab)
                         dbug_serve_apcs(tab->join->thd, 1);
                  );
 
-
-  delete tab->select->quick;
-  tab->select->quick=0;
+  tab->select->set_quick(NULL);
 
   if (tab->table->file->inited != handler::NONE)
     tab->table->file->ha_index_or_rnd_end();
 
   int res= tab->select->test_quick_select(tab->join->thd, tab->keys,
-                                          (table_map) 0, HA_POS_ERROR, 0,
+                                          (table_map) 0, HA_POS_ERROR,
+					  false,      // don't force quick range
+					  ORDER::ORDER_NOT_RELEVANT,
                                           FALSE, /*remove where parts*/FALSE,
                                           FALSE);
   if (tab->explain_plan && tab->explain_plan->range_checked_fer)
@@ -23393,7 +23399,9 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
                                          (tab->join->select_options &
                                           OPTION_FOUND_ROWS) ?
                                           HA_POS_ERROR :
-                                          tab->join->unit->select_limit_cnt,TRUE,
+                                          tab->join->unit->select_limit_cnt,
+					  true, // force quick range
+					  order->direction,
                                          TRUE, FALSE, FALSE) <= 0;
           if (res)
           {
@@ -23523,7 +23531,9 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
                                 join->select_options & OPTION_FOUND_ROWS ?
                                 HA_POS_ERROR :
                                 join->unit->select_limit_cnt,
-                                TRUE, FALSE, FALSE, FALSE);
+				true,     // force quick range
+				order->direction,
+                                FALSE, FALSE, FALSE);
 
       if (cond_saved)
         select->cond= saved_cond;
@@ -23545,7 +23555,6 @@ check_reverse_order:
 
   if (order_direction == -1)		// If ORDER BY ... DESC
   {
-    int quick_type;
     if (select && select->quick)
     {
       /*
@@ -23555,16 +23564,12 @@ check_reverse_order:
       if (select->quick->reverse_sorted())
         goto skipped_filesort;
 
-      quick_type= select->quick->get_type();
-      if (quick_type == QUICK_SELECT_I::QS_TYPE_INDEX_MERGE ||
-          quick_type == QUICK_SELECT_I::QS_TYPE_INDEX_INTERSECT ||
-          quick_type == QUICK_SELECT_I::QS_TYPE_ROR_INTERSECT ||
-          quick_type == QUICK_SELECT_I::QS_TYPE_ROR_UNION ||
-          quick_type == QUICK_SELECT_I::QS_TYPE_GROUP_MIN_MAX)
-      {
-        tab->limit= 0;
-        goto use_filesort;               // Use filesort
-      }
+      /*
+        test_quick_select() should not create a quick that cannot do
+        reverse ordering
+      */
+      DBUG_ASSERT((select->quick == save_quick) ||
+                  select->quick->reverse_sort_possible());
     }
   }
 
@@ -23724,7 +23729,7 @@ check_reverse_order:
   /*
     Cleanup:
     We may have both a 'select->quick' and 'save_quick' (original)
-    at this point. Delete the one that we wan't use.
+    at this point. Delete the one that we won't use.
   */
 
 skipped_filesort:
@@ -23744,10 +23749,8 @@ skipped_filesort:
 use_filesort:
   // Restore original save_quick
   if (select && select->quick != save_quick)
-  {
-    delete select->quick;
-    select->quick= save_quick;
-  }
+    select->set_quick(save_quick);
+
   if (orig_cond_saved)
     tab->set_cond(orig_cond);
 

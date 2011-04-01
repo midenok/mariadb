@@ -915,7 +915,15 @@ public:
   /* Range end should be called when we have looped over the whole index */
   virtual void range_end() {}
 
-  virtual bool reverse_sorted() = 0;
+  /** 
+    Whether the range access method returns records in reverse order.
+  */
+  virtual bool reverse_sorted() const = 0;
+  /** 
+    Whether the range access method is capable of returning records 
+    in reverse order.
+  */
+  virtual bool reverse_sort_possible() const = 0;
   virtual bool unique_key_range() { return false; }
 
   /*
@@ -1106,7 +1114,8 @@ public:
   void range_end();
   int get_next_prefix(uint prefix_length, uint group_key_parts, 
                       uchar *cur_prefix);
-  bool reverse_sorted() { return 0; }
+  bool reverse_sorted() const { return false; }
+  bool reverse_sort_possible() const { return true; }
   bool unique_key_range();
   int init_ror_merged_scan(bool reuse_handler, MEM_ROOT *alloc);
   void save_last_pos()
@@ -1253,7 +1262,8 @@ public:
   int  init();
   void need_sorted_output() { DBUG_ASSERT(0); /* Can't do it */ }
   int  reset(void);
-  bool reverse_sorted() { return false; }
+  bool reverse_sorted() const { return false; }
+  bool reverse_sort_possible() const { return false; }
   bool unique_key_range() { return false; }
   bool is_keys_used(const MY_BITMAP *fields);
 #ifndef DBUG_OFF
@@ -1359,7 +1369,8 @@ public:
   void need_sorted_output() { DBUG_ASSERT(0); /* Can't do it */ }
   int  reset(void);
   int  get_next();
-  bool reverse_sorted() { return false; }
+  bool reverse_sorted() const { return false; }
+  bool reverse_sort_possible() const { return false; }
   bool unique_key_range() { return false; }
   int get_type() { return QS_TYPE_ROR_INTERSECT; }
   void add_keys_and_lengths(String *key_names, String *used_lengths);
@@ -1439,7 +1450,8 @@ public:
   void need_sorted_output() { DBUG_ASSERT(0); /* Can't do it */ }
   int  reset(void);
   int  get_next();
-  bool reverse_sorted() { return false; }
+  bool reverse_sorted() const { return false; }
+  bool reverse_sort_possible() const { return false; }
   bool unique_key_range() { return false; }
   int get_type() { return QS_TYPE_ROR_UNION; }
   void add_keys_and_lengths(String *key_names, String *used_lengths);
@@ -1585,7 +1597,8 @@ public:
   void need_sorted_output() { /* always do it */ }
   int reset();
   int get_next();
-  bool reverse_sorted() { return false; }
+  bool reverse_sorted() const { return false; }
+  bool reverse_sort_possible() const { return false; }
   bool unique_key_range() { return false; }
   int get_type() { return QS_TYPE_GROUP_MIN_MAX; }
   void add_keys_and_lengths(String *key_names, String *used_lengths);
@@ -1606,7 +1619,8 @@ public:
   virtual QUICK_RANGE_SELECT *clone(bool *create_error)
     { DBUG_ASSERT(0); return new QUICK_SELECT_DESC(this, used_key_parts); }
   int get_next();
-  bool reverse_sorted() { return 1; }
+  bool reverse_sorted() const { return true; }
+  bool reverse_sort_possible() const { return true; }
   int get_type() { return QS_TYPE_RANGE_DESC; }
   QUICK_SELECT_I *make_reverse(uint used_key_parts_arg)
   {
@@ -1652,6 +1666,7 @@ class SQL_SELECT :public Sql_alloc {
     key_map tmp;
     tmp.set_all();
     return test_quick_select(thd, tmp, 0, limit, force_quick_range,
+                             ORDER::ORDER_NOT_RELEVANT,
                              FALSE, FALSE, FALSE) < 0;
   }
   /* 
@@ -1669,6 +1684,7 @@ class SQL_SELECT :public Sql_alloc {
   }
   int test_quick_select(THD *thd, key_map keys, table_map prev_tables,
 			ha_rows limit, bool force_quick_range, 
+                        const ORDER::enum_order interesting_order,
                         bool ordered_output, bool remove_false_parts_of_where,
                         bool only_single_index_range_scan);
 };
