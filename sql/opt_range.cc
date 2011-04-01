@@ -330,6 +330,12 @@ public:
   /* Number of ranges in the last checked tree->key */
   uint n_ranges;
   uint8 first_null_comp; /* first null component if any, 0 - otherwise */
+
+  /* 
+     The sort order the range access method must be able
+     to provide. Three-value logic: asc/desc/don't care
+  */
+  ORDER::enum_order order_direction;
 };
 
 
@@ -2652,6 +2658,8 @@ static int fill_used_fields_bitmap(PARAM *param)
       limit             Query limit
       force_quick_range Prefer to use range (instead of full table scan) even
                         if it is more expensive.
+      interesting_order The sort order the range access method must be able
+                        to provide. Three-value logic: asc/desc/don't care
       remove_false_parts_of_where  Remove parts of OR-clauses for which range
                                    analysis produced SEL_TREE(IMPOSSIBLE)
       only_single_index_range_scan Evaluate only single index range scans
@@ -2721,6 +2729,7 @@ SQL_SELECT::test_quick_select(THD *thd,
                               key_map keys_to_use,
                               table_map prev_tables,
                               ha_rows limit, bool force_quick_range,
+			      const ORDER::enum_order interesting_order,
                               bool ordered_output,
                               bool remove_false_parts_of_where,
                               bool only_single_index_range_scan,
@@ -2809,11 +2818,12 @@ SQL_SELECT::test_quick_select(THD *thd,
     param.remove_jump_scans= TRUE;
     param.max_key_parts= 0;
     param.remove_false_where_parts= remove_false_parts_of_where;
-    param.force_default_mrr= ordered_output;
     param.note_unusable_keys= thd->give_notes_for_unusable_keys() ?
                               note_unusable_keys :
                               Item_func::BITMAP_NONE;
     param.possible_keys.clear_all();
+    param.force_default_mrr= (interesting_order != ORDER::ORDER_NOT_RELEVANT);
+    param.order_direction= interesting_order;
 
     thd->no_errors=1;				// Don't warn about NULL
     init_sql_alloc(key_memory_quick_range_select_root, &alloc,
@@ -3016,7 +3026,8 @@ SQL_SELECT::test_quick_select(THD *thd,
       */
       if ((thd->lex->sql_command != SQLCOM_DELETE) && 
            optimizer_flag(thd, OPTIMIZER_SWITCH_INDEX_MERGE) &&
-          !only_single_index_range_scan)
+          !only_single_index_range_scan &&
+	  interesting_order != ORDER::ORDER_DESC)
       {
         /*
           Get best non-covering ROR-intersection plan and prepare data for
@@ -3045,7 +3056,8 @@ SQL_SELECT::test_quick_select(THD *thd,
       if (param.table->covering_keys.is_clear_all() &&
           optimizer_flag(thd, OPTIMIZER_SWITCH_INDEX_MERGE) &&
           optimizer_flag(thd, OPTIMIZER_SWITCH_INDEX_MERGE_SORT_INTERSECT) &&
-          !only_single_index_range_scan)
+          !only_single_index_range_scan &&
+	  interesting_order != ORDER::ORDER_DESC)
       {
         if ((intersect_trp= get_best_index_intersect(&param, tree,
                                                     best_read_time)))
@@ -7390,6 +7402,9 @@ TRP_ROR_INTERSECT *get_best_ror_intersect(const PARAM *param, SEL_TREE *tree,
         trace_ror.add("cause", "too few roworder scans");
       DBUG_RETURN(NULL);
     }
+
+  if (param->order_direction == ORDER::ORDER_DESC)
+    DBUG_RETURN(NULL);
 
   /*
     Step1: Collect ROR-able SEL_ARGs and create ROR_SCAN_INFO for each of 
@@ -14221,6 +14236,10 @@ get_best_group_min_max(PARAM *param, SEL_TREE *tree, double read_time)
     trace_group.add("chosen", false).add("cause", cause);
     DBUG_RETURN(NULL);
   }
+
+  /* Cannot do reverse ordering */
+  if (param->order_direction == ORDER::ORDER_DESC)
+    DBUG_RETURN(NULL);
 
   is_agg_distinct = is_indexed_agg_distinct(join, &agg_distinct_flds);
 

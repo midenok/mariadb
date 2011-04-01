@@ -2057,13 +2057,14 @@ bool JOIN::make_range_rowid_filters()
     filter_map.set_bit(tab->range_rowid_filter_info->get_key_no());
     filter_map.merge(tab->table->with_impossible_ranges);
     quick_select_return rc;
+    ORDER::enum_order direction= order ? order->direction : ORDER::ORDER_NOT_RELEVANT;
     /*
       EQ_FUNC and EQUAL_FUNC already sent unusable key notes (if any)
       during update_ref_and_keys(). Have only other functions raise notes
       from can_optimize_scalar_range().
     */
     rc= sel->test_quick_select(thd, filter_map, (table_map) 0,
-                               (ha_rows) HA_POS_ERROR, true, false, true,
+                               (ha_rows) HA_POS_ERROR, true, direction, false, true,
                                true, Item_func::BITMAP_EXCEPT_ANY_EQUALITY);
     if (rc == SQL_SELECT::ERROR || thd->is_error())
     {
@@ -5388,7 +5389,9 @@ static bool get_quick_record_count(THD *thd, SQL_SELECT *select,
       from can_optimize_scalar_range().
     */
     error= select->test_quick_select(thd, *(key_map *)keys, (table_map) 0,
-                                     limit, 0, FALSE,
+                                     limit, 0,
+				     ORDER::ORDER_NOT_RELEVANT,
+				     FALSE,
                                      TRUE,     /* remove_where_parts*/
                                      FALSE,
                                      Item_func::BITMAP_EXCEPT_ANY_EQUALITY);
@@ -14140,6 +14143,7 @@ make_join_select(JOIN *join,SQL_SELECT *select,COND *cond)
                                               HA_POS_ERROR :
                                               join->unit->lim.get_select_limit()),
                                               0,
+					     ORDER::ORDER_NOT_RELEVANT,
                                              FALSE, FALSE, FALSE,
                                              Item_func::BITMAP_ALL)) ==
                 SQL_SELECT::IMPOSSIBLE_RANGE)
@@ -14156,7 +14160,9 @@ make_join_select(JOIN *join,SQL_SELECT *select,COND *cond)
                                                 OPTION_FOUND_ROWS ?
                                                 HA_POS_ERROR :
                                                 join->unit->lim.get_select_limit()),
-                                                0, FALSE, FALSE, FALSE,
+                                                0,
+					       ORDER::ORDER_NOT_RELEVANT,
+					       FALSE, FALSE, FALSE,
                                                 Item_func::BITMAP_NONE)) ==
                   SQL_SELECT::IMPOSSIBLE_RANGE)
 		DBUG_RETURN(1);			// Impossible WHERE
@@ -24587,6 +24593,7 @@ test_if_quick_select(JOIN_TAB *tab)
   quick_select_return res;
   res= tab->select->test_quick_select(tab->join->thd, tab->keys,
                                       (table_map) 0, HA_POS_ERROR, 0,
+				      ORDER::ORDER_NOT_RELEVANT,
                                       FALSE, /*remove where parts*/FALSE,
                                       FALSE,
                                       /* no unusable key notes */
@@ -26667,7 +26674,9 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
                                           HA_POS_ERROR :
                                           tab->join->unit->
                                             lim.get_select_limit(),
-                                          TRUE, TRUE, FALSE, FALSE,
+                                          TRUE,
+					  order->direction,
+					 TRUE, FALSE, FALSE,
                                           Item_func::BITMAP_ALL);
           // if we cannot use quick select
           if (res != SQL_SELECT::OK || !tab->select->quick)
@@ -26772,7 +26781,9 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
                                       join->select_options & OPTION_FOUND_ROWS ?
                                       HA_POS_ERROR :
                                       join->unit->lim.get_select_limit(),
-                                      TRUE, FALSE, FALSE, FALSE,
+                                      TRUE,
+				      order->direction,
+				      FALSE, FALSE, FALSE,
                                       Item_func::BITMAP_ALL);
       if (res == SQL_SELECT::ERROR)
       {
@@ -26800,7 +26811,6 @@ check_reverse_order:
 
   if (order_direction == -1)		// If ORDER BY ... DESC
   {
-    int quick_type;
     if (select && select->quick)
     {
       /*
@@ -26810,16 +26820,12 @@ check_reverse_order:
       if (select->quick->reverse_sorted())
         goto skipped_filesort;
 
-      quick_type= select->quick->get_type();
-      if (quick_type == QUICK_SELECT_I::QS_TYPE_INDEX_MERGE ||
-          quick_type == QUICK_SELECT_I::QS_TYPE_INDEX_INTERSECT ||
-          quick_type == QUICK_SELECT_I::QS_TYPE_ROR_INTERSECT ||
-          quick_type == QUICK_SELECT_I::QS_TYPE_ROR_UNION ||
-          quick_type == QUICK_SELECT_I::QS_TYPE_GROUP_MIN_MAX)
-      {
-        tab->limit= 0;
-        goto use_filesort;               // Use filesort
-      }
+      /*
+        test_quick_select() should not create a quick that cannot do
+        reverse ordering
+      */
+      DBUG_ASSERT((select->quick == save_quick) ||
+                  select->quick->reverse_sort_possible());
     }
   }
 
@@ -26986,7 +26992,7 @@ check_reverse_order:
   /*
     Cleanup:
     We may have both a 'select->quick' and 'save_quick' (original)
-    at this point. Delete the one that we wan't use.
+    at this point. Delete the one that we won't use.
   */
 
 skipped_filesort:
