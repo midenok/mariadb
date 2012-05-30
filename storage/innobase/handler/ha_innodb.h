@@ -260,6 +260,7 @@ public:
 	bool primary_key_is_clustered() override;
 
 	int cmp_ref(const uchar* ref1, const uchar* ref2) override;
+	longlong get_memory_buffer_size() const;
 
 	/** On-line ALTER TABLE interface @see handler0alter.cc @{ */
 

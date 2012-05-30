@@ -14011,6 +14011,16 @@ innodb_set_buf_pool_size(ulonglong buf_pool_size)
 	innobase_buffer_pool_size = buf_pool_size;
 }
 
+/******************************************************************//**
+Return the size of the InnoDB memory buffer. */
+UNIV_INTERN
+longlong
+ha_innobase::get_memory_buffer_size() const
+/*=======================================*/
+{
+	return innobase_buffer_pool_size;
+}
+
 /*********************************************************************//**
 Calculates the key number used inside MySQL for an Innobase index.
 @return the key number used inside MySQL */

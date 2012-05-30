@@ -3450,6 +3450,13 @@ public:
   */
   virtual double keyread_time(uint index, uint ranges, ha_rows rows);
 
+  /**
+    Return an estimate on the amount of memory the storage engine will
+    use for caching data in memory. If this is unknown or the storage
+    engine does not cache data in memory -1 is returned.
+  */
+  virtual longlong get_memory_buffer_size() const { return -1; }
+
   virtual const key_map *keys_to_use_for_scanning() { return &key_map_empty; }
 
   /*
