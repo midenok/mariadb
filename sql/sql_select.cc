@@ -23247,6 +23247,7 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
   int best_key= -1;
   bool changed_key= false;
   THD* thd = tab->join->thd;
+  bool can_skip_sorting= false;                  // used as return value
   DBUG_ENTER("test_if_skip_sort_order");
 
   /* Check that we are always called with first non-const table */
@@ -23289,7 +23290,7 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
                                         &col_keys);
     usable_keys.intersect(col_keys);
     if (usable_keys.is_clear_all())
-      goto use_filesort;                        // No usable keys
+      DBUG_RETURN(0);                        // No usable keys
   }
 
   ref_key= -1;
@@ -23304,7 +23305,7 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
     */
     if (tab->type == JT_REF_OR_NULL || tab->type == JT_FT ||
         tab->ref.uses_splitting)
-      goto use_filesort;
+      DBUG_RETURN(0);
   }
   else if (select && select->quick)		// Range found by opt_range
   {
@@ -23406,7 +23407,8 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
           if (res)
           {
             select->cond= save_cond;
-            goto use_filesort;
+            can_skip_sorting= false;
+            goto fix_ICP;
           }
           DBUG_ASSERT(tab->select->quick);
           tab->type= JT_ALL;
@@ -23437,7 +23439,10 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
           if (create_ref_for_key(tab->join, tab, keyuse, FALSE,
                                  (tab->join->const_table_map |
                                   OUTER_REF_TABLE_BIT)))
-            goto use_filesort;
+          {
+            can_skip_sorting= false;
+            goto fix_ICP;
+          }
 
           pick_table_access_method(tab);
 	}
@@ -23492,6 +23497,13 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
                                &saved_best_key_parts);
     }
 
+    if (best_key < 0)
+    {
+      // No usable key has been found
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
+
     /*
       filesort() and join cache are usually faster than reading in 
       index order and not using join cache, except in case that chosen
@@ -23502,7 +23514,10 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
          (tab->type == JT_ALL &&
          tab->join->table_count > tab->join->const_tables + 1) &&
          !(table->file->index_flags(best_key, 0, 1) & HA_CLUSTERED_INDEX)))
-      goto use_filesort;
+    {
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
 
     if (select && // psergey:  why doesn't this use a quick?
         table->quick_keys.is_set(best_key) && best_key != ref_key)
@@ -23562,16 +23577,38 @@ check_reverse_order:
         (In some cases test_if_order_by_key() can be called multiple times
       */
       if (select->quick->reverse_sorted())
-        goto skipped_filesort;
+      {
+        can_skip_sorting= true;
+        goto fix_ICP;
+      }
+
+      if (select->quick->reverse_sort_possible())
+        can_skip_sorting= true;
+      else
+      {
+        can_skip_sorting= false;
+        goto fix_ICP;
+      }
 
       /*
         test_quick_select() should not create a quick that cannot do
         reverse ordering
       */
-      DBUG_ASSERT((select->quick == save_quick) ||
-                  select->quick->reverse_sort_possible());
+      DBUG_ASSERT((select->quick == save_quick) || can_skip_sorting);
+    }
+    else
+    {
+      // Other index access (ref or scan) poses no problem
+      can_skip_sorting= true;
     }
   }
+  else
+  {
+    // ORDER BY ASC poses no problem
+    can_skip_sorting= true;
+  }
+
+  DBUG_ASSERT(can_skip_sorting);
 
   /*
     Update query plan with access pattern for doing ordered access
@@ -23683,8 +23720,9 @@ check_reverse_order:
         if (!tmp)
         {
           tab->limit= 0;
-          goto use_filesort;           // Reverse sort failed -> filesort
-        }
+	  can_skip_sorting= false;      // Reverse sort failed -> filesort
+          goto fix_ICP;
+       }
         /*
           Cancel Pushed Index Condition, as it doesn't work for reverse scans.
         */
@@ -23726,13 +23764,18 @@ check_reverse_order:
 
   } // QEP has been modified
 
+fix_ICP:
+  // Merge of Bug#15848665, the below if is for easier MariaDB downmerging:
+  if (!can_skip_sorting)
+    goto use_filesort0;
+
   /*
     Cleanup:
     We may have both a 'select->quick' and 'save_quick' (original)
     at this point. Delete the one that we won't use.
   */
 
-skipped_filesort:
+// skipped_filesort: removed by Bug#15848665 merge
   // Keep current (ordered) select->quick 
   if (select && save_quick != select->quick)
   {
@@ -23746,7 +23789,7 @@ skipped_filesort:
 
   DBUG_RETURN(1);
 
-use_filesort:
+use_filesort0:
   // Restore original save_quick
   if (select && select->quick != save_quick)
     select->set_quick(save_quick);
@@ -25760,7 +25803,10 @@ static bool add_ref_to_table_cond(THD *thd, JOIN_TAB *join_tab)
     if (join_tab->select->pre_idx_push_select_cond)
       cond_copy= cond->copy_andor_structure(thd);
     if (join_tab->select->cond)
+    {
       error=(int) cond->add(join_tab->select->cond, thd->mem_root);
+      cond->update_used_tables();
+    }
     join_tab->select->cond= cond;
     if (join_tab->select->pre_idx_push_select_cond)
     {
