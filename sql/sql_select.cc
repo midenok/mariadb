@@ -14091,7 +14091,7 @@ make_join_select(JOIN *join,SQL_SELECT *select,COND *cond)
 	      tab->table->reginfo.impossible_range)
 	    DBUG_RETURN(1);				// Impossible range
 	  /*
-	    We plan to scan all rows either with table or index scan
+	    We plan to scan (table/index/range scan).
 	    Check again if we should use an index.
 
             There are two cases:
@@ -14109,14 +14109,25 @@ make_join_select(JOIN *join,SQL_SELECT *select,COND *cond)
                   produce the desired ordering and de-duplication.
 	  */
 
+          enum { DONT_RECHECK, NOT_FIRST_TABLE, LOW_LIMIT }
+          recheck_reason= DONT_RECHECK;
+
 	  if (!tab->table->is_filled_at_execution() &&
               !tab->loosescan_match_tab &&              // (1)
               ((cond && (!tab->keys.is_subset(tab->const_keys) &&
-                         i > join->const_tables)) ||
-               (!tab->const_keys.is_clear_all() && i == join->const_tables &&
+                         i > join->const_tables))))
+          {
+            recheck_reason= NOT_FIRST_TABLE;
+          }
+          else if (!tab->const_keys.is_clear_all() && i == join->const_tables &&
                 join->unit->lim.get_select_limit() <
                 join->best_positions[i].records_read &&
-                !(join->select_options & OPTION_FOUND_ROWS))))
+                !(join->select_options & OPTION_FOUND_ROWS))
+          {
+            recheck_reason= LOW_LIMIT;
+          }
+
+          if (recheck_reason != DONT_RECHECK)
 	  {
 	    /* Join with outer join condition */
 	    COND *orig_cond=sel->cond;
@@ -14135,7 +14146,73 @@ make_join_select(JOIN *join,SQL_SELECT *select,COND *cond)
 	      sel->cond->quick_fix_field();
             quick_select_return res;
 
-	    if ((res= sel->test_quick_select(thd, tab->keys,
+            key_map usable_keys= tab->keys;
+            ORDER::enum_order interesting_order= ORDER::ORDER_NOT_RELEVANT;
+
+            if (recheck_reason == LOW_LIMIT)
+            {
+              /*
+                If rechecking index usage due to a LIMIT lower than
+                the number of rows estimated to be read for this
+                table, it only makes sense to check the indexes that
+                provide the necessary order.
+              */
+              for (ORDER *tmp_order= join->order;
+                   tmp_order ;
+                   tmp_order=tmp_order->next)
+              {
+                Item *item= (*tmp_order->item)->real_item();
+                if (item->type() != Item::FIELD_ITEM)
+                {
+                  recheck_reason= DONT_RECHECK;
+                  break;
+                }
+
+                if ((interesting_order != ORDER::ORDER_NOT_RELEVANT) &&
+                    (interesting_order != tmp_order->direction))
+                {
+                  /*
+                    MySQL currently does not support multi-column
+                    indexes with a mix of ASC and DESC ordering, so if
+                    ORDER BY contains both, no index can provide
+                    correct order.
+                  */
+                  recheck_reason= DONT_RECHECK;
+                  break;
+                }
+
+                usable_keys.intersect(((Item_field*)item)->field->part_of_sortkey);
+                interesting_order= tmp_order->direction;
+
+                if (usable_keys.is_clear_all())
+                {
+                  // No usable keys
+                  recheck_reason= DONT_RECHECK;
+                  break;
+                }
+              }
+              /*
+                If the current plan is to use a range access on an
+                index that provides the order dictated by the ORDER BY
+                clause there is no need to recheck index usage; we
+                already know from the former call to
+                test_quick_select() that a range scan on the chosen
+                index is cheapest. Note that previous calls to
+                test_quick_select() did not take order direction
+                (ASC/DESC) into account, so in case of DESC ordering
+                we still need to recheck.
+              */
+              if (sel->quick && (sel->quick->index != MAX_KEY) &&
+                  usable_keys.is_set(sel->quick->index) &&
+                  (interesting_order != ORDER::ORDER_DESC ||
+                   sel->quick->reverse_sorted()))
+              {
+                recheck_reason= DONT_RECHECK;
+              }
+            }
+
+	    if ((recheck_reason != DONT_RECHECK) &&
+		(res= sel->test_quick_select(thd, tab->keys,
                                              ((used_tables & ~ current_map) |
                                               OUTER_REF_TABLE_BIT),
                                              (join->select_options &
