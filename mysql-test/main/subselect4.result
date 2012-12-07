@@ -2395,7 +2395,7 @@ INSERT INTO t1 (x) VALUES (0),(0),(0);
 EXPLAIN
 SELECT x FROM t1 WHERE id > (SELECT MAX(id) - 1000 FROM t1) ORDER BY x LIMIT 1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	PRIMARY	t1	range	PRIMARY	PRIMARY	4	NULL	3	Using where; Using filesort
+1	PRIMARY	t1	ALL	PRIMARY	NULL	NULL	NULL	3	Using where; Using filesort
 2	SUBQUERY	NULL	NULL	NULL	NULL	NULL	NULL	NULL	Select tables optimized away
 SELECT x FROM t1 WHERE id > (SELECT MAX(id) - 1000 FROM t1) ORDER BY x LIMIT 1;
 x

@@ -4384,6 +4384,16 @@ INSERT INTO `CC` VALUES
 ,'e'),(8,9,'t','t'),(5,2,'q','q'),(4,6,'b','b'),(5,5,'w','w'),(3,2,'m','m'),(0,4,'x','x'),
 (8,9,'',''),(0,6,'w','w'),(4,5,'x','x'),(0,0,'e','e'),(0,0,'e','e'),(2,8,'p','p'),(0,0,'x'
 ,'x');
+--echo #
+--echo # range -> ALL change relates to:
+--echo #
+--echo #      /*
+--echo #        If rechecking index usage due to a LIMIT lower than
+--echo #        the number of rows estimated to be read for this
+--echo #        table, it only makes sense to check the indexes that
+--echo #        provide the necessary order.
+--echo #      */
+
 EXPLAIN SELECT `varchar_nokey` G1  FROM CC  WHERE `int_nokey` AND `int_key`  <= 4
   HAVING G1  ORDER  BY `varchar_key` LIMIT  6   ;
 
