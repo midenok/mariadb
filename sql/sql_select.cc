@@ -22831,7 +22831,7 @@ part_of_refkey(TABLE *table,Field *field)
 
 
 /**
-  Test if one can use the key to resolve ORDER BY.
+  Test if one can use the key to resolve ordering. 
 
   @param join                  if not NULL, can use the join's top-level
                                multiple-equalities.
@@ -23427,6 +23427,12 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
       ref_key_parts= select->quick->used_key_parts;
     }
   }
+  else if (tab->type == JT_NEXT && !table->quick_keys.is_set(tab->index))
+  {
+    // The optimizer has decided to use an index scan.
+    ref_key=       tab->index;
+    ref_key_parts= table->key_info[tab->index].ext_key_parts;
+  }
 
   if (ref_key >= 0 && ref_key != MAX_KEY)
   {
@@ -23582,8 +23588,16 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
     }
 
     if (!skip_reconsidering_for_order_by) {
+      /*
+        If an index scan that cannot provide ordering has been selected
+        then do not use the index scan key as starting hint to
+        test_if_cheaper_ordering()
+      */
+      const int ref_key_hint= (order_direction == 0 &&
+                              tab->type == JT_NEXT) ? -1 : ref_key;
+
       test_if_cheaper_ordering(tab, order, table, usable_keys,
-                               ref_key, select_limit,
+                               ref_key_hint, select_limit,
                                &best_key, &best_key_direction,
                                &select_limit, &best_key_parts,
                                &saved_best_key_parts);
@@ -23761,8 +23775,6 @@ check_reverse_order:
         {
           tab->ref.key= -1;
           tab->ref.key_parts= 0;
-          if (select_limit < table->stat_records())
-            tab->limit= select_limit;
           table->file->ha_end_keyread();
         }
       }
@@ -23847,6 +23859,19 @@ check_reverse_order:
            tab->table->file->cancel_pushed_idx_cond();
         }
       }
+      else if (tab->type == JT_NEXT)
+      {
+        tab->read_first_record= join_read_last;
+        tab->read_record.read_record_func= join_read_prev;
+        /*
+          Cancel Pushed Index Condition, as it doesn't work for reverse scans.
+        */
+        if (tab->select && tab->select->pre_idx_push_select_cond)
+	{
+          tab->set_cond(tab->select->pre_idx_push_select_cond);
+           tab->table->file->cancel_pushed_idx_cond();
+        }
+      }
     }
     else if (select && select->quick)
       select->quick->need_sorted_output();
@@ -23858,8 +23883,11 @@ check_reverse_order:
 
 fix_ICP:
   // Merge of Bug#15848665, the below if is for easier MariaDB downmerging:
-  if (!can_skip_sorting)
+  if (!can_skip_sorting || no_changes)
     goto use_filesort0;
+
+  if (tab->type == JT_NEXT && select_limit < table->stat_records())
+    tab->limit= select_limit;
 
   /*
     Cleanup:
@@ -23879,7 +23907,7 @@ fix_ICP:
   if (!no_changes && changed_key && table->file->pushed_idx_cond)
     table->file->cancel_pushed_idx_cond();
 
-  DBUG_RETURN(1);
+  DBUG_RETURN(can_skip_sorting);
 
 use_filesort0:
   // Restore original save_quick
@@ -23889,7 +23917,7 @@ use_filesort0:
   if (orig_cond_saved)
     tab->set_cond(orig_cond);
 
-  DBUG_RETURN(0);
+  DBUG_RETURN(can_skip_sorting);
 }
 
 

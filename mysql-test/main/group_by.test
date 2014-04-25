@@ -1,3 +1,5 @@
+--source include/have_innodb.inc
+
 # Initialise
 --disable_warnings
 drop table if exists t1,t2,t3;
@@ -2068,3 +2070,27 @@ drop table t20, t21, t22;
 --echo #
 --echo # End of 10.3 tests
 --echo #
+
+--echo # 
+--echo # Bug#18035906: TEST_IF_SKIP_SORT_ORDER INCORRECTLY CHOSES NON-COVERING
+--echo #               INDEX FOR ORDERING
+--echo # 
+
+CREATE TABLE t1 (
+  i INT PRIMARY KEY AUTO_INCREMENT,
+  kp1 INT,
+  kp2 INT,
+  INDEX idx_noncov(kp1),
+  INDEX idx_cov(kp1,kp2)
+) ENGINE=InnoDB;
+
+INSERT INTO t1 VALUES (NULL, 1, 1);
+
+INSERT INTO t1 SELECT NULL, kp1, kp2+1 from t1;
+INSERT INTO t1 SELECT NULL, kp1, kp2+2 from t1;
+INSERT INTO t1 SELECT NULL, kp1, kp2+4 from t1;
+INSERT INTO t1 SELECT NULL, kp1, kp2 from t1;
+
+EXPLAIN SELECT kp1, SUM(kp2) FROM t1 GROUP BY kp1;
+
+DROP TABLE t1;

@@ -2583,7 +2583,7 @@ SELECT * FROM t1
 WHERE (a BETWEEN 9 AND 10 OR a IS NULL) AND (b BETWEEN 9 AND 10 OR b = 9)
 ORDER BY pk LIMIT 1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t1	index	a,b	PRIMARY	4	NULL	3008	3008.00	1.36	0.00	Using where
+1	SIMPLE	t1	index	a,b	PRIMARY	4	NULL	75	3008.00	54.55	0.00	Using where
 DROP TABLE t1;
 SET global innodb_stats_persistent= @stats.save;
 #

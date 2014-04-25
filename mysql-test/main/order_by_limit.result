@@ -118,7 +118,7 @@ pk	i1	i2	pk	i1
 EXPLAIN SELECT * FROM t1 STRAIGHT_JOIN t2 ON t1.i1=t2.i1
 WHERE t1.pk > 7000 ORDER BY t1.i1 LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	PRIMARY,k1,k2	k2	8	NULL	16	Using where; Using index
+1	SIMPLE	t1	index	PRIMARY,k1,k2	k2	8	NULL	5	Using where; Using index
 1	SIMPLE	t2	ref	k1	k1	4	test.t1.i1	1	Using index
 SELECT * FROM t1 STRAIGHT_JOIN t2 ON t1.i1=t2.i1
 WHERE t1.pk > 7000 ORDER BY t1.i1 LIMIT 5;
@@ -161,7 +161,7 @@ i1	i2
 EXPLAIN SELECT * FROM t1 STRAIGHT_JOIN t2 ON t1.i1=t2.i1
 WHERE t1.pk > 7000 and t2.pk = 100 ORDER BY t1.i1 LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	PRIMARY,k1,k2	k2	8	NULL	16	Using where; Using index
+1	SIMPLE	t1	index	PRIMARY,k1,k2	k2	8	NULL	5	Using where; Using index
 1	SIMPLE	t2	const	PRIMARY,k1	PRIMARY	4	const	1	Using where
 SELECT * FROM t1 STRAIGHT_JOIN t2 ON t1.i1=t2.i1
 WHERE t1.pk > 7000 and t2.pk = 100 ORDER BY t1.i1 LIMIT 5;
@@ -180,7 +180,7 @@ test.t2	analyze	status	OK
 EXPLAIN SELECT * FROM t1 STRAIGHT_JOIN t2 ON t1.i1=t2.i1
 WHERE t1.pk > 7000 ORDER BY t1.i1 LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	PRIMARY,k1,k2	k2	8	NULL	6	Using where; Using index
+1	SIMPLE	t1	index	PRIMARY,k1,k2	k2	8	NULL	5	Using where; Using index
 1	SIMPLE	t2	ref	k1	k1	4	test.t1.i1	2	Using index
 SELECT * FROM t1 STRAIGHT_JOIN t2 ON t1.i1=t2.i1
 WHERE t1.pk > 7000 ORDER BY t1.i1 LIMIT 5;
@@ -195,7 +195,7 @@ pk	i1	i2	pk	i1
 EXPLAIN SELECT * FROM t1 FORCE INDEX FOR ORDER BY (k2) STRAIGHT_JOIN t2 ON
 t1.i1=t2.i1 WHERE t1.pk > 7000 ORDER BY t1.i1 LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	PRIMARY,k1,k2	k2	8	NULL	6	Using where; Using index
+1	SIMPLE	t1	index	PRIMARY,k1,k2	k2	8	NULL	5	Using where; Using index
 1	SIMPLE	t2	ref	k1	k1	4	test.t1.i1	2	Using index
 SELECT * FROM t1 FORCE INDEX FOR ORDER BY (k2) STRAIGHT_JOIN t2 ON
 t1.i1=t2.i1 WHERE t1.pk > 7000 ORDER BY t1.i1 LIMIT 5;
