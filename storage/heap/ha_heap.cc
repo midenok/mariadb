@@ -202,6 +202,9 @@ void ha_heap::update_key_stats()
   for (uint i= 0; i < table->s->keys; i++)
   {
     KEY *key=table->key_info+i;
+
+    key->set_in_memory_estimate(1.0);           // Index is in memory
+
     if (!key->rec_per_key)
       continue;
     if (key->algorithm != HA_KEY_ALG_BTREE)
@@ -376,6 +379,7 @@ int ha_heap::info(uint flag)
   stats.create_time=          (ulong) hp_info.create_time;
   if (flag & HA_STATUS_AUTO)
     stats.auto_increment_value= hp_info.auto_increment;
+  stats.table_in_mem_estimate= 1.0;             // Table entirely in memory
   /*
     If info() is called for the first time after open(), we will still
     have to update the key statistics. Hoping that a table lock is now

@@ -2398,7 +2398,7 @@ int pull_out_semijoin_tables(JOIN *join)
     optimization pass.
   
   NOTES 
-    Because of Join::reoptimize(), this function may be called multiple times.
+    Because of Joiqn::reoptimize(), this function may be called multiple times.
 
   RETURN
     FALSE  Ok 

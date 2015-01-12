@@ -814,6 +814,7 @@ static bool create_key_infos(const uchar *strpos, const uchar *frm_image_end,
 
     keyinfo->key_part=	 key_part;
     keyinfo->rec_per_key= rec_per_key;
+    keyinfo->set_in_memory_estimate(IN_MEMORY_ESTIMATE_UNKNOWN);
     for (j=keyinfo->user_defined_key_parts ; j-- ; key_part++)
     {
       if (strpos + (new_frm_ver >= 1 ? 9 : 7) >= frm_image_end)

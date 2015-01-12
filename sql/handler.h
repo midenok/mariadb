@@ -2948,14 +2948,23 @@ public:
   /*
     number of buffer bytes that native mrr implementation needs,
   */
-  uint mrr_length_per_rec; 
+  uint mrr_length_per_rec;
+
+  /**
+    Estimate for how much of the table that is availabe in a memory
+    buffer. Valid range is [0..1]. If it has the special value
+    IN_MEMORY_ESTIMATE_UNKNOWN (defined in structs.h), it means that
+    the storage engine has not supplied any value for it.
+  */
+  double table_in_mem_estimate;
 
   ha_statistics():
     data_file_length(0), max_data_file_length(0),
     index_file_length(0), max_index_file_length(0), delete_length(0),
     auto_increment_value(0), records(0), deleted(0), mean_rec_length(0),
     create_time(0), check_time(0), update_time(0), block_size(8192),
-    checksum(0), checksum_null(FALSE), mrr_length_per_rec(0)
+    checksum(0), checksum_null(FALSE), mrr_length_per_rec(0),
+    table_in_mem_estimate(IN_MEMORY_ESTIMATE_UNKNOWN)
   {}
 };
 
@@ -3456,6 +3465,37 @@ public:
     engine does not cache data in memory -1 is returned.
   */
   virtual longlong get_memory_buffer_size() const { return -1; }
+  double table_in_memory_estimate() const;
+
+  /**
+    Return an estimate of how much of the index that is currently stored
+    in main memory.
+
+    This estimate should be the fraction of the index that currently
+    is available in a main memory buffer. The estimate should be in the
+    range from 0.0 (nothing in memory) to 1.0 (entire index in memory).
+
+    @param keyno the index to get an estimate for
+
+    @return The fraction of the index in main memory buffer
+  */
+
+  double index_in_memory_estimate(uint keyno);
+
+private:
+  /**
+    Make a guestimate for how much of a table or index is in a memory
+    buffer in the case where the storage engine has not provided any
+    estimate for this.
+
+    @param table_index_size size of the table or index
+
+    @return The fraction of the table or index in main memory buffer
+  */
+
+  double estimate_in_memory_buffer(ulonglong table_index_size) const;
+
+public:
 
   virtual const key_map *keys_to_use_for_scanning() { return &key_map_empty; }
 
