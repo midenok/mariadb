@@ -1,6 +1,6 @@
 --- innodb-index.result
-+++ innodb-index.reject
-@@ -1851,6 +1851,7 @@
++++ innodb-index,debug.reject
+@@ -1915,6 +1915,7 @@
  #
  # MDEV-15325 Incomplete validation of missing tablespace during recovery
  #
