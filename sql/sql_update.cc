@@ -1919,7 +1919,7 @@ static bool safe_update_on_fly(THD *thd, JOIN_TAB *join_tab,
       return !is_key_used(table, table->s->primary_key, table->write_set);
     return TRUE;
   default:
-    break;					// Avoid compiler warning
+    break;          // Avoid compiler warning
   }
   return FALSE;
 

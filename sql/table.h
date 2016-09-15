@@ -1054,7 +1054,7 @@ public:
   ulonglong tc_time;
   Field **field;			/* Pointer to fields */
 
-  uchar *record[3];			/* Pointer to records */
+  uchar *record[3];      /* Pointer to records */
   uchar *write_row_record;		/* Used as optimisation in
 					   THD::write_row */
   uchar *insert_values;                  /* used by INSERT ... UPDATE */
@@ -1086,7 +1086,7 @@ public:
   Field *found_next_number_field;	/* Set on open */
   Field **vfield;                       /* Pointer to virtual fields*/
   Field **non_generated_field;          /* Like **field but without generated
-					                                 fields */
+                                           fields */
   /* Fields that are updated automatically on INSERT or UPDATE. */
   Field **default_field;
 
