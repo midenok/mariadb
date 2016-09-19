@@ -6057,6 +6057,7 @@ create_table_option:
             if (!info)
               MYSQL_YYABORT;
             info->declared_system_versioning = true;
+            Lex->create_info.options|= HA_VERSIONED_TABLE;
           }
         ;
 

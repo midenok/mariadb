@@ -11638,6 +11638,10 @@ index_bad:
 	DBUG_EXECUTE_IF("innodb_test_wrong_fts_aux_table_name",
 			*flags2 &= ~DICT_TF2_FTS_AUX_HEX_NAME;);
 
+	if (create_info->options & HA_VERSIONED_TABLE) {
+		*flags2 |= DICT_TF2_VERSIONED;
+	}
+
 	DBUG_RETURN(true);
 }
 

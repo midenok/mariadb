@@ -300,6 +300,9 @@ use its own tablespace instead of the system tablespace. */
 /** This bit is set if all aux table names (both common tables and
 index tables) of a FTS table are in HEX format. */
 #define DICT_TF2_FTS_AUX_HEX_NAME	64
+
+
+#define DICT_TF2_VERSIONED	128
 /* @} */
 
 #define DICT_TF2_FLAG_SET(table, flag)				\
