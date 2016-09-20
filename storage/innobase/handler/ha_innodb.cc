@@ -19964,7 +19964,8 @@ i_s_innodb_sys_datafiles,
 i_s_innodb_mutexes,
 i_s_innodb_sys_semaphore_waits,
 i_s_innodb_tablespaces_encryption,
-i_s_innodb_tablespaces_scrubbing
+i_s_innodb_tablespaces_scrubbing,
+i_s_innodb_vtq
 maria_declare_plugin_end;
 
 /** @brief Initialize the default value of innodb_commit_concurrency.

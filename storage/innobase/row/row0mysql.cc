@@ -1400,6 +1400,10 @@ error_exit:
 		return(err);
 	}
 
+	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
+		trx->versioned = true;
+	}
+
 	if (dict_table_has_fts_index(table)) {
 		doc_id_t        doc_id;
 
@@ -1839,6 +1843,10 @@ run_again:
 		return(err);
 	}
 
+	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
+		trx->versioned = true;
+	}
+
 	que_thr_stop_for_mysql_no_error(thr, trx);
 
 	if (dict_table_has_fts_index(table)
@@ -2091,6 +2099,10 @@ run_again:
 	if (err != DB_SUCCESS) {
 
 		return(err);
+	}
+
+	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
+		trx->versioned = true;
 	}
 
 	if (node->is_delete) {
