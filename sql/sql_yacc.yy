@@ -1662,6 +1662,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  TRIGGER_SYM                   /* SQL-2003-R */
 %token  TRIM                          /* SQL-2003-N */
 %token  TRUE_SYM                      /* SQL-2003-R */
+%token  TRX_ID_SYM                    /* 32N2439 */
 %token  TRUNCATE_SYM
 %token  TYPES_SYM
 %token  TYPE_SYM                      /* SQL-2003-N */
@@ -8899,6 +8900,28 @@ opt_for_system_time_clause:
             if (item1 == NULL || item2 == NULL)
               MYSQL_YYABORT;
             $$.init(FOR_SYSTEM_TIME_BETWEEN, item1, item2);
+          }
+        | FOR_SYSTEM_TIME_SYM
+          AS OF_SYM
+          TRX_ID_SYM ulong_num
+          {
+            $$.init_trx(FOR_SYSTEM_TIME_AS_OF, $5);
+          }
+        | FOR_SYSTEM_TIME_SYM
+          FROM
+          TRX_ID_SYM ulong_num
+          TO_SYM
+          TRX_ID_SYM ulong_num
+          {
+            $$.init_trx(FOR_SYSTEM_TIME_FROM_TO, $4, $7);
+          }
+        | FOR_SYSTEM_TIME_SYM
+          BETWEEN_SYM
+          TRX_ID_SYM ulong_num
+          AND_SYM
+          TRX_ID_SYM ulong_num
+          {
+            $$.init_trx(FOR_SYSTEM_TIME_BETWEEN, $4, $7);
           }
         ;
 

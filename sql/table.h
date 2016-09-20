@@ -1760,11 +1760,29 @@ enum for_system_time_type
   FOR_SYSTEM_TIME_FROM_TO, FOR_SYSTEM_TIME_BETWEEN
 };
 
+enum for_system_time_data_type
+{
+  FOR_SYSTEM_TIME_DATA_TYPE_TIMESTAMP,
+  FOR_SYSTEM_TIME_DATA_TYPE_TRX_ID
+};
 /** System versioning support. */
 struct system_versioning_for_select
 {
   enum for_system_time_type type;
-  Item *start, *end;
+
+  enum for_system_time_data_type data_type;
+  union
+  {
+    struct
+    {
+      Item *start, *end;
+    } ts;
+    struct
+    {
+      ulonglong start, end;
+    } trx;
+  };
+
   bool is_moved_to_where;
 
   void init(
@@ -1773,8 +1791,21 @@ struct system_versioning_for_select
     Item * const e=NULL)
   {
     type= t;
-    start= s;
-    end= e;
+    data_type= FOR_SYSTEM_TIME_DATA_TYPE_TIMESTAMP;
+    ts.start= s;
+    ts.end= e;
+    is_moved_to_where= false;
+  }
+
+  void init_trx(
+    const enum for_system_time_type t=FOR_SYSTEM_TIME_UNSPECIFIED,
+    ulonglong const s=0,
+    ulonglong const e=0)
+  {
+    type= t;
+    data_type= FOR_SYSTEM_TIME_DATA_TYPE_TRX_ID;
+    trx.start= s;
+    trx.end= e;
     is_moved_to_where= false;
   }
 };

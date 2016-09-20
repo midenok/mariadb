@@ -5614,3 +5614,15 @@ SET @time=NULL;
 SET @query=NULL;
 DEALLOCATE PREPARE stmt_t1;
 DROP TABLE t1;
+CREATE TABLE t1( x INT UNSIGNED, y INT UNSIGNED, Sys_start TIMESTAMP(6) GENERATED ALWAYS AS ROW START, Sys_end TIMESTAMP(6) GENERATED ALWAYS AS ROW END, PERIOD FOR SYSTEM_TIME (Sys_start, Sys_end)) WITH SYSTEM VERSIONING ENGINE=MyISAM;
+SELECT x, y FROM t1 FOR SYSTEM_TIME AS OF TRX_ID;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '' at line 1
+SELECT x, y FROM t1 FOR SYSTEM_TIME AS OF TRX_ID 333;
+x	y
+DROP TABLE t1;
+CREATE TABLE t1( x INT UNSIGNED, y INT UNSIGNED, Sys_start TIMESTAMP(6) GENERATED ALWAYS AS ROW START, Sys_end TIMESTAMP(6) GENERATED ALWAYS AS ROW END, PERIOD FOR SYSTEM_TIME (Sys_start, Sys_end)) WITH SYSTEM VERSIONING ENGINE=InnoDB;
+SELECT x, y FROM t1 FOR SYSTEM_TIME AS OF TRX_ID;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '' at line 1
+SELECT x, y FROM t1 FOR SYSTEM_TIME AS OF TRX_ID 333;
+x	y
+DROP TABLE t1;

@@ -688,6 +688,12 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
       my_error(ER_TABLE_DOESNT_SUPPORT_SYSTEM_VERSIONING, MYF(0), table->table_name);
       DBUG_RETURN(-1);
     }
+
+    if (table->system_versioning.data_type == FOR_SYSTEM_TIME_DATA_TYPE_TRX_ID)
+    {
+      // FIXME: XYZ: Implement me!
+      DBUG_RETURN(0);
+    }
   }
 
   if (versioned_tables == 0)
@@ -711,21 +717,21 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
           break;
         case FOR_SYSTEM_TIME_AS_OF:
           cond1= new (thd->mem_root) Item_func_le(thd, istart,
-                                                  table->system_versioning.start);
+                                                  table->system_versioning.ts.start);
           cond2= new (thd->mem_root) Item_func_gt(thd, iend,
-                                                  table->system_versioning.start);
+                                                  table->system_versioning.ts.start);
           break;
         case FOR_SYSTEM_TIME_FROM_TO:
           cond1= new (thd->mem_root) Item_func_lt(thd, istart,
-                                                  table->system_versioning.end);
+                                                  table->system_versioning.ts.end);
           cond2= new (thd->mem_root) Item_func_ge(thd, iend,
-                                                  table->system_versioning.start);
+                                                  table->system_versioning.ts.start);
           break;
         case FOR_SYSTEM_TIME_BETWEEN:
           cond1= new (thd->mem_root) Item_func_le(thd, istart,
-                                                  table->system_versioning.end);
+                                                  table->system_versioning.ts.end);
           cond2= new (thd->mem_root) Item_func_ge(thd, iend,
-                                                  table->system_versioning.start);
+                                                  table->system_versioning.ts.start);
           break;
         default:
           DBUG_ASSERT(0);
@@ -24595,25 +24601,52 @@ void TABLE_LIST::print_system_versioning(THD *thd, table_map eliminated_tables,
     return;
 
   // system versioning
-  if (system_versioning.type != FOR_SYSTEM_TIME_UNSPECIFIED)
+  if (system_versioning.type == FOR_SYSTEM_TIME_UNSPECIFIED)
+    return;
+
+  if (system_versioning.data_type == FOR_SYSTEM_TIME_DATA_TYPE_TIMESTAMP)
   {
     switch (system_versioning.type)
     {
       case FOR_SYSTEM_TIME_AS_OF:
         str->append(STRING_WITH_LEN(" for system_time as of "));
-        system_versioning.start->print(str, query_type);
+        system_versioning.ts.start->print(str, query_type);
         break;
       case FOR_SYSTEM_TIME_FROM_TO:
         str->append(STRING_WITH_LEN(" for system_time from timestamp "));
-        system_versioning.start->print(str, query_type);
+        system_versioning.ts.start->print(str, query_type);
         str->append(STRING_WITH_LEN(" to "));
-        system_versioning.end->print(str, query_type);
+        system_versioning.ts.end->print(str, query_type);
         break;
       case FOR_SYSTEM_TIME_BETWEEN:
         str->append(STRING_WITH_LEN(" for system_time between timestamp "));
-        system_versioning.start->print(str, query_type);
+        system_versioning.ts.start->print(str, query_type);
         str->append(STRING_WITH_LEN(" and "));
-        system_versioning.end->print(str, query_type);
+        system_versioning.ts.end->print(str, query_type);
+        break;
+      default:
+        DBUG_ASSERT(0);
+    }
+  }
+  else if (system_versioning.data_type == FOR_SYSTEM_TIME_DATA_TYPE_TRX_ID)
+  {
+    switch (system_versioning.type)
+    {
+      case FOR_SYSTEM_TIME_AS_OF:
+        str->append(STRING_WITH_LEN(" for system_time as of trx_id "));
+        str->append_ulonglong(system_versioning.trx.start);
+        break;
+      case FOR_SYSTEM_TIME_FROM_TO:
+        str->append(STRING_WITH_LEN(" for system_time from trx_id "));
+        str->append_ulonglong(system_versioning.trx.start);
+        str->append(STRING_WITH_LEN(" to trx_id "));
+        str->append_ulonglong(system_versioning.trx.end);
+        break;
+      case FOR_SYSTEM_TIME_BETWEEN:
+        str->append(STRING_WITH_LEN(" for system_time between trx_id "));
+        str->append_ulonglong(system_versioning.trx.start);
+        str->append(STRING_WITH_LEN(" and trx_id "));
+        str->append_ulonglong(system_versioning.trx.end);
         break;
       default:
         DBUG_ASSERT(0);
