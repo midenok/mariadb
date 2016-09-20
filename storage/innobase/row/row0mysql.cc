@@ -1401,7 +1401,13 @@ error_exit:
 	}
 
 	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
-		trx->versioned = true;
+		trx->versioned = true; // FIXME: is it really needed?
+		err = vers_notify_vtq(thr, prebuilt->heap);
+		if (err != DB_SUCCESS) {
+			fprintf(stderr,
+				"InnoDB: failed to insert VTQ record (see SQL error message)\n");
+			goto error_exit;
+		}
 	}
 
 	if (dict_table_has_fts_index(table)) {

@@ -422,6 +422,11 @@ dict_insert_tablespace_and_filepath(
 	const char*	filepath,	/*!< in: filepath */
 	ulint		fsp_flags);	/*!< in: tablespace flags */
 
+
+UNIV_INTERN
+dict_table_t*
+get_vtq_table();
+
 #ifndef UNIV_NONINL
 #include "dict0load.ic"
 #endif

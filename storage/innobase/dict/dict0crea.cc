@@ -1473,19 +1473,17 @@ dict_create_or_check_vtq_table(void)
 	trx_t*		trx;
 	my_bool		srv_file_per_table_backup;
 	dberr_t		err;
-	dberr_t		sys_foreign_err;
-	dberr_t		sys_foreign_cols_err;
+	dberr_t		sys_vtq_err;
 
 	ut_a(srv_get_active_thread_type() == SRV_NONE);
 
 	/* Note: The master thread has not been started at this point. */
 
 
-	sys_foreign_err = dict_check_if_system_table_exists(
+	sys_vtq_err = dict_check_if_system_table_exists(
 		"SYS_VTQ", DICT_NUM_FIELDS__SYS_VTQ + 1, 3);
 
-	if (sys_foreign_err == DB_SUCCESS
-		&& sys_foreign_cols_err == DB_SUCCESS) {
+	if (sys_vtq_err == DB_SUCCESS) {
 		return(DB_SUCCESS);
 	}
 
@@ -1499,7 +1497,7 @@ dict_create_or_check_vtq_table(void)
 
 	/* Check which incomplete table definition to drop. */
 
-	if (sys_foreign_err == DB_CORRUPTION) {
+	if (sys_vtq_err == DB_CORRUPTION) {
 		ib_logf(IB_LOG_LEVEL_WARN,
 			"Dropping incompletely created "
 			"SYS_FOREIGN table.");
@@ -1564,9 +1562,9 @@ dict_create_or_check_vtq_table(void)
 
 	/* Note: The master thread has not been started at this point. */
 	/* Confirm and move to the non-LRU part of the table LRU list. */
-	sys_foreign_err = dict_check_if_system_table_exists(
+	sys_vtq_err = dict_check_if_system_table_exists(
 		"SYS_VTQ", DICT_NUM_FIELDS__SYS_VTQ + 1, 3);
-	ut_a(sys_foreign_err == DB_SUCCESS);
+	ut_a(sys_vtq_err == DB_SUCCESS);
 
 	return(err);
 }

@@ -3387,3 +3387,57 @@ error_handling:
 
 	return(thr);
 }
+
+/***********************************************************//**
+Inserts a row to SYS_VTQ table.
+@return	error state */
+UNIV_INTERN
+dberr_t
+vers_notify_vtq(que_thr_t*	thr, mem_heap_t* heap)
+{
+	dberr_t		err;
+	dfield_t*	dfield;
+	trx_t* trx = thr_get_trx(thr);
+	dict_table_t* sys_vtq = dict_sys->sys_vtq;
+	ins_node_t* node = ins_node_create(INS_DIRECT, sys_vtq, heap);
+
+	node->select = NULL;
+	node->values_list = NULL; // for INS_VALUES
+	node->trx_id = trx->id;
+
+	dtuple_t* row = dtuple_create(heap, dict_table_get_n_cols(sys_vtq));
+	dict_table_copy_types(row, sys_vtq);
+
+	/* 0: TRX_ID -----------------------------*/
+	dfield = dtuple_get_nth_field(
+		row, DICT_FLD__SYS_VTQ__TRX_ID);
+
+	dfield_set_data(dfield, &trx->id, sizeof(trx->id));
+
+	///* 1: DB_TRX_ID added later */
+	///* 2: DB_ROLL_PTR added later */
+	///* 3: ID -------------------------------*/
+	//dfield = dtuple_get_nth_field(
+	//	entry, DICT_COL__SYS_TABLES__ID);
+
+	//ptr = static_cast<byte*>(mem_heap_alloc(heap, 8));
+	//mach_write_to_8(ptr, table->id);
+
+	//dfield_set_data(dfield, ptr, 8);
+
+	ins_node_set_new_row(node, row);
+
+	err = lock_table(0, node->table, LOCK_IX, thr);
+	DBUG_EXECUTE_IF("ib_row_ins_ix_lock_wait",
+		err = DB_LOCK_WAIT;);
+
+	if (err != DB_SUCCESS) {
+		goto end_func;
+	}
+	node->state = INS_NODE_ALLOC_ROW_ID;
+	err = row_ins(node, thr);
+
+end_func:
+	trx->error_state = err;
+	return err;
+}

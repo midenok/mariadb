@@ -3245,3 +3245,10 @@ load_next_index:
 
 	return(DB_SUCCESS);
 }
+
+UNIV_INTERN
+dict_table_t*
+get_vtq_table()
+{
+	return dict_table_get_low(SYSTEM_TABLE_NAME[SYS_VTQ]);
+}
