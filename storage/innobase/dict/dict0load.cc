@@ -47,7 +47,7 @@ Created 4/24/1996 Heikki Tuuri
 #include "fts0priv.h"
 
 /** Following are the InnoDB system tables. The positions in
-this array are referenced by enum dict_system_table_id. */
+this array are referenced by enum dict_system_id_t. */
 static const char* SYSTEM_TABLE_NAME[] = {
 	"SYS_TABLES",
 	"SYS_INDEXES",
@@ -56,7 +56,8 @@ static const char* SYSTEM_TABLE_NAME[] = {
 	"SYS_FOREIGN",
 	"SYS_FOREIGN_COLS",
 	"SYS_TABLESPACES",
-	"SYS_DATAFILES"
+	"SYS_DATAFILES",
+	"SYS_VTQ"
 };
 
 /* If this flag is TRUE, then we will load the cluster index's (and tables')

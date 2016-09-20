@@ -1514,7 +1514,7 @@ dict_create_or_check_vtq_table(void)
 	/* We always want SYSTEM tables to be created inside the system
 	tablespace. */
 
-	srv_file_per_table = 1;
+	srv_file_per_table = 0;
 
 	err = que_eval_sql(
 		NULL,
