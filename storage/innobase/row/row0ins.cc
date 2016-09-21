@@ -3388,18 +3388,26 @@ error_handling:
 	return(thr);
 }
 
+inline
+void set_row_field_8(dtuple_t* row, int field_num, ib_uint64_t data, mem_heap_t* heap)
+{
+	dfield_t* dfield = dtuple_get_nth_field(row, field_num);
+	byte* buf = static_cast<byte*>(mem_heap_alloc(heap, 8));
+	mach_write_to_8(buf, data);
+	dfield_set_data(dfield, buf, 8);
+}
+
 /***********************************************************//**
 Inserts a row to SYS_VTQ table.
 @return	error state */
 UNIV_INTERN
 dberr_t
-vers_notify_vtq(que_thr_t*	thr, mem_heap_t* heap)
+vers_notify_vtq(que_thr_t* thr, mem_heap_t* heap)
 {
 	dberr_t		err;
-	dfield_t*	dfield;
-	trx_t* trx = thr_get_trx(thr);
-	dict_table_t* sys_vtq = dict_sys->sys_vtq;
-	ins_node_t* node = ins_node_create(INS_DIRECT, sys_vtq, heap);
+	trx_t*		trx = thr_get_trx(thr);
+	dict_table_t*	sys_vtq = dict_sys->sys_vtq;
+	ins_node_t*	node = ins_node_create(INS_DIRECT, sys_vtq, heap);
 
 	node->select = NULL;
 	node->values_list = NULL; // for INS_VALUES
@@ -3407,22 +3415,10 @@ vers_notify_vtq(que_thr_t*	thr, mem_heap_t* heap)
 	dtuple_t* row = dtuple_create(heap, dict_table_get_n_cols(sys_vtq));
 	dict_table_copy_types(row, sys_vtq);
 
-	/* 0: TRX_ID -----------------------------*/
-	dfield = dtuple_get_nth_field(
-		row, DICT_FLD__SYS_VTQ__TRX_ID);
-
-	dfield_set_data(dfield, &trx->id, sizeof(trx->id));
-
-	///* 1: DB_TRX_ID added later */
-	///* 2: DB_ROLL_PTR added later */
-	///* 3: ID -------------------------------*/
-	//dfield = dtuple_get_nth_field(
-	//	entry, DICT_COL__SYS_TABLES__ID);
-
-	//ptr = static_cast<byte*>(mem_heap_alloc(heap, 8));
-	//mach_write_to_8(ptr, table->id);
-
-	//dfield_set_data(dfield, ptr, 8);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__TRX_ID, trx->id, heap);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__BEGIN_TS, 1, heap);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__COMMIT_TS, 2, heap);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__CONCURR_TRX, 3, heap);
 
 	ins_node_set_new_row(node, row);
 
@@ -3441,5 +3437,7 @@ vers_notify_vtq(que_thr_t*	thr, mem_heap_t* heap)
 
 end_func:
 	trx->error_state = err;
+	if (err)
+		fprintf(stderr, "InnoDB: failed to insert VTQ record (see SQL error message)\n");
 	return err;
 }

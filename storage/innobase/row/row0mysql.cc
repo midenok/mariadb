@@ -1400,12 +1400,10 @@ error_exit:
 		return(err);
 	}
 
-	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
-		trx->versioned = true; // FIXME: is it really needed?
-		err = vers_notify_vtq(thr, prebuilt->heap);
+	if (!trx->vtq_notified && DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
+		trx->vtq_notified = true;
+		err = vers_notify_vtq(thr, node->table->heap);
 		if (err != DB_SUCCESS) {
-			fprintf(stderr,
-				"InnoDB: failed to insert VTQ record (see SQL error message)\n");
 			goto error_exit;
 		}
 	}
@@ -1823,6 +1821,7 @@ run_again:
 	thr->fk_cascade_depth = 0;
 
 	if (err != DB_SUCCESS) {
+	error_exit:
 		que_thr_stop_for_mysql(thr);
 
 		if (err == DB_RECORD_NOT_FOUND) {
@@ -1849,8 +1848,12 @@ run_again:
 		return(err);
 	}
 
-	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
-		trx->versioned = true;
+	if (!trx->vtq_notified && DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
+		trx->vtq_notified = true;
+		err = vers_notify_vtq(thr, node->table->heap);
+		if (err != DB_SUCCESS) {
+			goto error_exit;
+		}
 	}
 
 	que_thr_stop_for_mysql_no_error(thr, trx);
@@ -2107,8 +2110,12 @@ run_again:
 		return(err);
 	}
 
-	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
-		trx->versioned = true;
+	if (!trx->vtq_notified && DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
+		trx->vtq_notified = true;
+		err = vers_notify_vtq(thr, node->table->heap);
+		if (err != DB_SUCCESS) {
+			return err;
+		}
 	}
 
 	if (node->is_delete) {

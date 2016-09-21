@@ -330,6 +330,29 @@ field_store_ulint(
 	return(ret);
 }
 
+/*******************************************************************//**
+Auxiliary function to store ulint value in MYSQL_TYPE_LONGLONG field.
+If the value is ULINT_UNDEFINED then the field it set to NULL.
+@return	0 on success */
+int
+field_store_ullong(
+/*==============*/
+	Field*	field,	/*!< in/out: target field for storage */
+	ullong	n)	/*!< in: value to store */
+{
+	int	ret;
+
+	if (n != ULINT_UNDEFINED) {
+		ret = field->store(n, 1);
+		field->set_notnull();
+	} else {
+		ret = 0; /* success */
+		field->set_null();
+	}
+
+	return(ret);
+}
+
 /* Fields of the dynamic table INFORMATION_SCHEMA.innodb_trx */
 static ST_FIELD_INFO	innodb_trx_fields_info[] =
 {
@@ -1229,197 +1252,11 @@ UNIV_INTERN struct st_maria_plugin	i_s_innodb_lock_waits =
         STRUCT_FLD(maturity, MariaDB_PLUGIN_MATURITY_GAMMA),
 };
 
-/* Fields of the dynamic table INFORMATION_SCHEMA.innodb_vtq */
-static ST_FIELD_INFO	innodb_vtq_fields_info[] =
-{
-#define IDX_TRX_ID	0
-	{ STRUCT_FLD(field_name,		"trx_id"),
-	STRUCT_FLD(field_length,	TRX_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
-	STRUCT_FLD(value,		0),
-	STRUCT_FLD(field_flags,	0),
-	STRUCT_FLD(old_name,		""),
-	STRUCT_FLD(open_method,	SKIP_OPEN_TABLE) },
-
-#define IDX_BEGIN_TS	1
-	{ STRUCT_FLD(field_name,		"begin_ts"),
-	STRUCT_FLD(field_length,	TRX_I_S_LOCK_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
-	STRUCT_FLD(value,		0),
-	STRUCT_FLD(field_flags,	0),
-	STRUCT_FLD(old_name,		""),
-	STRUCT_FLD(open_method,	SKIP_OPEN_TABLE) },
-
-#define IDX_COMMIT_TS	2
-	{ STRUCT_FLD(field_name,		"commit_ts"),
-	STRUCT_FLD(field_length,	TRX_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
-	STRUCT_FLD(value,		0),
-	STRUCT_FLD(field_flags,	0),
-	STRUCT_FLD(old_name,		""),
-	STRUCT_FLD(open_method,	SKIP_OPEN_TABLE) },
-
-#define IDX_CONCURR_TRX	3
-	{ STRUCT_FLD(field_name,		"concurr_trx"),
-	STRUCT_FLD(field_length,	TRX_I_S_LOCK_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
-	STRUCT_FLD(value,		0),
-	STRUCT_FLD(field_flags,	0),
-	STRUCT_FLD(old_name,		""),
-	STRUCT_FLD(open_method,	SKIP_OPEN_TABLE) },
-
-	END_OF_ST_FIELD_INFO
-};
-
-/*******************************************************************//**
-Read data from cache buffer and fill the
-INFORMATION_SCHEMA.innodb_vtq table with it.
-@return	0 on success */
-static
-int
-fill_innodb_vtq_from_cache(
-	/*==============================*/
-	trx_i_s_cache_t*	cache,	/*!< in: cache to read from */
-	THD*			thd,	/*!< in: used to call
-							schema_table_store_record() */
-	TABLE*			table)	/*!< in/out: fill this table */
-{
-	Field**	fields;
-	ulint	rows_num;
-	char	requested_lock_id[TRX_I_S_LOCK_ID_MAX_LEN + 1];
-	char	blocking_lock_id[TRX_I_S_LOCK_ID_MAX_LEN + 1];
-	ulint	i;
-
-	DBUG_ENTER("fill_innodb_vtq_from_cache");
-
-	fields = table->field;
-
-#if 0
-	rows_num = trx_i_s_cache_get_rows_used(cache,
-		I_S_INNODB_LOCK_WAITS);
-
-	for (i = 0; i < rows_num; i++) {
-
-		i_s_vtq_row_t*	row;
-
-		char	trx_id[TRX_ID_MAX_LEN + 1];
-		char	blocking_trx_id[TRX_ID_MAX_LEN + 1];
-
-		row = (i_s_lock_waits_row_t*)
-			trx_i_s_cache_get_nth_row(
-				cache, I_S_INNODB_LOCK_WAITS, i);
-
-		/* requesting_trx_id */
-		ut_snprintf(requesting_trx_id, sizeof(requesting_trx_id),
-			TRX_ID_FMT, row->requested_lock_row->lock_trx_id);
-		OK(field_store_string(fields[IDX_REQUESTING_TRX_ID],
-			requesting_trx_id));
-
-		/* requested_lock_id */
-		OK(field_store_string(
-			fields[IDX_REQUESTED_LOCK_ID],
-			trx_i_s_create_lock_id(
-				row->requested_lock_row,
-				requested_lock_id,
-				sizeof(requested_lock_id))));
-
-		/* blocking_trx_id */
-		ut_snprintf(blocking_trx_id, sizeof(blocking_trx_id),
-			TRX_ID_FMT, row->blocking_lock_row->lock_trx_id);
-		OK(field_store_string(fields[IDX_BLOCKING_TRX_ID],
-			blocking_trx_id));
-
-		/* blocking_lock_id */
-		OK(field_store_string(
-			fields[IDX_BLOCKING_LOCK_ID],
-			trx_i_s_create_lock_id(
-				row->blocking_lock_row,
-				blocking_lock_id,
-				sizeof(blocking_lock_id))));
-
-		OK(schema_table_store_record(thd, table));
-	}
-#endif
-
-	DBUG_RETURN(0);
-}
-
-/*******************************************************************//**
-Bind the dynamic table INFORMATION_SCHEMA.innodb_vtq
-@return	0 on success */
-static
-int
-innodb_vtq_init(
-/*===================*/
-	void*	p)	/*!< in/out: table schema object */
-{
-	ST_SCHEMA_TABLE*	schema;
-
-	DBUG_ENTER("innodb_vtq_init");
-
-	schema = (ST_SCHEMA_TABLE*) p;
-
-	schema->fields_info = innodb_vtq_fields_info;
-	schema->fill_table = trx_i_s_common_fill_table;
-
-	DBUG_RETURN(0);
-}
-
-UNIV_INTERN struct st_maria_plugin	i_s_innodb_vtq =
-{
-	/* the plugin type (a MYSQL_XXX_PLUGIN value) */
-	/* int */
-	STRUCT_FLD(type, MYSQL_INFORMATION_SCHEMA_PLUGIN),
-
-	/* pointer to type-specific plugin descriptor */
-	/* void* */
-	STRUCT_FLD(info, &i_s_info),
-
-	/* plugin name */
-	/* const char* */
-	STRUCT_FLD(name, "INNODB_VTQ"),
-
-	/* plugin author (for SHOW PLUGINS) */
-	/* const char* */
-	STRUCT_FLD(author, plugin_author),
-
-	/* general descriptive text (for SHOW PLUGINS) */
-	/* const char* */
-	STRUCT_FLD(descr, "InnoDB Versioning Transaction Query table"),
-
-	/* the plugin license (PLUGIN_LICENSE_XXX) */
-	/* int */
-	STRUCT_FLD(license, PLUGIN_LICENSE_GPL),
-
-	/* the function to invoke when plugin is loaded */
-	/* int (*)(void*); */
-	STRUCT_FLD(init, innodb_vtq_init),
-
-	/* the function to invoke when plugin is unloaded */
-	/* int (*)(void*); */
-	STRUCT_FLD(deinit, i_s_common_deinit),
-
-	/* plugin version (for SHOW PLUGINS) */
-	/* unsigned int */
-	STRUCT_FLD(version, INNODB_VERSION_SHORT),
-
-	/* struct st_mysql_show_var* */
-	STRUCT_FLD(status_vars, NULL),
-
-	/* struct st_mysql_sys_var** */
-	STRUCT_FLD(system_vars, NULL),
-
-		/* Maria extension */
-	STRUCT_FLD(version_info, INNODB_VERSION_STR),
-		STRUCT_FLD(maturity, MariaDB_PLUGIN_MATURITY_GAMMA),
-};
-
 /*******************************************************************//**
 Common function to fill any of the dynamic tables:
 INFORMATION_SCHEMA.innodb_trx
 INFORMATION_SCHEMA.innodb_locks
 INFORMATION_SCHEMA.innodb_lock_waits
-INFORMATION_SCHEMA.innodb_vtq
 @return	0 on success */
 static
 int
@@ -1487,13 +1324,6 @@ trx_i_s_common_fill_table(
 	} else if (innobase_strcasecmp(table_name, "innodb_lock_waits") == 0) {
 
 		if (fill_innodb_lock_waits_from_cache(
-			cache, thd, tables->table) != 0) {
-
-			ret = 1;
-		}
-	} else if (innobase_strcasecmp(table_name, "innodb_vtq") == 0) {
-
-		if (fill_innodb_vtq_from_cache(
 			cache, thd, tables->table) != 0) {
 
 			ret = 1;
@@ -9333,4 +9163,232 @@ UNIV_INTERN struct st_maria_plugin	i_s_innodb_sys_semaphore_waits =
         /* Maria extension */
 	STRUCT_FLD(version_info, INNODB_VERSION_STR),
         STRUCT_FLD(maturity, MariaDB_PLUGIN_MATURITY_GAMMA),
+};
+/* Fields of the dynamic table INFORMATION_SCHEMA.innodb_vtq */
+static ST_FIELD_INFO	innodb_vtq_fields_info[] =
+{
+#define SYS_VTQ_TRX_ID 0
+	{ STRUCT_FLD(field_name,	"trx_id"),
+	STRUCT_FLD(field_length,	TRX_ID_MAX_LEN + 1),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	STRUCT_FLD(value,		0),
+	STRUCT_FLD(field_flags,		0),
+	STRUCT_FLD(old_name,		""),
+	STRUCT_FLD(open_method,		SKIP_OPEN_TABLE) },
+
+#define SYS_VTQ_BEGIN_TS 1
+	{ STRUCT_FLD(field_name,	"begin_ts"),
+	STRUCT_FLD(field_length,	TRX_I_S_LOCK_ID_MAX_LEN + 1),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	STRUCT_FLD(value,		0),
+	STRUCT_FLD(field_flags,		0),
+	STRUCT_FLD(old_name,		""),
+	STRUCT_FLD(open_method,		SKIP_OPEN_TABLE) },
+
+#define SYS_VTQ_COMMIT_TS 2
+	{ STRUCT_FLD(field_name,	"commit_ts"),
+	STRUCT_FLD(field_length,	TRX_ID_MAX_LEN + 1),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	STRUCT_FLD(value,		0),
+	STRUCT_FLD(field_flags,		0),
+	STRUCT_FLD(old_name,		""),
+	STRUCT_FLD(open_method,		SKIP_OPEN_TABLE) },
+
+#define SYS_VTQ_CONCURR_TRX 3
+	{ STRUCT_FLD(field_name,	"concurr_trx"),
+	STRUCT_FLD(field_length,	TRX_I_S_LOCK_ID_MAX_LEN + 1),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	STRUCT_FLD(value,		0),
+	STRUCT_FLD(field_flags,		0),
+	STRUCT_FLD(old_name,		""),
+	STRUCT_FLD(open_method,		SKIP_OPEN_TABLE) },
+
+	END_OF_ST_FIELD_INFO
+};
+
+/**********************************************************************//**
+Function to fill INFORMATION_SCHEMA.INNODB_SYS_VTQ with information
+collected by scanning SYS_VTQ table.
+@return 0 on success */
+static
+int
+i_s_dict_fill_vtq(
+/*========================*/
+	THD*		thd,		/*!< in: thread */
+	ullong		col_trx_id,	/*!< in: table fields */
+	ullong		col_begin_ts,
+	ullong		col_commit_ts,
+	ullong		col_concurr_trx,
+	TABLE*		table_to_fill)	/*!< in/out: fill this table */
+{
+	Field**		fields;
+
+	DBUG_ENTER("i_s_dict_fill_vtq");
+	fields = table_to_fill->field;
+
+	OK(field_store_ullong(fields[SYS_VTQ_TRX_ID], col_trx_id));
+	OK(field_store_ullong(fields[SYS_VTQ_BEGIN_TS], col_begin_ts));
+	OK(field_store_ullong(fields[SYS_VTQ_COMMIT_TS], col_commit_ts));
+	OK(field_store_ullong(fields[SYS_VTQ_CONCURR_TRX], col_concurr_trx));
+
+	OK(schema_table_store_record(thd, table_to_fill));
+
+	DBUG_RETURN(0);
+}
+
+/*******************************************************************//**
+Function to populate INFORMATION_SCHEMA.INNODB_SYS_VTQ table.
+Loop through each record in SYS_VTQ, and extract the column
+information and fill the INFORMATION_SCHEMA.INNODB_SYS_VTQ table.
+@return 0 on success */
+static
+int
+i_s_sys_vtq_fill_table(
+/*=========================*/
+	THD*		thd,	/*!< in: thread */
+	TABLE_LIST*	tables,	/*!< in/out: tables to fill */
+	Item*		)	/*!< in: condition (not used) */
+{
+	btr_pcur_t	pcur;
+	const rec_t*	rec;
+	mem_heap_t*	heap;
+	mtr_t		mtr;
+	int		err = 0;
+
+	DBUG_ENTER("i_s_sys_vtq_fill_table");
+	RETURN_IF_INNODB_NOT_STARTED(tables->schema_table_name);
+
+	/* deny access to user without PROCESS_ACL privilege */
+	if (check_global_access(thd, PROCESS_ACL)) {
+		DBUG_RETURN(0);
+	}
+
+	heap = mem_heap_create(1000);
+	mutex_enter(&dict_sys->mutex);
+	mtr_start(&mtr);
+
+	rec = dict_startscan_system(&pcur, &mtr, SYS_VTQ);
+
+	while (rec) {
+		const char*	err_msg;
+		ullong		col_trx_id;
+		ullong		col_begin_ts;
+		ullong		col_commit_ts;
+		ullong		col_concurr_trx;
+
+		/* Extract necessary information from a SYS_VTQ row */
+		err_msg = dict_process_sys_vtq(
+			heap,
+			rec,
+			&col_trx_id,
+			&col_begin_ts,
+			&col_commit_ts,
+			&col_concurr_trx);
+
+		mtr_commit(&mtr);
+		mutex_exit(&dict_sys->mutex);
+
+		if (!err_msg) {
+			err = i_s_dict_fill_vtq(
+				thd,
+				col_trx_id,
+				col_begin_ts,
+				col_commit_ts,
+				col_concurr_trx,
+				tables->table);
+		} else {
+			push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+					    ER_CANT_FIND_SYSTEM_REC, "%s",
+					    err_msg);
+			err = 1;
+		}
+
+		if (err)
+			break;
+
+		mem_heap_empty(heap);
+
+		/* Get the next record */
+		mutex_enter(&dict_sys->mutex);
+		mtr_start(&mtr);
+		rec = dict_getnext_system(&pcur, &mtr);
+	}
+
+	if (!err) {
+		mtr_commit(&mtr);
+		mutex_exit(&dict_sys->mutex);
+	}
+	mem_heap_free(heap);
+
+	DBUG_RETURN(err);
+}
+
+/*******************************************************************//**
+Bind the dynamic table INFORMATION_SCHEMA.innodb_vtq
+@return	0 on success */
+static
+int
+innodb_vtq_init(
+/*===================*/
+void*	p)	/*!< in/out: table schema object */
+{
+	ST_SCHEMA_TABLE*	schema;
+
+	DBUG_ENTER("innodb_vtq_init");
+
+	schema = (ST_SCHEMA_TABLE*) p;
+
+	schema->fields_info = innodb_vtq_fields_info;
+	schema->fill_table = i_s_sys_vtq_fill_table;
+
+	DBUG_RETURN(0);
+}
+
+UNIV_INTERN struct st_maria_plugin	i_s_innodb_vtq =
+{
+	/* the plugin type (a MYSQL_XXX_PLUGIN value) */
+	/* int */
+	STRUCT_FLD(type, MYSQL_INFORMATION_SCHEMA_PLUGIN),
+
+	/* pointer to type-specific plugin descriptor */
+	/* void* */
+	STRUCT_FLD(info, &i_s_info),
+
+	/* plugin name */
+	/* const char* */
+	STRUCT_FLD(name, "INNODB_VTQ"),
+
+	/* plugin author (for SHOW PLUGINS) */
+	/* const char* */
+	STRUCT_FLD(author, plugin_author),
+
+	/* general descriptive text (for SHOW PLUGINS) */
+	/* const char* */
+	STRUCT_FLD(descr, "InnoDB Versioning Transaction Query table"),
+
+	/* the plugin license (PLUGIN_LICENSE_XXX) */
+	/* int */
+	STRUCT_FLD(license, PLUGIN_LICENSE_GPL),
+
+	/* the function to invoke when plugin is loaded */
+	/* int (*)(void*); */
+	STRUCT_FLD(init, innodb_vtq_init),
+
+	/* the function to invoke when plugin is unloaded */
+	/* int (*)(void*); */
+	STRUCT_FLD(deinit, i_s_common_deinit),
+
+	/* plugin version (for SHOW PLUGINS) */
+	/* unsigned int */
+	STRUCT_FLD(version, INNODB_VERSION_SHORT),
+
+	/* struct st_mysql_show_var* */
+	STRUCT_FLD(status_vars, NULL),
+
+	/* struct st_mysql_sys_var** */
+	STRUCT_FLD(system_vars, NULL),
+
+		/* Maria extension */
+	STRUCT_FLD(version_info, INNODB_VERSION_STR),
+		STRUCT_FLD(maturity, MariaDB_PLUGIN_MATURITY_GAMMA),
 };

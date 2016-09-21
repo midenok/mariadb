@@ -1030,7 +1030,7 @@ struct trx_t{
 	os_event_t	wsrep_event;	/* event waited for in srv_conc_slot */
 #endif /* WITH_WSREP */
 
-	bool versioned;
+	bool vtq_notified;
 };
 
 /* Transaction isolation levels (trx->isolation_level) */

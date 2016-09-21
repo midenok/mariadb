@@ -333,13 +333,13 @@ enum dict_col_sys_vtq_enum
 /* The field numbers in the SYS_VTQ clustered index */
 enum dict_fld_sys_vtq_enum
 {
-	DICT_FLD__SYS_VTQ__TRX_ID				= 0,
+	DICT_FLD__SYS_VTQ__TRX_ID			= 0,
 	DICT_FLD__SYS_VTQ__DB_TRX_ID			= 1,
 	DICT_FLD__SYS_VTQ__DB_ROLL_PTR			= 2,
-	DICT_FLD__SYS_VTQ__BEGIN_TS				= 3,
+	DICT_FLD__SYS_VTQ__BEGIN_TS			= 3,
 	DICT_FLD__SYS_VTQ__COMMIT_TS			= 4,
 	DICT_FLD__SYS_VTQ__CONCURR_TRX			= 5,
-	DICT_NUM_FIELDS__SYS_VTQ				= 6
+	DICT_NUM_FIELDS__SYS_VTQ			= 6
 };
 
 /* A number of the columns above occur in multiple tables.  These are the

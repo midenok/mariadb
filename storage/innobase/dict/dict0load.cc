@@ -730,6 +730,64 @@ err_len:
 }
 
 /********************************************************************//**
+This function parses a SYS_VTQ record, extracts necessary
+information from the record and returns it to the caller.
+@return error message, or NULL on success */
+UNIV_INTERN
+const char*
+dict_process_sys_vtq(
+/*=======================*/
+mem_heap_t*	heap,		/*!< in/out: heap memory */
+const rec_t*	rec,		/*!< in: current rec */
+ullong*		col_trx_id,	/*!< out: field values */
+ullong*		col_begin_ts,
+ullong*		col_commit_ts,
+ullong*		col_concurr_trx)
+{
+	ulint		len;
+	const byte*	field;
+
+	if (rec_get_deleted_flag(rec, 0)) {
+		return("delete-marked record in SYS_VTQ");
+	}
+
+	if (rec_get_n_fields_old(rec) != DICT_NUM_FIELDS__SYS_VTQ) {
+		return("wrong number of columns in SYS_VTQ record");
+	}
+
+	field = rec_get_nth_field_old(
+		rec, DICT_FLD__SYS_VTQ__TRX_ID, &len);
+	if (len != sizeof(col_trx_id)) {
+	err_len:
+		return("incorrect column length in SYS_VTQ");
+	}
+	*col_trx_id = mach_read_from_8(field);
+
+	field = rec_get_nth_field_old(
+		rec, DICT_FLD__SYS_VTQ__BEGIN_TS, &len);
+	//if (len != sizeof(col_begin_ts)) {
+	//	goto err_len;
+	//}
+	*col_begin_ts = mach_read_from_8(field);
+
+	field = rec_get_nth_field_old(
+		rec, DICT_FLD__SYS_VTQ__COMMIT_TS, &len);
+	//if (len != sizeof(col_commit_ts)) {
+	//	goto err_len;
+	//}
+	*col_commit_ts = mach_read_from_8(field);
+
+	field = rec_get_nth_field_old(
+		rec, DICT_FLD__SYS_VTQ__CONCURR_TRX, &len);
+	//if (len != sizeof(col_concurr_trx)) {
+	//	goto err_len;
+	//}
+	*col_concurr_trx = mach_read_from_8(field);
+
+	return(NULL);
+}
+
+/********************************************************************//**
 Determine the flags of a table as stored in SYS_TABLES.TYPE and N_COLS.
 @return  ULINT_UNDEFINED if error, else a valid dict_table_t::flags. */
 static
