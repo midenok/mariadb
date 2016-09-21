@@ -9194,17 +9194,17 @@ static ST_FIELD_INFO	innodb_vtq_fields_info[] =
 {
 #define SYS_VTQ_TRX_ID 0
 	{ STRUCT_FLD(field_name,	"trx_id"),
-	STRUCT_FLD(field_length,	TRX_ID_MAX_LEN + 1),
+	STRUCT_FLD(field_length,	MY_INT64_NUM_DECIMAL_DIGITS),
 	STRUCT_FLD(field_type,		MYSQL_TYPE_LONGLONG),
 	STRUCT_FLD(value,		0),
-	STRUCT_FLD(field_flags,		0),
+	STRUCT_FLD(field_flags,		MY_I_S_UNSIGNED),
 	STRUCT_FLD(old_name,		""),
 	STRUCT_FLD(open_method,		SKIP_OPEN_TABLE) },
 
 #define SYS_VTQ_BEGIN_TS 1
 	{ STRUCT_FLD(field_name,	"begin_ts"),
-	STRUCT_FLD(field_length,	TRX_I_S_LOCK_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_DATETIME),
+	STRUCT_FLD(field_length,	6),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_TIMESTAMP),
 	STRUCT_FLD(value,		0),
 	STRUCT_FLD(field_flags,		0),
 	STRUCT_FLD(old_name,		""),
@@ -9212,8 +9212,8 @@ static ST_FIELD_INFO	innodb_vtq_fields_info[] =
 
 #define SYS_VTQ_COMMIT_TS 2
 	{ STRUCT_FLD(field_name,	"commit_ts"),
-	STRUCT_FLD(field_length,	TRX_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_DATETIME),
+	STRUCT_FLD(field_length,	6),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_TIMESTAMP),
 	STRUCT_FLD(value,		0),
 	STRUCT_FLD(field_flags,		0),
 	STRUCT_FLD(old_name,		""),
@@ -9221,8 +9221,8 @@ static ST_FIELD_INFO	innodb_vtq_fields_info[] =
 
 #define SYS_VTQ_CONCURR_TRX 3
 	{ STRUCT_FLD(field_name,	"concurr_trx"),
-	STRUCT_FLD(field_length,	TRX_I_S_LOCK_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	STRUCT_FLD(field_length,	120),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_MEDIUM_BLOB),
 	STRUCT_FLD(value,		0),
 	STRUCT_FLD(field_flags,		0),
 	STRUCT_FLD(old_name,		""),
