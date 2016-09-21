@@ -3397,6 +3397,9 @@ void set_row_field_8(dtuple_t* row, int field_num, ib_uint64_t data, mem_heap_t*
 	dfield_set_data(dfield, buf, 8);
 }
 
+#include "my_time.h"
+#include "sql_time.h"
+
 /***********************************************************//**
 Inserts a row to SYS_VTQ table.
 @return	error state */
@@ -3415,9 +3418,16 @@ vers_notify_vtq(que_thr_t* thr, mem_heap_t* heap)
 	dtuple_t* row = dtuple_create(heap, dict_table_get_n_cols(sys_vtq));
 	dict_table_copy_types(row, sys_vtq);
 
+	struct tm unix_time;
+	MYSQL_TIME mysql_time;
+	localtime_r(&trx->start_time, &unix_time);
+	localtime_to_TIME(&mysql_time, &unix_time);
+	mysql_time.second_part = trx->start_time_us;
+	ullong start_time = pack_time(&mysql_time);
+
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__TRX_ID, trx->id, heap);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__BEGIN_TS - 2, trx->start_time, heap);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__COMMIT_TS - 2, 2, heap);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__BEGIN_TS - 2, start_time, heap);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__COMMIT_TS - 2, start_time, heap);
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__CONCURR_TRX - 2, 3, heap);
 
 	ins_node_set_new_row(node, row);

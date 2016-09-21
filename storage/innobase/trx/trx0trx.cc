@@ -918,7 +918,9 @@ trx_start_low(
 	mutex_exit(&trx_sys->mutex);
 
 	trx->vtq_notified = false;
-	trx->start_time = ut_time();
+	ut_usectime(
+		(ulint*)&trx->start_time,
+		(ulint*)&trx->start_time_us);
 
 	MONITOR_INC(MONITOR_TRX_ACTIVE);
 }

@@ -332,7 +332,7 @@ field_store_ulint(
 
 /*******************************************************************//**
 Auxiliary function to store ulint value in MYSQL_TYPE_LONGLONG field.
-If the value is ULINT_UNDEFINED then the field it set to NULL.
+If the value is UINT64_UNDEFINED then the field it set to NULL.
 @return	0 on success */
 int
 field_store_ullong(
@@ -342,8 +342,33 @@ field_store_ullong(
 {
 	int	ret;
 
-	if (n != ULINT_UNDEFINED) {
+	if (n != UINT64_UNDEFINED) {
 		ret = field->store(n, 1);
+		field->set_notnull();
+	} else {
+		ret = 0; /* success */
+		field->set_null();
+	}
+
+	return(ret);
+}
+
+/*******************************************************************//**
+Auxiliary function to store packed timestamp value in MYSQL_TYPE_DATETIME field.
+If the value is ULINT_UNDEFINED then the field it set to NULL.
+@return	0 on success */
+int
+field_store_packed_ts(
+/*==============*/
+Field*	field,	/*!< in/out: target field for storage */
+ullong	n)	/*!< in: value to store */
+{
+	int	ret;
+	MYSQL_TIME tmp;
+
+	if (n != UINT64_UNDEFINED) {
+		unpack_time(n, &tmp);
+		ret = field->store_time(&tmp);
 		field->set_notnull();
 	} else {
 		ret = 0; /* success */
@@ -9170,7 +9195,7 @@ static ST_FIELD_INFO	innodb_vtq_fields_info[] =
 #define SYS_VTQ_TRX_ID 0
 	{ STRUCT_FLD(field_name,	"trx_id"),
 	STRUCT_FLD(field_length,	TRX_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_LONGLONG),
 	STRUCT_FLD(value,		0),
 	STRUCT_FLD(field_flags,		0),
 	STRUCT_FLD(old_name,		""),
@@ -9179,7 +9204,7 @@ static ST_FIELD_INFO	innodb_vtq_fields_info[] =
 #define SYS_VTQ_BEGIN_TS 1
 	{ STRUCT_FLD(field_name,	"begin_ts"),
 	STRUCT_FLD(field_length,	TRX_I_S_LOCK_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_DATETIME),
 	STRUCT_FLD(value,		0),
 	STRUCT_FLD(field_flags,		0),
 	STRUCT_FLD(old_name,		""),
@@ -9188,7 +9213,7 @@ static ST_FIELD_INFO	innodb_vtq_fields_info[] =
 #define SYS_VTQ_COMMIT_TS 2
 	{ STRUCT_FLD(field_name,	"commit_ts"),
 	STRUCT_FLD(field_length,	TRX_ID_MAX_LEN + 1),
-	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	STRUCT_FLD(field_type,		MYSQL_TYPE_DATETIME),
 	STRUCT_FLD(value,		0),
 	STRUCT_FLD(field_flags,		0),
 	STRUCT_FLD(old_name,		""),
@@ -9227,8 +9252,8 @@ i_s_dict_fill_vtq(
 	fields = table_to_fill->field;
 
 	OK(field_store_ullong(fields[SYS_VTQ_TRX_ID], col_trx_id));
-	OK(field_store_ullong(fields[SYS_VTQ_BEGIN_TS], col_begin_ts));
-	OK(field_store_ullong(fields[SYS_VTQ_COMMIT_TS], col_commit_ts));
+	OK(field_store_packed_ts(fields[SYS_VTQ_BEGIN_TS], col_begin_ts));
+	OK(field_store_packed_ts(fields[SYS_VTQ_COMMIT_TS], col_commit_ts));
 	OK(field_store_ullong(fields[SYS_VTQ_CONCURR_TRX], col_concurr_trx));
 
 	OK(schema_table_store_record(thd, table_to_fill));
