@@ -9266,6 +9266,9 @@ Function to populate INFORMATION_SCHEMA.INNODB_SYS_VTQ table.
 Loop through each record in SYS_VTQ, and extract the column
 information and fill the INFORMATION_SCHEMA.INNODB_SYS_VTQ table.
 @return 0 on success */
+
+static const int I_S_SYS_VTQ_LIMIT = 1000; // maximum number of records in I_S.INNODB_SYS_VTQ
+
 static
 int
 i_s_sys_vtq_fill_table(
@@ -9294,7 +9297,7 @@ i_s_sys_vtq_fill_table(
 
 	rec = dict_startscan_system(&pcur, &mtr, SYS_VTQ);
 
-	while (rec) {
+	for (int i = 0; rec && i < I_S_SYS_VTQ_LIMIT; ++i) {
 		const char*	err_msg;
 		ullong		col_trx_id;
 		ullong		col_begin_ts;
