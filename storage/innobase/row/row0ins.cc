@@ -3403,7 +3403,6 @@ vers_notify_vtq(que_thr_t*	thr, mem_heap_t* heap)
 
 	node->select = NULL;
 	node->values_list = NULL; // for INS_VALUES
-	node->trx_id = trx->id;
 
 	dtuple_t* row = dtuple_create(heap, dict_table_get_n_cols(sys_vtq));
 	dict_table_copy_types(row, sys_vtq);
@@ -3427,6 +3426,7 @@ vers_notify_vtq(que_thr_t*	thr, mem_heap_t* heap)
 
 	ins_node_set_new_row(node, row);
 
+	trx_write_trx_id(node->trx_id_buf, trx->id);
 	err = lock_table(0, node->table, LOCK_IX, thr);
 	DBUG_EXECUTE_IF("ib_row_ins_ix_lock_wait",
 		err = DB_LOCK_WAIT;);
@@ -3434,6 +3434,8 @@ vers_notify_vtq(que_thr_t*	thr, mem_heap_t* heap)
 	if (err != DB_SUCCESS) {
 		goto end_func;
 	}
+
+	node->trx_id = trx->id;
 	node->state = INS_NODE_ALLOC_ROW_ID;
 	err = row_ins(node, thr);
 
