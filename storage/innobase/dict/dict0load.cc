@@ -765,23 +765,23 @@ ullong*		col_concurr_trx)
 
 	field = rec_get_nth_field_old(
 		rec, DICT_FLD__SYS_VTQ__BEGIN_TS, &len);
-	//if (len != sizeof(col_begin_ts)) {
-	//	goto err_len;
-	//}
+	if (len != sizeof(col_begin_ts)) {
+		goto err_len;
+	}
 	*col_begin_ts = mach_read_from_8(field);
 
 	field = rec_get_nth_field_old(
 		rec, DICT_FLD__SYS_VTQ__COMMIT_TS, &len);
-	//if (len != sizeof(col_commit_ts)) {
-	//	goto err_len;
-	//}
+	if (len != sizeof(col_commit_ts)) {
+		goto err_len;
+	}
 	*col_commit_ts = mach_read_from_8(field);
 
 	field = rec_get_nth_field_old(
 		rec, DICT_FLD__SYS_VTQ__CONCURR_TRX, &len);
-	//if (len != sizeof(col_concurr_trx)) {
-	//	goto err_len;
-	//}
+	if (len != sizeof(col_concurr_trx)) {
+		goto err_len;
+	}
 	*col_concurr_trx = mach_read_from_8(field);
 
 	return(NULL);
