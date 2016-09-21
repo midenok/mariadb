@@ -3416,7 +3416,7 @@ vers_notify_vtq(que_thr_t* thr, mem_heap_t* heap)
 	dict_table_copy_types(row, sys_vtq);
 
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__TRX_ID, trx->id, heap);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__BEGIN_TS - 2, 1, heap);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__BEGIN_TS - 2, trx->start_time, heap);
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__COMMIT_TS - 2, 2, heap);
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__CONCURR_TRX - 2, 3, heap);
 
@@ -3437,7 +3437,7 @@ vers_notify_vtq(que_thr_t* thr, mem_heap_t* heap)
 
 end_func:
 	trx->error_state = err;
-	if (err)
+	if (err != DB_SUCCESS)
 		fprintf(stderr, "InnoDB: failed to insert VTQ record (see SQL error message)\n");
 	return err;
 }
