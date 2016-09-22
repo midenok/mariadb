@@ -917,7 +917,7 @@ trx_start_low(
 
 	mutex_exit(&trx_sys->mutex);
 
-	trx->vtq_notified = false;
+	trx->vtq_notify_on_commit = false;
 	ut_usectime(
 		(ulint*)&trx->start_time,
 		(ulint*)&trx->start_time_us);

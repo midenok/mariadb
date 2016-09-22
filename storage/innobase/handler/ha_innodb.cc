@@ -4254,6 +4254,15 @@ innobase_commit(
 
 	trx = check_trx_exists(thd);
 
+	if (trx->vtq_notify_on_commit) {
+		mem_heap_t* heap = mem_heap_create(1024);
+		int err = vers_notify_vtq(trx, heap);
+		if (err != DB_SUCCESS) {
+			DBUG_PRINT("trans", ("failed to update VTQ table"));
+		}
+		mem_heap_free(heap);
+	}
+
 	/* Since we will reserve the trx_sys->mutex, we have to release
 	the search system latch first to obey the latching order. */
 
