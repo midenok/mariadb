@@ -194,7 +194,7 @@ row_ins_step(
 /***********************************************************//**
 Inserts a row to SYS_VTQ table.
 @return	error state */
-dberr_t vers_notify_vtq(trx_t* trx, mem_heap_t * heap);
+void vers_notify_vtq(trx_t* trx);
 
 /* Insert node structure */
 

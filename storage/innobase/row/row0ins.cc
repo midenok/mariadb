@@ -3414,51 +3414,26 @@ void set_row_field_8(dtuple_t* row, int field_num, ib_uint64_t data, mem_heap_t*
 	dfield_set_data(dfield, buf, 8);
 }
 
-#include "my_time.h"
-#include "sql_time.h"
-
 /***********************************************************//**
-Inserts a row to SYS_VTQ table.
-@return	error state */
-UNIV_INTERN
+Inserts a row to SYS_VTQ, low level.
+@return DB_SUCCESS if operation successfully completed, else error
+code */
+static __attribute__((nonnull, warn_unused_result))
 dberr_t
-vers_notify_vtq(trx_t* trx, mem_heap_t* heap)
+vers_row_ins_vtq_low(trx_t* trx, mem_heap_t* heap, dtuple_t* row)
 {
 	dberr_t		err;
-	dict_table_t*	sys_vtq = dict_sys->sys_vtq;
-	ins_node_t*	node = ins_node_create(INS_DIRECT, sys_vtq, heap);
-
-	node->select = NULL;
-	node->values_list = NULL; // for INS_VALUES
-
-	dtuple_t* row = dtuple_create(heap, dict_table_get_n_cols(sys_vtq));
-	dict_table_copy_types(row, sys_vtq);
-
-	struct tm unix_time;
-	MYSQL_TIME mysql_time;
-	localtime_r(&trx->start_time, &unix_time);
-	localtime_to_TIME(&mysql_time, &unix_time);
-	mysql_time.second_part = trx->start_time_us;
-	ullong start_time = pack_time(&mysql_time);
-
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__TRX_ID, trx->id, heap);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__BEGIN_TS - 2, start_time, heap);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__COMMIT_TS - 2, start_time, heap);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__CONCURR_TRX - 2, 3, heap);
-
-	{
 	dtuple_t*	entry;
 	ulint		n_index = 0;
-	dict_index_t*	index	= dict_table_get_first_index(sys_vtq);
-	static const ulint	flags
+	dict_index_t*	index	= dict_table_get_first_index(dict_sys->sys_vtq);
+	static const ulint flags
 		= (BTR_KEEP_SYS_FLAG
 			| BTR_NO_LOCKING_FLAG
 			| BTR_NO_UNDO_LOG_FLAG);
 
-	//row_upd_index_entry_sys_field(entry, index,
-	//	DATA_ROLL_PTR, roll_ptr);
-
 	entry = row_build_index_entry(row, NULL, index, heap);
+	row_upd_index_entry_sys_field(entry, index, DATA_TRX_ID, trx->id);
+	row_upd_index_entry_sys_field(entry, index, DATA_ROLL_PTR, 0);
 
 	err = row_ins_clust_index_entry_low(
 		flags, BTR_MODIFY_TREE, index, index->n_uniq, entry, 0, NULL, trx);
@@ -3469,9 +3444,9 @@ vers_notify_vtq(trx_t* trx, mem_heap_t* heap)
 	case DB_SUCCESS_LOCKED_REC:
 		/* The row had already been copied to the table. */
 		fprintf(stderr, "InnoDB: duplicate VTQ record!\n");
-		err = DB_SUCCESS;
+		return DB_SUCCESS;
 	default:
-		goto end_func;
+		return err;
 	}
 
 	mem_heap_t* offsets_heap = mem_heap_create(1024);
@@ -3492,19 +3467,40 @@ vers_notify_vtq(trx_t* trx, mem_heap_t* heap)
 			flags, BTR_MODIFY_TREE,
 			index, offsets_heap, heap, entry, trx->id, NULL, trx);
 
-		/* Report correct index name for duplicate key error. */
-		if (err == DB_DUPLICATE_KEY) {
-			trx->error_key_num = n_index;
-		}
-
+		///* Report correct index name for duplicate key error. */
+		// No need to report on commit phase?
+		//if (err == DB_DUPLICATE_KEY) {
+		//	trx->error_key_num = n_index;
+		//}
 	} while (err == DB_SUCCESS);
 
 	mem_heap_free(offsets_heap);
-	}
-
-end_func:
-	trx->error_state = err;
-	if (err != DB_SUCCESS)
-		fprintf(stderr, "InnoDB: failed to insert VTQ record (see SQL error message)\n");
 	return err;
+}
+
+#include "sql_time.h"
+
+/***********************************************************//**
+Inserts a row to SYS_VTQ table.
+@return	error state */
+void vers_notify_vtq(trx_t* trx)
+{
+	mem_heap_t* heap = mem_heap_create(1024);
+	dtuple_t* row = dtuple_create(heap, dict_table_get_n_cols(dict_sys->sys_vtq));
+
+	ulint now_secs, now_usecs;
+	ut_usectime(&now_secs, &now_usecs);
+	ullong begin_ts = unix_time_to_packed(trx->start_time, trx->start_time_us);
+	ullong commit_ts = unix_time_to_packed(now_secs, now_usecs);
+
+	dict_table_copy_types(row, dict_sys->sys_vtq);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__TRX_ID, trx->id, heap);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__BEGIN_TS - 2, begin_ts, heap);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__COMMIT_TS - 2, commit_ts, heap);
+	set_row_field_8(row, DICT_FLD__SYS_VTQ__CONCURR_TRX - 2, 3, heap);
+
+	if (DB_SUCCESS != vers_row_ins_vtq_low(trx, heap, row))
+		fprintf(stderr, "InnoDB: failed to insert VTQ record (see SQL error message)\n");
+
+	mem_heap_free(heap);
 }
