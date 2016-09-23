@@ -729,6 +729,14 @@ err_len:
 	return(NULL);
 }
 
+inline
+const char* dict_print_error(mem_heap_t* heap, ulint col, ulint len, ulint expected)
+{
+	return mem_heap_printf(heap,
+		"incorrect column %lu length in SYS_VTQ; got: %lu, expected: %lu",
+		col, len, expected);
+}
+
 /********************************************************************//**
 This function parses a SYS_VTQ record, extracts necessary
 information from the record and returns it to the caller.
@@ -742,10 +750,12 @@ const rec_t*	rec,		/*!< in: current rec */
 ullong*		col_trx_id,	/*!< out: field values */
 ullong*		col_begin_ts,
 ullong*		col_commit_ts,
-ullong*		col_concurr_trx)
+char**		col_concurr_trx)
 {
-	ulint		len;
-	const byte*	field;
+	ulint		len, col, concurr_n;
+	const byte	*field, *ptr;
+	char		*out;
+	ullong		trx_id;
 
 	if (rec_get_deleted_flag(rec, 0)) {
 		return("delete-marked record in SYS_VTQ");
@@ -754,36 +764,58 @@ ullong*		col_concurr_trx)
 	if (rec_get_n_fields_old(rec) != DICT_NUM_FIELDS__SYS_VTQ) {
 		return("wrong number of columns in SYS_VTQ record");
 	}
-
+	/////////////
 	field = rec_get_nth_field_old(
-		rec, DICT_FLD__SYS_VTQ__TRX_ID, &len);
-	if (len != sizeof(col_trx_id)) {
-	err_len:
-		return("incorrect column length in SYS_VTQ");
-	}
+		rec, (col = DICT_FLD__SYS_VTQ__TRX_ID), &len);
+
+	if (len != sizeof(col_trx_id))
+		return dict_print_error(heap, col, len, sizeof(col_trx_id));
+
 	*col_trx_id = mach_read_from_8(field);
-
+	/////////////
 	field = rec_get_nth_field_old(
-		rec, DICT_FLD__SYS_VTQ__BEGIN_TS, &len);
-	if (len != sizeof(col_begin_ts)) {
-		goto err_len;
-	}
+		rec, (col = DICT_FLD__SYS_VTQ__BEGIN_TS), &len);
+
+	if (len != sizeof(col_begin_ts))
+		return dict_print_error(heap, col, len, sizeof(col_begin_ts));
+
 	*col_begin_ts = mach_read_from_8(field);
-
+	/////////////
 	field = rec_get_nth_field_old(
-		rec, DICT_FLD__SYS_VTQ__COMMIT_TS, &len);
-	if (len != sizeof(col_commit_ts)) {
-		goto err_len;
-	}
+		rec, (col = DICT_FLD__SYS_VTQ__COMMIT_TS), &len);
+
+	if (len != sizeof(col_commit_ts))
+		return dict_print_error(heap, col, len, sizeof(col_commit_ts));
+
 	*col_commit_ts = mach_read_from_8(field);
-
+	/////////////
 	field = rec_get_nth_field_old(
-		rec, DICT_FLD__SYS_VTQ__CONCURR_TRX, &len);
-	if (len != sizeof(col_concurr_trx)) {
-		goto err_len;
-	}
-	*col_concurr_trx = mach_read_from_8(field);
+		rec, (col = DICT_FLD__SYS_VTQ__CONCURR_TRX), &len);
+	concurr_n = len / sizeof(col_trx_id);
+	if (len != concurr_n * sizeof(col_trx_id))
+		return dict_print_error(heap, col, len, concurr_n * sizeof(col_trx_id));
 
+	bool truncated = false;
+	if (concurr_n > I_S_MAX_CONCURR_TRX) {
+		concurr_n = I_S_MAX_CONCURR_TRX;
+		truncated = true;
+	}
+
+	if (concurr_n == 0) {
+		*col_concurr_trx = NULL;
+		return(NULL);
+	}
+	*col_concurr_trx = static_cast<char*>(mem_heap_alloc(heap, concurr_n * (TRX_ID_MAX_LEN + 1) + 3 + 1));
+	ptr = field, out = *col_concurr_trx;
+	for (ulint i = 0; i < concurr_n;
+		++i, ptr += sizeof(col_trx_id))
+	{
+		trx_id = mach_read_from_8(ptr);
+		out += ut_snprintf(out, TRX_ID_MAX_LEN + 1, TRX_ID_FMT " ", trx_id);
+	}
+	if (truncated)
+		strcpy(out, "...");
+	/////////////
 	return(NULL);
 }
 

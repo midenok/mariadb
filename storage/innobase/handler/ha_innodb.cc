@@ -4254,10 +4254,6 @@ innobase_commit(
 
 	trx = check_trx_exists(thd);
 
-	if (trx->vtq_notify_on_commit) {
-		vers_notify_vtq(trx);
-	}
-
 	/* Since we will reserve the trx_sys->mutex, we have to release
 	the search system latch first to obey the latching order. */
 
@@ -4278,6 +4274,10 @@ innobase_commit(
 
 	if (commit_trx
 	    || (!thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))) {
+		/* Notify VTQ on System Versioned tables update */
+		if (trx->vtq_notify_on_commit) {
+			vers_notify_vtq(trx);
+		}
 
 		/* Run the fast part of commit if we did not already. */
 		if (!trx_is_active_commit_ordered(trx)) {

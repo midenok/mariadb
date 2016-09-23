@@ -3408,10 +3408,12 @@ error_handling:
 inline
 void set_row_field_8(dtuple_t* row, int field_num, ib_uint64_t data, mem_heap_t* heap)
 {
+	static const ulint fsize = 8;
 	dfield_t* dfield = dtuple_get_nth_field(row, field_num);
-	byte* buf = static_cast<byte*>(mem_heap_alloc(heap, 8));
+	ut_ad(dfield->type.len == fsize);
+	byte* buf = static_cast<byte*>(mem_heap_alloc(heap, fsize));
 	mach_write_to_8(buf, data);
-	dfield_set_data(dfield, buf, 8);
+	dfield_set_data(dfield, buf, fsize);
 }
 
 /***********************************************************//**
@@ -3432,8 +3434,11 @@ vers_row_ins_vtq_low(trx_t* trx, mem_heap_t* heap, dtuple_t* row)
 			| BTR_NO_UNDO_LOG_FLAG);
 
 	entry = row_build_index_entry(row, NULL, index, heap);
+
+	dfield_t* dfield = dtuple_get_nth_field(entry, DATA_TRX_ID);
+	ut_ad(dfield->type.len == DATA_TRX_ID_LEN);
+	dfield_set_data(dfield, mem_heap_alloc(heap, DATA_TRX_ID_LEN), DATA_TRX_ID_LEN);
 	row_upd_index_entry_sys_field(entry, index, DATA_TRX_ID, trx->id);
-	row_upd_index_entry_sys_field(entry, index, DATA_ROLL_PTR, 0);
 
 	err = row_ins_clust_index_entry_low(
 		flags, BTR_MODIFY_TREE, index, index->n_uniq, entry, 0, NULL, trx);
@@ -3497,7 +3502,38 @@ void vers_notify_vtq(trx_t* trx)
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__TRX_ID, trx->id, heap);
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__BEGIN_TS - 2, begin_ts, heap);
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__COMMIT_TS - 2, commit_ts, heap);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__CONCURR_TRX - 2, 3, heap);
+
+	dfield_t* dfield = dtuple_get_nth_field(row, DICT_FLD__SYS_VTQ__CONCURR_TRX - 2);
+	mutex_enter(&trx_sys->mutex);
+	trx_list_t &rw_list = trx_sys->rw_trx_list;
+	if (rw_list.count > 1) {
+		byte* buf = static_cast<byte*>(mem_heap_alloc(heap, rw_list.count * 8));
+		byte* ptr = buf;
+		ulint count = 0;
+
+		for (trx_t* ctrx = UT_LIST_GET_FIRST(rw_list);
+			ctrx != NULL;
+			ctrx = UT_LIST_GET_NEXT(trx_list, ctrx))
+		{
+			if (ctrx == trx || ctrx->state == TRX_STATE_NOT_STARTED)
+				continue;
+
+			mach_write_to_8(ptr, ctrx->id);
+			++count;
+			ptr += 8;
+		}
+
+		if (count)
+			dfield_set_data(dfield, buf, count * 8);
+		else
+			dfield_set_data(dfield, NULL, 0);
+	} else {
+		// there must be at least current transaction
+		ut_ad(rw_list.count == 1 && UT_LIST_GET_FIRST(rw_list) == trx);
+		dfield_set_data(dfield, NULL, 0);
+	}
+	mutex_exit(&trx_sys->mutex);
+
 
 	if (DB_SUCCESS != vers_row_ins_vtq_low(trx, heap, row))
 		fprintf(stderr, "InnoDB: failed to insert VTQ record (see SQL error message)\n");
