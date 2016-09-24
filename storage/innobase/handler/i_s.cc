@@ -9268,7 +9268,7 @@ Loop through each record in SYS_VTQ, and extract the column
 information and fill the INFORMATION_SCHEMA.INNODB_SYS_VTQ table.
 @return 0 on success */
 
-static const int I_S_SYS_VTQ_LIMIT = 1000; // maximum number of records in I_S.INNODB_SYS_VTQ
+static const int I_S_SYS_VTQ_LIMIT = 10000; // maximum number of records in I_S.INNODB_SYS_VTQ
 
 static
 int

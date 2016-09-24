@@ -333,7 +333,7 @@ records are left, the cursor ends up 'before first in tree'.
 @return	TRUE if the cursor moved forward, ending on a user record */
 UNIV_INLINE
 ibool
-btr_pcur_move_to_next_prev_rec(
+btr_pcur_move_to_prev_user_rec(
 /*===========================*/
 	btr_pcur_t*	cursor,	/*!< in: persistent cursor; NOTE that the
 				function may release the page latch */
