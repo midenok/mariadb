@@ -52,6 +52,7 @@ Created 4/20/1996 Heikki Tuuri
 #include "fts0fts.h"
 #include "fts0types.h"
 #include "m_string.h"
+#include "sql_time.h"
 
 /*************************************************************************
 IMPORTANT NOTE: Any operation that generates redo MUST check that there
@@ -3482,8 +3483,6 @@ vers_row_ins_vtq_low(trx_t* trx, mem_heap_t* heap, dtuple_t* row)
 	mem_heap_free(offsets_heap);
 	return err;
 }
-
-#include "sql_time.h"
 
 /***********************************************************//**
 Inserts a row to SYS_VTQ table.

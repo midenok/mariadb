@@ -9296,7 +9296,7 @@ i_s_sys_vtq_fill_table(
 	mutex_enter(&dict_sys->mutex);
 	mtr_start(&mtr);
 
-	rec = dict_startscan_system(&pcur, &mtr, SYS_VTQ);
+	rec = dict_startscan_system(&pcur, &mtr, SYS_VTQ, false);
 
 	for (int i = 0; rec && i < I_S_SYS_VTQ_LIMIT; ++i) {
 		const char*	err_msg;
