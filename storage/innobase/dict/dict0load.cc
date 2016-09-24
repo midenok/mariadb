@@ -733,6 +733,7 @@ err_len:
 	return(NULL);
 }
 
+
 inline
 const char* dict_print_error(mem_heap_t* heap, ulint col, ulint len, ulint expected)
 {
@@ -751,7 +752,7 @@ dict_process_sys_vtq(
 /*=======================*/
 mem_heap_t*	heap,		/*!< in/out: heap memory */
 const rec_t*	rec,		/*!< in: current rec */
-ullong*		col_trx_id,	/*!< out: field values */
+trx_id_t*	col_trx_id,	/*!< out: field values */
 ullong*		col_begin_ts,
 ullong*		col_commit_ts,
 char**		col_concurr_trx)
@@ -759,7 +760,7 @@ char**		col_concurr_trx)
 	ulint		len, col, concurr_n;
 	const byte	*field, *ptr;
 	char		*out;
-	ullong		trx_id;
+	trx_id_t	trx_id;
 
 	if (rec_get_deleted_flag(rec, 0)) {
 		return("delete-marked record in SYS_VTQ");
@@ -772,32 +773,32 @@ char**		col_concurr_trx)
 	field = rec_get_nth_field_old(
 		rec, (col = DICT_FLD__SYS_VTQ__TRX_ID), &len);
 
-	if (len != sizeof(col_trx_id))
-		return dict_print_error(heap, col, len, sizeof(col_trx_id));
+	if (len != sizeof(trx_id_t))
+		return dict_print_error(heap, col, len, sizeof(trx_id_t));
 
 	*col_trx_id = mach_read_from_8(field);
 	/////////////
 	field = rec_get_nth_field_old(
 		rec, (col = DICT_FLD__SYS_VTQ__BEGIN_TS), &len);
 
-	if (len != sizeof(col_begin_ts))
-		return dict_print_error(heap, col, len, sizeof(col_begin_ts));
+	if (len != sizeof(ullong))
+		return dict_print_error(heap, col, len, sizeof(ullong));
 
 	*col_begin_ts = mach_read_from_8(field);
 	/////////////
 	field = rec_get_nth_field_old(
 		rec, (col = DICT_FLD__SYS_VTQ__COMMIT_TS), &len);
 
-	if (len != sizeof(col_commit_ts))
-		return dict_print_error(heap, col, len, sizeof(col_commit_ts));
+	if (len != sizeof(ullong))
+		return dict_print_error(heap, col, len, sizeof(ullong));
 
 	*col_commit_ts = mach_read_from_8(field);
 	/////////////
 	field = rec_get_nth_field_old(
 		rec, (col = DICT_FLD__SYS_VTQ__CONCURR_TRX), &len);
-	concurr_n = len / sizeof(col_trx_id);
-	if (len != concurr_n * sizeof(col_trx_id))
-		return dict_print_error(heap, col, len, concurr_n * sizeof(col_trx_id));
+	concurr_n = len / sizeof(trx_id_t);
+	if (len != concurr_n * sizeof(trx_id_t))
+		return dict_print_error(heap, col, len, concurr_n * sizeof(trx_id_t));
 
 	bool truncated = false;
 	if (concurr_n > I_S_MAX_CONCURR_TRX) {
@@ -812,7 +813,7 @@ char**		col_concurr_trx)
 	*col_concurr_trx = static_cast<char*>(mem_heap_alloc(heap, concurr_n * (TRX_ID_MAX_LEN + 1) + 3 + 1));
 	ptr = field, out = *col_concurr_trx;
 	for (ulint i = 0; i < concurr_n;
-		++i, ptr += sizeof(col_trx_id))
+		++i, ptr += sizeof(trx_id_t))
 	{
 		trx_id = mach_read_from_8(ptr);
 		out += ut_snprintf(out, TRX_ID_MAX_LEN + 1, TRX_ID_FMT " ", trx_id);

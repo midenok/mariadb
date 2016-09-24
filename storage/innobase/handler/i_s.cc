@@ -9300,12 +9300,12 @@ i_s_sys_vtq_fill_table(
 
 	for (int i = 0; rec && i < I_S_SYS_VTQ_LIMIT; ++i) {
 		const char*	err_msg;
-		ullong		col_trx_id;
+		trx_id_t	col_trx_id;
 		ullong		col_begin_ts;
 		ullong		col_commit_ts;
 		char*		col_concurr_trx;
 
-		/* Extract necessary information from a SYS_VTQ row */
+		/* Extract necessary information from SYS_VTQ row */
 		err_msg = dict_process_sys_vtq(
 			heap,
 			rec,
