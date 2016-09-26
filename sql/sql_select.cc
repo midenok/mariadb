@@ -691,7 +691,7 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
 
     if (table->system_versioning.data_type == FOR_SYSTEM_TIME_DATA_TYPE_TRX_ID)
     {
-      if (!(table->table->file->ha_table_flags() & HA_VTQ_SYSTEM_VERSIONING))
+      if (!(table->db_type->flags & HTON_VTQ_SYSTEM_VERSIONING))
       {
         my_error(ER_TRX_QUERIES_ARE_SUPPORTED_ONLY_BY_SOME_ENGINES, MYF(0), table->table_name);
         DBUG_RETURN(-1);

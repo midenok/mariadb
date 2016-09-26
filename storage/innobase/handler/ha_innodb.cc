@@ -2734,8 +2734,7 @@ ha_innobase::ha_innobase(
 		  HA_CAN_GEOMETRY | HA_PARTIAL_COLUMN_READ |
 		  HA_TABLE_SCAN_ON_INDEX | HA_CAN_FULLTEXT |
 		  (srv_force_primary_key ? HA_REQUIRE_PRIMARY_KEY : 0 ) |
-		  HA_CAN_FULLTEXT_EXT | HA_CAN_EXPORT |
-		  HA_VTQ_SYSTEM_VERSIONING),
+		  HA_CAN_FULLTEXT_EXT | HA_CAN_EXPORT),
 	start_of_scan(0),
 	num_write_row(0),
 	ha_partition_stats(NULL)
@@ -3351,7 +3350,8 @@ innobase_init(
 	innobase_hton->flush_logs = innobase_flush_logs;
 	innobase_hton->show_status = innobase_show_status;
 	innobase_hton->flags =
-		HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS;
+		HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS |
+		HTON_VTQ_SYSTEM_VERSIONING;
 
 	innobase_hton->release_temporary_latches =
 		innobase_release_temporary_latches;

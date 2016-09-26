@@ -249,11 +249,6 @@ enum enum_alter_inplace_result {
 #define HA_CAN_EXPORT                 (1LL << 45)
 
 /*
-  Storage engine supports System Versioning through VTQ table
- */
-#define HA_VTQ_SYSTEM_VERSIONING      (1LL << 46)
-
-/*
   Set of all binlog flags. Currently only contain the capabilities
   flags.
  */
@@ -1407,6 +1402,8 @@ handlerton *ha_default_tmp_handlerton(THD *thd);
 
 // MySQL compatibility. Unused.
 #define HTON_SUPPORTS_FOREIGN_KEYS   (1 << 0) //Foreign key constraint supported.
+
+#define HTON_VTQ_SYSTEM_VERSIONING   (1 << 11) //Engine supports System Versioning
 
 class Ha_trx_info;
 
