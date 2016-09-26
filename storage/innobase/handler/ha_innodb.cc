@@ -4277,6 +4277,7 @@ innobase_commit(
 		/* Notify VTQ on System Versioned tables update */
 		if (trx->vtq_notify_on_commit) {
 			vers_notify_vtq(trx);
+			trx->vtq_notify_on_commit = false;
 		}
 
 		/* Run the fast part of commit if we did not already. */
