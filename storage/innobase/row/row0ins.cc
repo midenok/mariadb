@@ -3489,6 +3489,7 @@ Inserts a row to SYS_VTQ table.
 @return	error state */
 void vers_notify_vtq(trx_t* trx)
 {
+	dberr_t err;
 	mem_heap_t* heap = mem_heap_create(1024);
 	dtuple_t* row = dtuple_create(heap, dict_table_get_n_cols(dict_sys->sys_vtq));
 
@@ -3533,9 +3534,9 @@ void vers_notify_vtq(trx_t* trx)
 	}
 	mutex_exit(&trx_sys->mutex);
 
-
-	if (DB_SUCCESS != vers_row_ins_vtq_low(trx, heap, row))
-		fprintf(stderr, "InnoDB: failed to insert VTQ record (see SQL error message)\n");
+	err = vers_row_ins_vtq_low(trx, heap, row);
+	if (DB_SUCCESS != err)
+		fprintf(stderr, "InnoDB: failed to insert VTQ record (error %d)\n", err);
 
 	mem_heap_free(heap);
 }
