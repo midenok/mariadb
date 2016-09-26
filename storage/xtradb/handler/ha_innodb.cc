@@ -2934,7 +2934,9 @@ ha_innobase::ha_innobase(
 	start_of_scan(0),
 	num_write_row(0),
 	ha_partition_stats(NULL)
-{}
+{
+  DBUG_PRINT("INFO", ("XYZ:Xtradb innobase"));
+}
 
 /*********************************************************************//**
 Destruct ha_innobase handler. */

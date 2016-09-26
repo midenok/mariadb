@@ -248,6 +248,10 @@ enum enum_alter_inplace_result {
  */
 #define HA_CAN_EXPORT                 (1LL << 45)
 
+/*
+  Storage engine supports System Versioning through VTQ table
+ */
+#define HA_VTQ_SYSTEM_VERSIONING      (1LL << 46)
 
 /*
   Set of all binlog flags. Currently only contain the capabilities

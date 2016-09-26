@@ -2734,11 +2734,14 @@ ha_innobase::ha_innobase(
 		  HA_CAN_GEOMETRY | HA_PARTIAL_COLUMN_READ |
 		  HA_TABLE_SCAN_ON_INDEX | HA_CAN_FULLTEXT |
 		  (srv_force_primary_key ? HA_REQUIRE_PRIMARY_KEY : 0 ) |
-		  HA_CAN_FULLTEXT_EXT | HA_CAN_EXPORT),
+		  HA_CAN_FULLTEXT_EXT | HA_CAN_EXPORT |
+		  HA_VTQ_SYSTEM_VERSIONING),
 	start_of_scan(0),
 	num_write_row(0),
 	ha_partition_stats(NULL)
-{}
+{
+DBUG_PRINT("INFO", ("XYZ:Innobase handler"));
+}
 
 /*********************************************************************//**
 Destruct ha_innobase handler. */
