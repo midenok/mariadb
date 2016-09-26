@@ -2077,35 +2077,6 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
     }
   }
 
-  /* Set system versioning information. */
-  if (system_period == NULL)
-  {
-    share->disable_system_versioning();
-  }
-  else
-  {
-    DBUG_PRINT("info", ("Setting system versioning informations"));
-    uint16 row_start = uint2korr(system_period);
-    uint16 row_end =  uint2korr(system_period + sizeof(uint16));
-    if (row_start >= share->fields || row_end >= share->fields)
-      goto err;
-    DBUG_PRINT("info", ("Columns with system versioning: [%d, %d]", row_start, row_end));
-    share->enable_system_versioning(row_start, row_end);
-    vers_start_field()->set_generated_row_start();
-    vers_end_field()->set_generated_row_end();
-
-    if (vers_start_field()->type() != MYSQL_TYPE_TIMESTAMP)
-    {
-      my_error(ER_SYS_START_FIELD_MUST_BE_TIMESTAMP, MYF(0), share->table_name);
-      goto err;
-    }
-    if (vers_end_field()->type() != MYSQL_TYPE_TIMESTAMP)
-    {
-      my_error(ER_SYS_END_FIELD_MUST_BE_TIMESTAMP, MYF(0), share->table_name);
-      goto err;
-    }
-  }
-
   /*
     the correct null_bytes can now be set, since bitfields have been taken
     into account
@@ -2132,6 +2103,55 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
 #endif
 
   share->db_plugin= se_plugin;
+
+  /* Set system versioning information. */
+  if (system_period == NULL)
+  {
+    share->disable_system_versioning();
+  }
+  else
+  {
+    DBUG_PRINT("info", ("Setting system versioning informations"));
+    uint16 row_start = uint2korr(system_period);
+    uint16 row_end =  uint2korr(system_period + sizeof(uint16));
+    if (row_start >= share->fields || row_end >= share->fields)
+      goto err;
+    DBUG_PRINT("info", ("Columns with system versioning: [%d, %d]", row_start, row_end));
+    share->enable_system_versioning(row_start, row_end);
+    vers_start_field()->set_generated_row_start();
+    vers_end_field()->set_generated_row_end();
+
+    DBUG_ASSERT(db_type());
+    if (db_type()->versioned())
+    {
+      if (vers_start_field()->type() != MYSQL_TYPE_LONGLONG
+        || !(vers_start_field()->flags & UNSIGNED_FLAG))
+      {
+        my_error(ER_SYS_START_FIELD_MUST_BE_BIGINT, MYF(0), share->table_name);
+        goto err;
+      }
+      if (vers_end_field()->type() != MYSQL_TYPE_LONGLONG
+        || !(vers_end_field()->flags & UNSIGNED_FLAG))
+      {
+        my_error(ER_SYS_END_FIELD_MUST_BE_BIGINT, MYF(0), share->table_name);
+        goto err;
+      }
+    }
+    else
+    {
+      if (vers_start_field()->type() != MYSQL_TYPE_TIMESTAMP)
+      {
+        my_error(ER_SYS_START_FIELD_MUST_BE_TIMESTAMP, MYF(0), share->table_name);
+        goto err;
+      }
+      if (vers_end_field()->type() != MYSQL_TYPE_TIMESTAMP)
+      {
+        my_error(ER_SYS_END_FIELD_MUST_BE_TIMESTAMP, MYF(0), share->table_name);
+        goto err;
+      }
+    } // if (db_type()->versioned())
+  } // if (system_period == NULL)
+
   share->error= OPEN_FRM_OK;
   thd->status_var.opened_shares++;
   thd->mem_root= old_root;
