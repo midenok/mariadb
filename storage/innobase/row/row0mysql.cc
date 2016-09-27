@@ -1356,6 +1356,12 @@ row_insert_for_mysql(
 
 	row_mysql_convert_row_to_innobase(node->row, prebuilt, mysql_rec);
 
+	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
+		ut_ad(table->vers_row_start != table->vers_row_end);
+		set_row_field_8(node->row, table->vers_row_start, trx->id, table->heap, false);
+		set_row_field_8(node->row, table->vers_row_end, IB_UINT64_MAX, table->heap, false);
+	}
+
 	savept = trx_savept_take(trx);
 
 	thr = que_fork_get_first_thr(prebuilt->ins_graph);
