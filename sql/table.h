@@ -1458,7 +1458,8 @@ public:
 
   bool versioned() const
   {
-    return s->versioned;
+    DBUG_ASSERT(s->db_type());
+    return s->versioned && !s->db_type()->versioned();
   }
 
   Field *vers_start_field() const
@@ -1478,9 +1479,9 @@ public:
 /** Number of additional fields used in versioned tables */
 #define VERSIONING_FIELDS 2
 
-  uint user_fields() const
+  uint vers_user_fields() const
   {
-    return versioned() ?
+    return s->versioned ?
       s->fields - VERSIONING_FIELDS :
       s->fields;
   }

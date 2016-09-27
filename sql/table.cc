@@ -2096,7 +2096,6 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
   my_bitmap_init(&share->all_set, bitmaps, share->fields, FALSE);
   bitmap_set_all(&share->all_set);
 
-  delete handler_file;
 #ifndef DBUG_OFF
   if (use_hash)
     (void) my_hash_check(&share->name_hash);
@@ -2152,12 +2151,15 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
     } // if (db_type()->versioned())
   } // if (system_period == NULL)
 
+  delete handler_file;
+
   share->error= OPEN_FRM_OK;
   thd->status_var.opened_shares++;
   thd->mem_root= old_root;
   DBUG_RETURN(0);
 
- err:
+err:
+  share->db_plugin= NULL;
   share->error= OPEN_FRM_CORRUPTED;
   share->open_errno= my_errno;
   delete handler_file;
