@@ -10726,9 +10726,19 @@ create_table_def(
 
 	for (i = 0; i < n_cols; i++) {
 		Field*	field = form->field[i];
+		ulint vers_row_start = 0;
+		ulint vers_row_end = 0;
+
                 if (!field->stored_in_db())
 		  continue;
 
+		if (flags2 & DICT_TF2_VERSIONED) {
+			if (i == form->s->row_start_field) {
+				vers_row_start = DATA_VERS_ROW_START;
+			} else if (i == form->s->row_end_field) {
+				vers_row_end = DATA_VERS_ROW_END;
+			}
+		}
 		col_type = get_innobase_type_from_mysql_type(&unsigned_type,
 							     field);
 
@@ -10809,7 +10819,8 @@ err_col:
 			dtype_form_prtype(
 				(ulint) field->type()
 				| nulls_allowed | unsigned_type
-				| binary_type | long_true_varchar,
+				| binary_type | long_true_varchar
+				| vers_row_start | vers_row_end,
 				charset_no),
 			col_len);
 	}

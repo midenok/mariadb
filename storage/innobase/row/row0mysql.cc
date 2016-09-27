@@ -1400,7 +1400,7 @@ error_exit:
 		return(err);
 	}
 
-	if (!trx->vtq_notify_on_commit && DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
+	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
 		trx->vtq_notify_on_commit = true;
 	}
 
