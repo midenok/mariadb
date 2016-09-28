@@ -8735,14 +8735,37 @@ ha_innobase::update_row(
 		uvect = row_get_prebuilt_update_vector(prebuilt);
 	}
 
-	/* Build an update vector from the modified fields in the rows
-	(uses upd_buf of the handle) */
+	if (DICT_TF2_FLAG_IS_SET(prebuilt->table, DICT_TF2_VERSIONED)) {
+		/* System Versioning: update current row's sys_trx_end only */
+		dict_table_t* table = prebuilt->table;
+		dict_index_t* clust_index = dict_table_get_first_index(table);
+		ut_ad(uvect->n_fields == 0);
 
-	error = calc_row_difference(uvect, (uchar*) old_row, new_row, table,
-				    upd_buf, upd_buf_size, prebuilt, user_thd);
+		upd_field_t* ufield = &uvect->fields[0];
+		UNIV_MEM_INVALID(ufield, sizeof *ufield);
+		dict_col_t* col_row_end = &table->cols[table->vers_row_end];
+		ufield->field_no = dict_col_get_clust_pos(col_row_end, clust_index);
+		ufield->orig_len = 0;
+		ufield->exp = NULL;
 
-	if (error != DB_SUCCESS) {
-		goto func_exit;
+		static const ulint fsize = sizeof(trx_id_t);
+		byte* buf = static_cast<byte*>(mem_heap_alloc(table->heap, fsize));
+		mach_write_to_8(buf, trx->id);
+		dfield_t* dfield = &ufield->new_val;
+		dfield_set_data(dfield, buf, fsize);
+		dict_col_copy_type(col_row_end, &dfield->type);
+
+		uvect->n_fields = 1;
+	} else {
+		/* Build an update vector from the modified fields in the rows
+		(uses upd_buf of the handle) */
+
+		error = calc_row_difference(uvect, (uchar*) old_row, new_row, table,
+					    upd_buf, upd_buf_size, prebuilt, user_thd);
+
+		if (error != DB_SUCCESS) {
+			goto func_exit;
+		}
 	}
 
 	/* This is not a delete */

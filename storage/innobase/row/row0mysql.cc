@@ -1791,25 +1791,8 @@ row_update_for_mysql(
 					      &prebuilt->clust_pcur);
 	}
 
-	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
-		/* System Versioning: update sys_trx_end */
-		upd_t* uvect = node->update;
-		upd_field_t* ufield = uvect->fields + uvect->n_fields;
-		ut_ad(uvect->n_fields < node->table->n_cols);
-		UNIV_MEM_INVALID(ufield, sizeof *ufield);
-		dict_col_t* col_row_end = &table->cols[table->vers_row_end];
-		ufield->field_no = dict_col_get_clust_pos(col_row_end, clust_index);
-		ufield->orig_len = 0;
-		ufield->exp = NULL;
+	if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_VERSIONED)) {
 
-		static const ulint fsize = sizeof(trx_id_t);
-		byte* buf = static_cast<byte*>(mem_heap_alloc(table->heap, fsize));
-		mach_write_to_8(buf, trx->id);
-		dfield_t* dfield = &ufield->new_val;
-		dfield_set_data(dfield, buf, fsize);
-		dict_col_copy_type(col_row_end, &dfield->type);
-
-		uvect->n_fields++;
 	}
 
 	ut_a(node->pcur->rel_pos == BTR_PCUR_ON);
