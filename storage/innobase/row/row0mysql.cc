@@ -1361,10 +1361,10 @@ row_insert_for_mysql(
 	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
 		ut_ad(table->vers_row_start != table->vers_row_end);
 		if (historical) {
-			set_row_field_8(node->row, table->vers_row_end, trx->id, table->heap, false);
+			set_row_field_8(node->row, table->vers_row_end, trx->id, table->heap);
 		} else {
-			set_row_field_8(node->row, table->vers_row_start, trx->id, table->heap, false);
-			set_row_field_8(node->row, table->vers_row_end, IB_UINT64_MAX, table->heap, false);
+			set_row_field_8(node->row, table->vers_row_start, trx->id, table->heap);
+			set_row_field_8(node->row, table->vers_row_end, IB_UINT64_MAX, table->heap);
 		}
 	}
 
@@ -1797,8 +1797,27 @@ row_update_for_mysql(
 					      &prebuilt->clust_pcur);
 	}
 
-	if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_VERSIONED)) {
+	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)
+		&& !node->is_delete)
+	{
+		/* System Versioning: update sys_trx_start to current trx_id */
+		upd_t* uvect = node->update;
+		upd_field_t* ufield = uvect->fields + uvect->n_fields;
+		ut_ad(uvect->n_fields < node->table->n_cols);
+		UNIV_MEM_INVALID(ufield, sizeof *ufield);
+		dict_col_t* col_row_start = &table->cols[table->vers_row_start];
+		ufield->field_no = dict_col_get_clust_pos(col_row_start, clust_index);
+		ufield->orig_len = 0;
+		ufield->exp = NULL;
 
+		static const ulint fsize = sizeof(trx_id_t);
+		byte* buf = static_cast<byte*>(mem_heap_alloc(table->heap, fsize));
+		mach_write_to_8(buf, trx->id);
+		dfield_t* dfield = &ufield->new_val;
+		dfield_set_data(dfield, buf, fsize);
+		dict_col_copy_type(col_row_start, &dfield->type);
+
+		uvect->n_fields++;
 	}
 
 	ut_a(node->pcur->rel_pos == BTR_PCUR_ON);

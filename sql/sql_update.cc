@@ -851,6 +851,10 @@ int mysql_update(THD *thd,
 
             restore_record(table, record[2]);
           }
+          else if (table->versioned())
+          {
+            updated_sys_ver++;
+          }
         }
         else if (!ignore ||
                  table->file->is_fatal_error(error, HA_CHECK_DUP_KEY))
