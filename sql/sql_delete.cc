@@ -575,7 +575,7 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
 	 ! thd->is_error())
   {
     if (table->versioned_by_sql() &&
-        !table->vers_end_field()->infinite())
+        !table->vers_end_field()->is_max())
     {
       continue;
     }
@@ -1071,7 +1071,7 @@ int multi_delete::send_data(List<Item> &values)
       continue;
 
     if (table->versioned_by_sql() &&
-        !table->vers_end_field()->infinite())
+        !table->vers_end_field()->is_max())
     {
       continue;
     }

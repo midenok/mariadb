@@ -648,13 +648,13 @@ public:
   /**
      Used by System Versioning.
    */
-  virtual bool set_infinity() {
+  virtual bool set_max() {
     return true;
   }
   /**
      Used by System Versioning.
    */
-  virtual bool infinite() {
+  virtual bool is_max() {
     return false;
   }
 
@@ -2116,8 +2116,8 @@ public:
     return unpack_int64(to, from, from_end);
   }
 
-  bool set_infinity();
-  bool infinite();
+  bool set_max();
+  bool is_max();
 };
 
 
@@ -2519,8 +2519,8 @@ public:
   {
     return memcmp(a_ptr, b_ptr, pack_length());
   }
-  bool set_infinity();
-  bool infinite();
+  bool set_max();
+  bool is_max();
   void store_TIME(my_time_t timestamp, ulong sec_part);
   my_time_t get_timestamp(const uchar *pos, ulong *sec_part) const;
   uint size_of() const { return sizeof(*this); }

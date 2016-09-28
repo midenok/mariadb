@@ -7085,7 +7085,7 @@ void TABLE::vers_update_fields()
 
   if (vers_start_field()->set_time())
     DBUG_ASSERT(0);
-  if (vers_end_field()->set_infinity())
+  if (vers_end_field()->set_max())
     DBUG_ASSERT(0);
 
   bitmap_set_bit(write_set, vers_start_field()->field_index);

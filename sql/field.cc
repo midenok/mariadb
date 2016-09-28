@@ -4355,14 +4355,14 @@ void Field_longlong::sql_type(String &res) const
   add_zerofill_and_unsigned(res);
 }
 
-bool Field_longlong::set_infinity()
+bool Field_longlong::set_max()
 {
   ASSERT_COLUMN_MARKED_FOR_WRITE_OR_COMPUTED;
   int8store(ptr, ULONGLONG_MAX);
   return FALSE;
 }
 
-bool Field_longlong::infinite()
+bool Field_longlong::is_max()
 {
   ASSERT_COLUMN_MARKED_FOR_READ;
   ulonglong j;
@@ -5447,9 +5447,9 @@ void Field_timestampf::store_TIME(my_time_t timestamp, ulong sec_part)
   my_timestamp_to_binary(&tm, ptr, dec);
 }
 
-bool Field_timestampf::set_infinity()
+bool Field_timestampf::set_max()
 {
-  DBUG_ENTER("Field_timestampf::set_infinity");
+  DBUG_ENTER("Field_timestampf::set_max");
   ASSERT_COLUMN_MARKED_FOR_WRITE_OR_COMPUTED;
 
   mi_int4store(ptr, 0x7fffffff);
@@ -5458,9 +5458,9 @@ bool Field_timestampf::set_infinity()
   DBUG_RETURN(FALSE);
 }
 
-bool Field_timestampf::infinite()
+bool Field_timestampf::is_max()
 {
-  DBUG_ENTER("Field_timestampf::infinite");
+  DBUG_ENTER("Field_timestampf::is_max");
   ASSERT_COLUMN_MARKED_FOR_READ;
 
   DBUG_RETURN(mi_sint4korr(ptr) == 0x7fffffff);
