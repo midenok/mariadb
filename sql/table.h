@@ -1453,10 +1453,16 @@ public:
   bool validate_default_values_of_unset_fields(THD *thd) const;
 
   /**
-    System versioning support.
+    System Versioning support
    */
 
   bool versioned() const
+  {
+    return s->versioned;
+  }
+
+  /* Versioned by SQL layer */
+  bool versioned_by_sql() const
   {
     DBUG_ASSERT(s->db_type());
     return s->versioned && !s->db_type()->versioned();
@@ -1464,13 +1470,13 @@ public:
 
   Field *vers_start_field() const
   {
-    DBUG_ASSERT(versioned());
+    DBUG_ASSERT(s->versioned);
     return field[s->row_start_field];
   }
 
   Field *vers_end_field() const
   {
-    DBUG_ASSERT(versioned());
+    DBUG_ASSERT(s->versioned);
     return field[s->row_end_field];
   }
 

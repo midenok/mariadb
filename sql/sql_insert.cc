@@ -967,7 +967,7 @@ bool mysql_insert(THD *thd,TABLE_LIST *table_list,
       break;
     }
 
-    if (table->versioned())
+    if (table->versioned_by_sql())
       table->vers_update_fields();
 
     if ((res= table_list->view_check_option(thd,
@@ -1508,7 +1508,7 @@ bool mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
   if (!table)
     table= table_list->table;
 
-  if (table->versioned() && duplic == DUP_REPLACE)
+  if (table->versioned_by_sql() && duplic == DUP_REPLACE)
   {
     // Additional memory may be required to create historical items.
     if (table_list->set_insert_values(thd->mem_root))
@@ -1586,7 +1586,7 @@ static int last_uniq_key(TABLE *table,uint keynr)
 
 int vers_insert_history_row(TABLE *table, ha_rows *inserted)
 {
-  DBUG_ASSERT(table->versioned());
+  DBUG_ASSERT(table->versioned_by_sql());
   restore_record(table,record[1]);
 
   // Set Sys_end to now()
@@ -1803,7 +1803,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
           if (error != HA_ERR_RECORD_IS_THE_SAME)
           {
             info->updated++;
-            if (table->versioned() &&
+            if (table->versioned_by_sql() &&
               (error=vers_insert_history_row(table, &info->copied)))
               goto err;
           }
@@ -1864,7 +1864,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
         if (last_uniq_key(table,key_nr) &&
             !table->file->referenced_by_foreign_key() &&
             (!table->triggers || !table->triggers->has_delete_triggers()) &&
-            !table->versioned())
+            !table->versioned_by_sql())
         {
           if ((error=table->file->ha_update_row(table->record[1],
                                                 table->record[0])) &&
@@ -1888,7 +1888,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
                                                 TRG_ACTION_BEFORE, TRUE))
             goto before_trg_err;
 
-          if (!table->versioned())
+          if (!table->versioned_by_sql())
             error= table->file->ha_delete_row(table->record[1]);
           else
           {
@@ -1906,7 +1906,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
           }
           if (error)
             goto err;
-          if (!table->versioned())
+          if (!table->versioned_by_sql())
             info->deleted++;
           else
             info->updated++;
@@ -3719,7 +3719,7 @@ int select_insert::send_data(List<Item> &values)
     DBUG_RETURN(0);
 
   thd->count_cuted_fields= CHECK_FIELD_WARN;	// Calculate cuted fields
-  if (table->versioned())
+  if (table->versioned_by_sql())
     table->vers_update_fields();
   store_values(values);
   if (table->default_field && table->update_default_fields())

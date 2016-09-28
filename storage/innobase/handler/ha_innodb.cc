@@ -8739,7 +8739,7 @@ ha_innobase::update_row(
 		/* System Versioning: update current row's sys_trx_end only */
 		dict_table_t* table = prebuilt->table;
 		dict_index_t* clust_index = dict_table_get_first_index(table);
-		ut_ad(uvect->n_fields == 0);
+		ut_ad(uvect->n_fields == 1 || uvect->n_fields == table->n_cols);
 
 		upd_field_t* ufield = &uvect->fields[0];
 		UNIV_MEM_INVALID(ufield, sizeof *ufield);
@@ -8776,6 +8776,10 @@ ha_innobase::update_row(
 	innobase_srv_conc_enter_innodb(trx);
 
 	error = row_update_for_mysql((byte*) old_row, prebuilt);
+
+	if (error == DB_SUCCESS && DICT_TF2_FLAG_IS_SET(prebuilt->table, DICT_TF2_VERSIONED)) {
+		error = row_insert_for_mysql((byte*) old_row, prebuilt, true);
+	}
 
 	/* We need to do some special AUTOINC handling for the following case:
 

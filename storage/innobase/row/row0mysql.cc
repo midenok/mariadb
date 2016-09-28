@@ -1289,8 +1289,10 @@ dberr_t
 row_insert_for_mysql(
 /*=================*/
 	byte*		mysql_rec,	/*!< in: row in the MySQL format */
-	row_prebuilt_t*	prebuilt)	/*!< in: prebuilt struct in MySQL
+	row_prebuilt_t*	prebuilt,	/*!< in: prebuilt struct in MySQL
 					handle */
+	bool		historical)	/*!< in: System Versioning, row is
+					historical */
 {
 	trx_savept_t	savept;
 	que_thr_t*	thr;
@@ -1358,8 +1360,12 @@ row_insert_for_mysql(
 
 	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
 		ut_ad(table->vers_row_start != table->vers_row_end);
-		set_row_field_8(node->row, table->vers_row_start, trx->id, table->heap, false);
-		set_row_field_8(node->row, table->vers_row_end, IB_UINT64_MAX, table->heap, false);
+		if (historical) {
+			set_row_field_8(node->row, table->vers_row_end, trx->id, table->heap, false);
+		} else {
+			set_row_field_8(node->row, table->vers_row_start, trx->id, table->heap, false);
+			set_row_field_8(node->row, table->vers_row_end, IB_UINT64_MAX, table->heap, false);
+		}
 	}
 
 	savept = trx_savept_take(trx);
