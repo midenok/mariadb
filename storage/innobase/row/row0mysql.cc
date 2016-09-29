@@ -1826,6 +1826,7 @@ row_update_for_mysql(
 		dict_col_copy_type(col, &dfield->type);
 
 		uvect->n_fields++;
+		ut_ad(node->in_mysql_interface); // otherwise needs to recalculate node->cmpl_info
 	}
 
 	ut_a(node->pcur->rel_pos == BTR_PCUR_ON);
