@@ -1584,22 +1584,16 @@ static int last_uniq_key(TABLE *table,uint keynr)
  sets Sys_end to now() and calls ha_write_row() .
 */
 
-int vers_insert_history_row(TABLE *table, ha_rows *inserted)
+int vers_insert_history_row(TABLE *table)
 {
   DBUG_ASSERT(table->versioned_by_sql());
   restore_record(table,record[1]);
 
   // Set Sys_end to now()
   if (table->vers_end_field()->set_time())
-  {
-    return 1;
-  }
+    DBUG_ASSERT(0);
 
-  const int error= table->file->ha_write_row(table->record[0]);
-  if (!error)
-    ++*inserted;
-
-  return error;
+  return table->file->ha_write_row(table->record[0]);
 }
 
 /*
@@ -1803,9 +1797,20 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
           if (error != HA_ERR_RECORD_IS_THE_SAME)
           {
             info->updated++;
-            if (table->versioned_by_sql() &&
-              (error=vers_insert_history_row(table, &info->copied)))
-              goto err;
+            if (table->versioned())
+            {
+              if (table->versioned_by_sql())
+              {
+                store_record(table, record[2]);
+                if ((error= vers_insert_history_row(table)))
+                {
+                  restore_record(table, record[2]);
+                  goto err;
+                }
+                restore_record(table, record[2]);
+              }
+              info->copied++;
+            }
           }
           else
             error= 0;

@@ -843,16 +843,18 @@ int mysql_update(THD *thd,
         {
           updated++;
 
-          if (table->versioned_by_sql())
+          if (table->versioned())
           {
-            store_record(table, record[2]);
-            if ((error = vers_insert_history_row(table, &updated_sys_ver)))
-              break;
-
-            restore_record(table, record[2]);
-          }
-          else if (table->versioned())
-          {
+            if (table->versioned_by_sql())
+            {
+              store_record(table, record[2]);
+              if ((error = vers_insert_history_row(table)))
+              {
+                restore_record(table, record[2]);
+                break;
+              }
+              restore_record(table, record[2]);
+            }
             updated_sys_ver++;
           }
         }
@@ -2227,22 +2229,20 @@ int multi_update::send_data(List<Item> &not_used_values)
             error= 0;
             updated--;
           }
-          else if (table->versioned_by_sql())
+          else if (table->versioned())
           {
-            restore_record(table,record[1]);
-
-            // Set end time to now()
-            if (table->vers_end_field()->set_time())
+            if (table->versioned_by_sql())
             {
-              error= 1;
-              break;
+              store_record(table, record[2]);
+              if (vers_insert_history_row(table))
+              {
+                restore_record(table, record[2]);
+                error= 1;
+                break;
+              }
+              restore_record(table, record[2]);
             }
-
-            if ( (error= vers_insert_history_row(table, &updated_sys_ver)) )
-            {
-              error= 1;
-              break;
-            }
+            updated_sys_ver++;
           }
           /* non-transactional or transactional table got modified   */
           /* either multi_update class' flag is raised in its branch */
@@ -2516,21 +2516,20 @@ int multi_update::do_updates()
         {
           updated++;
 
-          if (table->versioned_by_sql())
+          if (table->versioned())
           {
-            restore_record(table,record[1]);
-
-            // Set end time to now()
-            if (table->vers_end_field()->set_time())
+            if (table->versioned_by_sql())
             {
-              goto err2;
+              store_record(table, record[2]);
+              if ((local_error= vers_insert_history_row(table)))
+              {
+                restore_record(table, record[2]);
+                err_table = table;
+                goto err;
+              }
+              restore_record(table, record[2]);
             }
-
-            if ( (local_error= vers_insert_history_row(table, &updated_sys_ver)) )
-            {
-              err_table = table;
-              goto err;
-            }
+            updated_sys_ver++;
           }
         }
         else
