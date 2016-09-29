@@ -1361,10 +1361,10 @@ row_insert_for_mysql(
 	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)) {
 		ut_ad(table->vers_row_start != table->vers_row_end);
 		if (historical) {
-			set_row_field_8(node->row, table->vers_row_end, trx->id, table->heap);
+			set_row_field_8(node->row, table->vers_row_end, trx->id, node->entry_sys_heap);
 		} else {
-			set_row_field_8(node->row, table->vers_row_start, trx->id, table->heap);
-			set_row_field_8(node->row, table->vers_row_end, IB_UINT64_MAX, table->heap);
+			set_row_field_8(node->row, table->vers_row_start, trx->id, node->entry_sys_heap);
+			set_row_field_8(node->row, table->vers_row_end, IB_UINT64_MAX, node->entry_sys_heap);
 		}
 	}
 
