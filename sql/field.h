@@ -648,15 +648,14 @@ public:
   /**
      Used by System Versioning.
    */
-  virtual bool set_max() {
-    return true;
-  }
+  virtual bool set_max()
+  { DBUG_ASSERT(0); }
+
   /**
      Used by System Versioning.
    */
-  virtual bool is_max() {
-    return false;
-  }
+  virtual bool is_max()
+  { DBUG_ASSERT(0); }
 
   uchar		*ptr;			// Position to field in record
   /**

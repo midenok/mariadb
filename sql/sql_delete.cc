@@ -574,8 +574,7 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   while (!(error=info.read_record(&info)) && !thd->killed &&
 	 ! thd->is_error())
   {
-    if (table->versioned_by_sql() &&
-        !table->vers_end_field()->is_max())
+    if (table->versioned() && !table->vers_end_field()->is_max())
     {
       continue;
     }
@@ -1070,8 +1069,7 @@ int multi_delete::send_data(List<Item> &values)
     if (table->status & (STATUS_NULL_ROW | STATUS_DELETED))
       continue;
 
-    if (table->versioned_by_sql() &&
-        !table->vers_end_field()->is_max())
+    if (table->versioned() && !table->vers_end_field()->is_max())
     {
       continue;
     }

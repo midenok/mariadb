@@ -2142,7 +2142,7 @@ int multi_update::send_data(List<Item> &not_used_values)
     if (table->status & (STATUS_NULL_ROW | STATUS_UPDATED))
       continue;
 
-    if (table->versioned_by_sql() && !table->vers_end_field()->is_max())
+    if (table->versioned() && !table->vers_end_field()->is_max())
     {
       continue;
     }

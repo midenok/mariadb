@@ -1797,25 +1797,33 @@ row_update_for_mysql(
 					      &prebuilt->clust_pcur);
 	}
 
-	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED)
-		&& !node->is_delete)
+	if (DICT_TF2_FLAG_IS_SET(node->table, DICT_TF2_VERSIONED))
 	{
 		/* System Versioning: update sys_trx_start to current trx_id */
 		upd_t* uvect = node->update;
-		upd_field_t* ufield = uvect->fields + uvect->n_fields;
-		ut_ad(uvect->n_fields < node->table->n_cols);
+		upd_field_t* ufield;
+		dict_col_t* col;
+		if (node->is_delete) {
+			ufield = &uvect->fields[0];
+			uvect->n_fields = 0;
+			node->is_delete = false;
+			col = &table->cols[table->vers_row_end];
+		} else {
+			ut_ad(uvect->n_fields < node->table->n_cols);
+			ufield = &uvect->fields[uvect->n_fields];
+			col = &table->cols[table->vers_row_start];
+		}
 		UNIV_MEM_INVALID(ufield, sizeof *ufield);
-		dict_col_t* col_row_start = &table->cols[table->vers_row_start];
-		ufield->field_no = dict_col_get_clust_pos(col_row_start, clust_index);
+		ufield->field_no = dict_col_get_clust_pos(col, clust_index);
 		ufield->orig_len = 0;
 		ufield->exp = NULL;
 
 		static const ulint fsize = sizeof(trx_id_t);
-		byte* buf = static_cast<byte*>(mem_heap_alloc(table->heap, fsize));
+		byte* buf = static_cast<byte*>(mem_heap_alloc(node->heap, fsize));
 		mach_write_to_8(buf, trx->id);
 		dfield_t* dfield = &ufield->new_val;
 		dfield_set_data(dfield, buf, fsize);
-		dict_col_copy_type(col_row_start, &dfield->type);
+		dict_col_copy_type(col, &dfield->type);
 
 		uvect->n_fields++;
 	}
