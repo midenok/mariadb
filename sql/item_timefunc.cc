@@ -3241,3 +3241,12 @@ bool Item_func_last_day::get_date(MYSQL_TIME *ltime, ulonglong fuzzy_date)
   ltime->time_type= MYSQL_TIMESTAMP_DATE;
   return (null_value= 0);
 }
+
+Item_func_vtq_ts::Item_func_vtq_ts(THD *thd, Item* a, uint _vtq_field) :
+  Item_datetimefunc(thd, new (thd->mem_root) Item_decimal(thd, 6, TRUE)),
+  trx_id(a->val_uint()),
+  vtq_field(_vtq_field)
+{
+  decimals = 6;
+}
+

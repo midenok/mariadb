@@ -1093,6 +1093,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  BACKUP_SYM
 %token  BEFORE_SYM                    /* SQL-2003-N */
 %token  BEGIN_SYM                     /* SQL-2003-R */
+%token  BEGIN_TS_SYM                  /* System Versioning */
 %token  BETWEEN_SYM                   /* SQL-2003-R */
 %token  BIGINT                        /* SQL-2003-R */
 %token  BINARY                        /* SQL-2003-R */
@@ -1144,6 +1145,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  COMMENT_SYM
 %token  COMMITTED_SYM                 /* SQL-2003-N */
 %token  COMMIT_SYM                    /* SQL-2003-R */
+%token  COMMIT_TS_SYM                 /* System Versioning */
 %token  COMPACT_SYM
 %token  COMPLETION_SYM
 %token  COMPRESSED_SYM
@@ -10140,6 +10142,12 @@ function_call_conflict:
             if ($$ == NULL)
               MYSQL_YYABORT;
           }
+        | BEGIN_TS_SYM  '(' expr ')'
+          {
+            $$= new (thd->mem_root) Item_func_vtq_ts(thd, $3, BEGIN_TS_SYM);
+            if ($$ == NULL)
+              MYSQL_YYABORT;
+          }
         | CHARSET '(' expr ')'
           {
             $$= new (thd->mem_root) Item_func_charset(thd, $3);
@@ -10155,6 +10163,12 @@ function_call_conflict:
         | COLLATION_SYM '(' expr ')'
           {
             $$= new (thd->mem_root) Item_func_collation(thd, $3);
+            if ($$ == NULL)
+              MYSQL_YYABORT;
+          }
+        | COMMIT_TS_SYM '(' expr ')'
+          {
+            $$= new (thd->mem_root) Item_func_vtq_ts(thd, $3, COMMIT_TS_SYM);
             if ($$ == NULL)
               MYSQL_YYABORT;
           }
@@ -14887,6 +14901,7 @@ keyword_sp:
         | AUTO_SYM                 {}
         | AVG_ROW_LENGTH           {}
         | AVG_SYM                  {}
+        | BEGIN_TS_SYM             {}
         | BIT_SYM                  {}
         | BLOCK_SYM                {}
         | BOOL_SYM                 {}
@@ -14904,6 +14919,7 @@ keyword_sp:
         | COLLATION_SYM            {}
         | COLUMN_NAME_SYM          {}
         | COLUMNS                  {}
+        | COMMIT_TS_SYM            {}
         | COMMITTED_SYM            {}
         | COMPACT_SYM              {}
         | COMPLETION_SYM           {}
