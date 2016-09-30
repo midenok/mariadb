@@ -8755,7 +8755,8 @@ ha_innobase::update_row(
 	error = row_update_for_mysql((byte*) old_row, prebuilt);
 
 	if (error == DB_SUCCESS && DICT_TF2_FLAG_IS_SET(prebuilt->table, DICT_TF2_VERSIONED)) {
-		error = row_insert_for_mysql((byte*) old_row, prebuilt, true);
+		if (trx->id != static_cast<trx_id_t>(table->vers_start_field()->val_int()))
+			error = row_insert_for_mysql((byte*) old_row, prebuilt, true);
 	}
 
 	/* We need to do some special AUTOINC handling for the following case:
