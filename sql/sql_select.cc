@@ -691,7 +691,8 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
 
     if (table->system_versioning.data_type == FOR_SYSTEM_TIME_DATA_TYPE_TRX_ID)
     {
-      if (!(table->db_type->flags & HTON_VTQ_SYSTEM_VERSIONING))
+      DBUG_PRINT("INFO", ("XYZ:db_type:%p", table->table->s->db_type())); _db_flush_();
+      if (!(table->table->s->db_type()->flags & HTON_VTQ_SYSTEM_VERSIONING))
       {
         my_error(ER_TRX_QUERIES_ARE_SUPPORTED_ONLY_BY_SOME_ENGINES, MYF(0), table->table_name);
         DBUG_RETURN(-1);
@@ -709,6 +710,12 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
   {
     if (table->table && table->table->versioned())
     {
+      if (table->system_versioning.data_type == FOR_SYSTEM_TIME_DATA_TYPE_TRX_ID)
+      {
+        // FIXME: Implement me!
+        continue;
+      }
+
       Field *fstart= table->table->vers_start_field();
       Field *fend= table->table->vers_end_field();
       Item *istart= new (thd->mem_root) Item_field(thd, fstart);
