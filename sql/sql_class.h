@@ -681,6 +681,8 @@ typedef struct system_variables
 
   my_bool pseudo_slave_mode;
 
+  /* System Versioning support */
+  my_bool sys_ver_new_tables;
 } SV;
 
 /**
