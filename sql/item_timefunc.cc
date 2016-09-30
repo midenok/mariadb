@@ -3248,5 +3248,20 @@ Item_func_vtq_ts::Item_func_vtq_ts(THD *thd, Item* a, uint _vtq_field) :
   vtq_field(_vtq_field)
 {
   decimals = 6;
+  memset(&ltime, 0, sizeof(ltime));
+}
+
+void Item_func_vtq_ts::fix_length_and_dec()
+{
+  handlerton *innodb;
+  if (innodb_plugin)
+  {
+    THD *thd = current_thd; // can it differ from constructor?
+    innodb = plugin_hton(&innodb_plugin);
+    DBUG_ASSERT(thd && innodb);
+    innodb->vers_get_vtq_ts(thd, &ltime, trx_id, vtq_field);
+  }
+  Item_temporal_func::fix_length_and_dec();
+  maybe_null= false;
 }
 

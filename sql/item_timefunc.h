@@ -1118,21 +1118,17 @@ public:
 class Item_func_vtq_ts :public Item_datetimefunc
 {
   MYSQL_TIME ltime;
-  ulong trx_id;
+  ulonglong trx_id;
   uint vtq_field;
 public:
-  Item_func_vtq_ts(THD *thd, Item* a, uint _vtq_field);
+  Item_func_vtq_ts(THD *_thd, Item* a, uint _vtq_field);
   const char *func_name() const { return "vtq_ts"; /* FIXME: BEGIN_TS or COMMIT_TS */ }
   bool get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
   {
     *res= ltime;
     return 0;
   }
-  void fix_length_and_dec()
-  {
-    Item_temporal_func::fix_length_and_dec();
-    maybe_null= false;
-  }
+  void fix_length_and_dec();
   bool check_partition_func_processor(uchar *int_arg) { return FALSE; }
   bool check_vcol_func_processor(uchar *int_arg) { return FALSE; }
   bool check_valid_arguments_processor(uchar *int_arg) { return FALSE; }
