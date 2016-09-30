@@ -165,6 +165,7 @@ trx_create(void)
 		heap_alloc, sizeof(void**), 32);
 
 	trx->vtq_notify_on_commit = false;
+	trx->vtq_query = NULL;
 
 #ifdef WITH_WSREP
 	trx->wsrep_event = NULL;
@@ -257,6 +258,11 @@ trx_free(
 	}
 
 	mutex_free(&trx->mutex);
+
+	if (trx->vtq_query) {
+		pars_info_free(trx->vtq_query->info);
+		mem_free(trx->vtq_query);
+	}
 
 	mem_free(trx);
 }

@@ -1440,6 +1440,9 @@ normalize_table_name_low(
 	ibool           set_lower_case); /* in: TRUE if we want to set
 					 name to lower case */
 
+void
+innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong trx_id, uint field);
+
 /*************************************************************//**
 Check for a valid value of innobase_commit_concurrency.
 @return	0 for valid innodb_commit_concurrency */
@@ -3364,6 +3367,9 @@ innobase_init(
           innobase_hton->tablefile_extensions = ha_innobase_exts;
 
 	innobase_hton->table_options = innodb_table_option_list;
+
+	/* System Versioning */
+	innobase_hton->vers_get_vtq_ts = innobase_get_vtq_ts;
 
 	innodb_remember_check_sysvar_funcs();
 
@@ -20642,4 +20648,31 @@ ib_push_warning(
 		buf);
 	my_free(buf);
 	va_end(args);
+}
+
+static
+vtq_query_t*
+vtq_query_create(trx_t* trx)
+{
+	vtq_query_t* q = static_cast<vtq_query_t*>(mem_alloc(sizeof(*q)));
+	q->info = pars_info_create();
+	q->table = get_vtq_table();
+	return q;
+}
+
+UNIV_INTERN
+void
+innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong trx_id, uint field)
+{
+	trx_t*	trx;
+
+	DBUG_ENTER("innobase_get_vtq_ts");
+	trx = thd_to_trx(thd);
+	ut_a(trx);
+
+	if (!trx->vtq_query) {
+		trx->vtq_query = vtq_query_create(trx);
+	}
+
+	DBUG_VOID_RETURN;
 }

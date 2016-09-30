@@ -1356,9 +1356,10 @@ struct handlerton
                                    TABLE_SHARE *share, HA_CREATE_INFO *info);
 
    /*
-     Engine supports System Versioning
+     System Versioning
    */
    bool versioned();
+   void (*vers_get_vtq_ts)(THD* thd, MYSQL_TIME *out, ulonglong trx_id, uint field);
 };
 
 
