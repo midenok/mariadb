@@ -260,6 +260,9 @@ trx_free(
 	mutex_free(&trx->mutex);
 
 	if (trx->vtq_query) {
+		mutex_enter(&dict_sys->mutex);
+		que_graph_free(trx->vtq_query->graph);
+		mutex_exit(&dict_sys->mutex);
 		pars_info_free(trx->vtq_query->info);
 		mem_free(trx->vtq_query);
 	}

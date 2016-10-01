@@ -1441,7 +1441,7 @@ normalize_table_name_low(
 					 name to lower case */
 
 void
-innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong trx_id, uint field);
+innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong in_trx_id, uint field);
 
 /*************************************************************//**
 Check for a valid value of innobase_commit_concurrency.
@@ -20650,29 +20650,103 @@ ib_push_warning(
 	va_end(args);
 }
 
+
+static
+ibool
+vers_vtq_fetch_data(
+	void*	node_void,	/*!< in: select node */
+	void*	arg_void)	/*!< out: fetched vtq data */
+{
+	sel_node_t*	node = (sel_node_t*) node_void;
+	que_common_t*	cnode = static_cast<que_common_t*>(
+		node->select_list);
+
+	if (cnode == NULL)
+		return FALSE;
+
+	dfield_t*	dfield = que_node_get_val(cnode);
+	dtype_t*	type = dfield_get_type(dfield);
+	ulint		len = dfield_get_len(dfield);
+	const byte*	data = static_cast<const byte*>(
+		dfield_get_data(dfield));
+
+	return TRUE;
+}
+
 static
 vtq_query_t*
-vtq_query_create(trx_t* trx)
+vtq_query_create(trx_t* trx, trx_id_t in_trx_id, uint field, uint* result)
 {
 	vtq_query_t* q = static_cast<vtq_query_t*>(mem_alloc(sizeof(*q)));
+	q->table = dict_sys->sys_vtq;
+
+	static const char sql[] =
+		"PROCEDURE QUERY_VTQ_PROC () IS\n"
+		"DECLARE FUNCTION vtq_fetch_data;\n"
+
+		"DECLARE CURSOR index_cur IS\n"
+		" SELECT BEGIN_TS, COMMIT_TS, CONCURR_TRX\n"
+		" FROM SYS_VTQ\n"
+		" WHERE TRX_ID=:trx_id;\n"
+
+		"BEGIN\n"
+		"OPEN index_cur;\n"
+		"FETCH index_cur INTO\n"
+		"  vtq_fetch_data();\n"
+		"CLOSE index_cur;\n"
+
+		"END;\n";
+
 	q->info = pars_info_create();
-	q->table = get_vtq_table();
+	pars_info_add_ull_literal(q->info, "trx_id", in_trx_id);
+	//pars_info_add_literal(q->info, "field", STRING_WITH_LEN("BEGIN_TS"), DATA_VARCHAR, DATA_ENGLISH);
+	pars_info_bind_function(q->info,
+			"vtq_fetch_data",
+			vers_vtq_fetch_data,
+			result);
+
+	mutex_enter(&dict_sys->mutex);
+	q->graph = pars_sql(q->info, sql);
+	mutex_exit(&dict_sys->mutex);
+
+	ut_a(q->graph);
+	q->graph->trx = trx;
+	q->graph->fork_type = QUE_FORK_MYSQL_INTERFACE;
 	return q;
 }
 
 UNIV_INTERN
 void
-innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong trx_id, uint field)
+innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
 {
 	trx_t*	trx;
+	que_thr_t*  thr;
+	vtq_query_t* q;
+	ut_ad(sizeof(_in_trx_id) == sizeof(trx_id_t));
+	trx_id_t in_trx_id = static_cast<trx_id_t>(_in_trx_id);
 
 	DBUG_ENTER("innobase_get_vtq_ts");
 	trx = thd_to_trx(thd);
 	ut_a(trx);
 
-	if (!trx->vtq_query) {
-		trx->vtq_query = vtq_query_create(trx);
+	q = trx->vtq_query;
+	uint result;
+
+	if (!q) {
+		q = vtq_query_create(trx, in_trx_id, field, &result);
+		trx->vtq_query = q;
+	} else {
+		pars_info_bind_ull_literal(q->info, "trx_id", &in_trx_id);
+		//pars_info_bind_literal(q->info, "field", STRING_WITH_LEN("BEGIN_TS"), DATA_VARCHAR, DATA_ENGLISH);
+		pars_info_bind_function(q->info,
+			"vtq_fetch_data",
+			vers_vtq_fetch_data,
+			&result);
 	}
+
+	ut_a(trx->error_state == DB_SUCCESS);
+	ut_a(thr = que_fork_start_command(q->graph));
+	que_run_threads(thr);
 
 	DBUG_VOID_RETURN;
 }
