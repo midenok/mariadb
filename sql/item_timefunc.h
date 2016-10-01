@@ -1114,6 +1114,7 @@ public:
   bool get_date(MYSQL_TIME *res, ulonglong fuzzy_date);
 };
 
+#include "vtq.h"
 
 class Item_func_vtq_ts :public Item_datetimefunc
 {

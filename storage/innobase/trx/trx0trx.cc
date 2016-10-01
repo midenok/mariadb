@@ -260,6 +260,8 @@ trx_free(
 	mutex_free(&trx->mutex);
 
 	if (trx->vtq_query) {
+		if (trx->vtq_query->close_read_view)
+			read_view_close_for_mysql(trx);
 		mutex_enter(&dict_sys->mutex);
 		que_graph_free(trx->vtq_query->graph);
 		mutex_exit(&dict_sys->mutex);
@@ -305,6 +307,11 @@ trx_free_for_background(
 		trx_print(stderr, trx, 600);
 		ut_print_buf(stderr, trx, sizeof(trx_t));
 		putc('\n', stderr);
+	}
+
+	if (trx->vtq_query && trx->vtq_query->close_read_view) {
+		read_view_close_for_mysql(trx);
+		trx->vtq_query->close_read_view = false;
 	}
 
 	ut_a(trx->state == TRX_STATE_NOT_STARTED);

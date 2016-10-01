@@ -10144,7 +10144,7 @@ function_call_conflict:
           }
         | BEGIN_TS_SYM  '(' expr ')'
           {
-            $$= new (thd->mem_root) Item_func_vtq_ts(thd, $3, BEGIN_TS_SYM);
+            $$= new (thd->mem_root) Item_func_vtq_ts(thd, $3, VTQ_BEGIN_TS);
             if ($$ == NULL)
               MYSQL_YYABORT;
           }
@@ -10168,7 +10168,7 @@ function_call_conflict:
           }
         | COMMIT_TS_SYM '(' expr ')'
           {
-            $$= new (thd->mem_root) Item_func_vtq_ts(thd, $3, COMMIT_TS_SYM);
+            $$= new (thd->mem_root) Item_func_vtq_ts(thd, $3, VTQ_COMMIT_TS);
             if ($$ == NULL)
               MYSQL_YYABORT;
           }
