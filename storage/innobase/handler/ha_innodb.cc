@@ -113,6 +113,7 @@ MYSQL_PLUGIN_IMPORT extern char mysql_unpacked_real_data_home[];
 #include "fts0priv.h"
 #include "page0zip.h"
 #include "fil0pagecompress.h"
+#include "vtq.h"
 
 #define thd_get_trx_isolation(X) ((enum_tx_isolation)thd_tx_isolation(X))
 
@@ -20658,27 +20659,53 @@ vers_vtq_fetch_data(
 	void*	arg_void)	/*!< out: fetched vtq data */
 {
 	sel_node_t*	node = (sel_node_t*) node_void;
-	que_common_t*	cnode = static_cast<que_common_t*>(
-		node->select_list);
+	vtq_query_t*	q = (vtq_query_t*) arg_void;
+	que_common_t*	cnode;
+	int		i;
 
-	if (cnode == NULL)
-		return FALSE;
+	/* this should loop exactly 3 times - for the columns that
+	were selected: BEGIN_TS, COMMIT_TS, CONCURR_TRX */
+	for (cnode = static_cast<que_common_t*>(node->select_list), i = 0;
+	     cnode != NULL;
+	     cnode = static_cast<que_common_t*>(que_node_get_next(cnode)),
+	     i++)
+	{
+		dfield_t*	dfield = que_node_get_val(cnode);
+		dtype_t*	type = dfield_get_type(dfield);
+		ulint		len = dfield_get_len(dfield);
+		const byte*	data = static_cast<const byte*>(
+			dfield_get_data(dfield));
 
-	dfield_t*	dfield = que_node_get_val(cnode);
-	dtype_t*	type = dfield_get_type(dfield);
-	ulint		len = dfield_get_len(dfield);
-	const byte*	data = static_cast<const byte*>(
-		dfield_get_data(dfield));
+		ut_ad(type);
+
+		switch (i) {
+		case 0:
+			ut_a(type->mtype == DATA_INT);
+			ut_ad(type->prtype & DATA_UNSIGNED);
+			ut_a(len == 8);
+			q->begin_ts = mach_read_from_8(data);
+			break;
+		case 1:
+			ut_a(type->mtype == DATA_INT);
+			ut_ad(type->prtype & DATA_UNSIGNED);
+			ut_a(len == 8);
+			q->commit_ts = mach_read_from_8(data);
+			break;
+		case 2:
+			break;
+		default:
+			ut_error;
+		}
+	}
 
 	return TRUE;
 }
 
 static
 vtq_query_t*
-vtq_query_create(trx_t* trx, trx_id_t in_trx_id, uint field, uint* result)
+vtq_query_create(trx_t* trx, trx_id_t in_trx_id, uint field)
 {
 	vtq_query_t* q = static_cast<vtq_query_t*>(mem_alloc(sizeof(*q)));
-	q->table = dict_sys->sys_vtq;
 
 	static const char sql[] =
 		"PROCEDURE QUERY_VTQ_PROC () IS\n"
@@ -20687,7 +20714,8 @@ vtq_query_create(trx_t* trx, trx_id_t in_trx_id, uint field, uint* result)
 		"DECLARE CURSOR index_cur IS\n"
 		" SELECT BEGIN_TS, COMMIT_TS, CONCURR_TRX\n"
 		" FROM SYS_VTQ\n"
-		" WHERE TRX_ID=:trx_id;\n"
+		" WHERE TRX_ID=:trx_id\n;"
+		//" LOCK IN SHARE MODE;\n"
 
 		"BEGIN\n"
 		"OPEN index_cur;\n"
@@ -20699,11 +20727,10 @@ vtq_query_create(trx_t* trx, trx_id_t in_trx_id, uint field, uint* result)
 
 	q->info = pars_info_create();
 	pars_info_add_ull_literal(q->info, "trx_id", in_trx_id);
-	//pars_info_add_literal(q->info, "field", STRING_WITH_LEN("BEGIN_TS"), DATA_VARCHAR, DATA_ENGLISH);
 	pars_info_bind_function(q->info,
 			"vtq_fetch_data",
 			vers_vtq_fetch_data,
-			result);
+			q);
 
 	mutex_enter(&dict_sys->mutex);
 	q->graph = pars_sql(q->info, sql);
@@ -20712,6 +20739,8 @@ vtq_query_create(trx_t* trx, trx_id_t in_trx_id, uint field, uint* result)
 	ut_a(q->graph);
 	q->graph->trx = trx;
 	q->graph->fork_type = QUE_FORK_MYSQL_INTERFACE;
+
+	q->close_read_view = trx->global_read_view ? false : true;
 	return q;
 }
 
@@ -20719,34 +20748,54 @@ UNIV_INTERN
 void
 innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
 {
-	trx_t*	trx;
-	que_thr_t*  thr;
-	vtq_query_t* q;
+	trx_t*		trx;
+	trx_state_t	saved_state;
+	que_thr_t*	thr;
+	vtq_query_t*	q;
+
 	ut_ad(sizeof(_in_trx_id) == sizeof(trx_id_t));
-	trx_id_t in_trx_id = static_cast<trx_id_t>(_in_trx_id);
+	trx_id_t	in_trx_id = static_cast<trx_id_t>(_in_trx_id);
 
 	DBUG_ENTER("innobase_get_vtq_ts");
 	trx = thd_to_trx(thd);
 	ut_a(trx);
+	saved_state = trx->state;
 
 	q = trx->vtq_query;
-	uint result;
 
 	if (!q) {
-		q = vtq_query_create(trx, in_trx_id, field, &result);
+		q = vtq_query_create(trx, in_trx_id, field);
 		trx->vtq_query = q;
 	} else {
-		pars_info_bind_ull_literal(q->info, "trx_id", &in_trx_id);
-		//pars_info_bind_literal(q->info, "field", STRING_WITH_LEN("BEGIN_TS"), DATA_VARCHAR, DATA_ENGLISH);
-		pars_info_bind_function(q->info,
-			"vtq_fetch_data",
-			vers_vtq_fetch_data,
-			&result);
+		trx_id_t trx_id_net;
+		if (q->trx_id == in_trx_id) {
+			goto return_result;
+		}
+		mach_write_to_8(
+			reinterpret_cast<byte*>(&trx_id_net),
+			in_trx_id);
+		pars_info_bind_ull_literal(q->info, "trx_id", &trx_id_net);
 	}
+
+	q->trx_id = in_trx_id;
 
 	ut_a(trx->error_state == DB_SUCCESS);
 	ut_a(thr = que_fork_start_command(q->graph));
 	que_run_threads(thr);
+
+return_result:
+	switch (field) {
+	case VTQ_BEGIN_TS:
+		unpack_time(q->begin_ts, out);
+		break;
+	case VTQ_COMMIT_TS:
+		unpack_time(q->commit_ts, out);
+		break;
+	default:
+		ut_error;
+	}
+
+	trx->state = saved_state;
 
 	DBUG_VOID_RETURN;
 }

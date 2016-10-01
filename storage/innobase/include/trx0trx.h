@@ -682,9 +682,12 @@ typedef enum {
 
 struct vtq_query_t
 {
-	dict_table_t*	table;
 	pars_info_t*    info;
 	que_t*		graph;
+	trx_id_t	trx_id;
+	ib_uint64_t	begin_ts;
+	ib_uint64_t	commit_ts;
+	bool		close_read_view;
 };
 
 struct trx_t{
