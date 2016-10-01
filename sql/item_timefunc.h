@@ -1121,7 +1121,7 @@ class Item_func_vtq_ts :public Item_datetimefunc
   ulonglong trx_id;
   uint vtq_field;
 public:
-  Item_func_vtq_ts(THD *_thd, Item* a, uint _vtq_field);
+  Item_func_vtq_ts(THD *thd, Item* a, uint _vtq_field);
   const char *func_name() const { return "vtq_ts"; /* FIXME: BEGIN_TS or COMMIT_TS */ }
   bool get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
   {

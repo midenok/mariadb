@@ -3256,7 +3256,7 @@ void Item_func_vtq_ts::fix_length_and_dec()
   handlerton *innodb;
   if (innodb_plugin)
   {
-    THD *thd = current_thd; // can it differ from constructor?
+    THD *thd = current_thd; // can it differ from constructor's?
     innodb = plugin_hton(&innodb_plugin);
     DBUG_ASSERT(thd && innodb);
     innodb->vers_get_vtq_ts(thd, &ltime, trx_id, vtq_field);
