@@ -20759,6 +20759,62 @@ innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
 	DBUG_ENTER("innobase_get_vtq_ts");
 	trx = thd_to_trx(thd);
 	ut_a(trx);
+
+	if (field == 1) {
+		dict_index_t*	index = dict_table_get_first_index(dict_sys->sys_vtq);
+		btr_pcur_t	pcur;
+		dtuple_t*	tuple;
+		dfield_t*	dfield;
+		trx_id_t	trx_id_net;
+		mtr_t		mtr;
+		mem_heap_t*	heap = mem_heap_create(0);
+		rec_t*		rec;
+		ulint		len;
+		byte*		result_net;
+		ib_uint64_t	result;
+
+		ut_ad(index);
+		ut_ad(dict_index_is_clust(index));
+
+		mach_write_to_8(
+			reinterpret_cast<byte*>(&trx_id_net),
+			in_trx_id);
+
+		tuple = dtuple_create(heap, 1);
+		dfield = dtuple_get_nth_field(tuple, DICT_FLD__SYS_VTQ__TRX_ID);
+		dfield_set_data(dfield, &trx_id_net, 8);
+		dict_index_copy_types(tuple, index, 1);
+
+		mtr_start_trx(&mtr, trx);
+		btr_pcur_open_on_user_rec(index, tuple, PAGE_CUR_GE,
+				BTR_SEARCH_LEAF, &pcur, &mtr);
+		if (!btr_pcur_is_on_user_rec(&pcur)) {
+			// FIXME: return NULL
+			btr_pcur_close(&pcur);
+			mtr_commit(&mtr);
+			mem_heap_free(heap);
+			DBUG_VOID_RETURN;
+		}
+		rec = btr_pcur_get_rec(&pcur);
+		result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__TRX_ID, &len);
+		ut_ad(len == 8);
+		if (trx_id_net != *(trx_id_t *) result_net) {
+			// FIXME: return NULL
+			btr_pcur_close(&pcur);
+			mtr_commit(&mtr);
+			mem_heap_free(heap);
+			DBUG_VOID_RETURN;
+		}
+		result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__COMMIT_TS, &len);
+		ut_ad(len == 8);
+		result = mach_read_from_8(result_net);
+		btr_pcur_close(&pcur);
+		mtr_commit(&mtr);
+		mem_heap_free(heap);
+
+		unpack_time(result, out);
+		DBUG_VOID_RETURN;
+	}
 	saved_state = trx->state;
 
 	q = trx->vtq_query;
