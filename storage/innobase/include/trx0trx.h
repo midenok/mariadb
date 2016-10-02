@@ -682,12 +682,9 @@ typedef enum {
 
 struct vtq_query_t
 {
-	pars_info_t*    info;
-	que_t*		graph;
 	trx_id_t	trx_id;
 	ib_uint64_t	begin_ts;
 	ib_uint64_t	commit_ts;
-	bool		close_read_view;
 };
 
 struct trx_t{
@@ -1045,7 +1042,7 @@ struct trx_t{
 	/* System Versioning */
 	bool		vtq_notify_on_commit;
 					/*!< Notify VTQ for System Versioned update */
-	vtq_query_t*	vtq_query;
+	vtq_query_t	vtq_query;
 };
 
 /* Transaction isolation levels (trx->isolation_level) */

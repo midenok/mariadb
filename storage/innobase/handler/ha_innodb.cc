@@ -20652,194 +20652,10 @@ ib_push_warning(
 }
 
 
-static
-ibool
-vers_vtq_fetch_data(
-	void*	node_void,	/*!< in: select node */
-	void*	arg_void)	/*!< out: fetched vtq data */
-{
-	sel_node_t*	node = (sel_node_t*) node_void;
-	vtq_query_t*	q = (vtq_query_t*) arg_void;
-	que_common_t*	cnode;
-	int		i;
-
-	/* this should loop exactly 3 times - for the columns that
-	were selected: BEGIN_TS, COMMIT_TS, CONCURR_TRX */
-	for (cnode = static_cast<que_common_t*>(node->select_list), i = 0;
-	     cnode != NULL;
-	     cnode = static_cast<que_common_t*>(que_node_get_next(cnode)),
-	     i++)
-	{
-		dfield_t*	dfield = que_node_get_val(cnode);
-		dtype_t*	type = dfield_get_type(dfield);
-		ulint		len = dfield_get_len(dfield);
-		const byte*	data = static_cast<const byte*>(
-			dfield_get_data(dfield));
-
-		ut_ad(type);
-
-		switch (i) {
-		case 0:
-			ut_a(type->mtype == DATA_INT);
-			ut_ad(type->prtype & DATA_UNSIGNED);
-			ut_a(len == 8);
-			q->begin_ts = mach_read_from_8(data);
-			break;
-		case 1:
-			ut_a(type->mtype == DATA_INT);
-			ut_ad(type->prtype & DATA_UNSIGNED);
-			ut_a(len == 8);
-			q->commit_ts = mach_read_from_8(data);
-			break;
-		case 2:
-			break;
-		default:
-			ut_error;
-		}
-	}
-
-	return TRUE;
-}
-
-static
-vtq_query_t*
-vtq_query_create(trx_t* trx, trx_id_t in_trx_id, uint field)
-{
-	vtq_query_t* q = static_cast<vtq_query_t*>(mem_alloc(sizeof(*q)));
-
-	static const char sql[] =
-		"PROCEDURE QUERY_VTQ_PROC () IS\n"
-		"DECLARE FUNCTION vtq_fetch_data;\n"
-
-		"DECLARE CURSOR index_cur IS\n"
-		" SELECT BEGIN_TS, COMMIT_TS, CONCURR_TRX\n"
-		" FROM SYS_VTQ\n"
-		" WHERE TRX_ID=:trx_id\n;"
-		//" LOCK IN SHARE MODE;\n"
-
-		"BEGIN\n"
-		"OPEN index_cur;\n"
-		"FETCH index_cur INTO\n"
-		"  vtq_fetch_data();\n"
-		"CLOSE index_cur;\n"
-
-		"END;\n";
-
-	q->info = pars_info_create();
-	pars_info_add_ull_literal(q->info, "trx_id", in_trx_id);
-	pars_info_bind_function(q->info,
-			"vtq_fetch_data",
-			vers_vtq_fetch_data,
-			q);
-
-	mutex_enter(&dict_sys->mutex);
-	q->graph = pars_sql(q->info, sql);
-	mutex_exit(&dict_sys->mutex);
-
-	ut_a(q->graph);
-	q->graph->trx = trx;
-	q->graph->fork_type = QUE_FORK_MYSQL_INTERFACE;
-
-	q->close_read_view = trx->global_read_view ? false : true;
-	return q;
-}
-
-UNIV_INTERN
+inline
 void
-innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
+innobase_get_vtq_ts_result(vtq_query_t*	q, MYSQL_TIME *out, uint field)
 {
-	trx_t*		trx;
-	trx_state_t	saved_state;
-	que_thr_t*	thr;
-	vtq_query_t*	q;
-
-	ut_ad(sizeof(_in_trx_id) == sizeof(trx_id_t));
-	trx_id_t	in_trx_id = static_cast<trx_id_t>(_in_trx_id);
-
-	DBUG_ENTER("innobase_get_vtq_ts");
-	trx = thd_to_trx(thd);
-	ut_a(trx);
-
-	if (field == 1) {
-		dict_index_t*	index = dict_table_get_first_index(dict_sys->sys_vtq);
-		btr_pcur_t	pcur;
-		dtuple_t*	tuple;
-		dfield_t*	dfield;
-		trx_id_t	trx_id_net;
-		mtr_t		mtr;
-		mem_heap_t*	heap = mem_heap_create(0);
-		rec_t*		rec;
-		ulint		len;
-		byte*		result_net;
-		ib_uint64_t	result;
-
-		ut_ad(index);
-		ut_ad(dict_index_is_clust(index));
-
-		mach_write_to_8(
-			reinterpret_cast<byte*>(&trx_id_net),
-			in_trx_id);
-
-		tuple = dtuple_create(heap, 1);
-		dfield = dtuple_get_nth_field(tuple, DICT_FLD__SYS_VTQ__TRX_ID);
-		dfield_set_data(dfield, &trx_id_net, 8);
-		dict_index_copy_types(tuple, index, 1);
-
-		mtr_start_trx(&mtr, trx);
-		btr_pcur_open_on_user_rec(index, tuple, PAGE_CUR_GE,
-				BTR_SEARCH_LEAF, &pcur, &mtr);
-		if (!btr_pcur_is_on_user_rec(&pcur)) {
-			// FIXME: return NULL
-			btr_pcur_close(&pcur);
-			mtr_commit(&mtr);
-			mem_heap_free(heap);
-			DBUG_VOID_RETURN;
-		}
-		rec = btr_pcur_get_rec(&pcur);
-		result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__TRX_ID, &len);
-		ut_ad(len == 8);
-		if (trx_id_net != *(trx_id_t *) result_net) {
-			// FIXME: return NULL
-			btr_pcur_close(&pcur);
-			mtr_commit(&mtr);
-			mem_heap_free(heap);
-			DBUG_VOID_RETURN;
-		}
-		result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__COMMIT_TS, &len);
-		ut_ad(len == 8);
-		result = mach_read_from_8(result_net);
-		btr_pcur_close(&pcur);
-		mtr_commit(&mtr);
-		mem_heap_free(heap);
-
-		unpack_time(result, out);
-		DBUG_VOID_RETURN;
-	}
-	saved_state = trx->state;
-
-	q = trx->vtq_query;
-
-	if (!q) {
-		q = vtq_query_create(trx, in_trx_id, field);
-		trx->vtq_query = q;
-	} else {
-		trx_id_t trx_id_net;
-		if (q->trx_id == in_trx_id) {
-			goto return_result;
-		}
-		mach_write_to_8(
-			reinterpret_cast<byte*>(&trx_id_net),
-			in_trx_id);
-		pars_info_bind_ull_literal(q->info, "trx_id", &trx_id_net);
-	}
-
-	q->trx_id = in_trx_id;
-
-	ut_a(trx->error_state == DB_SUCCESS);
-	ut_a(thr = que_fork_start_command(q->graph));
-	que_run_threads(thr);
-
-return_result:
 	switch (field) {
 	case VTQ_BEGIN_TS:
 		unpack_time(q->begin_ts, out);
@@ -20850,8 +20666,81 @@ return_result:
 	default:
 		ut_error;
 	}
+}
 
-	trx->state = saved_state;
+UNIV_INTERN
+void
+innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
+{
+	trx_t*		trx;
+	dict_index_t*	index;
+	btr_pcur_t	pcur;
+	dtuple_t*	tuple;
+	dfield_t*	dfield;
+	trx_id_t	trx_id_net;
+	mtr_t		mtr;
+	mem_heap_t*	heap;
+	rec_t*		rec;
+	ulint		len;
+	byte*		result_net;
+
+	ut_ad(sizeof(_in_trx_id) == sizeof(trx_id_t));
+	trx_id_t	in_trx_id = static_cast<trx_id_t>(_in_trx_id);
+
+	DBUG_ENTER("innobase_get_vtq_ts");
+	trx = thd_to_trx(thd);
+	ut_a(trx);
+	vtq_query_t*	q = &trx->vtq_query;
+
+	if (q->trx_id == in_trx_id) {
+		innobase_get_vtq_ts_result(q, out, field);
+		DBUG_VOID_RETURN;
+	}
+
+	index = dict_table_get_first_index(dict_sys->sys_vtq);
+	heap = mem_heap_create(0);
+
+	ut_ad(index);
+	ut_ad(dict_index_is_clust(index));
+
+	mach_write_to_8(
+		reinterpret_cast<byte*>(&trx_id_net),
+		in_trx_id);
+
+	tuple = dtuple_create(heap, 1);
+	dfield = dtuple_get_nth_field(tuple, DICT_FLD__SYS_VTQ__TRX_ID);
+	dfield_set_data(dfield, &trx_id_net, 8);
+	dict_index_copy_types(tuple, index, 1);
+
+	mtr_start_trx(&mtr, trx);
+	btr_pcur_open_on_user_rec(index, tuple, PAGE_CUR_GE,
+			BTR_SEARCH_LEAF, &pcur, &mtr);
+
+	if (!btr_pcur_is_on_user_rec(&pcur))
+		goto not_found;
+
+	rec = btr_pcur_get_rec(&pcur);
+	result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__TRX_ID, &len);
+	ut_ad(len == 8);
+	q->trx_id = mach_read_from_8(result_net);
+
+	result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__BEGIN_TS, &len);
+	ut_ad(len == 8);
+	q->begin_ts = mach_read_from_8(result_net);
+
+	result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__COMMIT_TS, &len);
+	ut_ad(len == 8);
+	q->commit_ts = mach_read_from_8(result_net);
+
+	if (q->trx_id != in_trx_id)
+		goto not_found;
+
+	innobase_get_vtq_ts_result(q, out, field);
+
+not_found:
+	btr_pcur_close(&pcur);
+	mtr_commit(&mtr);
+	mem_heap_free(heap);
 
 	DBUG_VOID_RETURN;
 }
