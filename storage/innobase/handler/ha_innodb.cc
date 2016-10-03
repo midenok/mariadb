@@ -1441,7 +1441,7 @@ normalize_table_name_low(
 	ibool           set_lower_case); /* in: TRUE if we want to set
 					 name to lower case */
 
-void
+bool
 innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong in_trx_id, uint field);
 
 /*************************************************************//**
@@ -20669,7 +20669,7 @@ innobase_get_vtq_ts_result(vtq_query_t*	q, MYSQL_TIME *out, uint field)
 }
 
 UNIV_INTERN
-void
+bool
 innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
 {
 	trx_t*		trx;
@@ -20683,6 +20683,7 @@ innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
 	rec_t*		rec;
 	ulint		len;
 	byte*		result_net;
+	bool		found = false;
 
 	ut_ad(sizeof(_in_trx_id) == sizeof(trx_id_t));
 	trx_id_t	in_trx_id = static_cast<trx_id_t>(_in_trx_id);
@@ -20694,7 +20695,7 @@ innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
 
 	if (q->trx_id == in_trx_id) {
 		innobase_get_vtq_ts_result(q, out, field);
-		DBUG_VOID_RETURN;
+		DBUG_RETURN(true);
 	}
 
 	index = dict_table_get_first_index(dict_sys->sys_vtq);
@@ -20736,11 +20737,12 @@ innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
 		goto not_found;
 
 	innobase_get_vtq_ts_result(q, out, field);
+	found = true;
 
 not_found:
 	btr_pcur_close(&pcur);
 	mtr_commit(&mtr);
 	mem_heap_free(heap);
 
-	DBUG_VOID_RETURN;
+	DBUG_RETURN(found);
 }

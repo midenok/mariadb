@@ -1359,7 +1359,7 @@ struct handlerton
      System Versioning
    */
    bool versioned();
-   void (*vers_get_vtq_ts)(THD* thd, MYSQL_TIME *out, ulonglong trx_id, uint field);
+   bool (*vers_get_vtq_ts)(THD* thd, MYSQL_TIME *out, ulonglong trx_id, uint field);
 };
 
 
