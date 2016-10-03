@@ -1118,21 +1118,22 @@ public:
 
 class Item_func_vtq_ts :public Item_datetimefunc
 {
-  MYSQL_TIME ltime;
-  ulonglong trx_id;
-  uint vtq_field;
+  Item* trx_id;
+  vtq_field_t vtq_field;
+  handlerton *hton;
 public:
-  Item_func_vtq_ts(THD *thd, Item* a, uint _vtq_field);
-  const char *func_name() const { return "vtq_ts"; /* FIXME: BEGIN_TS or COMMIT_TS */ }
-  bool get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
+  Item_func_vtq_ts(THD *thd, Item* a, vtq_field_t _vtq_field, handlerton *hton);
+  Item_func_vtq_ts(THD *thd, Item* a, vtq_field_t _vtq_field);
+  const char *func_name() const
   {
-    *res= ltime;
-    return 0;
+    if (vtq_field == VTQ_BEGIN_TS)
+    {
+      return "begin_ts";
+    }
+    return "commit_ts";
   }
+  bool get_date(MYSQL_TIME *res, ulonglong fuzzy_date);
   void fix_length_and_dec();
-  bool check_partition_func_processor(uchar *int_arg) { return FALSE; }
-  bool check_vcol_func_processor(uchar *int_arg) { return FALSE; }
-  bool check_valid_arguments_processor(uchar *int_arg) { return FALSE; }
 };
 
 #endif /* ITEM_TIMEFUNC_INCLUDED */

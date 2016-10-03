@@ -681,7 +681,7 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
 
   for (table= tables; table; table= table->next_local)
   {
-    if (table->table && table->table->versioned_by_sql())
+    if (table->table && table->table->versioned())
       versioned_tables++;
     else if (table->system_versioning.type != FOR_SYSTEM_TIME_UNSPECIFIED)
     {
@@ -695,45 +695,80 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
 
   for (table= tables; table; table= table->next_local)
   {
-    if (table->table && table->table->versioned_by_sql())
+    if (table->table && table->table->versioned())
     {
       Field *fstart= table->table->vers_start_field();
       Field *fend= table->table->vers_end_field();
-      Item *istart= new (thd->mem_root) Item_field(thd, fstart);
-      Item *iend= new (thd->mem_root) Item_field(thd, fend);
+      Item *row_start;
+      Item *row_end;
+
+      if (table->table->versioned_by_sql())
+      {
+        row_start= new (thd->mem_root) Item_field(thd, fstart);
+        row_end= new (thd->mem_root) Item_field(thd, fend);
+      }
+      else
+      {
+        DBUG_ASSERT(table->table->s && table->table->s->db_plugin);
+        row_start= new (thd->mem_root) Item_func_vtq_ts(thd,
+          new (thd->mem_root) Item_field(thd, fstart),
+          VTQ_COMMIT_TS,
+          plugin_hton(table->table->s->db_plugin));
+        row_end= new (thd->mem_root) Item_func_vtq_ts(thd,
+          new (thd->mem_root) Item_field(thd, fend),
+          VTQ_COMMIT_TS,
+          plugin_hton(table->table->s->db_plugin));
+      }
       Item *cond1= 0, *cond2= 0, *curr = 0;
       switch (table->system_versioning.type)
       {
         case FOR_SYSTEM_TIME_UNSPECIFIED:
-          curr= new (thd->mem_root) Item_func_now_local(thd, 6);
-          cond1= new (thd->mem_root) Item_func_le(thd, istart, curr);
-          cond2= new (thd->mem_root) Item_func_gt(thd, iend, curr);
+          if (table->table->versioned_by_sql())
+          {
+            curr= new (thd->mem_root) Item_func_now_local(thd, 6);
+            cond1= new (thd->mem_root) Item_func_le(thd, row_start, curr);
+            cond2= new (thd->mem_root) Item_func_gt(thd, row_end, curr);
+          }
+          else
+          {
+            curr= new (thd->mem_root) Item_int(thd, ULONGLONG_MAX);
+            cond1= new (thd->mem_root) Item_func_eq(thd,
+              new (thd->mem_root) Item_field(thd, fend),
+              curr);
+          }
           break;
         case FOR_SYSTEM_TIME_AS_OF:
-          cond1= new (thd->mem_root) Item_func_le(thd, istart,
-                                                  table->system_versioning.start);
-          cond2= new (thd->mem_root) Item_func_gt(thd, iend,
-                                                  table->system_versioning.start);
+          cond1= new (thd->mem_root) Item_func_le(thd, row_start,
+            table->system_versioning.start);
+          cond2= new (thd->mem_root) Item_func_gt(thd, row_end,
+            table->system_versioning.start);
           break;
         case FOR_SYSTEM_TIME_FROM_TO:
-          cond1= new (thd->mem_root) Item_func_lt(thd, istart,
+          cond1= new (thd->mem_root) Item_func_lt(thd, row_start,
                                                   table->system_versioning.end);
-          cond2= new (thd->mem_root) Item_func_ge(thd, iend,
+          cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
                                                   table->system_versioning.start);
           break;
         case FOR_SYSTEM_TIME_BETWEEN:
-          cond1= new (thd->mem_root) Item_func_le(thd, istart,
+          cond1= new (thd->mem_root) Item_func_le(thd, row_start,
                                                   table->system_versioning.end);
-          cond2= new (thd->mem_root) Item_func_ge(thd, iend,
+          cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
                                                   table->system_versioning.start);
           break;
         default:
           DBUG_ASSERT(0);
       }
-      if (cond1 && cond2)
+      if (cond1)
       {
-        COND *system_time_cond= new (thd->mem_root) Item_cond_and(thd, cond1, cond2);
-        thd->change_item_tree(conds, and_items(thd, *conds, system_time_cond));
+        if (cond2)
+        {
+          COND *system_time_cond= new (thd->mem_root) Item_cond_and(thd, cond1, cond2);
+          thd->change_item_tree(conds, and_items(thd, *conds, system_time_cond));
+        }
+        else
+        {
+          thd->change_item_tree(conds, and_items(thd, *conds, cond1));
+        }
         table->system_versioning.is_moved_to_where= true;
       }
     }

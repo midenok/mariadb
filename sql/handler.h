@@ -33,6 +33,7 @@
 #include "structs.h"                            /* SHOW_COMP_OPTION */
 #include "sql_array.h"          /* Dynamic_array<> */
 #include "mdl.h"
+#include "vtq.h"
 
 #include "sql_analyze_stmt.h" // for Exec_time_tracker 
 
@@ -1359,7 +1360,7 @@ struct handlerton
      System Versioning
    */
    bool versioned();
-   bool (*vers_get_vtq_ts)(THD* thd, MYSQL_TIME *out, ulonglong trx_id, uint field);
+   bool (*vers_get_vtq_ts)(THD* thd, MYSQL_TIME *out, ulonglong trx_id, vtq_field_t field);
 };
 
 

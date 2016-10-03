@@ -1442,7 +1442,7 @@ normalize_table_name_low(
 					 name to lower case */
 
 bool
-innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong in_trx_id, uint field);
+innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong in_trx_id, vtq_field_t field);
 
 /*************************************************************//**
 Check for a valid value of innobase_commit_concurrency.
@@ -20654,7 +20654,7 @@ ib_push_warning(
 
 inline
 void
-innobase_get_vtq_ts_result(vtq_query_t*	q, MYSQL_TIME *out, uint field)
+innobase_get_vtq_ts_result(vtq_query_t*	q, MYSQL_TIME *out, vtq_field_t field)
 {
 	switch (field) {
 	case VTQ_BEGIN_TS:
@@ -20670,7 +20670,7 @@ innobase_get_vtq_ts_result(vtq_query_t*	q, MYSQL_TIME *out, uint field)
 
 UNIV_INTERN
 bool
-innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
+innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, vtq_field_t field)
 {
 	trx_t*		trx;
 	dict_index_t*	index;
@@ -20685,10 +20685,15 @@ innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, uint field)
 	byte*		result_net;
 	bool		found = false;
 
+	DBUG_ENTER("innobase_get_vtq_ts");
+
+	if (_in_trx_id == 0) {
+		DBUG_RETURN(false);
+	}
+
 	ut_ad(sizeof(_in_trx_id) == sizeof(trx_id_t));
 	trx_id_t	in_trx_id = static_cast<trx_id_t>(_in_trx_id);
 
-	DBUG_ENTER("innobase_get_vtq_ts");
 	trx = thd_to_trx(thd);
 	ut_a(trx);
 	vtq_query_t*	q = &trx->vtq_query;

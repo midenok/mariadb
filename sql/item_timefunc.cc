@@ -3242,27 +3242,61 @@ bool Item_func_last_day::get_date(MYSQL_TIME *ltime, ulonglong fuzzy_date)
   return (null_value= 0);
 }
 
-Item_func_vtq_ts::Item_func_vtq_ts(THD *thd, Item* a, uint _vtq_field) :
-  Item_datetimefunc(thd, new (thd->mem_root) Item_decimal(thd, 6, TRUE)),
-  trx_id(a->val_uint()),
-  vtq_field(_vtq_field)
+Item_func_vtq_ts::Item_func_vtq_ts(
+    THD *thd,
+    Item* a,
+    vtq_field_t _vtq_field,
+    handlerton* _hton) :
+  Item_datetimefunc(thd, a),
+  trx_id(a),
+  vtq_field(_vtq_field),
+  hton(_hton)
 {
   decimals= 6;
   null_value= true;
-  memset(&ltime, 0, sizeof(ltime));
+}
+
+Item_func_vtq_ts::Item_func_vtq_ts(
+    THD *thd,
+    Item* a,
+    vtq_field_t _vtq_field) :
+  Item_datetimefunc(thd, a),
+  trx_id(a),
+  vtq_field(_vtq_field),
+  hton(NULL)
+{
+  decimals= 6;
+  null_value= true;
+  if (innodb_plugin)
+  {
+    hton= plugin_hton(&innodb_plugin);
+    DBUG_ASSERT(hton);
+  }
 }
 
 void Item_func_vtq_ts::fix_length_and_dec()
 {
-  handlerton *innodb;
-  if (innodb_plugin)
-  {
-    THD *thd = current_thd; // can it differ from constructor's?
-    innodb = plugin_hton(&innodb_plugin);
-    DBUG_ASSERT(thd && innodb);
-    null_value= !innodb->vers_get_vtq_ts(thd, &ltime, trx_id, vtq_field);
-  }
   Item_temporal_func::fix_length_and_dec();
   maybe_null= true;
 }
 
+bool Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
+{
+  if (hton)
+  {
+    THD *thd= current_thd; // can it differ from constructor's?
+    DBUG_ASSERT(thd);
+    DBUG_ASSERT(trx_id);
+    ulonglong trx_id_int= trx_id->val_uint();
+    if (trx_id_int == ULONGLONG_MAX)
+    {
+      null_value= false;
+      unix_time_to_TIME(res, TIMESTAMP_MAX_VALUE, 0);
+    }
+    else
+    {
+      null_value= !hton->vers_get_vtq_ts(thd, res, trx_id_int, vtq_field);
+    }
+  }
+  return 0;
+}
