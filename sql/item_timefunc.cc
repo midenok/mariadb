@@ -3248,12 +3248,12 @@ Item_func_vtq_ts::Item_func_vtq_ts(
     vtq_field_t _vtq_field,
     handlerton* _hton) :
   Item_datetimefunc(thd, a),
-  trx_id(a),
   vtq_field(_vtq_field),
   hton(_hton)
 {
   decimals= 6;
   null_value= true;
+  DBUG_ASSERT(arg_count == 1 && args[0]);
 }
 
 Item_func_vtq_ts::Item_func_vtq_ts(
@@ -3261,17 +3261,12 @@ Item_func_vtq_ts::Item_func_vtq_ts(
     Item* a,
     vtq_field_t _vtq_field) :
   Item_datetimefunc(thd, a),
-  trx_id(a),
   vtq_field(_vtq_field),
   hton(NULL)
 {
   decimals= 6;
   null_value= true;
-  if (innodb_plugin)
-  {
-    hton= plugin_hton(&innodb_plugin);
-    DBUG_ASSERT(hton);
-  }
+  DBUG_ASSERT(arg_count == 1 && args[0]);
 }
 
 void Item_func_vtq_ts::fix_length_and_dec()
@@ -3282,21 +3277,42 @@ void Item_func_vtq_ts::fix_length_and_dec()
 
 bool Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
 {
-  if (hton)
+  ulonglong trx_id= args[0]->val_uint();
+  if (trx_id == ULONGLONG_MAX)
   {
-    THD *thd= current_thd; // can it differ from constructor's?
-    DBUG_ASSERT(thd);
-    DBUG_ASSERT(trx_id);
-    ulonglong trx_id_int= trx_id->val_uint();
-    if (trx_id_int == ULONGLONG_MAX)
+    null_value= false;
+    unix_time_to_TIME(res, TIMESTAMP_MAX_VALUE, 0);
+    return false;
+  }
+
+  if (!hton)
+  {
+    if (args[0]->type() == Item::FIELD_ITEM)
     {
-      null_value= false;
-      unix_time_to_TIME(res, TIMESTAMP_MAX_VALUE, 0);
+      Item_field *f=
+        static_cast<Item_field *>(args[0]);
+      DBUG_ASSERT(
+        f->field &&
+        f->field->table &&
+        f->field->table->s &&
+        f->field->table->s->db_plugin);
+      hton= plugin_hton(f->field->table->s->db_plugin);
+      DBUG_ASSERT(hton);
     }
-    else
+    else if (innodb_plugin)
     {
-      null_value= !hton->vers_get_vtq_ts(thd, res, trx_id_int, vtq_field);
+      hton= plugin_hton(&innodb_plugin);
+      DBUG_ASSERT(hton);
     }
   }
-  return 0;
+
+  if (!hton)
+    return true;
+
+  THD *thd= current_thd; // can it differ from constructor's?
+  DBUG_ASSERT(thd);
+
+  null_value= !hton->vers_get_vtq_ts(thd, res, trx_id, vtq_field);
+
+  return false;
 }

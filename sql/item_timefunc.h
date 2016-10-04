@@ -1118,7 +1118,6 @@ public:
 
 class Item_func_vtq_ts :public Item_datetimefunc
 {
-  Item* trx_id;
   vtq_field_t vtq_field;
   handlerton *hton;
 public:
