@@ -678,6 +678,15 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
 
   TABLE_LIST *table;
   int versioned_tables= 0;
+  Query_arena *arena= 0, backup;
+  bool is_prepare= thd->stmt_arena->is_stmt_prepare();
+
+  if (!thd->stmt_arena->is_conventional()
+    && !is_prepare
+    && !thd->stmt_arena->is_sp_execute())
+  {
+    DBUG_RETURN(0);
+  }
 
   for (table= tables; table; table= table->next_local)
   {
@@ -693,33 +702,42 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
   if (versioned_tables == 0)
     DBUG_RETURN(0);
 
+  /* For prepared statements we create items on statement arena,
+     because they must outlive execution phase for multiple executions. */
+  if (is_prepare)
+    arena= thd->activate_stmt_arena_if_needed(&backup);
+
   for (table= tables; table; table= table->next_local)
   {
     if (table->table && table->table->versioned())
     {
       Field *fstart= table->table->vers_start_field();
       Field *fend= table->table->vers_end_field();
-      Item *row_start;
-      Item *row_end;
 
-      if (table->table->versioned_by_sql())
-      {
-        row_start= new (thd->mem_root) Item_field(thd, fstart);
-        row_end= new (thd->mem_root) Item_field(thd, fend);
-      }
-      else
+      DBUG_ASSERT(select_lex->parent_lex);
+      Name_resolution_context *context= select_lex->parent_lex->current_context();
+      DBUG_ASSERT(context);
+
+      Item *row_start= new (thd->mem_root) Item_field(thd, context, fstart);
+      Item *row_end= new (thd->mem_root) Item_field(thd, context, fend);
+      Item *row_end2= row_end;
+
+      if (!table->table->versioned_by_sql())
       {
         DBUG_ASSERT(table->table->s && table->table->s->db_plugin);
-        row_start= new (thd->mem_root) Item_func_vtq_ts(thd,
-          new (thd->mem_root) Item_field(thd, fstart),
+        row_start= new (thd->mem_root) Item_func_vtq_ts(
+          thd,
+          row_start,
           VTQ_COMMIT_TS,
           plugin_hton(table->table->s->db_plugin));
-        row_end= new (thd->mem_root) Item_func_vtq_ts(thd,
-          new (thd->mem_root) Item_field(thd, fend),
+        row_end= new (thd->mem_root) Item_func_vtq_ts(
+          thd,
+          row_end,
           VTQ_COMMIT_TS,
           plugin_hton(table->table->s->db_plugin));
       }
-      Item *cond1= 0, *cond2= 0, *curr = 0;
+
+      Item *cond1= 0, *cond2= 0, *curr= 0;
       switch (table->system_versioning.type)
       {
         case FOR_SYSTEM_TIME_UNSPECIFIED:
@@ -732,9 +750,7 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
           else
           {
             curr= new (thd->mem_root) Item_int(thd, ULONGLONG_MAX);
-            cond1= new (thd->mem_root) Item_func_eq(thd,
-              new (thd->mem_root) Item_field(thd, fend),
-              curr);
+            cond1= new (thd->mem_root) Item_func_eq(thd, row_end2, curr);
           }
           break;
         case FOR_SYSTEM_TIME_AS_OF:
@@ -758,20 +774,28 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
         default:
           DBUG_ASSERT(0);
       }
+
       if (cond1)
       {
-        if (cond2)
-        {
-          COND *system_time_cond= new (thd->mem_root) Item_cond_and(thd, cond1, cond2);
-          thd->change_item_tree(conds, and_items(thd, *conds, system_time_cond));
-        }
+        cond1= and_items(thd,
+          *conds,
+          and_items(thd,
+            cond2,
+            cond1));
+
+        if (is_prepare)
+          *conds= cond1;
         else
-        {
-          thd->change_item_tree(conds, and_items(thd, *conds, cond1));
-        }
+          thd->change_item_tree(conds, cond1);
+
         table->system_versioning.is_moved_to_where= true;
       }
     }
+  }
+
+  if (arena)
+  {
+    thd->restore_active_arena(arena, &backup);
   }
 
   DBUG_RETURN(0);
