@@ -55,6 +55,7 @@
 #include "sql_statistics.h"
 #include "sql_cte.h"
 #include "sql_window.h"
+#include "tztime.h"
 
 #include "debug_sync.h"          // DEBUG_SYNC
 #include <m_ctype.h>
@@ -743,9 +744,10 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
         case FOR_SYSTEM_TIME_UNSPECIFIED:
           if (table->table->versioned_by_sql())
           {
-            curr= new (thd->mem_root) Item_func_now_local(thd, 6);
-            cond1= new (thd->mem_root) Item_func_le(thd, row_start, curr);
-            cond2= new (thd->mem_root) Item_func_gt(thd, row_end, curr);
+            MYSQL_TIME max_time;
+            thd->variables.time_zone->gmt_sec_to_TIME(&max_time, TIMESTAMP_MAX_VALUE);
+            curr= new (thd->mem_root) Item_datetime_literal(thd, &max_time);
+            cond1= new (thd->mem_root) Item_func_eq(thd, row_end, curr);
           }
           else
           {

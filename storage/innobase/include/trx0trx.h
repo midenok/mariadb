@@ -683,8 +683,8 @@ typedef enum {
 struct vtq_query_t
 {
 	trx_id_t	trx_id;
-	ib_uint64_t	begin_ts;
-	ib_uint64_t	commit_ts;
+	timeval		begin_ts;
+	timeval		commit_ts;
 };
 
 struct trx_t{

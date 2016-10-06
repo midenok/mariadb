@@ -52,7 +52,6 @@ Created 4/20/1996 Heikki Tuuri
 #include "fts0fts.h"
 #include "fts0types.h"
 #include "m_string.h"
-#include "sql_time.h"
 
 /*************************************************************************
 IMPORTANT NOTE: Any operation that generates redo MUST check that there
@@ -3482,10 +3481,10 @@ void vers_notify_vtq(trx_t* trx)
 	mem_heap_t* heap = mem_heap_create(1024);
 	dtuple_t* row = dtuple_create(heap, dict_table_get_n_cols(dict_sys->sys_vtq));
 
-	ulint now_secs, now_usecs;
-	ut_usectime(&now_secs, &now_usecs);
-	ullong begin_ts = unix_time_to_packed(trx->start_time, trx->start_time_us);
-	ullong commit_ts = unix_time_to_packed(now_secs, now_usecs);
+	timeval begin_ts, commit_ts;
+	begin_ts.tv_sec = trx->start_time;
+	begin_ts.tv_usec = trx->start_time_us;
+	ut_usectime((ulint *)&commit_ts.tv_sec, (ulint *)&commit_ts.tv_usec);
 
 	dict_table_copy_types(row, dict_sys->sys_vtq);
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__TRX_ID, trx->id, heap);
