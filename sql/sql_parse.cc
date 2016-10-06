@@ -2824,6 +2824,8 @@ static bool do_execute_sp(THD *thd, sp_head *sp)
     TRUE        Error
 */
 
+my_bool (*sys_ver_every_new_table)(THD *thd);
+
 int
 mysql_execute_command(THD *thd)
 {
@@ -3616,6 +3618,12 @@ mysql_execute_command(THD *thd)
       /* If out of memory when creating a copy of alter_info. */
       res= 1;
       goto end_with_restore_list;
+    }
+
+    if (sys_ver_every_new_table && sys_ver_every_new_table(thd))
+    {
+      create_info.system_versioning_info.versioned= true;
+      create_info.system_versioning_info.declared_system_versioning= true;
     }
 
     if (System_versioning_info *info= create_info.get_system_versioning_info())
