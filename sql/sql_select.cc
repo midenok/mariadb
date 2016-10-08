@@ -705,8 +705,20 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
 
   /* For prepared statements we create items on statement arena,
      because they must outlive execution phase for multiple executions. */
-  if (is_prepare)
-    arena= thd->activate_stmt_arena_if_needed(&backup);
+  arena= thd->activate_stmt_arena_if_needed(&backup);
+
+  if (select_lex->saved_conds)
+  {
+    DBUG_ASSERT(thd->stmt_arena->is_sp_execute());
+    *conds= select_lex->saved_conds;
+  }
+  else if (thd->stmt_arena->is_sp_execute())
+  {
+    if (thd->stmt_arena->is_stmt_execute())
+      *conds= 0;
+    else if (*conds)
+      select_lex->saved_conds= (*conds)->copy_andor_structure(thd);
+  }
 
   for (table= tables; table; table= table->next_local)
   {
@@ -785,7 +797,7 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **conds, SELECT_LEX *se
             cond2,
             cond1));
 
-        if (is_prepare)
+        if (arena)
           *conds= cond1;
         else
           thd->change_item_tree(conds, cond1);
