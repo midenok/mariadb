@@ -3460,12 +3460,6 @@ vers_row_ins_vtq_low(trx_t* trx, mem_heap_t* heap, dtuple_t* row)
 		err = row_ins_sec_index_entry_low(
 			flags, BTR_MODIFY_TREE,
 			index, offsets_heap, heap, entry, trx->id, NULL, trx);
-
-		///* Report correct index name for duplicate key error. */
-		// No need to report on commit phase?
-		//if (err == DB_DUPLICATE_KEY) {
-		//	trx->error_key_num = n_index;
-		//}
 	} while (err == DB_SUCCESS);
 
 	mem_heap_free(offsets_heap);
@@ -3494,7 +3488,7 @@ void vers_notify_vtq(trx_t* trx)
 	dfield_t* dfield = dtuple_get_nth_field(row, DICT_FLD__SYS_VTQ__CONCURR_TRX - 2);
 	mutex_enter(&trx_sys->mutex);
 	trx_list_t &rw_list = trx_sys->rw_trx_list;
-	if (rw_list.count > 1) {
+	if (rw_list.count > 0) {
 		byte* buf = static_cast<byte*>(mem_heap_alloc(heap, rw_list.count * 8));
 		byte* ptr = buf;
 		ulint count = 0;
@@ -3516,8 +3510,8 @@ void vers_notify_vtq(trx_t* trx)
 		else
 			dfield_set_data(dfield, NULL, 0);
 	} else {
-		// there must be at least current transaction
-		ut_ad(rw_list.count == 1 && UT_LIST_GET_FIRST(rw_list) == trx);
+		// there should be at least current transaction
+		ut_ad(rw_list.count == 0 || rw_list.count == 1 && UT_LIST_GET_FIRST(rw_list) == trx);
 		dfield_set_data(dfield, NULL, 0);
 	}
 	mutex_exit(&trx_sys->mutex);
