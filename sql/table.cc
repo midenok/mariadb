@@ -42,8 +42,6 @@
 #include "sql_view.h"
 #include "rpl_filter.h"
 
-#include <mysql/plugin.h>
-
 /* INFORMATION_SCHEMA name */
 LEX_STRING INFORMATION_SCHEMA_NAME= {C_STRING_WITH_LEN("information_schema")};
 

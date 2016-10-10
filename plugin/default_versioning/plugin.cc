@@ -19,44 +19,41 @@
 #include <sql_show.h>
 #include <mysql/plugin.h>
 
+extern my_bool sys_ver_forced;
+extern my_bool sys_ver_hidden;
 
-static MYSQL_THDVAR_BOOL(enable,
-       PLUGIN_VAR_NOCMDOPT,
-       "Enables/disables default versioning for all newly "
-       "created tables",
-       NULL, NULL, FALSE);
+static MYSQL_SYSVAR_BOOL(forced,
+       sys_ver_forced,
+       PLUGIN_VAR_NOCMDARG,
+       "Every newly created table will be system versioned",
+       NULL, NULL, TRUE);
 
+static MYSQL_SYSVAR_BOOL(hidden,
+       sys_ver_hidden,
+       PLUGIN_VAR_NOCMDARG,
+       "SHOW and DESCRIBE commands will hide fileds related to system versioning",
+       NULL, NULL, TRUE);
 
 static struct st_mysql_daemon default_versioning_info_descriptor=
 { MYSQL_DAEMON_INTERFACE_VERSION };
 
-static my_bool is_enabled(MYSQL_THD thd)
-{
-  DBUG_ENTER("default_versioning is_enabled");
-  const my_bool ret = THDVAR(thd, enable);
-  DBUG_RETURN(ret);
-}
-
-extern my_bool (*sys_ver_every_new_table)(THD *thd);
 static int default_versioning_init(void *p __attribute__((unused)))
 {
   DBUG_ENTER("default_versioning_plugin_init");
-  DBUG_ASSERT(!sys_ver_every_new_table);
-  sys_ver_every_new_table = is_enabled;
   DBUG_RETURN(0);
 }
 static int default_versioning_deinit(void *arg __attribute__((unused)))
 {
   DBUG_ENTER("default_versioning_plugin_deinit");
-  // FIXME: XYZ: This is probably not thread safe, since some thread
-  //   can be accessing plugin data while plugin is being released.
-  sys_ver_every_new_table = NULL;
+  sys_ver_forced = FALSE;
+  sys_ver_hidden = FALSE;
   DBUG_RETURN(0);
 }
 
 static struct st_mysql_sys_var *default_versioning_vars[]=
 {
-  MYSQL_SYSVAR(enable),
+  MYSQL_SYSVAR(forced),
+  MYSQL_SYSVAR(hidden),
   NULL
 };
 

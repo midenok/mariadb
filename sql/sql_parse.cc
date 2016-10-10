@@ -401,6 +401,15 @@ const char *xa_state_names[]={
   "NON-EXISTING", "ACTIVE", "IDLE", "PREPARED", "ROLLBACK ONLY"
 };
 
+/*
+  These two variables are used by default_versioning module to enable
+  default system versioning for all newly created tables and to enable
+  hiding of fields related to system versioning in SHOW and DESCRIBE
+  statements.
+ */
+my_bool sys_ver_forced = FALSE;
+my_bool sys_ver_hidden = FALSE;
+
 #ifdef HAVE_REPLICATION
 /**
   Returns true if all tables should be ignored.
@@ -2824,8 +2833,6 @@ static bool do_execute_sp(THD *thd, sp_head *sp)
     TRUE        Error
 */
 
-my_bool (*sys_ver_every_new_table)(THD *thd);
-
 int
 mysql_execute_command(THD *thd)
 {
@@ -3620,7 +3627,7 @@ mysql_execute_command(THD *thd)
       goto end_with_restore_list;
     }
 
-    if (sys_ver_every_new_table && sys_ver_every_new_table(thd))
+    if (sys_ver_forced)
     {
       create_info.system_versioning_info.versioned= true;
       create_info.system_versioning_info.declared_system_versioning= true;

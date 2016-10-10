@@ -5365,8 +5365,3 @@ static Sys_var_ulong Sys_log_tc_size(
        DEFAULT(my_getpagesize() * 6),
        BLOCK_SIZE(my_getpagesize()));
 #endif
-static Sys_var_mybool Sys_sys_ver_new_tables(
-       "sys_ver_new_tables",
-       "Create all new tables as system versioned.",
-       SESSION_VAR(sys_ver_new_tables),
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE));

@@ -1,0 +1,8 @@
+SHOW VARIABLES LIKE 'default_versioning%';
+
+SET GLOBAL default_versioning_forced=ON;
+SET GLOBAL default_versioning_hidden=OFF;
+
+CREATE TABLE t(x INT UNSIGNED NOT NULL);
+SHOW CREATE TABLE t;
+DROP TABLE t;
