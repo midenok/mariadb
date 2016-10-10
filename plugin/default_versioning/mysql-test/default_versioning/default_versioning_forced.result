@@ -1,0 +1,22 @@
+SHOW VARIABLES LIKE 'default_versioning_%';
+Variable_name	Value
+default_versioning_forced	ON
+default_versioning_hidden	ON
+SET GLOBAL default_versioning_forced=ON;
+SET GLOBAL default_versioning_hidden=OFF;
+SHOW VARIABLES LIKE 'default_versioning_%';
+Variable_name	Value
+default_versioning_forced	ON
+default_versioning_hidden	OFF
+CREATE TABLE t(x INT UNSIGNED NOT NULL);
+SHOW CREATE TABLE t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `x` int(10) unsigned NOT NULL,
+  `sys_trx_start` timestamp(6) NULL GENERATED AS ROW START,
+  `sys_trx_end` timestamp(6) NULL GENERATED AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+DROP TABLE t;
+SET GLOBAL default_versioning_forced=ON;
+SET GLOBAL default_versioning_hidden=ON;
