@@ -1132,7 +1132,6 @@ public:
     return "commit_ts";
   }
   bool get_date(MYSQL_TIME *res, ulonglong fuzzy_date);
-  void fix_length_and_dec();
 };
 
 #endif /* ITEM_TIMEFUNC_INCLUDED */
