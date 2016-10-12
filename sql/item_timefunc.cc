@@ -3302,7 +3302,7 @@ bool Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
     }
     else if (innodb_plugin)
     {
-      hton= plugin_hton(&innodb_plugin);
+      hton= plugin_hton(plugin_int_to_ref(innodb_plugin));
       DBUG_ASSERT(hton);
     }
   }
