@@ -3486,35 +3486,16 @@ void vers_notify_vtq(trx_t* trx)
 	set_row_field_8(row, DICT_FLD__SYS_VTQ__COMMIT_TS - 2, commit_ts, heap);
 
 	dfield_t* dfield = dtuple_get_nth_field(row, DICT_FLD__SYS_VTQ__CONCURR_TRX - 2);
-	mutex_enter(&trx_sys->mutex);
-	trx_list_t &rw_list = trx_sys->rw_trx_list;
-	if (rw_list.count > 0) {
-		byte* buf = static_cast<byte*>(mem_heap_alloc(heap, rw_list.count * 8));
-		byte* ptr = buf;
-		ulint count = 0;
-
-		for (trx_t* ctrx = UT_LIST_GET_FIRST(rw_list);
-			ctrx != NULL;
-			ctrx = UT_LIST_GET_NEXT(trx_list, ctrx))
-		{
-			if (ctrx == trx || ctrx->state == TRX_STATE_NOT_STARTED)
-				continue;
-
-			mach_write_to_8(ptr, ctrx->id);
-			++count;
+	ulint count = 0;
+	byte* buf = NULL;
+	if (trx->vtq_concurr_n > 0) {
+		buf = static_cast<byte*>(mem_heap_alloc(heap, trx->vtq_concurr_n * 8));
+		for (byte* ptr = buf; count < trx->vtq_concurr_n; ++count) {
+			mach_write_to_8(ptr, trx->vtq_concurr_trx[count]);
 			ptr += 8;
 		}
-
-		if (count)
-			dfield_set_data(dfield, buf, count * 8);
-		else
-			dfield_set_data(dfield, NULL, 0);
-	} else {
-		// there should be at least current transaction
-		ut_ad(rw_list.count == 0 || rw_list.count == 1 && UT_LIST_GET_FIRST(rw_list) == trx);
-		dfield_set_data(dfield, NULL, 0);
 	}
-	mutex_exit(&trx_sys->mutex);
+	dfield_set_data(dfield, buf, count * 8);
 
 	err = vers_row_ins_vtq_low(trx, heap, row);
 	if (DB_SUCCESS != err)
