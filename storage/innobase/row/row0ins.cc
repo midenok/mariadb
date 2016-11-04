@@ -4134,7 +4134,7 @@ vers_row_ins_vtq_low(trx_t* trx, mem_heap_t* heap, dtuple_t* row)
 			flags, BTR_MODIFY_TREE,
 			index, offsets_heap, heap, entry, trx->id, NULL, false, trx);
 	} while (err == DB_SUCCESS);
-	ut_ad(n_index == 2 || err != DB_SUCCESS);
+	ut_ad(n_index == 3 || err != DB_SUCCESS);
 
 	mem_heap_free(offsets_heap);
 	return err;
@@ -4163,7 +4163,8 @@ void vers_notify_vtq(trx_t* trx)
 	set_row_field_8(row, DICT_COL__SYS_VTQ__COMMIT_ID, commit_id, heap);
 	set_row_field_8(row, DICT_COL__SYS_VTQ__BEGIN_TS, begin_ts, heap);
 	set_row_field_8(row, DICT_COL__SYS_VTQ__COMMIT_TS, commit_ts, heap);
-	// FIXME: TRANS_TYPE
+	ut_ad(trx->isolation_level < 256);
+	set_row_field_1(row, DICT_COL__SYS_VTQ__TRANS_TYPE, trx->isolation_level, heap);
 
 	err = vers_row_ins_vtq_low(trx, heap, row);
 	if (DB_SUCCESS != err)

@@ -2012,9 +2012,9 @@ dict_create_or_check_vtq_table(void)
 
 	/* Note: The master thread has not been started at this point. */
 
-
+	static const int vtq_num_indexes = 4;
 	sys_vtq_err = dict_check_if_system_table_exists(
-		"SYS_VTQ", DICT_NUM_FIELDS__SYS_VTQ + 1, 3);
+		"SYS_VTQ", DICT_NUM_FIELDS__SYS_VTQ + 1, vtq_num_indexes);
 
 	if (sys_vtq_err == DB_SUCCESS) {
 		mutex_enter(&dict_sys->mutex);
@@ -2104,7 +2104,7 @@ dict_create_or_check_vtq_table(void)
 	/* Note: The master thread has not been started at this point. */
 	/* Confirm and move to the non-LRU part of the table LRU list. */
 	sys_vtq_err = dict_check_if_system_table_exists(
-		"SYS_VTQ", DICT_NUM_FIELDS__SYS_VTQ + 1, 3);
+		"SYS_VTQ", DICT_NUM_FIELDS__SYS_VTQ + 1, vtq_num_indexes);
 	ut_a(sys_vtq_err == DB_SUCCESS);
 	mutex_enter(&dict_sys->mutex);
 	dict_sys->sys_vtq = dict_table_get_low("SYS_VTQ");
