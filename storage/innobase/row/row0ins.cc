@@ -4152,11 +4152,15 @@ void vers_notify_vtq(trx_t* trx)
 	timeval begin_ts, commit_ts;
 	begin_ts.tv_sec = trx->start_time;
 	begin_ts.tv_usec = trx->start_time_us;
+
+	mutex_enter(&trx_sys->mutex);
+	trx_id_t commit_id = trx_sys_get_new_trx_id();
 	ut_usectime((ulint *)&commit_ts.tv_sec, (ulint *)&commit_ts.tv_usec);
+	mutex_exit(&trx_sys->mutex);
 
 	dict_table_copy_types(row, dict_sys->sys_vtq);
 	set_row_field_8(row, DICT_COL__SYS_VTQ__TRX_ID, trx->id, heap);
-	// FIXME: COMMIT_ID
+	set_row_field_8(row, DICT_COL__SYS_VTQ__COMMIT_ID, commit_id, heap);
 	set_row_field_8(row, DICT_COL__SYS_VTQ__BEGIN_TS, begin_ts, heap);
 	set_row_field_8(row, DICT_COL__SYS_VTQ__COMMIT_TS, commit_ts, heap);
 	// FIXME: TRANS_TYPE
