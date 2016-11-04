@@ -1302,8 +1302,6 @@ struct trx_t {
 	bool		vtq_notify_on_commit;
 					/*!< Notify VTQ for System Versioned update */
 	vtq_query_t	vtq_query;
-	trx_id_t*	vtq_concurr_trx;
-	ulint		vtq_concurr_n;
 	ulint		magic_n;
 };
 

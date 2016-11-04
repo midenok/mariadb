@@ -4155,21 +4155,11 @@ void vers_notify_vtq(trx_t* trx)
 	ut_usectime((ulint *)&commit_ts.tv_sec, (ulint *)&commit_ts.tv_usec);
 
 	dict_table_copy_types(row, dict_sys->sys_vtq);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__TRX_ID, trx->id, heap);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__BEGIN_TS - 2, begin_ts, heap);
-	set_row_field_8(row, DICT_FLD__SYS_VTQ__COMMIT_TS - 2, commit_ts, heap);
-
-	dfield_t* dfield = dtuple_get_nth_field(row, DICT_FLD__SYS_VTQ__CONCURR_TRX - 2);
-	ulint count = 0;
-	byte* buf = NULL;
-	if (trx->vtq_concurr_n > 0) {
-		buf = static_cast<byte*>(mem_heap_alloc(heap, trx->vtq_concurr_n * 8));
-		for (byte* ptr = buf; count < trx->vtq_concurr_n; ++count) {
-			mach_write_to_8(ptr, trx->vtq_concurr_trx[count]);
-			ptr += 8;
-		}
-	}
-	dfield_set_data(dfield, buf, count * 8);
+	set_row_field_8(row, DICT_COL__SYS_VTQ__TRX_ID, trx->id, heap);
+	// FIXME: COMMIT_ID
+	set_row_field_8(row, DICT_COL__SYS_VTQ__BEGIN_TS, begin_ts, heap);
+	set_row_field_8(row, DICT_COL__SYS_VTQ__COMMIT_TS, commit_ts, heap);
+	// FIXME: TRANS_TYPE
 
 	err = vers_row_ins_vtq_low(trx, heap, row);
 	if (DB_SUCCESS != err)

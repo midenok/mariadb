@@ -420,17 +420,22 @@ dict_process_sys_datafiles(
 This function parses a SYS_VTQ record, extracts necessary
 information from the record and returns it to the caller.
 @return error message, or NULL on success */
-#define I_S_MAX_CONCURR_TRX 100
+struct vtq_record
+{
+	trx_id_t	trx_id;
+	trx_id_t	commit_id;
+	timeval		begin_ts;
+	timeval		commit_ts;
+	uint16_t	trans_type;
+};
 UNIV_INTERN
 const char*
 dict_process_sys_vtq(
 /*=======================*/
 mem_heap_t*	heap,		/*!< in/out: heap memory */
 const rec_t*	rec,		/*!< in: current rec */
-ullong*		col_trx_id,	/*!< out: field values */
-timeval*	col_begin_ts,
-timeval*	col_commit_ts,
-char**		col_concurr_trx);
+vtq_record&	fields		/*!< out: field values */
+);
 
 /** Update the record for space_id in SYS_TABLESPACES to this filepath.
 @param[in]	space_id	Tablespace ID
