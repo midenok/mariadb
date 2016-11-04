@@ -333,7 +333,7 @@ enum dict_col_sys_vtq_enum
 	DICT_COL__SYS_VTQ__COMMIT_ID			= 1,
 	DICT_COL__SYS_VTQ__BEGIN_TS			= 2,
 	DICT_COL__SYS_VTQ__COMMIT_TS			= 3,
-	DICT_COL__SYS_VTQ__TRANS_TYPE			= 4,
+	DICT_COL__SYS_VTQ__ISOLATION_LEVEL		= 4,
 	DICT_NUM_COLS__SYS_VTQ				= 5
 };
 /* The field numbers in the SYS_VTQ clustered index */
@@ -345,7 +345,7 @@ enum dict_fld_sys_vtq_enum
 	DICT_FLD__SYS_VTQ__COMMIT_ID			= 3,
 	DICT_FLD__SYS_VTQ__BEGIN_TS			= 4,
 	DICT_FLD__SYS_VTQ__COMMIT_TS			= 5,
-	DICT_FLD__SYS_VTQ__TRANS_TYPE			= 6,
+	DICT_FLD__SYS_VTQ__ISOLATION_LEVEL		= 6,
 	DICT_NUM_FIELDS__SYS_VTQ			= 7
 };
 

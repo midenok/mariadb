@@ -800,14 +800,14 @@ vtq_record&	fields		/*!< out: field values */
 
 	fields.commit_ts.tv_sec = mach_read_from_4(field);
 	fields.commit_ts.tv_usec = mach_read_from_4(field + 4);
-	/* TRANS_TYPE */
+	/* ISOLATION_LEVEL */
 	field = rec_get_nth_field_old(
-		rec, (nfld = DICT_FLD__SYS_VTQ__TRANS_TYPE), &len);
+		rec, (nfld = DICT_FLD__SYS_VTQ__ISOLATION_LEVEL), &len);
 
-	if (len != sizeof(uint16_t))
-		return dict_print_error(heap, nfld, len, sizeof(trx_id_t));
+	if (len != sizeof(byte))
+		return dict_print_error(heap, nfld, len, sizeof(byte));
 
-	fields.trans_type = mach_read_from_2(field); // FIXME: CHAR type
+	fields.isolation_level = *field;
 
 	return(NULL);
 }

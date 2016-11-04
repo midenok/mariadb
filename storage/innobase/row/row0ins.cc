@@ -4164,7 +4164,7 @@ void vers_notify_vtq(trx_t* trx)
 	set_row_field_8(row, DICT_COL__SYS_VTQ__BEGIN_TS, begin_ts, heap);
 	set_row_field_8(row, DICT_COL__SYS_VTQ__COMMIT_TS, commit_ts, heap);
 	ut_ad(trx->isolation_level < 256);
-	set_row_field_1(row, DICT_COL__SYS_VTQ__TRANS_TYPE, trx->isolation_level, heap);
+	set_row_field_1(row, DICT_COL__SYS_VTQ__ISOLATION_LEVEL, trx->isolation_level, heap);
 
 	err = vers_row_ins_vtq_low(trx, heap, row);
 	if (DB_SUCCESS != err)

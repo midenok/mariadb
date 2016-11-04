@@ -426,7 +426,7 @@ struct vtq_record
 	trx_id_t	commit_id;
 	timeval		begin_ts;
 	timeval		commit_ts;
-	uint16_t	trans_type;
+	byte		isolation_level;
 };
 UNIV_INTERN
 const char*

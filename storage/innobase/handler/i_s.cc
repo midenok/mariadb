@@ -10077,8 +10077,8 @@ static ST_FIELD_INFO	innodb_vtq_fields_info[] =
 	STRUCT_FLD(old_name,		""),
 	STRUCT_FLD(open_method,		SKIP_OPEN_TABLE) },
 
-#define SYS_VTQ_TRANS_TYPE 4
-	{ STRUCT_FLD(field_name,	"trans_type"),
+#define SYS_VTQ_ISO_LEVEL 4
+	{ STRUCT_FLD(field_name,	"iso_level"),
 	STRUCT_FLD(field_length,	2),
 	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
 	STRUCT_FLD(value,		0),
@@ -10102,16 +10102,31 @@ i_s_dict_fill_vtq(
 	TABLE*		table_to_fill)	/*!< in/out: fill this table */
 {
 	Field**		fields;
+	const char*	iso_level;
 
 	DBUG_ENTER("i_s_dict_fill_vtq");
 	fields = table_to_fill->field;
+
+	switch (vtq.isolation_level) {
+	case TRX_ISO_REPEATABLE_READ:
+		iso_level = "RR";
+		break;
+	case TRX_ISO_READ_COMMITTED:
+		iso_level = "RC";
+		break;
+	case TRX_ISO_SERIALIZABLE:
+		iso_level = "S";
+		break;
+	case TRX_ISO_READ_UNCOMMITTED:
+		iso_level = "RU";
+		break;
+	}
 
 	OK(field_store_ullong(fields[SYS_VTQ_TRX_ID], vtq.trx_id));
 	OK(field_store_ullong(fields[SYS_VTQ_COMMIT_ID], vtq.commit_id));
 	OK(field_store_timeval(fields[SYS_VTQ_BEGIN_TS], vtq.begin_ts, thd));
 	OK(field_store_timeval(fields[SYS_VTQ_COMMIT_TS], vtq.commit_ts, thd));
-	// FIXME: CHAR type
-	//OK(field_store_string(fields[SYS_VTQ_TRANS_TYPE], vtq.trans_type));
+	OK(field_store_string(fields[SYS_VTQ_ISO_LEVEL], iso_level));
 
 	OK(schema_table_store_record(thd, table_to_fill));
 
