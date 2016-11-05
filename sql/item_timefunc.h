@@ -1280,13 +1280,48 @@ public:
   {
     if (vtq_field == VTQ_BEGIN_TS)
     {
-      return "begin_ts";
+      return "vtq_begin_ts";
     }
-    return "commit_ts";
+    return "vtq_commit_ts";
   }
   bool get_date(MYSQL_TIME *res, ulonglong fuzzy_date);
   Item *get_copy(THD *thd, MEM_ROOT *mem_root)
   { return get_item_copy<Item_func_vtq_ts>(thd, mem_root, this); }
+};
+
+class Item_func_vtq_id :public Item_int_func
+{
+  vtq_field_t vtq_field;
+  handlerton *hton;
+public:
+  Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field, handlerton *hton);
+  Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field);
+
+  const char *func_name() const
+  {
+    if (vtq_field == VTQ_COMMIT_ID)
+    {
+      return "vtq_commit_id";
+    }
+    return "vtq_iso_level";
+  }
+
+  void fix_length_and_dec()
+  {
+    Item_int_func::fix_length_and_dec();
+    max_length= 20;
+  }
+
+  bool fix_fields(THD *thd, Item **ref)
+  {
+    if (Item_int_func::fix_fields(thd, ref))
+      return TRUE;
+    return FALSE;
+  }
+
+  longlong val_int();
+  Item *get_copy(THD *thd, MEM_ROOT *mem_root)
+  { return get_item_copy<Item_func_vtq_id>(thd, mem_root, this); }
 };
 
 #endif /* ITEM_TIMEFUNC_INCLUDED */

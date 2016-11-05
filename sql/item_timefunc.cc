@@ -3277,7 +3277,8 @@ Item_func_vtq_ts::Item_func_vtq_ts(
   DBUG_ASSERT(arg_count == 1 && args[0]);
 }
 
-bool Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
+bool
+Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
 {
   THD *thd= current_thd; // can it differ from constructor's?
   DBUG_ASSERT(thd);
@@ -3316,4 +3317,78 @@ bool Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
   null_value= !hton->vers_query_vtq(thd, res, trx_id, vtq_field);
 
   return false;
+}
+
+Item_func_vtq_id::Item_func_vtq_id(
+    THD *thd,
+    Item* a,
+    vtq_field_t _vtq_field,
+    handlerton* _hton) :
+  Item_int_func(thd, a),
+  vtq_field(_vtq_field),
+  hton(_hton)
+{
+  decimals= 0;
+  unsigned_flag= 1;
+  null_value= true;
+  DBUG_ASSERT(arg_count == 1 && args[0]);
+}
+
+Item_func_vtq_id::Item_func_vtq_id(
+    THD *thd,
+    Item* a,
+    vtq_field_t _vtq_field) :
+  Item_int_func(thd, a),
+  vtq_field(_vtq_field),
+  hton(NULL)
+{
+  decimals= 0;
+  unsigned_flag= 1;
+  null_value= true;
+  DBUG_ASSERT(arg_count == 1 && args[0]);
+}
+
+longlong
+Item_func_vtq_id::val_int()
+{
+  THD *thd= current_thd; // can it differ from constructor's?
+  DBUG_ASSERT(thd);
+  ulonglong trx_id= args[0]->val_uint();
+  if (trx_id == ULONGLONG_MAX)
+  {
+    null_value= true;
+    return 0;
+  }
+
+  if (!hton)
+  {
+    if (args[0]->type() == Item::FIELD_ITEM)
+    {
+      Item_field *f=
+        static_cast<Item_field *>(args[0]);
+      DBUG_ASSERT(
+        f->field &&
+        f->field->table &&
+        f->field->table->s &&
+        f->field->table->s->db_plugin);
+      hton= plugin_hton(f->field->table->s->db_plugin);
+      DBUG_ASSERT(hton);
+    }
+    else if (innodb_plugin)
+    {
+      hton= plugin_hton(plugin_int_to_ref(innodb_plugin));
+      DBUG_ASSERT(hton);
+    }
+  }
+
+  if (!hton)
+  {
+    null_value= true;
+    return 0;
+  }
+
+  longlong res;
+  null_value= !hton->vers_query_vtq(thd, &res, trx_id, vtq_field);
+
+  return res;
 }
