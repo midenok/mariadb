@@ -753,7 +753,7 @@ dict_process_sys_vtq(
 /*=======================*/
 mem_heap_t*	heap,		/*!< in/out: heap memory */
 const rec_t*	rec,		/*!< in: current rec */
-vtq_record&	fields		/*!< out: field values */
+vtq_record&	out		/*!< out: field values */
 )
 {
 	ulint		len, nfld;
@@ -773,7 +773,7 @@ vtq_record&	fields		/*!< out: field values */
 	if (len != sizeof(trx_id_t))
 		return dict_print_error(heap, nfld, len, sizeof(trx_id_t));
 
-	fields.trx_id = mach_read_from_8(field);
+	out.trx_id = mach_read_from_8(field);
 	/* COMMIT_ID */
 	field = rec_get_nth_field_old(
 		rec, (nfld = DICT_FLD__SYS_VTQ__COMMIT_ID), &len);
@@ -781,7 +781,7 @@ vtq_record&	fields		/*!< out: field values */
 	if (len != sizeof(trx_id_t))
 		return dict_print_error(heap, nfld, len, sizeof(trx_id_t));
 
-	fields.commit_id = mach_read_from_8(field);
+	out.commit_id = mach_read_from_8(field);
 	/* BEGIN_TS */
 	field = rec_get_nth_field_old(
 		rec, (nfld = DICT_FLD__SYS_VTQ__BEGIN_TS), &len);
@@ -789,8 +789,8 @@ vtq_record&	fields		/*!< out: field values */
 	if (len != sizeof(ullong))
 		return dict_print_error(heap, nfld, len, sizeof(ullong));
 
-	fields.begin_ts.tv_sec = mach_read_from_4(field);
-	fields.begin_ts.tv_usec = mach_read_from_4(field + 4);
+	out.begin_ts.tv_sec = mach_read_from_4(field);
+	out.begin_ts.tv_usec = mach_read_from_4(field + 4);
 	/* COMMIT_TS */
 	field = rec_get_nth_field_old(
 		rec, (nfld = DICT_FLD__SYS_VTQ__COMMIT_TS), &len);
@@ -798,8 +798,8 @@ vtq_record&	fields		/*!< out: field values */
 	if (len != sizeof(ullong))
 		return dict_print_error(heap, nfld, len, sizeof(ullong));
 
-	fields.commit_ts.tv_sec = mach_read_from_4(field);
-	fields.commit_ts.tv_usec = mach_read_from_4(field + 4);
+	out.commit_ts.tv_sec = mach_read_from_4(field);
+	out.commit_ts.tv_usec = mach_read_from_4(field + 4);
 	/* ISOLATION_LEVEL */
 	field = rec_get_nth_field_old(
 		rec, (nfld = DICT_FLD__SYS_VTQ__ISOLATION_LEVEL), &len);
@@ -807,7 +807,7 @@ vtq_record&	fields		/*!< out: field values */
 	if (len != sizeof(byte))
 		return dict_print_error(heap, nfld, len, sizeof(byte));
 
-	fields.isolation_level = *field;
+	out.iso_level = *field;
 
 	return(NULL);
 }

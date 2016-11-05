@@ -17,9 +17,10 @@
 
 enum vtq_field_t
 {
-  VTQ_BEGIN_TS = 0,
-  VTQ_COMMIT_TS
+  VTQ_COMMIT_ID,
+  VTQ_BEGIN_TS,
+  VTQ_COMMIT_TS,
+  VTQ_ISO_LEVEL
 };
 
 #endif /* VTQ_INCLUDED */
-

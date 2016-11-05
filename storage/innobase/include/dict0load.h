@@ -30,6 +30,7 @@ Created 4/24/1996 Heikki Tuuri
 #include "univ.i"
 #include "dict0types.h"
 #include "trx0types.h"
+#include "trx0vtq.h"
 #include "ut0byte.h"
 #include "mem0mem.h"
 #include "btr0types.h"
@@ -420,14 +421,6 @@ dict_process_sys_datafiles(
 This function parses a SYS_VTQ record, extracts necessary
 information from the record and returns it to the caller.
 @return error message, or NULL on success */
-struct vtq_record
-{
-	trx_id_t	trx_id;
-	trx_id_t	commit_id;
-	timeval		begin_ts;
-	timeval		commit_ts;
-	byte		isolation_level;
-};
 UNIV_INTERN
 const char*
 dict_process_sys_vtq(

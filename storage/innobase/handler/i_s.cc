@@ -10107,7 +10107,7 @@ i_s_dict_fill_vtq(
 	DBUG_ENTER("i_s_dict_fill_vtq");
 	fields = table_to_fill->field;
 
-	switch (vtq.isolation_level) {
+	switch (vtq.iso_level) {
 	case TRX_ISO_REPEATABLE_READ:
 		iso_level = "RR";
 		break;

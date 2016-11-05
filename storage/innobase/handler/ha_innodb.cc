@@ -123,7 +123,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "trx0xa.h"
 #include "ut0mem.h"
 #include "row0ext.h"
-#include "vtq.h"
 
 #define thd_get_trx_isolation(X) ((enum_tx_isolation)thd_tx_isolation(X))
 
@@ -1570,7 +1569,7 @@ innobase_fts_store_docid(
 #endif
 
 bool
-innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong in_trx_id, vtq_field_t field);
+innobase_query_vtq(THD* thd, void *out, ulonglong in_trx_id, vtq_field_t field);
 
 /*************************************************************//**
 Check for a valid value of innobase_commit_concurrency.
@@ -4108,7 +4107,7 @@ innobase_init(
 	innobase_hton->table_options = innodb_table_option_list;
 
 	/* System Versioning */
-	innobase_hton->vers_get_vtq_ts = innobase_get_vtq_ts;
+	innobase_hton->vers_query_vtq = innobase_query_vtq;
 
 	innodb_remember_check_sysvar_funcs();
 
@@ -25005,16 +25004,26 @@ ib_push_frm_error(
 
 inline
 void
-innobase_get_vtq_ts_result(THD* thd, vtq_query_t* q, MYSQL_TIME *out, vtq_field_t field)
+innobase_vtq_result(THD* thd, vtq_record& q, void *out, vtq_field_t field)
 {
 	switch (field) {
-	case VTQ_BEGIN_TS:
-		thd_get_timezone(thd)->gmt_sec_to_TIME(out, q->begin_ts.tv_sec);
-		out->second_part = q->begin_ts.tv_usec;
+	case VTQ_COMMIT_ID:
+		*reinterpret_cast<trx_id_t *>(out) = q.commit_id;
 		break;
-	case VTQ_COMMIT_TS:
-		thd_get_timezone(thd)->gmt_sec_to_TIME(out, q->commit_ts.tv_sec);
-		out->second_part = q->commit_ts.tv_usec;
+	case VTQ_BEGIN_TS: {
+		MYSQL_TIME* out_ts = reinterpret_cast<MYSQL_TIME *>(out);
+		thd_get_timezone(thd)->gmt_sec_to_TIME(out_ts, q.begin_ts.tv_sec);
+		out_ts->second_part = q.begin_ts.tv_usec;
+		break;
+	}
+	case VTQ_COMMIT_TS: {
+		MYSQL_TIME* out_ts = reinterpret_cast<MYSQL_TIME *>(out);
+		thd_get_timezone(thd)->gmt_sec_to_TIME(out_ts, q.commit_ts.tv_sec);
+		out_ts->second_part = q.commit_ts.tv_usec;
+		break;
+	}
+	case VTQ_ISO_LEVEL:
+		*reinterpret_cast<uint *>(out) = q.iso_level;
 		break;
 	default:
 		ut_error;
@@ -25023,7 +25032,7 @@ innobase_get_vtq_ts_result(THD* thd, vtq_query_t* q, MYSQL_TIME *out, vtq_field_
 
 UNIV_INTERN
 bool
-innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, vtq_field_t field)
+innobase_query_vtq(THD* thd, void *out, ulonglong _in_trx_id, vtq_field_t field)
 {
 	trx_t*		trx;
 	dict_index_t*	index;
@@ -25034,11 +25043,9 @@ innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, vtq_field_t
 	mtr_t		mtr;
 	mem_heap_t*	heap;
 	rec_t*		rec;
-	ulint		len;
-	byte*		result_net;
 	bool		found = false;
 
-	DBUG_ENTER("innobase_get_vtq_ts");
+	DBUG_ENTER("innobase_query_vtq");
 
 	if (_in_trx_id == 0) {
 		DBUG_RETURN(false);
@@ -25049,10 +25056,9 @@ innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, vtq_field_t
 
 	trx = thd_to_trx(thd);
 	ut_a(trx);
-	vtq_query_t*	q = &trx->vtq_query;
 
-	if (q->trx_id == in_trx_id) {
-		innobase_get_vtq_ts_result(thd, q, out, field);
+	if (trx->vtq_query.trx_id == in_trx_id) {
+		innobase_vtq_result(thd, trx->vtq_query, out, field);
 		DBUG_RETURN(true);
 	}
 
@@ -25079,24 +25085,19 @@ innobase_get_vtq_ts(THD* thd, MYSQL_TIME *out, ulonglong _in_trx_id, vtq_field_t
 		goto not_found;
 
 	rec = btr_pcur_get_rec(&pcur);
-	result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__TRX_ID, &len);
-	ut_ad(len == 8);
-	q->trx_id = mach_read_from_8(result_net);
+	{
+		const char *err = dict_process_sys_vtq(heap, rec, trx->vtq_query);
+		if (err) {
+			fprintf(stderr, "InnoDB: Error: get VTQ field failed: %s\n", err);
+			ut_ad(false && "get VTQ field failed");
+			goto not_found;
+		}
+	}
 
-	result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__BEGIN_TS, &len);
-	ut_ad(len == 8);
-	q->begin_ts.tv_sec = mach_read_from_4(result_net);
-	q->begin_ts.tv_usec = mach_read_from_4(result_net + 4);
-
-	result_net = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTQ__COMMIT_TS, &len);
-	ut_ad(len == 8);
-	q->commit_ts.tv_sec = mach_read_from_4(result_net);
-	q->commit_ts.tv_usec = mach_read_from_4(result_net + 4);
-
-	if (q->trx_id != in_trx_id)
+	if (trx->vtq_query.trx_id != in_trx_id)
 		goto not_found;
 
-	innobase_get_vtq_ts_result(thd, q, out, field);
+	innobase_vtq_result(thd, trx->vtq_query, out, field);
 	found = true;
 
 not_found:

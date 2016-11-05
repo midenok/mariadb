@@ -3313,7 +3313,7 @@ bool Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
   if (!hton)
     return true;
 
-  null_value= !hton->vers_get_vtq_ts(thd, res, trx_id, vtq_field);
+  null_value= !hton->vers_query_vtq(thd, res, trx_id, vtq_field);
 
   return false;
 }
