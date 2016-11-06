@@ -2007,6 +2007,7 @@ dict_create_or_check_vtq_table(void)
 	my_bool		srv_file_per_table_backup;
 	dberr_t		err;
 	dberr_t		sys_vtq_err;
+	dict_index_t*	index;
 
 	ut_a(srv_get_active_thread_type() == SRV_NONE);
 
@@ -2017,10 +2018,8 @@ dict_create_or_check_vtq_table(void)
 		"SYS_VTQ", DICT_NUM_FIELDS__SYS_VTQ + 1, vtq_num_indexes);
 
 	if (sys_vtq_err == DB_SUCCESS) {
-		mutex_enter(&dict_sys->mutex);
-		dict_sys->sys_vtq = dict_table_get_low("SYS_VTQ");
-		mutex_exit(&dict_sys->mutex);
-		return(DB_SUCCESS);
+		err = DB_SUCCESS;
+		goto assign_and_exit;
 	}
 
 	trx = trx_allocate_for_mysql();
@@ -2106,8 +2105,18 @@ dict_create_or_check_vtq_table(void)
 	sys_vtq_err = dict_check_if_system_table_exists(
 		"SYS_VTQ", DICT_NUM_FIELDS__SYS_VTQ + 1, vtq_num_indexes);
 	ut_a(sys_vtq_err == DB_SUCCESS);
+
+assign_and_exit:
 	mutex_enter(&dict_sys->mutex);
 	dict_sys->sys_vtq = dict_table_get_low("SYS_VTQ");
+	ut_ad(dict_sys->sys_vtq);
+	index = dict_table_get_first_index(dict_sys->sys_vtq);
+	for (int i = 0; i < 3; ++i) {
+		index = dict_table_get_next_index(index);
+		ut_ad(index);
+	}
+	ut_ad(strcmp(index->name, "COMMIT_TS_IND") == 0);
+	dict_sys->vtq_commit_ts_ind = index;
 	mutex_exit(&dict_sys->mutex);
 
 	return(err);

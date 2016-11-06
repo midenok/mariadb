@@ -5758,6 +5758,7 @@ Create_func_vtq<VTQ_FIELD>::create_native(THD *thd, LEX_STRING name,
     case VTQ_COMMIT_TS:
       func= new (thd->mem_root) Item_func_vtq_ts(thd, param_1, VTQ_FIELD);
       break;
+    case VTQ_TRX_ID:
     case VTQ_COMMIT_ID:
     case VTQ_ISO_LEVEL:
       func= new (thd->mem_root) Item_func_vtq_id(thd, param_1, VTQ_FIELD);
@@ -6107,6 +6108,7 @@ static Native_func_registry func_array[] =
   { { C_STRING_WITH_LEN("VTQ_COMMIT_ID") }, BUILDER(Create_func_vtq<VTQ_COMMIT_ID>)},
   { { C_STRING_WITH_LEN("VTQ_COMMIT_TS") }, BUILDER(Create_func_vtq<VTQ_COMMIT_TS>)},
   { { C_STRING_WITH_LEN("VTQ_ISO_LEVEL") }, BUILDER(Create_func_vtq<VTQ_ISO_LEVEL>)},
+  { { C_STRING_WITH_LEN("VTQ_TRX_ID") }, BUILDER(Create_func_vtq<VTQ_TRX_ID>)},
   { { C_STRING_WITH_LEN("WEEKDAY") }, BUILDER(Create_func_weekday)},
   { { C_STRING_WITH_LEN("WEEKOFYEAR") }, BUILDER(Create_func_weekofyear)},
   { { C_STRING_WITH_LEN("WITHIN") }, GEOM_BUILDER(Create_func_within)},
