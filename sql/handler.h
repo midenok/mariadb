@@ -1372,7 +1372,8 @@ struct handlerton
      System Versioning
    */
    bool versioned() const;
-   bool (*vers_query_vtq)(THD* thd, void *out, ulonglong trx_id, vtq_field_t field);
+   bool (*vers_query_trx_id)(THD* thd, void *out, ulonglong trx_id, vtq_field_t field);
+   bool (*vers_query_commit_ts)(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, bool find_max);
 };
 
 

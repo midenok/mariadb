@@ -510,7 +510,7 @@ btr_pessimistic_scrub(
 /****************************************************************
 Location index by id for a table
 return index or NULL */
-static
+UNIV_INTERN
 dict_index_t*
 find_index(
 /*========*/

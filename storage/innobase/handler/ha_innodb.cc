@@ -1569,7 +1569,11 @@ innobase_fts_store_docid(
 #endif
 
 bool
-innobase_query_vtq(THD* thd, void *out, ulonglong in_trx_id, vtq_field_t field);
+vtq_query_trx_id(THD* thd, void *out, ulonglong in_trx_id, vtq_field_t field);
+
+bool
+vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, bool find_max = true);
+
 
 /*************************************************************//**
 Check for a valid value of innobase_commit_concurrency.
@@ -4107,7 +4111,8 @@ innobase_init(
 	innobase_hton->table_options = innodb_table_option_list;
 
 	/* System Versioning */
-	innobase_hton->vers_query_vtq = innobase_query_vtq;
+	innobase_hton->vers_query_trx_id = vtq_query_trx_id;
+	innobase_hton->vers_query_commit_ts = vtq_query_commit_ts;
 
 	innodb_remember_check_sysvar_funcs();
 
@@ -25032,7 +25037,7 @@ innobase_vtq_result(THD* thd, vtq_record& q, void *out, vtq_field_t field)
 
 UNIV_INTERN
 bool
-innobase_query_vtq(THD* thd, void *out, ulonglong _in_trx_id, vtq_field_t field)
+vtq_query_trx_id(THD* thd, void *out, ulonglong _in_trx_id, vtq_field_t field)
 {
 	trx_t*		trx;
 	dict_index_t*	index;
@@ -25106,4 +25111,37 @@ not_found:
 	mem_heap_free(heap);
 
 	DBUG_RETURN(found);
+}
+
+UNIV_INTERN
+bool
+vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, bool find_max)
+{
+	trx_t*		trx;
+	btr_pcur_t	pcur;
+	dtuple_t*	tuple;
+	page_cur_mode_t mode;
+	mtr_t		mtr;
+	if (find_max) {
+		mode = PAGE_CUR_GE;
+	} else {
+		mode = PAGE_CUR_LE;
+	}
+
+	trx = thd_to_trx(thd);
+	ut_a(trx);
+	dict_index_t* index = find_index(dict_sys->sys_vtq, 2);
+
+	mtr_start_trx(&mtr, trx);
+	btr_pcur_open_on_user_rec(index, tuple, mode,
+		BTR_SEARCH_LEAF, &pcur, &mtr);
+	mtr_commit(&mtr);
+
+	return false;
+}
+
+void
+innobase_vtq_trx_sees(trx_id_t trx_id1, trx_id_t trx_id0)
+{
+
 }

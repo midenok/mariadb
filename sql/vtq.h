@@ -17,6 +17,7 @@
 
 enum vtq_field_t
 {
+  VTQ_TRX_ID,
   VTQ_COMMIT_ID,
   VTQ_BEGIN_TS,
   VTQ_COMMIT_TS,

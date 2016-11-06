@@ -3254,10 +3254,9 @@ Item_func_vtq_ts::Item_func_vtq_ts(
     THD *thd,
     Item* a,
     vtq_field_t _vtq_field,
-    handlerton* _hton) :
-  Item_datetimefunc(thd, a),
-  vtq_field(_vtq_field),
-  hton(_hton)
+    handlerton* hton) :
+  VTQ_common<Item_datetimefunc>(thd, a, hton),
+  vtq_field(_vtq_field)
 {
   decimals= 6;
   null_value= true;
@@ -3268,13 +3267,38 @@ Item_func_vtq_ts::Item_func_vtq_ts(
     THD *thd,
     Item* a,
     vtq_field_t _vtq_field) :
-  Item_datetimefunc(thd, a),
-  vtq_field(_vtq_field),
-  hton(NULL)
+  VTQ_common<Item_datetimefunc>(thd, a),
+  vtq_field(_vtq_field)
 {
   decimals= 6;
   null_value= true;
   DBUG_ASSERT(arg_count == 1 && args[0]);
+}
+
+template <class Item_func_X>
+void
+VTQ_common<Item_func_X>::init_hton()
+{
+  if (!hton)
+  {
+    if (Item_func_X::args[0]->type() == Item::FIELD_ITEM)
+    {
+      Item_field *f=
+        static_cast<Item_field *>(Item_func_X::args[0]);
+      DBUG_ASSERT(
+        f->field &&
+        f->field->table &&
+        f->field->table->s &&
+        f->field->table->s->db_plugin);
+      hton= plugin_hton(f->field->table->s->db_plugin);
+      DBUG_ASSERT(hton);
+    }
+    else if (innodb_plugin)
+    {
+      hton= plugin_hton(plugin_int_to_ref(innodb_plugin));
+      DBUG_ASSERT(hton);
+    }
+  }
 }
 
 bool
@@ -3290,31 +3314,12 @@ Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
     return false;
   }
 
-  if (!hton)
-  {
-    if (args[0]->type() == Item::FIELD_ITEM)
-    {
-      Item_field *f=
-        static_cast<Item_field *>(args[0]);
-      DBUG_ASSERT(
-        f->field &&
-        f->field->table &&
-        f->field->table->s &&
-        f->field->table->s->db_plugin);
-      hton= plugin_hton(f->field->table->s->db_plugin);
-      DBUG_ASSERT(hton);
-    }
-    else if (innodb_plugin)
-    {
-      hton= plugin_hton(plugin_int_to_ref(innodb_plugin));
-      DBUG_ASSERT(hton);
-    }
-  }
+  init_hton();
 
   if (!hton)
     return true;
 
-  null_value= !hton->vers_query_vtq(thd, res, trx_id, vtq_field);
+  null_value= !hton->vers_query_trx_id(thd, res, trx_id, vtq_field);
 
   return false;
 }
@@ -3323,10 +3328,9 @@ Item_func_vtq_id::Item_func_vtq_id(
     THD *thd,
     Item* a,
     vtq_field_t _vtq_field,
-    handlerton* _hton) :
-  Item_int_func(thd, a),
-  vtq_field(_vtq_field),
-  hton(_hton)
+    handlerton* hton) :
+  VTQ_common<Item_int_func>(thd, a, hton),
+  vtq_field(_vtq_field)
 {
   decimals= 0;
   unsigned_flag= 1;
@@ -3338,9 +3342,8 @@ Item_func_vtq_id::Item_func_vtq_id(
     THD *thd,
     Item* a,
     vtq_field_t _vtq_field) :
-  Item_int_func(thd, a),
-  vtq_field(_vtq_field),
-  hton(NULL)
+  VTQ_common<Item_int_func>(thd, a),
+  vtq_field(_vtq_field)
 {
   decimals= 0;
   unsigned_flag= 1;
@@ -3360,26 +3363,7 @@ Item_func_vtq_id::val_int()
     return 0;
   }
 
-  if (!hton)
-  {
-    if (args[0]->type() == Item::FIELD_ITEM)
-    {
-      Item_field *f=
-        static_cast<Item_field *>(args[0]);
-      DBUG_ASSERT(
-        f->field &&
-        f->field->table &&
-        f->field->table->s &&
-        f->field->table->s->db_plugin);
-      hton= plugin_hton(f->field->table->s->db_plugin);
-      DBUG_ASSERT(hton);
-    }
-    else if (innodb_plugin)
-    {
-      hton= plugin_hton(plugin_int_to_ref(innodb_plugin));
-      DBUG_ASSERT(hton);
-    }
-  }
+  init_hton();
 
   if (!hton)
   {
@@ -3388,7 +3372,20 @@ Item_func_vtq_id::val_int()
   }
 
   longlong res;
-  null_value= !hton->vers_query_vtq(thd, &res, trx_id, vtq_field);
+  switch (vtq_field)
+  {
+  case VTQ_COMMIT_ID:
+  case VTQ_ISO_LEVEL:
+    null_value= !hton->vers_query_trx_id(thd, &res, trx_id, vtq_field);
+    break;
+  case VTQ_TRX_ID:
+    MYSQL_TIME commit_ts;
+    null_value= !hton->vers_query_commit_ts(thd, res, commit_ts, true);
+    break;
+  default:
+    DBUG_ASSERT(0);
+    res= 0;
+  }
 
   return res;
 }

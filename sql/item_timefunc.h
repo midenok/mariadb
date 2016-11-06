@@ -1269,10 +1269,25 @@ public:
 
 #include "vtq.h"
 
-class Item_func_vtq_ts :public Item_datetimefunc
+template <class Item_func_X>
+class VTQ_common : public Item_func_X
+{
+protected:
+  handlerton *hton;
+  void init_hton();
+public:
+  VTQ_common(THD *thd, Item* a) :
+    Item_func_X(thd, a),
+    hton(NULL) {}
+  VTQ_common(THD *thd, Item* a, handlerton* _hton) :
+    Item_func_X(thd, a),
+    hton(_hton) {}
+};
+
+class Item_func_vtq_ts :
+  public VTQ_common<Item_datetimefunc>
 {
   vtq_field_t vtq_field;
-  handlerton *hton;
 public:
   Item_func_vtq_ts(THD *thd, Item* a, vtq_field_t _vtq_field, handlerton *hton);
   Item_func_vtq_ts(THD *thd, Item* a, vtq_field_t _vtq_field);
@@ -1289,21 +1304,28 @@ public:
   { return get_item_copy<Item_func_vtq_ts>(thd, mem_root, this); }
 };
 
-class Item_func_vtq_id :public Item_int_func
+class Item_func_vtq_id :
+  public VTQ_common<Item_int_func>
 {
   vtq_field_t vtq_field;
-  handlerton *hton;
 public:
   Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field, handlerton *hton);
   Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field);
 
   const char *func_name() const
   {
-    if (vtq_field == VTQ_COMMIT_ID)
+    switch (vtq_field)
     {
-      return "vtq_commit_id";
+    case VTQ_TRX_ID:
+      return "vtq_trx_id";
+    case VTQ_COMMIT_ID:
+        return "vtq_commit_id";
+    case VTQ_ISO_LEVEL:
+      return "vtq_iso_level";
+    default:
+      DBUG_ASSERT(0);
     }
-    return "vtq_iso_level";
+    return NULL;
   }
 
   void fix_length_and_dec()
@@ -1312,6 +1334,7 @@ public:
     max_length= 20;
   }
 
+  // FIXME: remove
   bool fix_fields(THD *thd, Item **ref)
   {
     if (Item_int_func::fix_fields(thd, ref))
