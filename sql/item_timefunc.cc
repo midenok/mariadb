@@ -3380,6 +3380,11 @@ Item_func_vtq_id::val_int()
     break;
   case VTQ_TRX_ID:
     MYSQL_TIME commit_ts;
+    if (args[0]->get_date(&commit_ts, 0))
+    {
+      null_value= true;
+      break;
+    }
     null_value= !hton->vers_query_commit_ts(thd, res, commit_ts, true);
     break;
   default:

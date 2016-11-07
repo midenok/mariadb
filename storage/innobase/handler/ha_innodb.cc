@@ -25050,7 +25050,7 @@ vtq_query_trx_id(THD* thd, void *out, ulonglong _in_trx_id, vtq_field_t field)
 	rec_t*		rec;
 	bool		found = false;
 
-	DBUG_ENTER("innobase_query_vtq");
+	DBUG_ENTER("vtq_query_trx_id");
 
 	if (_in_trx_id == 0) {
 		DBUG_RETURN(false);
@@ -25126,6 +25126,9 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool 
 	uint		err;
 	timeval		commit_ts;
 	dict_index_t*	index = dict_sys->vtq_commit_ts_ind;
+	bool		found = false;
+
+	DBUG_ENTER("vtq_query_commit_ts");
 
 	if (find_max) {
 		mode = PAGE_CUR_GE;
@@ -25136,30 +25139,33 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool 
 	trx = thd_to_trx(thd);
 	ut_a(trx);
 
-	heap = mem_heap_create(0);
-
 	commit_ts.tv_usec = _commit_ts.second_part;
 	commit_ts.tv_sec = thd_get_timezone(thd)->TIME_to_gmt_sec(&_commit_ts, &err);
 	if (err) {
-		ut_ad(0);
-		return false;
+		DBUG_RETURN(false);
 	}
 
+	heap = mem_heap_create(0);
+
 	tuple = dtuple_create(heap, 1);
-	set_tuple_col_8(tuple, DICT_COL__SYS_VTQ__COMMIT_TS, commit_ts, heap);
 	dict_index_copy_types(tuple, index, 1);
+	set_tuple_col_8(tuple, 0, commit_ts, heap);
 
 	mtr_start_trx(&mtr, trx);
-	btr_pcur_open_on_user_rec(
-		index,
-		tuple,
-		mode,
-		BTR_SEARCH_LEAF,
-		&pcur,
-		&mtr);
-	mtr_commit(&mtr);
+	btr_pcur_open_on_user_rec(index, tuple, mode,
+			BTR_SEARCH_LEAF, &pcur, &mtr);
 
-	return false;
+	if (!btr_pcur_is_on_user_rec(&pcur))
+		goto not_found;
+
+	found = true;
+
+not_found:
+	btr_pcur_close(&pcur);
+	mtr_commit(&mtr);
+	mem_heap_free(heap);
+
+	DBUG_RETURN(false);
 }
 
 void
