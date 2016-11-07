@@ -25113,6 +25113,34 @@ not_found:
 	DBUG_RETURN(found);
 }
 
+static
+inline
+trx_id_t rec_get_trx_id(const rec_t* rec, ulint nfield)
+{
+	ulint		len;
+	const byte*	field;
+	field = rec_get_nth_field_old(
+		rec, nfield, &len);
+
+	ut_ad(len == sizeof(trx_id_t));
+	return mach_read_from_8(field);
+}
+
+static
+inline
+void rec_get_timeval(const rec_t* rec, ulint nfield, timeval& out)
+{
+	ulint		len;
+	const byte*	field;
+	field = rec_get_nth_field_old(
+		rec, nfield, &len);
+
+	ut_ad(len == sizeof(ullong));
+
+	out.tv_sec = mach_read_from_4(field);
+	out.tv_usec = mach_read_from_4(field + 4);
+}
+
 UNIV_INTERN
 bool
 vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool find_max)
@@ -25125,6 +25153,7 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool 
 	mem_heap_t*	heap;
 	uint		err;
 	timeval		commit_ts;
+	const rec_t*	rec;
 	dict_index_t*	index = dict_sys->vtq_commit_ts_ind;
 	bool		found = false;
 
@@ -25155,9 +25184,27 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool 
 	btr_pcur_open_on_user_rec(index, tuple, mode,
 			BTR_SEARCH_LEAF, &pcur, &mtr);
 
+	if (btr_pcur_is_on_user_rec(&pcur)) {
+		timeval rec_ts;
+		rec = btr_pcur_get_rec(&pcur);
+		rec_get_timeval(rec, 0, rec_ts);
+		if (rec_ts.tv_sec == commit_ts.tv_sec
+		&& rec_ts.tv_usec == commit_ts.tv_usec)
+			goto found;
+	}
+
+	if (mode == PAGE_CUR_GE) {
+		btr_pcur_move_to_prev_user_rec(&pcur, &mtr);
+	} else {
+		btr_pcur_move_to_next_user_rec(&pcur, &mtr);
+	}
+
 	if (!btr_pcur_is_on_user_rec(&pcur))
 		goto not_found;
 
+	rec = btr_pcur_get_rec(&pcur);
+found:
+	out = rec_get_trx_id(rec, 1);
 	found = true;
 
 not_found:
@@ -25165,7 +25212,7 @@ not_found:
 	mtr_commit(&mtr);
 	mem_heap_free(heap);
 
-	DBUG_RETURN(false);
+	DBUG_RETURN(found);
 }
 
 void
