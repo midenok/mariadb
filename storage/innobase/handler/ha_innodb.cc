@@ -1572,7 +1572,7 @@ bool
 vtq_query_trx_id(THD* thd, void *out, ulonglong in_trx_id, vtq_field_t field);
 
 bool
-vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, bool find_max = true);
+vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, bool backwards = false);
 
 
 /*************************************************************//**
@@ -25143,7 +25143,7 @@ void rec_get_timeval(const rec_t* rec, ulint nfield, timeval& out)
 
 UNIV_INTERN
 bool
-vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool find_max)
+vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool backwards)
 {
 	trx_t*		trx;
 	btr_pcur_t	pcur;
@@ -25159,11 +25159,7 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool 
 
 	DBUG_ENTER("vtq_query_commit_ts");
 
-	if (find_max) {
-		mode = PAGE_CUR_GE;
-	} else {
-		mode = PAGE_CUR_LE;
-	}
+	mode = backwards ? PAGE_CUR_LE : PAGE_CUR_GE;
 
 	trx = thd_to_trx(thd);
 	ut_a(trx);
@@ -25188,6 +25184,7 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool 
 		timeval rec_ts;
 		rec = btr_pcur_get_rec(&pcur);
 		rec_get_timeval(rec, 0, rec_ts);
+
 		if (rec_ts.tv_sec == commit_ts.tv_sec
 		&& rec_ts.tv_usec == commit_ts.tv_usec)
 			goto found;

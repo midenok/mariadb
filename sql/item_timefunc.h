@@ -1279,6 +1279,9 @@ public:
   VTQ_common(THD *thd, Item* a) :
     Item_func_X(thd, a),
     hton(NULL) {}
+  VTQ_common(THD *thd, Item* a, Item* b) :
+    Item_func_X(thd, a, b),
+    hton(NULL) {}
   VTQ_common(THD *thd, Item* a, handlerton* _hton) :
     Item_func_X(thd, a),
     hton(_hton) {}
@@ -1311,6 +1314,7 @@ class Item_func_vtq_id :
 public:
   Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field, handlerton *hton);
   Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field);
+  Item_func_vtq_id(THD *thd, Item* a, Item* b, vtq_field_t _vtq_field);
 
   const char *func_name() const
   {
@@ -1334,7 +1338,7 @@ public:
     max_length= 20;
   }
 
-  // FIXME: remove
+  // FIXME: remove or move val_int() code here
   bool fix_fields(THD *thd, Item **ref)
   {
     if (Item_int_func::fix_fields(thd, ref))

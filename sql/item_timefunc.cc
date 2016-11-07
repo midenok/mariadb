@@ -3351,6 +3351,20 @@ Item_func_vtq_id::Item_func_vtq_id(
   DBUG_ASSERT(arg_count == 1 && args[0]);
 }
 
+Item_func_vtq_id::Item_func_vtq_id(
+    THD *thd,
+    Item* a,
+    Item* b,
+    vtq_field_t _vtq_field) :
+  VTQ_common<Item_int_func>(thd, a, b),
+  vtq_field(_vtq_field)
+{
+  decimals= 0;
+  unsigned_flag= 1;
+  null_value= true;
+  DBUG_ASSERT(arg_count == 2 && args[0] && args[1]);
+}
+
 longlong
 Item_func_vtq_id::val_int()
 {
@@ -3379,14 +3393,22 @@ Item_func_vtq_id::val_int()
     null_value= !hton->vers_query_trx_id(thd, &res, trx_id, vtq_field);
     break;
   case VTQ_TRX_ID:
+  {
     MYSQL_TIME commit_ts;
+    bool backwards= false;
     if (args[0]->get_date(&commit_ts, 0))
     {
       null_value= true;
       break;
     }
-    null_value= !hton->vers_query_commit_ts(thd, res, commit_ts, true);
+    if (arg_count > 1)
+    {
+      backwards= args[1]->val_bool();
+      DBUG_ASSERT(arg_count == 2);
+    }
+    null_value= !hton->vers_query_commit_ts(thd, res, commit_ts, backwards);
     break;
+  }
   default:
     DBUG_ASSERT(0);
     res= 0;

@@ -5720,7 +5720,7 @@ Create_func_year_week::create_native(THD *thd, LEX_STRING name,
 }
 
 
-/* System Versioning: VTQ_COMMIT_ID(), VTQ_BEGIN_TS(), VTQ_COMMIT_TS(), VTQ_ISO_LEVEL() */
+/* System Versioning: VTQ_TRX_ID(), VTQ_COMMIT_ID(), VTQ_BEGIN_TS(), VTQ_COMMIT_TS(), VTQ_ISO_LEVEL() */
 template <vtq_field_t VTQ_FIELD>
 class Create_func_vtq : public Create_native_func
 {
@@ -5767,6 +5767,16 @@ Create_func_vtq<VTQ_FIELD>::create_native(THD *thd, LEX_STRING name,
       DBUG_ASSERT(0);
     }
     break;
+  }
+  case 2:
+  {
+    Item *param_1= item_list->pop();
+    Item *param_2= item_list->pop();
+    if (VTQ_FIELD == VTQ_TRX_ID)
+    {
+      func= new (thd->mem_root) Item_func_vtq_id(thd, param_1, param_2, VTQ_FIELD);
+      break;
+    }
   }
   default:
   {
