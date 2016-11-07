@@ -4088,7 +4088,7 @@ Inserts a row to SYS_VTQ, low level.
 code */
 static __attribute__((nonnull, warn_unused_result))
 dberr_t
-vers_row_ins_vtq_low(trx_t* trx, mem_heap_t* heap, dtuple_t* row)
+vers_row_ins_vtq_low(trx_t* trx, mem_heap_t* heap, dtuple_t* tuple)
 {
 	dberr_t		err;
 	dtuple_t*	entry;
@@ -4099,7 +4099,7 @@ vers_row_ins_vtq_low(trx_t* trx, mem_heap_t* heap, dtuple_t* row)
 			| BTR_NO_LOCKING_FLAG
 			| BTR_NO_UNDO_LOG_FLAG);
 
-	entry = row_build_index_entry(row, NULL, index, heap);
+	entry = row_build_index_entry(tuple, NULL, index, heap);
 
 	dfield_t* dfield = dtuple_get_nth_field(entry, DATA_TRX_ID);
 	ut_ad(dfield->type.len == DATA_TRX_ID_LEN);
@@ -4129,7 +4129,7 @@ vers_row_ins_vtq_low(trx_t* trx, mem_heap_t* heap, dtuple_t* row)
 
 		n_index++;
 
-		entry = row_build_index_entry(row, NULL, index, heap);
+		entry = row_build_index_entry(tuple, NULL, index, heap);
 		err = row_ins_sec_index_entry_low(
 			flags, BTR_MODIFY_TREE,
 			index, offsets_heap, heap, entry, trx->id, NULL, false, trx);
@@ -4147,7 +4147,7 @@ void vers_notify_vtq(trx_t* trx)
 {
 	dberr_t err;
 	mem_heap_t* heap = mem_heap_create(1024);
-	dtuple_t* row = dtuple_create(heap, dict_table_get_n_cols(dict_sys->sys_vtq));
+	dtuple_t* tuple = dtuple_create(heap, dict_table_get_n_cols(dict_sys->sys_vtq));
 
 	timeval begin_ts, commit_ts;
 	begin_ts.tv_sec = trx->start_time;
@@ -4158,15 +4158,15 @@ void vers_notify_vtq(trx_t* trx)
 	ut_usectime((ulint *)&commit_ts.tv_sec, (ulint *)&commit_ts.tv_usec);
 	mutex_exit(&trx_sys->mutex);
 
-	dict_table_copy_types(row, dict_sys->sys_vtq);
-	set_row_field_8(row, DICT_COL__SYS_VTQ__TRX_ID, trx->id, heap);
-	set_row_field_8(row, DICT_COL__SYS_VTQ__COMMIT_ID, commit_id, heap);
-	set_row_field_8(row, DICT_COL__SYS_VTQ__BEGIN_TS, begin_ts, heap);
-	set_row_field_8(row, DICT_COL__SYS_VTQ__COMMIT_TS, commit_ts, heap);
+	dict_table_copy_types(tuple, dict_sys->sys_vtq);
+	set_tuple_col_8(tuple, DICT_COL__SYS_VTQ__TRX_ID, trx->id, heap);
+	set_tuple_col_8(tuple, DICT_COL__SYS_VTQ__COMMIT_ID, commit_id, heap);
+	set_tuple_col_8(tuple, DICT_COL__SYS_VTQ__BEGIN_TS, begin_ts, heap);
+	set_tuple_col_8(tuple, DICT_COL__SYS_VTQ__COMMIT_TS, commit_ts, heap);
 	ut_ad(trx->isolation_level < 256);
-	set_row_field_1(row, DICT_COL__SYS_VTQ__ISOLATION_LEVEL, trx->isolation_level, heap);
+	set_tuple_col_1(tuple, DICT_COL__SYS_VTQ__ISOLATION_LEVEL, trx->isolation_level, heap);
 
-	err = vers_row_ins_vtq_low(trx, heap, row);
+	err = vers_row_ins_vtq_low(trx, heap, tuple);
 	if (DB_SUCCESS != err)
 		fprintf(stderr, "InnoDB: failed to insert VTQ record (error %d)\n", err);
 

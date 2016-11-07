@@ -2203,16 +2203,6 @@ bool
 dict_table_have_virtual_index(
 	dict_table_t*	table);
 
-/****************************************************************
-Location index by id for a table
-return index or NULL */
-UNIV_INTERN
-dict_index_t*
-find_index(
-/*========*/
-	dict_table_t* table, /*!< in: table */
-	index_id_t index_id); /*!< in: index id */
-
 #endif /* !UNIV_HOTBACKUP */
 
 

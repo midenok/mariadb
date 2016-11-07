@@ -25,14 +25,14 @@ Created 4/20/1996 Heikki Tuuri
 
 
 UNIV_INLINE
-void set_row_field_8(
-	dtuple_t* row,
-	int field_num,
+void set_tuple_col_8(
+	dtuple_t* tuple,
+	int col,
 	ib_uint64_t data,
 	mem_heap_t* heap)
 {
 	static const ulint fsize = sizeof(data);
-	dfield_t* dfield = dtuple_get_nth_field(row, field_num);
+	dfield_t* dfield = dtuple_get_nth_field(tuple, col);
 	ut_ad(dfield->type.len == fsize);
 	if (dfield->len == UNIV_SQL_NULL) {
 		byte* buf = reinterpret_cast<byte*>(mem_heap_alloc(heap, fsize));
@@ -42,13 +42,13 @@ void set_row_field_8(
 }
 
 UNIV_INLINE
-void set_row_field_8(
-	dtuple_t* row,
-	int field_num,
+void set_tuple_col_8(
+	dtuple_t* tuple,
+	int col,
 	timeval& data,
 	mem_heap_t* heap)
 {
-	dfield_t* dfield = dtuple_get_nth_field(row, field_num);
+	dfield_t* dfield = dtuple_get_nth_field(tuple, col);
 	ut_ad(dfield->type.len == 8);
 	if (dfield->len == UNIV_SQL_NULL) {
 		byte* buf = reinterpret_cast<byte*>(mem_heap_alloc(heap, 8));
@@ -59,13 +59,13 @@ void set_row_field_8(
 }
 
 UNIV_INLINE
-void set_row_field_1(
-	dtuple_t* row,
-	int field_num,
+void set_tuple_col_1(
+	dtuple_t* tuple,
+	int col,
 	byte data,
 	mem_heap_t* heap)
 {
-	dfield_t* dfield = dtuple_get_nth_field(row, field_num);
+	dfield_t* dfield = dtuple_get_nth_field(tuple, col);
 	ut_ad(dfield->type.len == 1);
 	if (dfield->len == UNIV_SQL_NULL) {
 		byte* buf = reinterpret_cast<byte*>(mem_heap_alloc(heap, 1));
