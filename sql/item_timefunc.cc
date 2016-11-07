@@ -3370,12 +3370,6 @@ Item_func_vtq_id::val_int()
 {
   THD *thd= current_thd; // can it differ from constructor's?
   DBUG_ASSERT(thd);
-  ulonglong trx_id= args[0]->val_uint();
-  if (trx_id == ULONGLONG_MAX)
-  {
-    null_value= true;
-    return 0;
-  }
 
   init_hton();
 
@@ -3385,16 +3379,40 @@ Item_func_vtq_id::val_int()
     return 0;
   }
 
+  MYSQL_TIME commit_ts;
   longlong res;
   switch (vtq_field)
   {
   case VTQ_COMMIT_ID:
+    if (!args[0]->get_date(&commit_ts, 0))
+    {
+      bool backwards= false;
+      if (arg_count > 1)
+      {
+        backwards= args[1]->val_bool();
+        DBUG_ASSERT(arg_count == 2);
+      }
+      null_value= !hton->vers_query_commit_ts(thd, res, commit_ts, vtq_field, backwards);
+      break;
+    }
   case VTQ_ISO_LEVEL:
+  {
+    if (arg_count > 1)
+    {
+      my_error(ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT, MYF(0), name);
+      return 0;
+    }
+    ulonglong trx_id= args[0]->val_uint();
+    if (trx_id == ULONGLONG_MAX)
+    {
+      null_value= true;
+      return 0;
+    }
     null_value= !hton->vers_query_trx_id(thd, &res, trx_id, vtq_field);
     break;
+  }
   case VTQ_TRX_ID:
   {
-    MYSQL_TIME commit_ts;
     bool backwards= false;
     if (args[0]->get_date(&commit_ts, 0))
     {
@@ -3406,7 +3424,7 @@ Item_func_vtq_id::val_int()
       backwards= args[1]->val_bool();
       DBUG_ASSERT(arg_count == 2);
     }
-    null_value= !hton->vers_query_commit_ts(thd, res, commit_ts, backwards);
+    null_value= !hton->vers_query_commit_ts(thd, res, commit_ts, vtq_field, backwards);
     break;
   }
   default:

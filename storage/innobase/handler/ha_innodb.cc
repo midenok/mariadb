@@ -1572,7 +1572,7 @@ bool
 vtq_query_trx_id(THD* thd, void *out, ulonglong in_trx_id, vtq_field_t field);
 
 bool
-vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, bool backwards = false);
+vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, vtq_field_t field, bool backwards);
 
 
 /*************************************************************//**
@@ -25093,7 +25093,7 @@ vtq_query_trx_id(THD* thd, void *out, ulonglong _in_trx_id, vtq_field_t field)
 	{
 		const char *err = dict_process_sys_vtq(heap, rec, trx->vtq_query);
 		if (err) {
-			fprintf(stderr, "InnoDB: Error: get VTQ field failed: %s\n", err);
+			fprintf(stderr, "InnoDB: vtq_query_trx_id: get VTQ field failed: %s\n", err);
 			ut_ad(false && "get VTQ field failed");
 			goto not_found;
 		}
@@ -25143,7 +25143,7 @@ void rec_get_timeval(const rec_t* rec, ulint nfield, timeval& out)
 
 UNIV_INTERN
 bool
-vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool backwards)
+vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, vtq_field_t field, bool backwards)
 {
 	trx_t*		trx;
 	btr_pcur_t	pcur;
@@ -25169,6 +25169,8 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool 
 	if (err) {
 		DBUG_RETURN(false);
 	}
+
+	// FIXME: cache result
 
 	heap = mem_heap_create(0);
 
@@ -25201,7 +25203,32 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, bool 
 
 	rec = btr_pcur_get_rec(&pcur);
 found:
-	out = rec_get_trx_id(rec, 1);
+	switch (field) {
+	case VTQ_TRX_ID:
+		out = rec_get_trx_id(rec, 1);
+		break;
+	case VTQ_COMMIT_ID:
+	{
+		dict_index_t* clust_index;
+		rec_t* clust_rec = row_get_clust_rec(BTR_SEARCH_LEAF, rec, index, &clust_index, &mtr);
+		if (!clust_rec) {
+			fprintf(stderr, "InnoDB: vtq_query_commit_ts: secondary index is out of sync\n");
+			ut_ad(false && "secondary index is out of sync");
+			goto not_found;
+		}
+		const char *err = dict_process_sys_vtq(heap, clust_rec, trx->vtq_query);
+		if (err) {
+			fprintf(stderr, "InnoDB: vtq_query_commit_ts: get VTQ field failed: %s\n", err);
+			ut_ad(false && "get VTQ field failed");
+			goto not_found;
+		}
+		out = trx->vtq_query.commit_id;
+		break;
+	}
+	default:
+		ut_ad(0);
+		goto not_found;
+	}
 	found = true;
 
 not_found:

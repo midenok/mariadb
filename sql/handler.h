@@ -1373,7 +1373,7 @@ struct handlerton
    */
    bool versioned() const;
    bool (*vers_query_trx_id)(THD* thd, void *out, ulonglong trx_id, vtq_field_t field);
-   bool (*vers_query_commit_ts)(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, bool backwards);
+   bool (*vers_query_commit_ts)(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, vtq_field_t field, bool backwards);
 };
 
 

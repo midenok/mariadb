@@ -5772,12 +5772,18 @@ Create_func_vtq<VTQ_FIELD>::create_native(THD *thd, LEX_STRING name,
   {
     Item *param_1= item_list->pop();
     Item *param_2= item_list->pop();
-    if (VTQ_FIELD == VTQ_TRX_ID)
+    switch (VTQ_FIELD)
     {
+    case VTQ_TRX_ID:
+    case VTQ_COMMIT_ID:
       func= new (thd->mem_root) Item_func_vtq_id(thd, param_1, param_2, VTQ_FIELD);
       break;
+    default:
+      goto error;
     }
+    break;
   }
+  error:
   default:
   {
     my_error(ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT, MYF(0), name.str);
