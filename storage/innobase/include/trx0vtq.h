@@ -35,7 +35,6 @@ class vtq_query_t
 public:
 	timeval		ts_query;
 	bool		backwards;
-	bool		strict;
 
 	vtq_record_t	result;
 
@@ -43,8 +42,7 @@ public:
 	const char * cache_result(
 		mem_heap_t* heap,
 		const rec_t* rec,
-		const timeval &strict_ts,
-		const timeval &loose_ts,
+		const timeval &_ts_query,
 		bool _backwards);
 };
 

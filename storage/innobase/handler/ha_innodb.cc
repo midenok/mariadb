@@ -25160,17 +25160,10 @@ const char *
 vtq_query_t::cache_result(
 	mem_heap_t* heap,
 	const rec_t* rec,
-	const timeval& strict_ts,
-	const timeval& loose_ts,
+	const timeval& _ts_query,
 	bool _backwards)
 {
-	if (strict_ts.tv_sec) {
-		ts_query = strict_ts;
-		strict = true;
-	} else {
-		ts_query = loose_ts;
-		strict = false;
-	}
+	ts_query = _ts_query;
 	backwards = _backwards;
 	return dict_process_sys_vtq(heap, rec, result);
 }
@@ -25249,11 +25242,10 @@ vtq_query_commit_ts(THD* thd, void *out, const MYSQL_TIME &_commit_ts, vtq_field
 	}
 
 	timeval &ts_query = trx->vtq_query.ts_query;
-	bool strict = trx->vtq_query.strict;
 
 	if (cached.commit_ts == commit_ts ||
-		(!backwards && (!ts_query.tv_sec || (strict ? commit_ts < ts_query : commit_ts <= ts_query)) && commit_ts > cached.commit_ts) ||
-		(backwards && (!ts_query.tv_sec || (strict ? commit_ts > ts_query : commit_ts >= ts_query)) && commit_ts < cached.commit_ts))
+		(!backwards && (!ts_query.tv_sec || commit_ts < ts_query) && commit_ts > cached.commit_ts) ||
+		(backwards && (!ts_query.tv_sec || commit_ts > ts_query) && commit_ts < cached.commit_ts))
 	{
 		innobase_vtq_result(thd, cached, out, field);
 		DBUG_RETURN(true);
@@ -25302,7 +25294,6 @@ found:
 				heap,
 				clust_rec,
 				rec_ts,
-				commit_ts,
 				backwards);
 		if (err) {
 			fprintf(stderr, "InnoDB: vtq_query_commit_ts: get VTQ field failed: %s\n", err);
