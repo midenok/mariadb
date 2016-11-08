@@ -18,14 +18,34 @@
 
 #include <vtq.h>
 #include "trx0types.h"
+#include "mem0mem.h"
+#include "rem0types.h"
 
-struct vtq_record
+struct vtq_record_t
 {
 	trx_id_t	trx_id;
 	trx_id_t	commit_id;
 	timeval		begin_ts;
 	timeval		commit_ts;
 	byte		iso_level;
+};
+
+class vtq_query_t
+{
+public:
+	timeval		ts_query;
+	bool		backwards;
+	bool		strict;
+
+	vtq_record_t	result;
+
+	const char * cache_result(mem_heap_t* heap, const rec_t* rec);
+	const char * cache_result(
+		mem_heap_t* heap,
+		const rec_t* rec,
+		const timeval &strict_ts,
+		const timeval &loose_ts,
+		bool _backwards);
 };
 
 #endif // trx0vtq_h

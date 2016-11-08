@@ -753,7 +753,7 @@ dict_process_sys_vtq(
 /*=======================*/
 mem_heap_t*	heap,		/*!< in/out: heap memory */
 const rec_t*	rec,		/*!< in: current rec */
-vtq_record&	out		/*!< out: field values */
+vtq_record_t&	out		/*!< out: field values */
 )
 {
 	ulint		len, nfld;

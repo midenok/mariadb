@@ -427,7 +427,7 @@ dict_process_sys_vtq(
 /*=======================*/
 mem_heap_t*	heap,		/*!< in/out: heap memory */
 const rec_t*	rec,		/*!< in: current rec */
-vtq_record&	fields		/*!< out: field values */
+vtq_record_t&	fields		/*!< out: field values */
 );
 
 /** Update the record for space_id in SYS_TABLESPACES to this filepath.

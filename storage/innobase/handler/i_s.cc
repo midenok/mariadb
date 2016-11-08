@@ -10098,7 +10098,7 @@ int
 i_s_dict_fill_vtq(
 /*========================*/
 	THD*		thd,		/*!< in: thread */
-	vtq_record&	vtq,		/*!< in: table fields */
+	vtq_record_t&	vtq,		/*!< in: table fields */
 	TABLE*		table_to_fill)	/*!< in/out: fill this table */
 {
 	Field**		fields;
@@ -10171,7 +10171,7 @@ i_s_sys_vtq_fill_table(
 
 	for (int i = 0; rec && i < I_S_SYS_VTQ_LIMIT; ++i) {
 		const char*	err_msg;
-		vtq_record	fields;
+		vtq_record_t	fields;
 
 		/* Extract necessary information from SYS_VTQ row */
 		err_msg = dict_process_sys_vtq(

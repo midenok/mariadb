@@ -1572,7 +1572,7 @@ bool
 vtq_query_trx_id(THD* thd, void *out, ulonglong in_trx_id, vtq_field_t field);
 
 bool
-vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &commit_ts, vtq_field_t field, bool backwards);
+vtq_query_commit_ts(THD* thd, void *out, const MYSQL_TIME &commit_ts, vtq_field_t field, bool backwards);
 
 
 /*************************************************************//**
@@ -25009,9 +25009,12 @@ ib_push_frm_error(
 
 inline
 void
-innobase_vtq_result(THD* thd, vtq_record& q, void *out, vtq_field_t field)
+innobase_vtq_result(THD* thd, vtq_record_t& q, void *out, vtq_field_t field)
 {
 	switch (field) {
+	case VTQ_TRX_ID:
+		*reinterpret_cast<trx_id_t *>(out) = q.trx_id;
+		break;
 	case VTQ_COMMIT_ID:
 		*reinterpret_cast<trx_id_t *>(out) = q.commit_id;
 		break;
@@ -25033,6 +25036,15 @@ innobase_vtq_result(THD* thd, vtq_record& q, void *out, vtq_field_t field)
 	default:
 		ut_error;
 	}
+}
+
+
+inline
+const char *
+vtq_query_t::cache_result(mem_heap_t* heap, const rec_t* rec)
+{
+	ts_query.tv_sec = 0;
+	return dict_process_sys_vtq(heap, rec, result);
 }
 
 UNIV_INTERN
@@ -25062,8 +25074,10 @@ vtq_query_trx_id(THD* thd, void *out, ulonglong _in_trx_id, vtq_field_t field)
 	trx = thd_to_trx(thd);
 	ut_a(trx);
 
-	if (trx->vtq_query.trx_id == in_trx_id) {
-		innobase_vtq_result(thd, trx->vtq_query, out, field);
+	vtq_record_t	&cached = trx->vtq_query.result;
+
+	if (cached.trx_id == in_trx_id) {
+		innobase_vtq_result(thd, cached, out, field);
 		DBUG_RETURN(true);
 	}
 
@@ -25091,7 +25105,7 @@ vtq_query_trx_id(THD* thd, void *out, ulonglong _in_trx_id, vtq_field_t field)
 
 	rec = btr_pcur_get_rec(&pcur);
 	{
-		const char *err = dict_process_sys_vtq(heap, rec, trx->vtq_query);
+		const char *err = trx->vtq_query.cache_result(heap, rec);
 		if (err) {
 			fprintf(stderr, "InnoDB: vtq_query_trx_id: get VTQ field failed: %s\n", err);
 			ut_ad(false && "get VTQ field failed");
@@ -25099,10 +25113,10 @@ vtq_query_trx_id(THD* thd, void *out, ulonglong _in_trx_id, vtq_field_t field)
 		}
 	}
 
-	if (trx->vtq_query.trx_id != in_trx_id)
+	if (cached.trx_id != in_trx_id)
 		goto not_found;
 
-	innobase_vtq_result(thd, trx->vtq_query, out, field);
+	innobase_vtq_result(thd, cached, out, field);
 	found = true;
 
 not_found:
@@ -25141,9 +25155,69 @@ void rec_get_timeval(const rec_t* rec, ulint nfield, timeval& out)
 	out.tv_usec = mach_read_from_4(field + 4);
 }
 
+inline
+const char *
+vtq_query_t::cache_result(
+	mem_heap_t* heap,
+	const rec_t* rec,
+	const timeval& strict_ts,
+	const timeval& loose_ts,
+	bool _backwards)
+{
+	if (strict_ts.tv_sec) {
+		ts_query = strict_ts;
+		strict = true;
+	} else {
+		ts_query = loose_ts;
+		strict = false;
+	}
+	backwards = _backwards;
+	return dict_process_sys_vtq(heap, rec, result);
+}
+
+static
+inline
+bool
+operator== (const timeval &a, const timeval &b)
+{
+	return a.tv_sec == b.tv_sec && a.tv_usec == b.tv_usec;
+}
+
+static
+inline
+bool
+operator> (const timeval &a, const timeval &b)
+{
+	return a.tv_sec > b.tv_sec || (a.tv_sec == b.tv_sec && a.tv_usec > b.tv_usec);
+}
+
+static
+inline
+bool
+operator>= (const timeval &a, const timeval &b)
+{
+	return a.tv_sec > b.tv_sec || (a.tv_sec == b.tv_sec && a.tv_usec >= b.tv_usec);
+}
+
+static
+inline
+bool
+operator< (const timeval &a, const timeval &b)
+{
+	return b > a;
+}
+
+static
+inline
+bool
+operator<= (const timeval &a, const timeval &b)
+{
+	return b >= a;
+}
+
 UNIV_INTERN
 bool
-vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, vtq_field_t field, bool backwards)
+vtq_query_commit_ts(THD* thd, void *out, const MYSQL_TIME &_commit_ts, vtq_field_t field, bool backwards)
 {
 	trx_t*		trx;
 	btr_pcur_t	pcur;
@@ -25153,8 +25227,10 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, vtq_f
 	mem_heap_t*	heap;
 	uint		err;
 	timeval		commit_ts;
-	const rec_t*	rec;
+	timeval		rec_ts = { 0, 0 };
+	const rec_t	*rec, *clust_rec;
 	dict_index_t*	index = dict_sys->vtq_commit_ts_ind;
+	dict_index_t*	clust_index;
 	bool		found = false;
 
 	DBUG_ENTER("vtq_query_commit_ts");
@@ -25164,13 +25240,24 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, vtq_f
 	trx = thd_to_trx(thd);
 	ut_a(trx);
 
+	vtq_record_t &cached = trx->vtq_query.result;
+
 	commit_ts.tv_usec = _commit_ts.second_part;
 	commit_ts.tv_sec = thd_get_timezone(thd)->TIME_to_gmt_sec(&_commit_ts, &err);
 	if (err) {
 		DBUG_RETURN(false);
 	}
 
-	// FIXME: cache result
+	timeval &ts_query = trx->vtq_query.ts_query;
+	bool strict = trx->vtq_query.strict;
+
+	if (cached.commit_ts == commit_ts ||
+		(!backwards && (!ts_query.tv_sec || (strict ? commit_ts < ts_query : commit_ts <= ts_query)) && commit_ts > cached.commit_ts) ||
+		(backwards && (!ts_query.tv_sec || (strict ? commit_ts > ts_query : commit_ts >= ts_query)) && commit_ts < cached.commit_ts))
+	{
+		innobase_vtq_result(thd, cached, out, field);
+		DBUG_RETURN(true);
+	}
 
 	heap = mem_heap_create(0);
 
@@ -25183,7 +25270,6 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, vtq_f
 			BTR_SEARCH_LEAF, &pcur, &mtr);
 
 	if (btr_pcur_is_on_user_rec(&pcur)) {
-		timeval rec_ts;
 		rec = btr_pcur_get_rec(&pcur);
 		rec_get_timeval(rec, 0, rec_ts);
 
@@ -25203,32 +25289,28 @@ vtq_query_commit_ts(THD* thd, longlong &out, const MYSQL_TIME &_commit_ts, vtq_f
 
 	rec = btr_pcur_get_rec(&pcur);
 found:
-	switch (field) {
-	case VTQ_TRX_ID:
-		out = rec_get_trx_id(rec, 1);
-		break;
-	case VTQ_COMMIT_ID:
+	clust_rec = row_get_clust_rec(BTR_SEARCH_LEAF, rec, index, &clust_index, &mtr);
+	if (!clust_rec) {
+		fprintf(stderr, "InnoDB: vtq_query_commit_ts: secondary index is out of sync\n");
+		ut_ad(false && "secondary index is out of sync");
+		goto not_found;
+	}
+
 	{
-		dict_index_t* clust_index;
-		rec_t* clust_rec = row_get_clust_rec(BTR_SEARCH_LEAF, rec, index, &clust_index, &mtr);
-		if (!clust_rec) {
-			fprintf(stderr, "InnoDB: vtq_query_commit_ts: secondary index is out of sync\n");
-			ut_ad(false && "secondary index is out of sync");
-			goto not_found;
-		}
-		const char *err = dict_process_sys_vtq(heap, clust_rec, trx->vtq_query);
+		const char *err =
+			trx->vtq_query.cache_result(
+				heap,
+				clust_rec,
+				rec_ts,
+				commit_ts,
+				backwards);
 		if (err) {
 			fprintf(stderr, "InnoDB: vtq_query_commit_ts: get VTQ field failed: %s\n", err);
 			ut_ad(false && "get VTQ field failed");
 			goto not_found;
 		}
-		out = trx->vtq_query.commit_id;
-		break;
 	}
-	default:
-		ut_ad(0);
-		goto not_found;
-	}
+	innobase_vtq_result(thd, cached, out, field);
 	found = true;
 
 not_found:

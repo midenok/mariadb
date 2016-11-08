@@ -3392,7 +3392,7 @@ Item_func_vtq_id::val_int()
         backwards= args[1]->val_bool();
         DBUG_ASSERT(arg_count == 2);
       }
-      null_value= !hton->vers_query_commit_ts(thd, res, commit_ts, vtq_field, backwards);
+      null_value= !hton->vers_query_commit_ts(thd, &res, commit_ts, vtq_field, backwards);
       break;
     }
   case VTQ_ISO_LEVEL:
@@ -3424,7 +3424,7 @@ Item_func_vtq_id::val_int()
       backwards= args[1]->val_bool();
       DBUG_ASSERT(arg_count == 2);
     }
-    null_value= !hton->vers_query_commit_ts(thd, res, commit_ts, vtq_field, backwards);
+    null_value= !hton->vers_query_commit_ts(thd, &res, commit_ts, vtq_field, backwards);
     break;
   }
   default:

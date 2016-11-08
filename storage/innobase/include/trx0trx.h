@@ -1295,7 +1295,7 @@ struct trx_t {
 	/* System Versioning */
 	bool		vtq_notify_on_commit;
 					/*!< Notify VTQ for System Versioned update */
-	vtq_record	vtq_query;
+	vtq_query_t	vtq_query;
 	ulint		magic_n;
 };
 
