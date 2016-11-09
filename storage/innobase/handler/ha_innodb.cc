@@ -1574,6 +1574,9 @@ vtq_query_trx_id(THD* thd, void *out, ulonglong in_trx_id, vtq_field_t field);
 bool
 vtq_query_commit_ts(THD* thd, void *out, const MYSQL_TIME &commit_ts, vtq_field_t field, bool backwards);
 
+bool
+vtq_trx_sees(THD *thd, bool &result, ulonglong trx_id1, ulonglong trx_id0, ulonglong commit_id1, uchar iso_level1, ulonglong commit_id0);
+
 
 /*************************************************************//**
 Check for a valid value of innobase_commit_concurrency.
@@ -4113,6 +4116,7 @@ innobase_init(
 	/* System Versioning */
 	innobase_hton->vers_query_trx_id = vtq_query_trx_id;
 	innobase_hton->vers_query_commit_ts = vtq_query_commit_ts;
+	innobase_hton->vers_trx_sees = vtq_trx_sees;
 
 	innodb_remember_check_sysvar_funcs();
 
@@ -25011,7 +25015,14 @@ inline
 void
 innobase_vtq_result(THD* thd, vtq_record_t& q, void *out, vtq_field_t field)
 {
+	ut_ad(field == VTQ_ALL || out);
+
 	switch (field) {
+	case VTQ_ALL:
+		if (out) {
+			*reinterpret_cast<vtq_record_t *>(out) = q;
+		}
+		break;
 	case VTQ_TRX_ID:
 		*reinterpret_cast<trx_id_t *>(out) = q.trx_id;
 		break;
@@ -25312,8 +25323,47 @@ not_found:
 	DBUG_RETURN(found);
 }
 
-void
-innobase_vtq_trx_sees(trx_id_t trx_id1, trx_id_t trx_id0)
+bool
+vtq_trx_sees(THD *thd, bool &result, ulonglong trx_id1, ulonglong trx_id0, ulonglong commit_id1, uchar iso_level1, ulonglong commit_id0)
 {
+	DBUG_ENTER("vtq_trx_sees");
+	ut_ad(trx_id1 && trx_id0);
 
+	if (trx_id1 == trx_id0) {
+		DBUG_RETURN(false);
+	}
+
+	static const char* msg_cant_find = "InnoDB: vtq_trx_sees: can't find COMMIT_ID%c by TRX_ID: %llu\n";
+	if (!commit_id1) {
+		if (!vtq_query_trx_id(thd, NULL, trx_id1, VTQ_ALL)) {
+			fprintf(stderr, msg_cant_find, '1', trx_id1);
+			DBUG_RETURN(false);
+		}
+		trx_t* trx = thd_to_trx(thd);
+		ut_ad(trx);
+		commit_id1 = trx->vtq_query.result.commit_id;
+		iso_level1 = trx->vtq_query.result.iso_level;
+	}
+
+	if (!commit_id0) {
+		if (!vtq_query_trx_id(thd, &commit_id0, trx_id0, VTQ_COMMIT_ID)) {
+			fprintf(stderr, msg_cant_find, '0', trx_id0);
+			DBUG_RETURN(false);
+		}
+	}
+
+	// Trivial case: TX1 started after TX0 committed
+	if (trx_id1 > commit_id0
+		// Concurrent transactions: TX1 committed after TX0 and TX1 is read (un)committed
+		|| (commit_id1 > commit_id0 && iso_level1 < TRX_ISO_REPEATABLE_READ))
+	{
+		result = true;
+	}
+	else
+	{
+		// All other cases: TX1 does not see TX0
+		result = false;
+	}
+
+	DBUG_RETURN(true);
 }

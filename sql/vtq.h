@@ -17,11 +17,21 @@
 
 enum vtq_field_t
 {
+  VTQ_ALL = 0,
   VTQ_TRX_ID,
   VTQ_COMMIT_ID,
   VTQ_BEGIN_TS,
   VTQ_COMMIT_TS,
   VTQ_ISO_LEVEL
+};
+
+struct vtq_record_t
+{
+	ulonglong	trx_id;
+	ulonglong	commit_id;
+	timeval		begin_ts;
+	timeval		commit_ts;
+	uchar		iso_level;
 };
 
 #endif /* VTQ_INCLUDED */

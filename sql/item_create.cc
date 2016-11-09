@@ -5794,6 +5794,42 @@ Create_func_vtq<VTQ_FIELD>::create_native(THD *thd, LEX_STRING name,
   return func;
 };
 
+class Create_func_vtq_trx_sees : public Create_native_func
+{
+public:
+  virtual Item *create_native(THD *thd, LEX_STRING name, List<Item> *item_list)
+  {
+    Item *func= NULL;
+    int arg_count= 0;
+
+    if (item_list != NULL)
+      arg_count= item_list->elements;
+
+    switch (arg_count) {
+    case 2:
+    {
+      Item *param_1= item_list->pop();
+      Item *param_2= item_list->pop();
+      func= new (thd->mem_root) Item_func_vtq_trx_sees(thd, param_1, param_2);
+      break;
+    }
+    default:
+      my_error(ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT, MYF(0), name.str);
+      break;
+    }
+
+    return func;
+  }
+
+  static Create_func_vtq_trx_sees s_singleton;
+
+protected:
+  Create_func_vtq_trx_sees() {}
+  virtual ~Create_func_vtq_trx_sees() {}
+};
+
+Create_func_vtq_trx_sees Create_func_vtq_trx_sees::s_singleton;
+
 
 struct Native_func_registry
 {
@@ -6125,6 +6161,7 @@ static Native_func_registry func_array[] =
   { { C_STRING_WITH_LEN("VTQ_COMMIT_TS") }, BUILDER(Create_func_vtq<VTQ_COMMIT_TS>)},
   { { C_STRING_WITH_LEN("VTQ_ISO_LEVEL") }, BUILDER(Create_func_vtq<VTQ_ISO_LEVEL>)},
   { { C_STRING_WITH_LEN("VTQ_TRX_ID") }, BUILDER(Create_func_vtq<VTQ_TRX_ID>)},
+  { { C_STRING_WITH_LEN("VTQ_TRX_SEES") }, BUILDER(Create_func_vtq_trx_sees)},
   { { C_STRING_WITH_LEN("WEEKDAY") }, BUILDER(Create_func_weekday)},
   { { C_STRING_WITH_LEN("WEEKOFYEAR") }, BUILDER(Create_func_weekofyear)},
   { { C_STRING_WITH_LEN("WITHIN") }, GEOM_BUILDER(Create_func_within)},

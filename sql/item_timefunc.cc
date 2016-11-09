@@ -3434,3 +3434,83 @@ Item_func_vtq_id::val_int()
 
   return res;
 }
+
+Item_func_vtq_trx_sees::Item_func_vtq_trx_sees(
+    THD *thd,
+    Item* a,
+    Item* b) :
+  VTQ_common<Item_bool_func>(thd, a, b),
+  reverse_args(false)
+{
+  memset(&cached_arg, 0, sizeof(cached_arg));
+  null_value= true;
+  DBUG_ASSERT(arg_count == 2 && args[0] && args[1]);
+}
+
+Item_func_vtq_trx_sees::Item_func_vtq_trx_sees(
+    THD *thd,
+    Item* a,
+    ulonglong trx_id_arg,
+    bool _reverse_args,
+    handlerton *hton) :
+  VTQ_common<Item_bool_func>(thd, a, hton),
+  reverse_args(_reverse_args)
+{
+  memset(&cached_arg, 0, sizeof(cached_arg));
+  cached_arg.trx_id= trx_id_arg;
+  null_value= true;
+  DBUG_ASSERT(arg_count == 1 && args[0]);
+}
+
+longlong
+Item_func_vtq_trx_sees::val_int()
+{
+  THD *thd= current_thd;
+  DBUG_ASSERT(thd);
+
+  init_hton();
+
+  if (!hton)
+  {
+    null_value= true;
+    return 0;
+  }
+
+  ulonglong trx_id1, trx_id0;
+  ulonglong commit_id1= 0;
+  ulonglong commit_id0= 0;
+  uchar iso_level1= 0;
+
+  trx_id1= args[0]->val_uint();
+
+  if (arg_count > 1)
+  {
+    trx_id0= args[1]->val_uint();
+  }
+  else
+  {
+    DBUG_ASSERT(cached_arg.trx_id);
+    if (!cached_arg.commit_id)
+    {
+      null_value= !hton->vers_query_trx_id(thd, &cached_arg, cached_arg.trx_id, VTQ_ALL);
+      if (null_value)
+        return 0;
+    }
+    if (reverse_args)
+    {
+      trx_id0= trx_id1;
+      trx_id1= cached_arg.trx_id;
+      commit_id1= cached_arg.commit_id;
+    }
+    else
+    {
+      trx_id0= cached_arg.trx_id;
+      commit_id0= cached_arg.commit_id;
+    }
+  }
+
+  bool result= false;
+  null_value= !hton->vers_trx_sees(thd, result, trx_id1, trx_id0, commit_id1, iso_level1, commit_id0);
+  return result;
+}
+

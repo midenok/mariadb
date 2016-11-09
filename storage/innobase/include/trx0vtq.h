@@ -21,15 +21,6 @@
 #include "mem0mem.h"
 #include "rem0types.h"
 
-struct vtq_record_t
-{
-	trx_id_t	trx_id;
-	trx_id_t	commit_id;
-	timeval		begin_ts;
-	timeval		commit_ts;
-	byte		iso_level;
-};
-
 class vtq_query_t
 {
 public:

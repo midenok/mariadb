@@ -741,6 +741,8 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
     }
   }
 
+  const static bool vers_simple_select= true;
+
   for (table= tables; table; table= table->next_local)
   {
     if (table->table && table->table->versioned())
@@ -770,24 +772,29 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
           DBUG_RETURN(-1);
         }
       }
-      else if (slex->vers_conditions.unit == UNIT_TIMESTAMP)
+      else if (vers_simple_select && slex->vers_conditions.unit == UNIT_TIMESTAMP
+          && slex->vers_conditions.type != FOR_SYSTEM_TIME_UNSPECIFIED)
       {
         DBUG_ASSERT(table->table->s && table->table->s->db_plugin);
+        handlerton *hton= plugin_hton(table->table->s->db_plugin);
+        DBUG_ASSERT(hton);
         row_start= new (thd->mem_root) Item_func_vtq_ts(
           thd,
           row_start,
           VTQ_COMMIT_TS,
-          plugin_hton(table->table->s->db_plugin));
+          hton);
         row_end= new (thd->mem_root) Item_func_vtq_ts(
           thd,
           row_end,
           VTQ_COMMIT_TS,
-          plugin_hton(table->table->s->db_plugin));
+          hton);
       }
 
       Item *cond1= 0, *cond2= 0, *curr= 0;
-      switch (slex->vers_conditions.type)
+      if (table->table->versioned_by_sql() || vers_simple_select)
       {
+        switch (slex->vers_conditions.type)
+        {
         case FOR_SYSTEM_TIME_UNSPECIFIED:
           if (table->table->versioned_by_sql())
           {
@@ -810,18 +817,56 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
           break;
         case FOR_SYSTEM_TIME_FROM_TO:
           cond1= new (thd->mem_root) Item_func_lt(thd, row_start,
-                                                  slex->vers_conditions.end);
+            slex->vers_conditions.end);
           cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
-                                                  slex->vers_conditions.start);
+            slex->vers_conditions.start);
           break;
         case FOR_SYSTEM_TIME_BETWEEN:
           cond1= new (thd->mem_root) Item_func_le(thd, row_start,
-                                                  slex->vers_conditions.end);
+            slex->vers_conditions.end);
           cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
-                                                  slex->vers_conditions.start);
+            slex->vers_conditions.start);
           break;
         default:
           DBUG_ASSERT(0);
+        }
+      }
+      else
+      {
+        DBUG_ASSERT(table->table->s && table->table->s->db_plugin);
+        handlerton *hton= plugin_hton(table->table->s->db_plugin);
+        DBUG_ASSERT(hton);
+        MYSQL_TIME commit_ts;
+
+        //hton->vers_query_commit_ts(THD* thd, void *out, commit_ts, VTQ_ALL, false);
+
+        switch (slex->vers_conditions.type)
+        {
+        case FOR_SYSTEM_TIME_UNSPECIFIED:
+          curr= new (thd->mem_root) Item_int(thd, ULONGLONG_MAX);
+          cond1= new (thd->mem_root) Item_func_eq(thd, row_end2, curr);
+          break;
+        case FOR_SYSTEM_TIME_AS_OF:
+          cond1= new (thd->mem_root) Item_func_le(thd, row_start,
+            slex->vers_conditions.start);
+          cond2= new (thd->mem_root) Item_func_gt(thd, row_end,
+            slex->vers_conditions.start);
+          break;
+        case FOR_SYSTEM_TIME_FROM_TO:
+          cond1= new (thd->mem_root) Item_func_lt(thd, row_start,
+            slex->vers_conditions.end);
+          cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
+            slex->vers_conditions.start);
+          break;
+        case FOR_SYSTEM_TIME_BETWEEN:
+          cond1= new (thd->mem_root) Item_func_le(thd, row_start,
+            slex->vers_conditions.end);
+          cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
+            slex->vers_conditions.start);
+          break;
+        default:
+          DBUG_ASSERT(0);
+        }
       }
 
       if (cond1)

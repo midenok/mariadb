@@ -1351,4 +1351,21 @@ public:
   { return get_item_copy<Item_func_vtq_id>(thd, mem_root, this); }
 };
 
+class Item_func_vtq_trx_sees :
+  public VTQ_common<Item_bool_func>
+{
+  vtq_record_t cached_arg;
+  bool reverse_args;
+public:
+  Item_func_vtq_trx_sees(THD *thd, Item* a, Item* b);
+  Item_func_vtq_trx_sees(THD *thd, Item* a, ulonglong b, bool reverse_args = false, handlerton *hton = NULL);
+  const char *func_name() const
+  {
+    return "vtq_trx_sees";
+  }
+  longlong val_int();
+  Item *get_copy(THD *thd, MEM_ROOT *mem_root)
+  { return get_item_copy<Item_func_vtq_trx_sees>(thd, mem_root, this); }
+};
+
 #endif /* ITEM_TIMEFUNC_INCLUDED */
