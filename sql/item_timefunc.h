@@ -1356,9 +1356,15 @@ class Item_func_vtq_trx_sees :
 {
   vtq_record_t cached_arg;
   bool reverse_args;
+  bool accept_eq;
 public:
   Item_func_vtq_trx_sees(THD *thd, Item* a, Item* b);
-  Item_func_vtq_trx_sees(THD *thd, Item* a, ulonglong b, bool reverse_args = false, handlerton *hton = NULL);
+  Item_func_vtq_trx_sees(THD *thd, Item* a, vtq_record_t &_cached_arg, bool reverse_args = false, handlerton *hton = NULL);
+  Item_func_vtq_trx_sees* accept_equal()
+  {
+    accept_eq= true;
+    return this;
+  }
   const char *func_name() const
   {
     return "vtq_trx_sees";

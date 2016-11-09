@@ -671,6 +671,7 @@ static int
 setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LEX *slex)
 {
   DBUG_ENTER("setup_for_system_time");
+#define newx new (thd->mem_root)
 
   TABLE_LIST *table;
   int versioned_tables= 0;
@@ -760,8 +761,8 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
       Name_resolution_context *context= slex->parent_lex->current_context();
       DBUG_ASSERT(context);
 
-      Item *row_start= new (thd->mem_root) Item_field(thd, context, fstart);
-      Item *row_end= new (thd->mem_root) Item_field(thd, context, fend);
+      Item *row_start= newx Item_field(thd, context, fstart);
+      Item *row_end= newx Item_field(thd, context, fend);
       Item *row_end2= row_end;
 
       if (table->table->versioned_by_sql())
@@ -778,12 +779,13 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
         DBUG_ASSERT(table->table->s && table->table->s->db_plugin);
         handlerton *hton= plugin_hton(table->table->s->db_plugin);
         DBUG_ASSERT(hton);
-        row_start= new (thd->mem_root) Item_func_vtq_ts(
+        row_start= newx Item_func_vtq_ts(
           thd,
           row_start,
           VTQ_COMMIT_TS,
+          // FIXME: is it needed to pass hton or it can be deduced from arg 'a'?
           hton);
-        row_end= new (thd->mem_root) Item_func_vtq_ts(
+        row_end= newx Item_func_vtq_ts(
           thd,
           row_end,
           VTQ_COMMIT_TS,
@@ -800,31 +802,31 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
           {
             MYSQL_TIME max_time;
             thd->variables.time_zone->gmt_sec_to_TIME(&max_time, TIMESTAMP_MAX_VALUE);
-            curr= new (thd->mem_root) Item_datetime_literal(thd, &max_time);
-            cond1= new (thd->mem_root) Item_func_eq(thd, row_end, curr);
+            curr= newx Item_datetime_literal(thd, &max_time);
+            cond1= newx Item_func_eq(thd, row_end, curr);
           }
           else
           {
-            curr= new (thd->mem_root) Item_int(thd, ULONGLONG_MAX);
-            cond1= new (thd->mem_root) Item_func_eq(thd, row_end2, curr);
+            curr= newx Item_int(thd, ULONGLONG_MAX);
+            cond1= newx Item_func_eq(thd, row_end2, curr);
           }
           break;
         case FOR_SYSTEM_TIME_AS_OF:
-          cond1= new (thd->mem_root) Item_func_le(thd, row_start,
+          cond1= newx Item_func_le(thd, row_start,
             slex->vers_conditions.start);
-          cond2= new (thd->mem_root) Item_func_gt(thd, row_end,
+          cond2= newx Item_func_gt(thd, row_end,
             slex->vers_conditions.start);
           break;
         case FOR_SYSTEM_TIME_FROM_TO:
-          cond1= new (thd->mem_root) Item_func_lt(thd, row_start,
+          cond1= newx Item_func_lt(thd, row_start,
             slex->vers_conditions.end);
-          cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
+          cond2= newx Item_func_ge(thd, row_end,
             slex->vers_conditions.start);
           break;
         case FOR_SYSTEM_TIME_BETWEEN:
-          cond1= new (thd->mem_root) Item_func_le(thd, row_start,
+          cond1= newx Item_func_le(thd, row_start,
             slex->vers_conditions.end);
-          cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
+          cond2= newx Item_func_ge(thd, row_end,
             slex->vers_conditions.start);
           break;
         default:
@@ -836,33 +838,28 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
         DBUG_ASSERT(table->table->s && table->table->s->db_plugin);
         handlerton *hton= plugin_hton(table->table->s->db_plugin);
         DBUG_ASSERT(hton);
-        MYSQL_TIME commit_ts;
-
-        //hton->vers_query_commit_ts(THD* thd, void *out, commit_ts, VTQ_ALL, false);
 
         switch (slex->vers_conditions.type)
         {
         case FOR_SYSTEM_TIME_UNSPECIFIED:
-          curr= new (thd->mem_root) Item_int(thd, ULONGLONG_MAX);
-          cond1= new (thd->mem_root) Item_func_eq(thd, row_end2, curr);
+          curr= newx Item_int(thd, ULONGLONG_MAX);
+          cond1= newx Item_func_eq(thd, row_end2, curr);
           break;
         case FOR_SYSTEM_TIME_AS_OF:
-          cond1= new (thd->mem_root) Item_func_le(thd, row_start,
-            slex->vers_conditions.start);
-          cond2= new (thd->mem_root) Item_func_gt(thd, row_end,
-            slex->vers_conditions.start);
+
+          if (slex->vers_conditions.unit == UNIT_TIMESTAMP) {
+
+          }
+          cond1= (newx Item_func_vtq_trx_sees(thd, slex->vers_conditions.start, row_start))->accept_equal();
+          cond2= newx Item_func_vtq_trx_sees(thd, row_end, slex->vers_conditions.start);
           break;
         case FOR_SYSTEM_TIME_FROM_TO:
-          cond1= new (thd->mem_root) Item_func_lt(thd, row_start,
-            slex->vers_conditions.end);
-          cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
-            slex->vers_conditions.start);
+          cond1= newx Item_func_vtq_trx_sees(thd, slex->vers_conditions.end, row_start);
+          cond2= (newx Item_func_vtq_trx_sees(thd, row_end, slex->vers_conditions.start))->accept_equal();
           break;
         case FOR_SYSTEM_TIME_BETWEEN:
-          cond1= new (thd->mem_root) Item_func_le(thd, row_start,
-            slex->vers_conditions.end);
-          cond2= new (thd->mem_root) Item_func_ge(thd, row_end,
-            slex->vers_conditions.start);
+          cond1= (newx Item_func_vtq_trx_sees(thd, slex->vers_conditions.end, row_start))->accept_equal();
+          cond2= (newx Item_func_vtq_trx_sees(thd, row_end, slex->vers_conditions.start))->accept_equal();
           break;
         default:
           DBUG_ASSERT(0);
@@ -893,6 +890,7 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
   }
 
   DBUG_RETURN(0);
+#undef newx
 }
 
 /*****************************************************************************

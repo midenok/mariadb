@@ -25358,9 +25358,7 @@ vtq_trx_sees(THD *thd, bool &result, ulonglong trx_id1, ulonglong trx_id0, ulong
 		|| (commit_id1 > commit_id0 && iso_level1 < TRX_ISO_REPEATABLE_READ))
 	{
 		result = true;
-	}
-	else
-	{
+	} else {
 		// All other cases: TX1 does not see TX0
 		result = false;
 	}

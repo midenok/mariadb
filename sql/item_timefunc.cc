@@ -3440,7 +3440,8 @@ Item_func_vtq_trx_sees::Item_func_vtq_trx_sees(
     Item* a,
     Item* b) :
   VTQ_common<Item_bool_func>(thd, a, b),
-  reverse_args(false)
+  reverse_args(false),
+  accept_eq(false)
 {
   memset(&cached_arg, 0, sizeof(cached_arg));
   null_value= true;
@@ -3450,14 +3451,14 @@ Item_func_vtq_trx_sees::Item_func_vtq_trx_sees(
 Item_func_vtq_trx_sees::Item_func_vtq_trx_sees(
     THD *thd,
     Item* a,
-    ulonglong trx_id_arg,
+    vtq_record_t &_cached_arg,
     bool _reverse_args,
     handlerton *hton) :
   VTQ_common<Item_bool_func>(thd, a, hton),
-  reverse_args(_reverse_args)
+  cached_arg(_cached_arg),
+  reverse_args(_reverse_args),
+  accept_eq(false)
 {
-  memset(&cached_arg, 0, sizeof(cached_arg));
-  cached_arg.trx_id= trx_id_arg;
   null_value= true;
   DBUG_ASSERT(arg_count == 1 && args[0]);
 }
@@ -3489,13 +3490,7 @@ Item_func_vtq_trx_sees::val_int()
   }
   else
   {
-    DBUG_ASSERT(cached_arg.trx_id);
-    if (!cached_arg.commit_id)
-    {
-      null_value= !hton->vers_query_trx_id(thd, &cached_arg, cached_arg.trx_id, VTQ_ALL);
-      if (null_value)
-        return 0;
-    }
+    DBUG_ASSERT(cached_arg.trx_id && cached_arg.commit_id);
     if (reverse_args)
     {
       trx_id0= trx_id1;
@@ -3507,6 +3502,11 @@ Item_func_vtq_trx_sees::val_int()
       trx_id0= cached_arg.trx_id;
       commit_id0= cached_arg.commit_id;
     }
+  }
+
+  if (accept_eq && trx_id1 && trx_id1 == trx_id0)
+  {
+    return true;
   }
 
   bool result= false;
