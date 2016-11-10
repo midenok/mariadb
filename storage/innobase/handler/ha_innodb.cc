@@ -25054,7 +25054,7 @@ inline
 const char *
 vtq_query_t::cache_result(mem_heap_t* heap, const rec_t* rec)
 {
-	ts_query.tv_sec = 0;
+	prev_query.tv_sec = 0;
 	return dict_process_sys_vtq(heap, rec, result);
 }
 
@@ -25174,7 +25174,7 @@ vtq_query_t::cache_result(
 	const timeval& _ts_query,
 	bool _backwards)
 {
-	ts_query = _ts_query;
+	prev_query = _ts_query;
 	backwards = _backwards;
 	return dict_process_sys_vtq(heap, rec, result);
 }
@@ -25245,18 +25245,28 @@ vtq_query_commit_ts(THD* thd, void *out, const MYSQL_TIME &_commit_ts, vtq_field
 	ut_a(trx);
 
 	vtq_record_t &cached = trx->vtq_query.result;
+	timeval &prev_query = trx->vtq_query.prev_query;
+	bool prev_bwds = trx->vtq_query.backwards;
 
 	commit_ts.tv_usec = _commit_ts.second_part;
 	commit_ts.tv_sec = thd_get_timezone(thd)->TIME_to_gmt_sec(&_commit_ts, &err);
 	if (err) {
-		DBUG_RETURN(false);
-	}
-
-	timeval &ts_query = trx->vtq_query.ts_query;
-
-	if (cached.commit_ts == commit_ts ||
-		(!backwards && (!ts_query.tv_sec || commit_ts < ts_query) && commit_ts > cached.commit_ts) ||
-		(backwards && (!ts_query.tv_sec || commit_ts > ts_query) && commit_ts < cached.commit_ts))
+		if (err == ER_WARN_DATA_OUT_OF_RANGE) {
+			if (_commit_ts.year <= TIMESTAMP_MIN_YEAR) {
+				commit_ts.tv_usec = 0;
+				commit_ts.tv_sec = 1;
+			} else {
+				ut_ad(_commit_ts.year >= TIMESTAMP_MAX_YEAR);
+				commit_ts.tv_usec = TIME_MAX_SECOND_PART;
+				commit_ts.tv_sec = MY_TIME_T_MAX;
+			}
+		} else {
+			DBUG_RETURN(false);
+		}
+	} else if (cached.commit_ts == commit_ts ||
+		(prev_query.tv_sec && prev_bwds == backwards && (
+			(!backwards && (commit_ts < prev_query) && commit_ts > cached.commit_ts) ||
+			(backwards && (commit_ts > prev_query) && commit_ts < cached.commit_ts))))
 	{
 		innobase_vtq_result(thd, cached, out, field);
 		DBUG_RETURN(true);
@@ -25279,6 +25289,8 @@ vtq_query_commit_ts(THD* thd, void *out, const MYSQL_TIME &_commit_ts, vtq_field
 		if (rec_ts.tv_sec == commit_ts.tv_sec
 		&& rec_ts.tv_usec == commit_ts.tv_usec)
 			goto found;
+	} else {
+		rec_ts = commit_ts;
 	}
 
 	if (mode == PAGE_CUR_GE) {
@@ -25330,7 +25342,13 @@ vtq_trx_sees(THD *thd, bool &result, ulonglong trx_id1, ulonglong trx_id0, ulong
 	ut_ad(trx_id1 && trx_id0);
 
 	if (trx_id1 == trx_id0) {
-		DBUG_RETURN(false);
+		result = false;
+		DBUG_RETURN(true);
+	}
+
+	if (trx_id1 == ULONGLONG_MAX) {
+		result = true;
+		DBUG_RETURN(true);
 	}
 
 	static const char* msg_cant_find = "InnoDB: vtq_trx_sees: can't find COMMIT_ID%c by TRX_ID: %llu\n";

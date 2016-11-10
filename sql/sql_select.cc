@@ -742,7 +742,7 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
     }
   }
 
-  const static bool vers_simple_select= true;
+  const static bool vers_simple_select= false;
 
   for (table= tables; table; table= table->next_local)
   {
@@ -866,10 +866,14 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
             trx_id0= slex->vers_conditions.start;
             trx_id1= slex->vers_conditions.end;
           }
-          cond1= slex->vers_conditions.type == FOR_SYSTEM_TIME_FROM_TO ?
-            newx Item_func_vtq_trx_sees(thd, trx_id1, row_start) :
-            newx Item_func_vtq_trx_sees_eq(thd, trx_id1, row_start);
-          cond2= newx Item_func_vtq_trx_sees_eq(thd, row_end, trx_id0);
+          {
+            uint check0= trx_id0->val_uint();
+            uint check1= trx_id1->val_uint();
+            cond1= slex->vers_conditions.type == FOR_SYSTEM_TIME_FROM_TO ?
+              newx Item_func_vtq_trx_sees(thd, trx_id1, row_start) :
+              newx Item_func_vtq_trx_sees_eq(thd, trx_id1, row_start);
+            cond2= newx Item_func_vtq_trx_sees_eq(thd, row_end, trx_id0);
+          }
           break;
         default:
           DBUG_ASSERT(0);

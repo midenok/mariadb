@@ -24,7 +24,7 @@
 class vtq_query_t
 {
 public:
-	timeval		ts_query;
+	timeval		prev_query;
 	bool		backwards;
 
 	vtq_record_t	result;

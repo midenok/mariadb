@@ -1342,14 +1342,6 @@ public:
     max_length= 20;
   }
 
-  // FIXME: remove or move val_int() code here
-  bool fix_fields(THD *thd, Item **ref)
-  {
-    if (Item_int_func::fix_fields(thd, ref))
-      return TRUE;
-    return FALSE;
-  }
-
   longlong val_int();
   Item *get_copy(THD *thd, MEM_ROOT *mem_root)
   { return get_item_copy<Item_func_vtq_id>(thd, mem_root, this); }
