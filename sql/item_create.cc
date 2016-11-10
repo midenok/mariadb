@@ -5794,6 +5794,7 @@ Create_func_vtq<VTQ_FIELD>::create_native(THD *thd, LEX_STRING name,
   return func;
 };
 
+template <class Item_func_vtq_trx_seesX>
 class Create_func_vtq_trx_sees : public Create_native_func
 {
 public:
@@ -5810,7 +5811,7 @@ public:
     {
       Item *param_1= item_list->pop();
       Item *param_2= item_list->pop();
-      func= new (thd->mem_root) Item_func_vtq_trx_sees(thd, param_1, param_2);
+      func= new (thd->mem_root) Item_func_vtq_trx_seesX(thd, param_1, param_2);
       break;
     }
     default:
@@ -5821,14 +5822,15 @@ public:
     return func;
   }
 
-  static Create_func_vtq_trx_sees s_singleton;
+  static Create_func_vtq_trx_sees<Item_func_vtq_trx_seesX> s_singleton;
 
 protected:
-  Create_func_vtq_trx_sees() {}
-  virtual ~Create_func_vtq_trx_sees() {}
+  Create_func_vtq_trx_sees<Item_func_vtq_trx_seesX>() {}
+  virtual ~Create_func_vtq_trx_sees<Item_func_vtq_trx_seesX>() {}
 };
 
-Create_func_vtq_trx_sees Create_func_vtq_trx_sees::s_singleton;
+template<class X>
+Create_func_vtq_trx_sees<X> Create_func_vtq_trx_sees<X>::s_singleton;
 
 
 struct Native_func_registry
@@ -6161,7 +6163,8 @@ static Native_func_registry func_array[] =
   { { C_STRING_WITH_LEN("VTQ_COMMIT_TS") }, BUILDER(Create_func_vtq<VTQ_COMMIT_TS>)},
   { { C_STRING_WITH_LEN("VTQ_ISO_LEVEL") }, BUILDER(Create_func_vtq<VTQ_ISO_LEVEL>)},
   { { C_STRING_WITH_LEN("VTQ_TRX_ID") }, BUILDER(Create_func_vtq<VTQ_TRX_ID>)},
-  { { C_STRING_WITH_LEN("VTQ_TRX_SEES") }, BUILDER(Create_func_vtq_trx_sees)},
+  { { C_STRING_WITH_LEN("VTQ_TRX_SEES") }, BUILDER(Create_func_vtq_trx_sees<Item_func_vtq_trx_sees>)},
+  { { C_STRING_WITH_LEN("VTQ_TRX_SEES_EQ") }, BUILDER(Create_func_vtq_trx_sees<Item_func_vtq_trx_sees_eq>)},
   { { C_STRING_WITH_LEN("WEEKDAY") }, BUILDER(Create_func_weekday)},
   { { C_STRING_WITH_LEN("WEEKOFYEAR") }, BUILDER(Create_func_weekofyear)},
   { { C_STRING_WITH_LEN("WITHIN") }, GEOM_BUILDER(Create_func_within)},

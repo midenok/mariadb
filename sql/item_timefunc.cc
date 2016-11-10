@@ -3324,27 +3324,17 @@ Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
   return false;
 }
 
-Item_func_vtq_id::Item_func_vtq_id(
-    THD *thd,
-    Item* a,
-    vtq_field_t _vtq_field,
-    handlerton* hton) :
-  VTQ_common<Item_int_func>(thd, a, hton),
-  vtq_field(_vtq_field)
-{
-  decimals= 0;
-  unsigned_flag= 1;
-  null_value= true;
-  DBUG_ASSERT(arg_count == 1 && args[0]);
-}
 
 Item_func_vtq_id::Item_func_vtq_id(
     THD *thd,
     Item* a,
-    vtq_field_t _vtq_field) :
+    vtq_field_t _vtq_field,
+    bool _backwards) :
   VTQ_common<Item_int_func>(thd, a),
-  vtq_field(_vtq_field)
+  vtq_field(_vtq_field),
+  backwards(_backwards)
 {
+  memset(&cached_result, 0, sizeof(cached_result));
   decimals= 0;
   unsigned_flag= 1;
   null_value= true;
@@ -3355,10 +3345,13 @@ Item_func_vtq_id::Item_func_vtq_id(
     THD *thd,
     Item* a,
     Item* b,
-    vtq_field_t _vtq_field) :
+    vtq_field_t _vtq_field,
+    bool _backwards) :
   VTQ_common<Item_int_func>(thd, a, b),
-  vtq_field(_vtq_field)
+  vtq_field(_vtq_field),
+  backwards(_backwards)
 {
+  memset(&cached_result, 0, sizeof(cached_result));
   decimals= 0;
   unsigned_flag= 1;
   null_value= true;
@@ -3386,13 +3379,13 @@ Item_func_vtq_id::val_int()
   case VTQ_COMMIT_ID:
     if (!args[0]->get_date(&commit_ts, 0))
     {
-      bool backwards= false;
       if (arg_count > 1)
       {
         backwards= args[1]->val_bool();
         DBUG_ASSERT(arg_count == 2);
       }
-      null_value= !hton->vers_query_commit_ts(thd, &res, commit_ts, vtq_field, backwards);
+      null_value= !hton->vers_query_commit_ts(thd, &cached_result, commit_ts, VTQ_ALL, backwards);
+      res= cached_result.commit_id;
       break;
     }
   case VTQ_ISO_LEVEL:
@@ -3413,7 +3406,6 @@ Item_func_vtq_id::val_int()
   }
   case VTQ_TRX_ID:
   {
-    bool backwards= false;
     if (args[0]->get_date(&commit_ts, 0))
     {
       null_value= true;
@@ -3424,7 +3416,8 @@ Item_func_vtq_id::val_int()
       backwards= args[1]->val_bool();
       DBUG_ASSERT(arg_count == 2);
     }
-    null_value= !hton->vers_query_commit_ts(thd, &res, commit_ts, vtq_field, backwards);
+    null_value= !hton->vers_query_commit_ts(thd, &cached_result, commit_ts, VTQ_ALL, backwards);
+    res= cached_result.trx_id;
     break;
   }
   default:
@@ -3440,27 +3433,10 @@ Item_func_vtq_trx_sees::Item_func_vtq_trx_sees(
     Item* a,
     Item* b) :
   VTQ_common<Item_bool_func>(thd, a, b),
-  reverse_args(false),
   accept_eq(false)
 {
-  memset(&cached_arg, 0, sizeof(cached_arg));
   null_value= true;
   DBUG_ASSERT(arg_count == 2 && args[0] && args[1]);
-}
-
-Item_func_vtq_trx_sees::Item_func_vtq_trx_sees(
-    THD *thd,
-    Item* a,
-    vtq_record_t &_cached_arg,
-    bool _reverse_args,
-    handlerton *hton) :
-  VTQ_common<Item_bool_func>(thd, a, hton),
-  cached_arg(_cached_arg),
-  reverse_args(_reverse_args),
-  accept_eq(false)
-{
-  null_value= true;
-  DBUG_ASSERT(arg_count == 1 && args[0]);
 }
 
 longlong
@@ -3482,30 +3458,26 @@ Item_func_vtq_trx_sees::val_int()
   ulonglong commit_id0= 0;
   uchar iso_level1= 0;
 
+  DBUG_ASSERT(arg_count > 1);
   trx_id1= args[0]->val_uint();
+  trx_id0= args[1]->val_uint();
 
-  if (arg_count > 1)
+  vtq_record_t *cached= args[0]->vtq_cached_result();
+  if (cached && cached->commit_id)
   {
-    trx_id0= args[1]->val_uint();
+    commit_id1= cached->commit_id;
+    iso_level1= cached->iso_level;
   }
-  else
+
+  cached= args[1]->vtq_cached_result();
+  if (cached && cached->commit_id)
   {
-    DBUG_ASSERT(cached_arg.trx_id && cached_arg.commit_id);
-    if (reverse_args)
-    {
-      trx_id0= trx_id1;
-      trx_id1= cached_arg.trx_id;
-      commit_id1= cached_arg.commit_id;
-    }
-    else
-    {
-      trx_id0= cached_arg.trx_id;
-      commit_id0= cached_arg.commit_id;
-    }
+    commit_id0= cached->commit_id;
   }
 
   if (accept_eq && trx_id1 && trx_id1 == trx_id0)
   {
+    null_value= false;
     return true;
   }
 

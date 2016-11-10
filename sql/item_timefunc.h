@@ -1311,10 +1311,14 @@ class Item_func_vtq_id :
   public VTQ_common<Item_int_func>
 {
   vtq_field_t vtq_field;
+  vtq_record_t cached_result;
+  bool backwards;
+
 public:
-  Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field, handlerton *hton);
-  Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field);
-  Item_func_vtq_id(THD *thd, Item* a, Item* b, vtq_field_t _vtq_field);
+  Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field, bool _backwards= false);
+  Item_func_vtq_id(THD *thd, Item* a, Item* b, vtq_field_t _vtq_field, bool _backwards= false);
+
+  vtq_record_t *vtq_cached_result() { return &cached_result; }
 
   const char *func_name() const
   {
@@ -1354,17 +1358,11 @@ public:
 class Item_func_vtq_trx_sees :
   public VTQ_common<Item_bool_func>
 {
-  vtq_record_t cached_arg;
-  bool reverse_args;
+protected:
   bool accept_eq;
+
 public:
   Item_func_vtq_trx_sees(THD *thd, Item* a, Item* b);
-  Item_func_vtq_trx_sees(THD *thd, Item* a, vtq_record_t &_cached_arg, bool reverse_args = false, handlerton *hton = NULL);
-  Item_func_vtq_trx_sees* accept_equal()
-  {
-    accept_eq= true;
-    return this;
-  }
   const char *func_name() const
   {
     return "vtq_trx_sees";
@@ -1372,6 +1370,21 @@ public:
   longlong val_int();
   Item *get_copy(THD *thd, MEM_ROOT *mem_root)
   { return get_item_copy<Item_func_vtq_trx_sees>(thd, mem_root, this); }
+};
+
+class Item_func_vtq_trx_sees_eq :
+  public Item_func_vtq_trx_sees
+{
+public:
+  Item_func_vtq_trx_sees_eq(THD *thd, Item* a, Item* b) :
+    Item_func_vtq_trx_sees(thd, a, b)
+  {
+    accept_eq= true;
+  }
+  const char *func_name() const
+  {
+    return "vtq_trx_sees_eq";
+  }
 };
 
 #endif /* ITEM_TIMEFUNC_INCLUDED */

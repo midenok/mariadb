@@ -839,6 +839,8 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
         handlerton *hton= plugin_hton(table->table->s->db_plugin);
         DBUG_ASSERT(hton);
 
+        Item *trx_id0, *trx_id1;
+
         switch (slex->vers_conditions.type)
         {
         case FOR_SYSTEM_TIME_UNSPECIFIED:
@@ -846,20 +848,28 @@ setup_for_system_time(THD *thd, TABLE_LIST *tables, COND **where_expr, SELECT_LE
           cond1= newx Item_func_eq(thd, row_end2, curr);
           break;
         case FOR_SYSTEM_TIME_AS_OF:
-
-          if (slex->vers_conditions.unit == UNIT_TIMESTAMP) {
-
-          }
-          cond1= (newx Item_func_vtq_trx_sees(thd, slex->vers_conditions.start, row_start))->accept_equal();
-          cond2= newx Item_func_vtq_trx_sees(thd, row_end, slex->vers_conditions.start);
+          trx_id0= slex->vers_conditions.unit == UNIT_TIMESTAMP ?
+            newx Item_func_vtq_id(thd, slex->vers_conditions.start, VTQ_TRX_ID) :
+            slex->vers_conditions.start;
+          cond1= newx Item_func_vtq_trx_sees_eq(thd, trx_id0, row_start);
+          cond2= newx Item_func_vtq_trx_sees(thd, row_end, trx_id0);
           break;
         case FOR_SYSTEM_TIME_FROM_TO:
-          cond1= newx Item_func_vtq_trx_sees(thd, slex->vers_conditions.end, row_start);
-          cond2= (newx Item_func_vtq_trx_sees(thd, row_end, slex->vers_conditions.start))->accept_equal();
-          break;
         case FOR_SYSTEM_TIME_BETWEEN:
-          cond1= (newx Item_func_vtq_trx_sees(thd, slex->vers_conditions.end, row_start))->accept_equal();
-          cond2= (newx Item_func_vtq_trx_sees(thd, row_end, slex->vers_conditions.start))->accept_equal();
+          if (slex->vers_conditions.unit == UNIT_TIMESTAMP)
+          {
+            trx_id0= newx Item_func_vtq_id(thd, slex->vers_conditions.start, VTQ_TRX_ID, true);
+            trx_id1= newx Item_func_vtq_id(thd, slex->vers_conditions.end, VTQ_TRX_ID, false);
+          }
+          else
+          {
+            trx_id0= slex->vers_conditions.start;
+            trx_id1= slex->vers_conditions.end;
+          }
+          cond1= slex->vers_conditions.type == FOR_SYSTEM_TIME_FROM_TO ?
+            newx Item_func_vtq_trx_sees(thd, trx_id1, row_start) :
+            newx Item_func_vtq_trx_sees_eq(thd, trx_id1, row_start);
+          cond2= newx Item_func_vtq_trx_sees_eq(thd, row_end, trx_id0);
           break;
         default:
           DBUG_ASSERT(0);
