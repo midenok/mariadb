@@ -3345,11 +3345,10 @@ Item_func_vtq_id::Item_func_vtq_id(
     THD *thd,
     Item* a,
     Item* b,
-    vtq_field_t _vtq_field,
-    bool _backwards) :
+    vtq_field_t _vtq_field) :
   VTQ_common<Item_int_func>(thd, a, b),
   vtq_field(_vtq_field),
-  backwards(_backwards)
+  backwards(false)
 {
   memset(&cached_result, 0, sizeof(cached_result));
   decimals= 0;
@@ -3359,11 +3358,53 @@ Item_func_vtq_id::Item_func_vtq_id(
 }
 
 longlong
-Item_func_vtq_id::val_int()
+Item_func_vtq_id::get_by_trx_id(ulonglong trx_id)
+{
+  ulonglong res;
+  THD *thd= current_thd; // can it differ from constructor's?
+  DBUG_ASSERT(thd);
+
+  if (trx_id == ULONGLONG_MAX)
+  {
+    null_value= true;
+    return 0;
+  }
+
+  null_value= !hton->vers_query_trx_id(thd, &res, trx_id, vtq_field);
+  return res;
+}
+
+longlong
+Item_func_vtq_id::get_by_commit_ts(MYSQL_TIME &commit_ts, bool backwards)
 {
   THD *thd= current_thd; // can it differ from constructor's?
   DBUG_ASSERT(thd);
 
+  null_value= !hton->vers_query_commit_ts(thd, &cached_result, commit_ts, VTQ_ALL, backwards);
+  if (null_value)
+  {
+    return 0;
+  }
+
+  switch (vtq_field)
+  {
+  case VTQ_COMMIT_ID:
+    return cached_result.commit_id;
+  case VTQ_ISO_LEVEL:
+    return cached_result.iso_level;
+  case VTQ_TRX_ID:
+    return cached_result.trx_id;
+  default:
+    DBUG_ASSERT(0);
+    null_value= true;
+  }
+
+  return 0;
+}
+
+longlong
+Item_func_vtq_id::val_int()
+{
   init_hton();
 
   if (!hton)
@@ -3372,60 +3413,30 @@ Item_func_vtq_id::val_int()
     return 0;
   }
 
-  MYSQL_TIME commit_ts;
-  longlong res;
-  switch (vtq_field)
+  if (args[0]->is_null())
   {
-  case VTQ_COMMIT_ID:
-    if (!args[0]->get_date(&commit_ts, 0))
-    {
-      if (arg_count > 1)
-      {
-        backwards= args[1]->val_bool();
-        DBUG_ASSERT(arg_count == 2);
-      }
-      null_value= !hton->vers_query_commit_ts(thd, &cached_result, commit_ts, VTQ_ALL, backwards);
-      res= cached_result.commit_id;
-      break;
-    }
-  case VTQ_ISO_LEVEL:
-  {
-    if (arg_count > 1)
-    {
-      my_error(ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT, MYF(0), name);
-      return 0;
-    }
-    ulonglong trx_id= args[0]->val_uint();
-    if (trx_id == ULONGLONG_MAX)
+    if (arg_count < 2 || vtq_field == VTQ_TRX_ID)
     {
       null_value= true;
       return 0;
     }
-    null_value= !hton->vers_query_trx_id(thd, &res, trx_id, vtq_field);
-    break;
+    return get_by_trx_id(args[1]->val_uint());
   }
-  case VTQ_TRX_ID:
+  else
   {
+    MYSQL_TIME commit_ts;
     if (args[0]->get_date(&commit_ts, 0))
     {
       null_value= true;
-      break;
+      return 0;
     }
     if (arg_count > 1)
     {
       backwards= args[1]->val_bool();
       DBUG_ASSERT(arg_count == 2);
     }
-    null_value= !hton->vers_query_commit_ts(thd, &cached_result, commit_ts, VTQ_ALL, backwards);
-    res= cached_result.trx_id;
-    break;
+    return get_by_commit_ts(commit_ts, backwards);
   }
-  default:
-    DBUG_ASSERT(0);
-    res= 0;
-  }
-
-  return res;
 }
 
 Item_func_vtq_trx_sees::Item_func_vtq_trx_sees(

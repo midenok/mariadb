@@ -1314,9 +1314,12 @@ class Item_func_vtq_id :
   vtq_record_t cached_result;
   bool backwards;
 
+  longlong get_by_trx_id(ulonglong trx_id);
+  longlong get_by_commit_ts(MYSQL_TIME &commit_ts, bool backwards);
+
 public:
   Item_func_vtq_id(THD *thd, Item* a, vtq_field_t _vtq_field, bool _backwards= false);
-  Item_func_vtq_id(THD *thd, Item* a, Item* b, vtq_field_t _vtq_field, bool _backwards= false);
+  Item_func_vtq_id(THD *thd, Item* a, Item* b, vtq_field_t _vtq_field);
 
   vtq_record_t *vtq_cached_result() { return &cached_result; }
 
