@@ -25339,14 +25339,13 @@ bool
 vtq_trx_sees(THD *thd, bool &result, ulonglong trx_id1, ulonglong trx_id0, ulonglong commit_id1, uchar iso_level1, ulonglong commit_id0)
 {
 	DBUG_ENTER("vtq_trx_sees");
-	ut_ad(trx_id1 && trx_id0);
 
 	if (trx_id1 == trx_id0) {
 		result = false;
 		DBUG_RETURN(true);
 	}
 
-	if (trx_id1 == ULONGLONG_MAX) {
+	if (trx_id1 == ULONGLONG_MAX || trx_id0 == 0) {
 		result = true;
 		DBUG_RETURN(true);
 	}
