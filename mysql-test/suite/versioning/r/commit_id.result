@@ -80,6 +80,16 @@ vtq_commit_id(@ts3) = vtq_commit_id(null, @tx2) as G,
 vtq_commit_id(@ts3, true) is null as H;
 A	B	C	D	E	F	G	H
 1	1	1	1	1	1	1	1
+select
+vtq_trx_sees(@tx1, @tx0) as A,
+not vtq_trx_sees(@tx0, @tx1) as B,
+vtq_trx_sees_eq(@tx1, @tx1) as C,
+not vtq_trx_sees(@tx1, @tx1) as D,
+vtq_trx_sees(@tx2, 0) as E,
+vtq_trx_sees(0, @tx2) is null as F,
+vtq_trx_sees(-1, @tx2) as H;
+A	B	C	D	E	F	H
+1	1	1	1	1	1	1
 drop table t1;
 call verify_vtq;
 No	A	B	C	D
