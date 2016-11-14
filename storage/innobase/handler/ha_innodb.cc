@@ -25276,6 +25276,7 @@ vtq_query_commit_ts(THD* thd, void *out, const MYSQL_TIME &_commit_ts, vtq_field
 
 	tuple = dtuple_create(heap, 1);
 	dict_index_copy_types(tuple, index, 1);
+	dtuple_get_nth_field(tuple, 0)->len = UNIV_SQL_NULL;
 	set_tuple_col_8(tuple, 0, commit_ts, heap);
 
 	mtr_start_trx(&mtr, trx);
