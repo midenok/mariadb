@@ -1575,7 +1575,14 @@ bool
 vtq_query_commit_ts(THD* thd, void *out, const MYSQL_TIME &commit_ts, vtq_field_t field, bool backwards);
 
 bool
-vtq_trx_sees(THD *thd, bool &result, ulonglong trx_id1, ulonglong trx_id0, ulonglong commit_id1, uchar iso_level1, ulonglong commit_id0);
+vtq_trx_sees(
+	THD *thd,
+	bool &result,
+	ulonglong trx_id1,
+	ulonglong trx_id0,
+	ulonglong commit_id1,
+	uchar iso_level1,
+	ulonglong commit_id0);
 
 
 /*************************************************************//**
@@ -25198,25 +25205,9 @@ operator> (const timeval &a, const timeval &b)
 static
 inline
 bool
-operator>= (const timeval &a, const timeval &b)
-{
-	return a.tv_sec > b.tv_sec || (a.tv_sec == b.tv_sec && a.tv_usec >= b.tv_usec);
-}
-
-static
-inline
-bool
 operator< (const timeval &a, const timeval &b)
 {
 	return b > a;
-}
-
-static
-inline
-bool
-operator<= (const timeval &a, const timeval &b)
-{
-	return b >= a;
 }
 
 UNIV_INTERN
@@ -25337,7 +25328,14 @@ not_found:
 }
 
 bool
-vtq_trx_sees(THD *thd, bool &result, ulonglong trx_id1, ulonglong trx_id0, ulonglong commit_id1, uchar iso_level1, ulonglong commit_id0)
+vtq_trx_sees(
+	THD *thd,
+	bool &result,
+	ulonglong trx_id1,
+	ulonglong trx_id0,
+	ulonglong commit_id1,
+	uchar iso_level1,
+	ulonglong commit_id0)
 {
 	DBUG_ENTER("vtq_trx_sees");
 
