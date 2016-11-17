@@ -4974,6 +4974,13 @@ part_type_def:
           { Lex->part_info->part_type= LIST_PARTITION; }
         | LIST_SYM part_column_list
           { Lex->part_info->part_type= LIST_PARTITION; }
+        | SYSTEM_TIME_SYM
+          {
+            partition_info *part_info= Lex->part_info;
+            part_info->part_type= VERSIONING_PARTITION;
+            part_info->list_of_part_fields= TRUE;
+            part_info->column_list= TRUE;
+          }
         ;
 
 opt_linear:
@@ -5247,6 +5254,32 @@ opt_part_values:
               part_info->part_type= LIST_PARTITION;
           }
           part_values_in {}
+        | AS OF_SYM NOW_SYM
+          {
+            LEX *lex= Lex;
+            partition_info *part_info= lex->part_info;
+            if (! lex->is_partition_management())
+            {
+              if (part_info->part_type != VERSIONING_PARTITION)
+                my_yyabort_error((ER_PARTITION_WRONG_PARTITION_TYPE, MYF(0),
+                                  "VERSIONING"));
+            }
+            else
+              part_info->part_type= VERSIONING_PARTITION;
+          }
+        | INTERVAL_SYM expr interval
+          {
+            LEX *lex= Lex;
+            partition_info *part_info= lex->part_info;
+            if (! lex->is_partition_management())
+            {
+              if (part_info->part_type != VERSIONING_PARTITION)
+                my_yyabort_error((ER_PARTITION_WRONG_PARTITION_TYPE, MYF(0),
+                                  "VERSIONING"));
+            }
+            else
+              part_info->part_type= VERSIONING_PARTITION;
+          }
         | DEFAULT
          {
             LEX *lex= Lex;

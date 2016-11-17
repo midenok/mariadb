@@ -87,7 +87,8 @@ const LEX_STRING partition_keywords[]=
 {
   { C_STRING_WITH_LEN("HASH") },
   { C_STRING_WITH_LEN("RANGE") },
-  { C_STRING_WITH_LEN("LIST") }, 
+  { C_STRING_WITH_LEN("LIST") },
+  { C_STRING_WITH_LEN("SYSTEM_TIME") },
   { C_STRING_WITH_LEN("KEY") },
   { C_STRING_WITH_LEN("MAXVALUE") },
   { C_STRING_WITH_LEN("LINEAR ") },
@@ -108,6 +109,7 @@ static int get_partition_id_list_col(partition_info *, uint32 *, longlong *);
 static int get_partition_id_list(partition_info *, uint32 *, longlong *);
 static int get_partition_id_range_col(partition_info *, uint32 *, longlong *);
 static int get_partition_id_range(partition_info *, uint32 *, longlong *);
+static int get_partition_id_versioning(partition_info *, uint32 *, longlong *);
 static int get_part_id_charset_func_part(partition_info *, uint32 *, longlong *);
 static int get_part_id_charset_func_subpart(partition_info *, uint32 *);
 static int get_partition_id_hash_nosub(partition_info *, uint32 *, longlong *);
@@ -1357,6 +1359,10 @@ static void set_up_partition_func_pointers(partition_info *part_info)
       else
         part_info->get_partition_id= get_partition_id_list;
     }
+    else if (part_info->part_type == VERSIONING_PARTITION)
+    {
+      part_info->get_part_partition_id= get_partition_id_versioning;
+    }
     else /* HASH partitioning */
     {
       if (part_info->list_of_part_fields)
@@ -1683,6 +1689,11 @@ bool fix_partition_func(THD *thd, TABLE *table,
       error_str= partition_keywords[PKW_LIST].str; 
       if (unlikely(part_info->check_list_constants(thd)))
         goto end;
+    }
+    else if (part_info->part_type == VERSIONING_PARTITION)
+    {
+      error_str= partition_keywords[PKW_SYSTEM_TIME].str;
+      // FIXME: set column list to sys_trx_end
     }
     else
     {
@@ -2495,6 +2506,9 @@ char *generate_partition_syntax(THD *thd, partition_info *part_info,
       }
       else
         err+= add_part_key_word(fptr, partition_keywords[PKW_HASH].str);
+      break;
+    case VERSIONING_PARTITION:
+      err+= add_part_key_word(fptr, partition_keywords[PKW_SYSTEM_TIME].str);
       break;
     default:
       DBUG_ASSERT(0);
@@ -8444,5 +8458,12 @@ uint get_partition_field_store_length(Field *field)
   if (field->real_type() == MYSQL_TYPE_VARCHAR)
     store_length+= HA_KEY_BLOB_LENGTH;
   return store_length;
+}
+
+int get_partition_id_versioning(partition_info *part_info,
+                          uint32 *part_id,
+                          longlong *func_value)
+{
+  return 0;
 }
 #endif
