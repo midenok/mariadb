@@ -2365,6 +2365,13 @@ static int add_partition_values(File fptr, partition_info *part_info,
     } while (++i < num_items);
     err+= add_end_parenthesis(fptr);
   }
+  else if (part_info->part_type == VERSIONING_PARTITION)
+  {
+    if (!p_elem->vers_historical)
+    {
+      err+= add_string(fptr, " AS OF NOW");
+    }
+  }
 end:
   return err;
 }
@@ -2523,7 +2530,7 @@ char *generate_partition_syntax(THD *thd, partition_info *part_info,
                          part_info->part_func_len);
     err+= add_end_parenthesis(fptr);
   }
-  else if (part_info->column_list)
+  else if (part_info->column_list && part_info->part_type != VERSIONING_PARTITION)
   {
     err+= add_string(fptr, partition_keywords[PKW_COLUMNS].str);
     err+= add_part_field_list(fptr, part_info->part_field_list);
