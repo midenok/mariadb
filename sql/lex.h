@@ -406,6 +406,7 @@ static SYMBOL symbols[] = {
   { "NODEGROUP",	SYM(NODEGROUP_SYM)},
   { "NONE",		SYM(NONE_SYM)},
   { "NOT",		SYM(NOT_SYM)},
+  { "NOW",		SYM(NOW_SYM)},
   { "NO_WRITE_TO_BINLOG",  SYM(NO_WRITE_TO_BINLOG)},
   { "NULL",		SYM(NULL_SYM)},
   { "NUMBER",           SYM(NUMBER_SYM)},
@@ -708,7 +709,6 @@ static SYMBOL sql_functions[] = {
   { "MAX",		SYM(MAX_SYM)},
   { "MID",		SYM(SUBSTRING)},	/* unireg function */
   { "MIN",		SYM(MIN_SYM)},
-  { "NOW",		SYM(NOW_SYM)},
   { "NTH_VALUE",        SYM(NTH_VALUE_SYM)},
   { "NTILE",            SYM(NTILE_SYM)},
   { "POSITION",		SYM(POSITION_SYM)},

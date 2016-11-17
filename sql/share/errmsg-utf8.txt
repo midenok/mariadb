@@ -7257,3 +7257,7 @@ ER_VERS_RANGE_UNITS_MISMATCH
 
 ER_NON_VERSIONED_FIELD_IN_VERSIONED_QUERY
         eng "Attempt to read unversioned field %`s in historical query"
+
+ER_PARTITION_WRONG_PARTITION_TYPE
+        eng "Wrong partition type, expected type: %s"
+

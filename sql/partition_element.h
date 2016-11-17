@@ -26,7 +26,8 @@ enum partition_type {
   NOT_A_PARTITION= 0,
   RANGE_PARTITION,
   HASH_PARTITION,
-  LIST_PARTITION
+  LIST_PARTITION,
+  VERSIONING_PARTITION
 };
 
 enum partition_state {
