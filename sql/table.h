@@ -1480,8 +1480,8 @@ public:
   /* Versioned by SQL layer */
   bool versioned_by_sql() const
   {
-    DBUG_ASSERT(s->db_type());
-    return s->versioned && !s->db_type()->versioned();
+    DBUG_ASSERT(file);
+    return s->versioned && !file->versioned();
   }
 
   Field *vers_start_field() const

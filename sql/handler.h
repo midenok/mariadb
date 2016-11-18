@@ -1371,7 +1371,6 @@ struct handlerton
    /*
      System Versioning
    */
-   bool versioned() const;
    bool (*vers_query_trx_id)(THD* thd, void *out, ulonglong trx_id, vtq_field_t field);
    bool (*vers_query_commit_ts)(THD* thd, void *out, const MYSQL_TIME &commit_ts, vtq_field_t field, bool backwards);
    bool (*vers_trx_sees)(THD *thd, bool &result, ulonglong trx_id1, ulonglong trx_id0, ulonglong commit_id1, uchar iso_level1, ulonglong commit_id0);
@@ -4198,6 +4197,9 @@ public:
   virtual void set_lock_type(enum thr_lock_type lock);
 
   friend enum icp_result handler_index_cond_check(void* h_arg);
+
+  virtual bool versioned() const
+  { DBUG_ASSERT(ht); return ht->flags & HTON_SUPPORTS_SYS_VERSIONING; }
 protected:
   Handler_share *get_ha_share_ptr();
   void set_ha_share_ptr(Handler_share *arg_ha_share);
@@ -4383,10 +4385,4 @@ void print_keydup_error(TABLE *table, KEY *key, myf errflag);
 
 int del_global_index_stat(THD *thd, TABLE* table, KEY* key_info);
 int del_global_table_stat(THD *thd, LEX_STRING *db, LEX_STRING *table);
-
-inline
-bool handlerton::versioned() const
-{
-  return flags & HTON_SUPPORTS_SYS_VERSIONING;
-}
 #endif /* HANDLER_INCLUDED */

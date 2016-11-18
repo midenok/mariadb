@@ -2383,8 +2383,7 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
     vers_start_field()->flags|= VERS_SYS_START_FLAG;
     vers_end_field()->flags|= VERS_SYS_END_FLAG;
 
-    DBUG_ASSERT(db_type());
-    if (db_type()->versioned())
+    if (handler_file->versioned())
     {
       if (vers_start_field()->type() != MYSQL_TYPE_LONGLONG
         || !(vers_start_field()->flags & UNSIGNED_FLAG))
@@ -2411,7 +2410,7 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
         my_error(ER_VERS_FIELD_WRONG_TYPE, MYF(0), vers_end_field()->field_name, "TIMESTAMP", share->table_name);
         goto err;
       }
-    } // if (db_type()->versioned())
+    } // if (handler_file->versioned())
   } // if (system_period == NULL)
 
   delete handler_file;
