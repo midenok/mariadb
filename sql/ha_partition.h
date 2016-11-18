@@ -1282,6 +1282,11 @@ public:
     return h;
   }
 
+  virtual bool versioned() const
+  {
+    return m_innodb;
+  }
+
   friend int cmp_key_rowid_part_id(void *ptr, uchar *ref1, uchar *ref2);
 };
 
