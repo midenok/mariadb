@@ -1667,6 +1667,13 @@ bool fix_partition_func(THD *thd, TABLE *table,
     const char *error_str;
     if (part_info->column_list)
     {
+      if (part_info->part_type == VERSIONING_PARTITION)
+      {
+        Field *sys_trx_end= table->vers_end_field();
+        part_info->part_field_list.empty();
+        part_info->part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
+        sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG;
+      }
       List_iterator<char> it(part_info->part_field_list);
       if (unlikely(handle_list_of_fields(thd, it, table, part_info, FALSE)))
         goto end;
@@ -1693,7 +1700,6 @@ bool fix_partition_func(THD *thd, TABLE *table,
     else if (part_info->part_type == VERSIONING_PARTITION)
     {
       error_str= partition_keywords[PKW_SYSTEM_TIME].str;
-      // FIXME: set column list to sys_trx_end
     }
     else
     {
