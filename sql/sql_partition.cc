@@ -109,7 +109,7 @@ static int get_partition_id_list_col(partition_info *, uint32 *, longlong *);
 static int get_partition_id_list(partition_info *, uint32 *, longlong *);
 static int get_partition_id_range_col(partition_info *, uint32 *, longlong *);
 static int get_partition_id_range(partition_info *, uint32 *, longlong *);
-static int get_partition_id_versioning(partition_info *, uint32 *, longlong *);
+static int vers_get_partition_id(partition_info *, uint32 *, longlong *);
 static int get_part_id_charset_func_part(partition_info *, uint32 *, longlong *);
 static int get_part_id_charset_func_subpart(partition_info *, uint32 *);
 static int get_partition_id_hash_nosub(partition_info *, uint32 *, longlong *);
@@ -1361,7 +1361,7 @@ static void set_up_partition_func_pointers(partition_info *part_info)
     }
     else if (part_info->part_type == VERSIONING_PARTITION)
     {
-      part_info->get_part_partition_id= get_partition_id_versioning;
+      part_info->get_partition_id= vers_get_partition_id;
     }
     else /* HASH partitioning */
     {
@@ -3371,6 +3371,19 @@ int get_partition_id_range_col(partition_info *part_info,
                          num_columns) >= 0))
     DBUG_RETURN(HA_ERR_NO_PARTITION_FOUND);
 
+  DBUG_PRINT("exit",("partition: %d", *part_id));
+  DBUG_RETURN(0);
+}
+
+
+int vers_get_partition_id(partition_info *part_info,
+                          uint32 *part_id,
+                          longlong *func_value)
+{
+  DBUG_ENTER("vers_get_partition_id");
+  Field *sys_trx_end= part_info->part_field_array[0];
+  DBUG_ASSERT(sys_trx_end);
+  *part_id= sys_trx_end->is_max() ? 0 : 1;
   DBUG_PRINT("exit",("partition: %d", *part_id));
   DBUG_RETURN(0);
 }
@@ -8473,10 +8486,4 @@ uint get_partition_field_store_length(Field *field)
   return store_length;
 }
 
-int get_partition_id_versioning(partition_info *part_info,
-                          uint32 *part_id,
-                          longlong *func_value)
-{
-  return 0;
-}
 #endif
