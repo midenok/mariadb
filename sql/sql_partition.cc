@@ -3383,7 +3383,8 @@ int vers_get_partition_id(partition_info *part_info,
   DBUG_ENTER("vers_get_partition_id");
   Field *sys_trx_end= part_info->part_field_array[0];
   DBUG_ASSERT(sys_trx_end);
-  *part_id= sys_trx_end->is_max() ? 0 : 1;
+  // new rows have NULL in sys_trx_end
+  *part_id= sys_trx_end->is_max() || sys_trx_end->is_null() ? 0 : 1;
   DBUG_PRINT("exit",("partition: %d", *part_id));
   DBUG_RETURN(0);
 }
