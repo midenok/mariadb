@@ -1669,6 +1669,11 @@ bool fix_partition_func(THD *thd, TABLE *table,
     {
       if (part_info->part_type == VERSIONING_PARTITION)
       {
+        if (!table->versioned())
+        {
+          my_error(ER_VERSIONING_REQUIRED, MYF(0), "'BY SYSTEM_TIME' partitioning");
+          goto end;
+        }
         Field *sys_trx_end= table->vers_end_field();
         part_info->part_field_list.empty();
         part_info->part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);

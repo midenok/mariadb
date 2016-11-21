@@ -1,0 +1,32 @@
+create table t1 (x int)
+partition by system_time (
+partition p0 as of now,
+partition p1);
+ERROR HY000: 'WITH SYSTEM VERSIONING' required: 'BY SYSTEM_TIME' partitioning
+create or replace table t1 (x int);
+alter table t1
+partition by system_time (
+partition p0 as of now,
+partition p1);
+ERROR HY000: 'WITH SYSTEM VERSIONING' required: 'BY SYSTEM_TIME' partitioning
+create or replace table t1 (x int)
+with system versioning
+partition by system_time (
+partition p0 as of now,
+partition p1);
+insert into t1 values (1);
+select * from t1;
+x
+1
+select * from t1 partition (p0);
+x
+1
+select * from t1 partition (p1);
+x
+delete from t1;
+select * from t1 partition (p0) for system_time all;
+x
+select * from t1 partition (p1) for system_time all;
+x
+1
+drop table t1;

@@ -5261,8 +5261,8 @@ opt_part_values:
             if (! lex->is_partition_management())
             {
               if (part_info->part_type != VERSIONING_PARTITION)
-                my_yyabort_error((ER_PARTITION_WRONG_PARTITION_TYPE, MYF(0),
-                                  "VERSIONING"));
+                my_yyabort_error((ER_PARTITION_WRONG_TYPE, MYF(0),
+                                  "BY SYSTEM_TIME"));
             }
             else
               part_info->part_type= VERSIONING_PARTITION;
@@ -5274,8 +5274,8 @@ opt_part_values:
             if (! lex->is_partition_management())
             {
               if (part_info->part_type != VERSIONING_PARTITION)
-                my_yyabort_error((ER_PARTITION_WRONG_PARTITION_TYPE, MYF(0),
-                                  "VERSIONING"));
+                my_yyabort_error((ER_PARTITION_WRONG_TYPE, MYF(0),
+                                  "BY SYSTEM_TIME"));
             }
             else
               part_info->part_type= VERSIONING_PARTITION;
@@ -6151,10 +6151,9 @@ period_for_system_time:
             Vers_parse_info &info= Lex->vers_get_info();
             if (!my_strcasecmp(system_charset_info, $4->c_ptr(), $6->c_ptr()))
             {
-              my_error(ER_VERS_WRONG_PARAMS, MYF(0),
+              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0),
                 Lex->create_last_non_select_table->table_name,
-                "'PERIOD FOR SYSTEM_TIME' columns must be different");
-              MYSQL_YYABORT;
+                "'PERIOD FOR SYSTEM_TIME' columns must be different"));
             }
             info.set_period_for_system_time($4, $6);
           }
@@ -6259,8 +6258,7 @@ field_def:
             }
             if (*p)
             {
-              my_error(ER_VERS_WRONG_PARAMS, MYF(0), table_name, err);
-              MYSQL_YYABORT;
+              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0), table_name, err));
             }
             *p= field_name;
           }
