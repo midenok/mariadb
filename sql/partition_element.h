@@ -110,8 +110,15 @@ public:
   bool has_null_value;
   bool signed_flag;                          // Range value signed
   bool max_value;                            // MAXVALUE range
-  bool vers_historical;
 
+  enum elem_type
+  {
+    CONVENTIONAL= 0,
+    AS_OF_NOW,
+    VERSIONING
+  };
+
+  elem_type type;
 
   partition_element()
   : part_max_rows(0), part_min_rows(0), range_value(0),
@@ -120,7 +127,7 @@ public:
     data_file_name(NULL), index_file_name(NULL),
     engine_type(NULL), connect_string(null_lex_str), part_state(PART_NORMAL),
     nodegroup_id(UNDEF_NODEGROUP), has_null_value(FALSE),
-    signed_flag(FALSE), max_value(FALSE), vers_historical(FALSE)
+    signed_flag(FALSE), max_value(FALSE), type(CONVENTIONAL)
   {
   }
   partition_element(partition_element *part_elem)
@@ -136,7 +143,7 @@ public:
     part_state(part_elem->part_state),
     nodegroup_id(part_elem->nodegroup_id),
     has_null_value(FALSE),
-    vers_historical(part_elem->vers_historical)
+    type(part_elem->type)
   {
   }
   ~partition_element() {}

@@ -1705,7 +1705,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  VARIANCE_SYM
 %token  VARYING                       /* SQL-2003-R */
 %token  VAR_SAMP_SYM
-%token  VERSIONING                    /* 32N2439 */
+%token  VERSIONING_SYM                /* 32N2439 */
 %token  VIA_SYM
 %token  VIEW_SYM                      /* SQL-2003-N */
 %token  VIRTUAL_SYM
@@ -5261,24 +5261,28 @@ opt_part_values:
             if (! lex->is_partition_management())
             {
               if (part_info->part_type != VERSIONING_PARTITION)
-                my_yyabort_error((ER_PARTITION_WRONG_PARTITION_TYPE, MYF(0),
-                                  "VERSIONING"));
+                my_yyabort_error((ER_PARTITION_WRONG_TYPE, MYF(0),
+                                  "BY SYSTEM_TIME"));
             }
             else
               part_info->part_type= VERSIONING_PARTITION;
+            partition_element *elem= part_info->curr_part_elem;
+            elem->type= partition_element::AS_OF_NOW;
           }
-        | INTERVAL_SYM expr interval
+        | VERSIONING_SYM opt_versioning_interval
           {
             LEX *lex= Lex;
             partition_info *part_info= lex->part_info;
             if (! lex->is_partition_management())
             {
               if (part_info->part_type != VERSIONING_PARTITION)
-                my_yyabort_error((ER_PARTITION_WRONG_PARTITION_TYPE, MYF(0),
-                                  "VERSIONING"));
+                my_yyabort_error((ER_PARTITION_WRONG_TYPE, MYF(0),
+                                  "BY SYSTEM_TIME"));
             }
             else
               part_info->part_type= VERSIONING_PARTITION;
+            partition_element *elem= part_info->curr_part_elem;
+            elem->type= partition_element::VERSIONING;
           }
         | DEFAULT
          {
@@ -5576,6 +5580,14 @@ opt_part_option:
         | COMMENT_SYM opt_equal TEXT_STRING_sys
           { Lex->part_info->curr_part_elem->part_comment= $3.str; }
         ;
+
+opt_versioning_interval:
+         /* empty */ {}
+       | INTERVAL_SYM expr interval
+         {
+           // FIXME: set versioning interval
+         }
+       ;
 
 /*
  End of partition parser part
@@ -5939,7 +5951,7 @@ create_table_option:
               engine_option_value($1, &Lex->create_info.option_list,
                                   &Lex->option_list_last);
           }
-        | WITH_SYSTEM_SYM VERSIONING
+        | WITH_SYSTEM_SYM VERSIONING_SYM
           {
             const char *table_name=
                 Lex->create_last_non_select_table->table_name;
@@ -5953,7 +5965,7 @@ create_table_option:
             info.declared_with_system_versioning= true;
             Lex->create_info.options|= HA_VERSIONED_TABLE;
           }
-	| WITHOUT SYSTEM VERSIONING
+	| WITHOUT SYSTEM VERSIONING_SYM
           {
             const char *table_name=
                 Lex->create_last_non_select_table->table_name;
@@ -6172,10 +6184,9 @@ period_for_system_time:
             Vers_parse_info &info= Lex->vers_get_info();
             if (!my_strcasecmp(system_charset_info, $4->c_ptr(), $6->c_ptr()))
             {
-              my_error(ER_VERS_WRONG_PARAMS, MYF(0),
+              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0),
                 Lex->create_last_non_select_table->table_name,
-                "'PERIOD FOR SYSTEM_TIME' columns must be different");
-              MYSQL_YYABORT;
+                "'PERIOD FOR SYSTEM_TIME' columns must be different"));
             }
             info.set_period_for_system_time($4, $6);
           }
@@ -6280,8 +6291,7 @@ field_def:
             }
             if (*p)
             {
-              my_error(ER_VERS_WRONG_PARAMS, MYF(0), table_name, err);
-              MYSQL_YYABORT;
+              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0), table_name, err));
             }
             *p= field_name;
           }
@@ -6759,7 +6769,7 @@ attribute:
             new (thd->mem_root)
               engine_option_value($1, &Lex->last_field->option_list, &Lex->option_list_last);
           }
-        | WITH_SYSTEM_SYM VERSIONING
+        | WITH_SYSTEM_SYM VERSIONING_SYM
           {
             if (Lex->last_field->versioning !=
                 Column_definition::VERSIONING_NOT_SET)
@@ -6772,7 +6782,7 @@ attribute:
             Lex->create_info.vers_info.has_versioned_fields= true;
             Lex->create_info.options|= HA_VERSIONED_TABLE;
           }
-        | WITHOUT SYSTEM VERSIONING
+        | WITHOUT SYSTEM VERSIONING_SYM
           {
             if (Lex->last_field->versioning !=
                 Column_definition::VERSIONING_NOT_SET)

@@ -1669,6 +1669,16 @@ bool fix_partition_func(THD *thd, TABLE *table,
     {
       if (part_info->part_type == VERSIONING_PARTITION)
       {
+        if (!table->versioned())
+        {
+          my_error(ER_VERSIONING_REQUIRED, MYF(0), "`BY SYSTEM_TIME` partitioning");
+          goto end;
+        }
+        if (part_info->num_parts != 2)
+        {
+          my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "unexpected number of partitions (expected 2)");
+          goto end;
+        }
         Field *sys_trx_end= table->vers_end_field();
         part_info->part_field_list.empty();
         part_info->part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
@@ -2373,9 +2383,16 @@ static int add_partition_values(File fptr, partition_info *part_info,
   }
   else if (part_info->part_type == VERSIONING_PARTITION)
   {
-    if (!p_elem->vers_historical)
+    switch (p_elem->type)
     {
+    case partition_element::AS_OF_NOW:
       err+= add_string(fptr, " AS OF NOW");
+      break;
+    case partition_element::VERSIONING:
+      err+= add_string(fptr, " VERSIONING");
+      break;
+    default:
+      DBUG_ASSERT(0 && "wrong p_elem->type");
     }
   }
 end:
