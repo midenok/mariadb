@@ -1635,6 +1635,7 @@ bool fix_partition_func(THD *thd, TABLE *table,
     }
   }
   DBUG_ASSERT(part_info->part_type != NOT_A_PARTITION);
+  DBUG_ASSERT(part_info->part_type != VERSIONING_PARTITION || part_info->column_list);
   /*
     Partition is defined. We need to verify that partitioning
     function is correct.
@@ -1679,6 +1680,14 @@ bool fix_partition_func(THD *thd, TABLE *table,
           my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "unexpected number of partitions (expected 2)");
           goto end;
         }
+        if (part_info->default_partition_id == UINT32_MAX)
+        {
+          my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "no `AS OF NOW` partition defined");
+          goto end;
+        }
+        DBUG_ASSERT(part_info->num_parts == part_info->partitions.elements);
+        DBUG_ASSERT(part_info->default_partition_id < part_info->num_parts);
+
         Field *sys_trx_end= table->vers_end_field();
         part_info->part_field_list.empty();
         part_info->part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
@@ -3400,8 +3409,11 @@ int vers_get_partition_id(partition_info *part_info,
   DBUG_ENTER("vers_get_partition_id");
   Field *sys_trx_end= part_info->part_field_array[0];
   DBUG_ASSERT(sys_trx_end);
+  DBUG_ASSERT(part_info->num_parts == 2 && part_info->default_partition_id < 2);
   // new rows have NULL in sys_trx_end
-  *part_id= sys_trx_end->is_max() || sys_trx_end->is_null() ? 0 : 1;
+  *part_id= sys_trx_end->is_max() || sys_trx_end->is_null() ?
+    part_info->default_partition_id :
+    1 - part_info->default_partition_id;
   DBUG_PRINT("exit",("partition: %d", *part_id));
   DBUG_RETURN(0);
 }

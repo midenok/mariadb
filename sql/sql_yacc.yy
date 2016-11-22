@@ -4980,6 +4980,7 @@ part_type_def:
             part_info->part_type= VERSIONING_PARTITION;
             part_info->list_of_part_fields= TRUE;
             part_info->column_list= TRUE;
+            part_info->default_partition_id= UINT32_MAX;
           }
         ;
 
@@ -5265,9 +5266,17 @@ opt_part_values:
                                   "BY SYSTEM_TIME"));
             }
             else
+            {
               part_info->part_type= VERSIONING_PARTITION;
+              // FIXME: ALTER TABLE
+              DBUG_ASSERT(0);
+            }
             partition_element *elem= part_info->curr_part_elem;
             elem->type= partition_element::AS_OF_NOW;
+            if (part_info->default_partition_id != UINT32_MAX)
+                my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0),
+                  "BY SYSTEM_TIME", "multiple `AS OF NOW` partitions"));
+            part_info->default_partition_id= part_info->partitions.elements - 1;
           }
         | VERSIONING_SYM opt_versioning_interval
           {
@@ -5280,7 +5289,11 @@ opt_part_values:
                                   "BY SYSTEM_TIME"));
             }
             else
+            {
               part_info->part_type= VERSIONING_PARTITION;
+              // FIXME: ALTER TABLE
+              DBUG_ASSERT(0);
+            }
             partition_element *elem= part_info->curr_part_elem;
             elem->type= partition_element::VERSIONING;
           }
