@@ -663,7 +663,7 @@ static SYMBOL symbols[] = {
   { "VIA",              SYM(VIA_SYM)},
   { "VIEW",		SYM(VIEW_SYM)},
   { "VIRTUAL",          SYM(VIRTUAL_SYM)},
-  { "VERSIONING",       SYM(VERSIONING)},
+  { "VERSIONING",       SYM(VERSIONING_SYM)},
   { "WAIT",		SYM(WAIT_SYM)},
   { "WARNINGS",		SYM(WARNINGS)},
   { "WEEK",		SYM(WEEK_SYM)},

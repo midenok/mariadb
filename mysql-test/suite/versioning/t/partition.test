@@ -1,25 +1,30 @@
 --source include/have_innodb.inc
 --source include/have_partition.inc
 
-
 --error ER_VERSIONING_REQUIRED
 create table t1 (x int)
 partition by system_time (
     partition p0 as of now,
-    partition p1);
+    partition p1 versioning);
     
 create or replace table t1 (x int);
 --error ER_VERSIONING_REQUIRED
 alter table t1
 partition by system_time (
     partition p0 as of now,
-    partition p1);
+    partition p1 versioning);
+
+--error ER_VERS_WRONG_PARAMS
+create or replace table t1 (x int)
+with system versioning
+partition by system_time (
+    partition p0 as of now);
 
 create or replace table t1 (x int)
 with system versioning
 partition by system_time (
     partition p0 as of now,
-    partition p1);
+    partition p1 versioning);
 
 insert into t1 values (1);
 select * from t1;

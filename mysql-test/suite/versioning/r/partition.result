@@ -1,19 +1,24 @@
 create table t1 (x int)
 partition by system_time (
 partition p0 as of now,
-partition p1);
-ERROR HY000: 'WITH SYSTEM VERSIONING' required: 'BY SYSTEM_TIME' partitioning
+partition p1 versioning);
+ERROR HY000: `WITH SYSTEM VERSIONING` required: `BY SYSTEM_TIME` partitioning
 create or replace table t1 (x int);
 alter table t1
 partition by system_time (
 partition p0 as of now,
-partition p1);
-ERROR HY000: 'WITH SYSTEM VERSIONING' required: 'BY SYSTEM_TIME' partitioning
+partition p1 versioning);
+ERROR HY000: `WITH SYSTEM VERSIONING` required: `BY SYSTEM_TIME` partitioning
+create or replace table t1 (x int)
+with system versioning
+partition by system_time (
+partition p0 as of now);
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: unexpected number of partitions (expected 2)
 create or replace table t1 (x int)
 with system versioning
 partition by system_time (
 partition p0 as of now,
-partition p1);
+partition p1 versioning);
 insert into t1 values (1);
 select * from t1;
 x

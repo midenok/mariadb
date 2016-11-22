@@ -1705,7 +1705,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  VARIANCE_SYM
 %token  VARYING                       /* SQL-2003-R */
 %token  VAR_SAMP_SYM
-%token  VERSIONING                    /* 32N2439 */
+%token  VERSIONING_SYM                /* 32N2439 */
 %token  VIA_SYM
 %token  VIEW_SYM                      /* SQL-2003-N */
 %token  VIRTUAL_SYM
@@ -5266,8 +5266,10 @@ opt_part_values:
             }
             else
               part_info->part_type= VERSIONING_PARTITION;
+            partition_element *elem= part_info->curr_part_elem;
+            elem->type= partition_element::AS_OF_NOW;
           }
-        | INTERVAL_SYM expr interval
+        | VERSIONING_SYM opt_versioning_interval
           {
             LEX *lex= Lex;
             partition_info *part_info= lex->part_info;
@@ -5279,6 +5281,8 @@ opt_part_values:
             }
             else
               part_info->part_type= VERSIONING_PARTITION;
+            partition_element *elem= part_info->curr_part_elem;
+            elem->type= partition_element::VERSIONING;
           }
         | DEFAULT
          {
@@ -5576,6 +5580,14 @@ opt_part_option:
         | COMMENT_SYM opt_equal TEXT_STRING_sys
           { Lex->part_info->curr_part_elem->part_comment= $3.str; }
         ;
+
+opt_versioning_interval:
+         /* empty */ {}
+       | INTERVAL_SYM expr interval
+         {
+           // FIXME: set versioning interval
+         }
+       ;
 
 /*
  End of partition parser part
@@ -5939,7 +5951,7 @@ create_table_option:
               engine_option_value($1, &Lex->create_info.option_list,
                                   &Lex->option_list_last);
           }
-        | WITH_SYSTEM_SYM VERSIONING
+        | WITH_SYSTEM_SYM VERSIONING_SYM
           {
             Vers_parse_info &info= Lex->vers_get_info();
             info.declared_system_versioning= true;
@@ -6736,13 +6748,13 @@ attribute:
             new (thd->mem_root)
               engine_option_value($1, &Lex->last_field->option_list, &Lex->option_list_last);
           }
-        | WITH_SYSTEM_SYM VERSIONING
+        | WITH_SYSTEM_SYM VERSIONING_SYM
           {
             Lex->last_field->versioning = Column_definition::WITH_VERSIONING;
             Lex->create_info.vers_info.has_versioned_fields= true;
             Lex->create_info.options|= HA_VERSIONED_TABLE;
           }
-        | WITHOUT SYSTEM VERSIONING
+        | WITHOUT SYSTEM VERSIONING_SYM
           {
             Lex->last_field->versioning = Column_definition::WITHOUT_VERSIONING;
             Lex->create_info.vers_info.has_unversioned_fields= true;
