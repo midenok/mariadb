@@ -20,11 +20,40 @@ with system versioning
 partition by system_time (
     partition p0 as of now);
 
+--error ER_VERS_WRONG_PARAMS
+create or replace table t1 (x int)
+with system versioning
+partition by system_time (
+    partition p0 as of now,
+    partition p1 as of now);
+
+--error ER_VERS_WRONG_PARAMS
+create or replace table t1 (x int)
+with system versioning
+partition by system_time (
+    partition p0 versioning,
+    partition p1 versioning);
+
 create or replace table t1 (x int)
 with system versioning
 partition by system_time (
     partition p0 as of now,
     partition p1 versioning);
+
+insert into t1 values (1);
+select * from t1;
+select * from t1 partition (p0);
+select * from t1 partition (p1);
+
+delete from t1;
+select * from t1 partition (p0) for system_time all;
+select * from t1 partition (p1) for system_time all;
+
+create or replace table t1 (x int)
+with system versioning
+partition by system_time (
+    partition p0 versioning,
+    partition p1 as of now);
 
 insert into t1 values (1);
 select * from t1;

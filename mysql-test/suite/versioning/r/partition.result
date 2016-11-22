@@ -18,6 +18,18 @@ create or replace table t1 (x int)
 with system versioning
 partition by system_time (
 partition p0 as of now,
+partition p1 as of now);
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: multiple `AS OF NOW` partitions
+create or replace table t1 (x int)
+with system versioning
+partition by system_time (
+partition p0 versioning,
+partition p1 versioning);
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: no `AS OF NOW` partition defined
+create or replace table t1 (x int)
+with system versioning
+partition by system_time (
+partition p0 as of now,
 partition p1 versioning);
 insert into t1 values (1);
 select * from t1;
@@ -34,4 +46,24 @@ x
 select * from t1 partition (p1) for system_time all;
 x
 1
+create or replace table t1 (x int)
+with system versioning
+partition by system_time (
+partition p0 versioning,
+partition p1 as of now);
+insert into t1 values (1);
+select * from t1;
+x
+1
+select * from t1 partition (p0);
+x
+select * from t1 partition (p1);
+x
+1
+delete from t1;
+select * from t1 partition (p0) for system_time all;
+x
+1
+select * from t1 partition (p1) for system_time all;
+x
 drop table t1;

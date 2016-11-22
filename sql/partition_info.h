@@ -202,6 +202,10 @@ public:
   uint num_full_part_fields;
 
   uint has_null_part_id;
+  /*
+    System Versioning: also specifies AS OF NOW partition
+    for `BY SYSTEM_TIME` partitioning.
+  */
   uint32 default_partition_id;
   /*
     This variable is used to calculate the partition id when using
