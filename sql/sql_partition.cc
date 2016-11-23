@@ -3410,10 +3410,34 @@ int vers_get_partition_id(partition_info *part_info,
   Field *sys_trx_end= part_info->part_field_array[0];
   DBUG_ASSERT(sys_trx_end);
   DBUG_ASSERT(part_info->num_parts == 2 && part_info->default_partition_id < 2);
+  DBUG_ASSERT(part_info->vers_info);
+  Vers_part_info *vers_info= part_info->vers_info;
+  DBUG_ASSERT(vers_info->historical_id != UINT32_MAX);
+  DBUG_ASSERT(sys_trx_end->table && sys_trx_end->table->versioned());
+
+  bool historical= !(sys_trx_end->is_max() || sys_trx_end->is_null());
+  if (historical && vers_info->interval)
+  {
+    THD *thd= current_thd;
+    partition_element *elem= vers_info->elem_history;
+    switch (thd->lex->sql_command)
+    {
+    case SQLCOM_INSERT:
+    case SQLCOM_INSERT_SELECT:
+      // FIXME: thd->start_time is reset on each stmt, not transaction
+      if (elem->vers_min_time + vers_info->interval < thd->start_time)
+      {
+        part_info->vers_rotate_histpart(thd);
+      }
+      break;
+    default:
+      ;
+    }
+  }
   // new rows have NULL in sys_trx_end
   *part_id= sys_trx_end->is_max() || sys_trx_end->is_null() ?
     part_info->default_partition_id :
-    1 - part_info->default_partition_id;
+    vers_info->historical_id;
   DBUG_PRINT("exit",("partition: %d", *part_id));
   DBUG_RETURN(0);
 }
