@@ -34,6 +34,19 @@ typedef int (*get_subpart_id_func)(partition_info *part_info,
  
 struct st_ddl_log_memory_entry;
 
+struct Vers_part_info
+{
+  Vers_part_info() :
+    interval(0),
+    historical_id(UINT32_MAX),
+    elem_now(NULL),
+    elem_history(NULL) {}
+  my_time_t interval;
+  uint32 historical_id;
+  partition_element *elem_now;
+  partition_element *elem_history;
+};
+
 class partition_info : public Sql_alloc
 {
 public:
@@ -142,6 +155,7 @@ public:
     LIST_PART_ENTRY *list_array;
     part_column_list_val *range_col_array;
     part_column_list_val *list_col_array;
+    Vers_part_info *vers_info;
   };
   
   /********************************************
@@ -394,6 +408,47 @@ private:
   bool is_full_part_expr_in_fields(List<Item> &fields);
 public:
   bool has_unique_name(partition_element *element);
+  void vers_setup(THD *thd)
+  {
+    part_type= VERSIONING_PARTITION;
+    list_of_part_fields= TRUE;
+    column_list= TRUE;
+    default_partition_id= UINT32_MAX;
+    vers_info= new (thd->mem_root) Vers_part_info;
+  }
+  bool vers_set_interval(const INTERVAL &i)
+  {
+    if (i.neg)
+    {
+      my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "negative INTERVAL");
+      return true;
+    }
+    if (i.second_part)
+    {
+      my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "second fractions in INTERVAL");
+      return true;
+    }
+
+    DBUG_ASSERT(vers_info);
+
+    // TODO: INTERVAL conversion to seconds leads to mismatch with calendar intervals (MONTH and YEAR)
+    vers_info->interval=
+      i.second +
+      i.minute * 60 +
+      i.hour * 60 * 60 +
+      i.day * 24 * 60 * 60 +
+      i.month * 30 * 24 * 60 * 60 +
+      i.year * 365 * 30 * 24 * 60 * 60;
+
+    if (vers_info->interval == 0)
+    {
+      my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "zero INTERVAL");
+      return true;
+    }
+    return false;
+  }
+
+  void vers_rotate_histpart(THD *thd);
 };
 
 uint32 get_next_partition_id_range(struct st_partition_iter* part_iter);

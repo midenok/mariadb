@@ -1058,6 +1058,15 @@ bool partition_info::has_unique_name(partition_element *element)
   DBUG_RETURN(TRUE);
 }
 
+void partition_info::vers_rotate_histpart(THD * thd)
+{
+  Alter_info alter_info;
+  alter_info.flags= Alter_info::ALTER_ADD_PARTITION;
+  thd->work_part_info= get_clone(thd);
+  bool changed, fast;
+  prep_alter_part_table(thd, table, &alter_info, NULL, NULL, &changed, &fast);
+}
+
 
 /*
   Check that the partition/subpartition is setup to use the correct
