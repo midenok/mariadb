@@ -4974,8 +4974,9 @@ part_type_def:
           { Lex->part_info->part_type= LIST_PARTITION; }
         | LIST_SYM part_column_list
           { Lex->part_info->part_type= LIST_PARTITION; }
-        | SYSTEM_TIME_SYM opt_versioning_interval
-          { Lex->part_info->vers_setup(thd); }
+        | SYSTEM_TIME_SYM
+          { if (Lex->part_info->vers_setup(thd)) MYSQL_YYABORT; }
+          opt_versioning_interval
         ;
 
 opt_linear:
