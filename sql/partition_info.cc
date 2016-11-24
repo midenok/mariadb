@@ -1060,6 +1060,53 @@ bool partition_info::has_unique_name(partition_element *element)
   DBUG_RETURN(TRUE);
 }
 
+bool partition_info::vers_setup(THD * thd)
+{
+  part_type= VERSIONING_PARTITION;
+  list_of_part_fields= TRUE;
+  column_list= TRUE;
+  default_partition_id= UINT32_MAX;
+  vers_info= new (thd->mem_root) Vers_part_info;
+  if (!vers_info)
+  {
+    mem_alloc_error(sizeof(Vers_part_info));
+    return true;
+  }
+  return false;
+}
+
+bool partition_info::vers_set_interval(const INTERVAL & i)
+{
+  if (i.neg)
+  {
+    my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "negative INTERVAL");
+    return true;
+  }
+  if (i.second_part)
+  {
+    my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "second fractions in INTERVAL");
+    return true;
+  }
+
+  DBUG_ASSERT(vers_info);
+
+  // TODO: INTERVAL conversion to seconds leads to mismatch with calendar intervals (MONTH and YEAR)
+  vers_info->interval=
+    i.second +
+    i.minute * 60 +
+    i.hour * 60 * 60 +
+    i.day * 24 * 60 * 60 +
+    i.month * 30 * 24 * 60 * 60 +
+    i.year * 365 * 30 * 24 * 60 * 60;
+
+  if (vers_info->interval == 0)
+  {
+    my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "zero INTERVAL");
+    return true;
+  }
+  return false;
+}
+
 void partition_info::vers_rotate_histpart(THD * thd)
 {
   Alter_info alter_info;

@@ -2555,14 +2555,25 @@ char *generate_partition_syntax(THD *thd, partition_info *part_info,
       my_error(ER_OUT_OF_RESOURCES, MYF(ME_FATALERROR));
       DBUG_RETURN(NULL);
   }
-  if (part_info->part_expr)
+  if (part_info->part_type == VERSIONING_PARTITION)
+  {
+    Vers_part_info *vers_info= part_info->vers_info;
+    DBUG_ASSERT(vers_info);
+    if (vers_info->interval)
+    {
+      err+= add_string(fptr, "INTERVAL ");
+      err+= add_int(fptr, vers_info->interval);
+      err+= add_string(fptr, " SECOND");
+    }
+  }
+  else if (part_info->part_expr)
   {
     err+= add_begin_parenthesis(fptr);
     err+= add_string_len(fptr, part_info->part_func_string,
                          part_info->part_func_len);
     err+= add_end_parenthesis(fptr);
   }
-  else if (part_info->column_list && part_info->part_type != VERSIONING_PARTITION)
+  else if (part_info->column_list)
   {
     err+= add_string(fptr, partition_keywords[PKW_COLUMNS].str);
     err+= add_part_field_list(fptr, part_info->part_field_list);
