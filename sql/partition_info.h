@@ -411,7 +411,7 @@ public:
 
   bool vers_setup(THD *thd);
   bool vers_set_interval(const INTERVAL &i);
-  void vers_rotate_histpart(THD *thd);
+  bool vers_rotate_histpart(THD *thd);
 };
 
 uint32 get_next_partition_id_range(struct st_partition_iter* part_iter);

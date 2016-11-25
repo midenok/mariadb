@@ -3433,8 +3433,10 @@ int vers_get_partition_id(partition_info *part_info,
     partition_element *elem= vers_info->elem_history;
     switch (thd->lex->sql_command)
     {
-    case SQLCOM_INSERT:
-    case SQLCOM_INSERT_SELECT:
+    case SQLCOM_DELETE:
+    case SQLCOM_DELETE_MULTI:
+    case SQLCOM_UPDATE:
+    case SQLCOM_UPDATE_MULTI:
       // FIXME: thd->start_time is reset on each stmt, not transaction
       if (elem->vers_min_time + vers_info->interval < thd->start_time)
       {
@@ -5058,7 +5060,8 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
         must know the number of new partitions in this case.
       */
       if (thd->lex->no_write_to_binlog &&
-          tab_part_info->part_type != HASH_PARTITION)
+          tab_part_info->part_type != HASH_PARTITION &&
+          tab_part_info->part_type != VERSIONING_PARTITION)
       {
         my_error(ER_NO_BINLOG_ERROR, MYF(0));
         goto err;

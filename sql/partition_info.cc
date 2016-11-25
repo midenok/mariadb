@@ -1107,13 +1107,33 @@ bool partition_info::vers_set_interval(const INTERVAL & i)
   return false;
 }
 
-void partition_info::vers_rotate_histpart(THD * thd)
+bool
+partition_info::vers_rotate_histpart(THD * thd)
 {
   Alter_info alter_info;
   alter_info.flags= Alter_info::ALTER_ADD_PARTITION;
-  thd->work_part_info= get_clone(thd);
+
+  if (!(thd->lex->part_info= get_clone(thd)))
+    return true;
   bool changed, fast;
-  prep_alter_part_table(thd, table, &alter_info, NULL, NULL, &changed, &fast);
+
+  TABLE_LIST* table_list= table->pos_in_table_list;
+  DBUG_ASSERT(table_list);
+
+  //uint tables_opened;
+  //table_list->required_type= FRMTYPE_TABLE;
+
+  //thd->open_options|= HA_OPEN_FOR_ALTER;
+  //bool error= open_tables(thd, &table_list, &tables_opened, 0,
+  //                        &alter_prelocking_strategy);
+  //thd->open_options&= ~HA_OPEN_FOR_ALTER;
+
+  // FIXME: is tables_opened == 1 ok for table_list size > 1?
+  Alter_table_ctx alter_ctx(thd, table_list, 1, table_list->db, table->s->table_name.str);
+
+  if (prep_alter_part_table(thd, table, &alter_info, NULL, &alter_ctx, &changed, &fast))
+    return true;
+  return false;
 }
 
 
