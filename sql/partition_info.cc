@@ -1107,31 +1107,61 @@ bool partition_info::vers_set_interval(const INTERVAL & i)
   return false;
 }
 
+bool mysql_alter_table(THD *thd, char *new_db, char *new_name,
+  HA_CREATE_INFO *create_info,
+  TABLE_LIST *table_list,
+  Alter_info *alter_info,
+  uint order_num, ORDER *order, bool ignore);
+
 bool
 partition_info::vers_rotate_histpart(THD * thd)
 {
   Alter_info alter_info;
-  alter_info.flags= Alter_info::ALTER_ADD_PARTITION;
+  alter_info.flags= Alter_info::ALTER_PARTITION | Alter_info::ALTER_ADD_PARTITION;
 
-  if (!(thd->lex->part_info= get_clone(thd)))
+  partition_info *alt_part_info;
+  alt_part_info= new (thd->mem_root) partition_info;
+  if (!alt_part_info)
+  {
+    mem_alloc_error(sizeof(partition_info));
     return true;
-  bool changed, fast;
+  }
 
-  TABLE_LIST* table_list= table->pos_in_table_list;
-  DBUG_ASSERT(table_list);
+  partition_element *p_elem= new (thd->mem_root) partition_element();
+  if (!p_elem || alt_part_info->partitions.push_back(p_elem, thd->mem_root))
+  {
+    mem_alloc_error(sizeof(partition_element));
+    return true;
+  }
+  p_elem->part_state= PART_NORMAL;
+  p_elem->partition_name= "FIXME_synthetic";
+  p_elem->type= partition_element::VERSIONING;
+  alt_part_info->curr_part_elem= p_elem;
+  alt_part_info->current_partition= p_elem;
+  alt_part_info->use_default_partitions= FALSE;
+  alt_part_info->use_default_num_partitions= FALSE;
+  alt_part_info->num_parts= alt_part_info->partitions.elements;
 
-  //uint tables_opened;
-  //table_list->required_type= FRMTYPE_TABLE;
+  TABLE_LIST table_list;
+  table_list.init_one_table(
+    table->s->db.str,
+    table->s->db.length,
+    table->s->table_name.str,
+    table->s->table_name.length,
+    NULL,
+    TL_READ_NO_INSERT);
 
-  //thd->open_options|= HA_OPEN_FOR_ALTER;
-  //bool error= open_tables(thd, &table_list, &tables_opened, 0,
-  //                        &alter_prelocking_strategy);
-  //thd->open_options&= ~HA_OPEN_FOR_ALTER;
-
-  // FIXME: is tables_opened == 1 ok for table_list size > 1?
-  Alter_table_ctx alter_ctx(thd, table_list, 1, table_list->db, table->s->table_name.str);
-
-  if (prep_alter_part_table(thd, table, &alter_info, NULL, &alter_ctx, &changed, &fast))
+  HA_CREATE_INFO create_info;
+  create_info.init();
+  update_create_info_from_table(&create_info, table);
+  //bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
+  //                       HA_CREATE_INFO *create_info,
+  //                       TABLE_LIST *table_list,
+  //                       Alter_info *alter_info,
+  //                       uint order_num, ORDER *order, bool ignore)
+  DBUG_ASSERT(!thd->lex->part_info);
+  thd->lex->part_info= alt_part_info;
+  if (mysql_alter_table(thd, NULL, NULL, &create_info, &table_list, &alter_info, 0, NULL, false))
     return true;
   return false;
 }
