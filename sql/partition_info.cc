@@ -1105,13 +1105,9 @@ bool partition_info::vers_set_interval(const INTERVAL & i)
   return false;
 }
 
-void partition_info::vers_rotate_histpart(THD * thd)
+bool partition_info::vers_rotate_histpart(THD * thd)
 {
-  Alter_info alter_info;
-  alter_info.flags= Alter_info::ALTER_ADD_PARTITION;
-  thd->work_part_info= get_clone(thd);
-  bool changed, fast;
-  prep_alter_part_table(thd, table, &alter_info, NULL, NULL, &changed, &fast);
+  return false;
 }
 
 
