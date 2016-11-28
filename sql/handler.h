@@ -4224,7 +4224,7 @@ public:
   friend enum icp_result handler_index_cond_check(void* h_arg);
 
   virtual bool versioned() const
-  { DBUG_ASSERT(ht); return ht->flags & HTON_SUPPORTS_SYS_VERSIONING; }
+  { DBUG_ASSERT(ht); return partition_ht()->flags & HTON_SUPPORTS_SYS_VERSIONING; }
 protected:
   Handler_share *get_ha_share_ptr();
   void set_ha_share_ptr(Handler_share *arg_ha_share);

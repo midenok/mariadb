@@ -3290,7 +3290,7 @@ VTQ_common<Item_func_X>::init_hton()
         f->field->table &&
         f->field->table->s &&
         f->field->table->s->db_plugin);
-      hton= plugin_hton(f->field->table->s->db_plugin);
+      hton= f->field->table->file->partition_ht();
       DBUG_ASSERT(hton);
     }
     else if (innodb_plugin)

@@ -1,14 +1,44 @@
 create table t1 (x int)
+with system versioning
+engine innodb
+partition by range columns (x) (
+partition p0 values less than (100),
+partition p1 values less than (1000));
+insert into t1 values (3), (300);
+select * from t1;
+x
+3
+300
+select * from t1 partition (p0);
+x
+3
+select * from t1 partition (p1);
+x
+300
+delete from t1;
+select * from t1;
+x
+select * from t1 for system_time all;
+x
+3
+300
+select * from t1 partition (p0) for system_time all;
+x
+3
+select * from t1 partition (p1) for system_time all;
+x
+300
+create or replace table t1 (x int)
 partition by system_time (
 partition p0 as of now,
 partition p1 versioning);
-ERROR HY000: `WITH SYSTEM VERSIONING` required: `BY SYSTEM_TIME` partitioning
+ERROR HY000: System Versioning required: `BY SYSTEM_TIME` partitioning
 create or replace table t1 (x int);
 alter table t1
 partition by system_time (
 partition p0 as of now,
 partition p1 versioning);
-ERROR HY000: `WITH SYSTEM VERSIONING` required: `BY SYSTEM_TIME` partitioning
+ERROR HY000: System Versioning required: `BY SYSTEM_TIME` partitioning
 create or replace table t1 (x int)
 with system versioning
 partition by system_time (
