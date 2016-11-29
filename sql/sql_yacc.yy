@@ -5293,11 +5293,9 @@ opt_part_values:
               // FIXME: ALTER TABLE
               DBUG_ASSERT(0);
             }
-            partition_element *elem= part_info->curr_part_elem;
-            elem->type= partition_element::VERSIONING;
-            DBUG_ASSERT(part_info->vers_info);
-            part_info->vers_info->hist_part= elem;
+            part_info->curr_part_elem->type= partition_element::VERSIONING;
           }
+          opt_default_hist_part
         | DEFAULT
          {
             LEX *lex= Lex;
@@ -5620,6 +5618,20 @@ opt_versioning_limit:
              MYSQL_YYABORT;
          }
        ;
+
+opt_default_hist_part:
+          /* empty */ {}
+        | DEFAULT
+          {
+            partition_info *part_info= Lex->part_info;
+            DBUG_ASSERT(part_info && part_info->vers_info && part_info->curr_part_elem);
+            if (part_info->vers_info->hist_part)
+              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0),
+                "BY SYSTEM_TIME", "multiple `DEFAULT` partitions"));
+            part_info->vers_info->hist_part= part_info->curr_part_elem;
+            part_info->default_partition_id= part_info->curr_part_elem->id;
+          }
+        ;
 
 /*
  End of partition parser part

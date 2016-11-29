@@ -52,16 +52,17 @@ struct Vers_part_info : public Sql_alloc
   {
     free_parts.empty();
   }
-  bool initialized()
+  bool initialized(bool fully= true)
   {
     if (now_part)
     {
       DBUG_ASSERT(
-        hist_part &&
         now_part->id != UINT32_MAX &&
-        hist_part->id != UINT32_MAX &&
         now_part->type == partition_element::AS_OF_NOW &&
-        hist_part->type == partition_element::VERSIONING);
+        (fully ? (bool) hist_part : true) &&
+        (!hist_part || (
+          hist_part->id != UINT32_MAX &&
+          hist_part->type == partition_element::VERSIONING)));
       return true;
     }
     return false;
@@ -439,56 +440,8 @@ public:
   bool vers_set_interval(const INTERVAL &i);
   bool vers_set_limit(ulonglong limit);
   bool vers_rotate_part(THD *thd);
-  bool vers_set_up_1(THD *thd)
-  {
-    DBUG_ASSERT(part_type == VERSIONING_PARTITION);
-    if (!table->versioned())
-    {
-      my_error(ER_VERSIONING_REQUIRED, MYF(0), "`BY SYSTEM_TIME` partitioning");
-      return true;
-    }
-    if (num_parts < 2)
-    {
-      my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "unexpected number of partitions (expected > 1)");
-      return true;
-    }
-    DBUG_ASSERT(vers_info);
-    if (!vers_info->now_part)
-    {
-      my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "no `AS OF NOW` partition defined");
-      return true;
-    }
-    DBUG_ASSERT(num_parts == partitions.elements);
-    Field *sys_trx_end= table->vers_end_field();
-    part_field_list.empty();
-    part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
-    sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG; // needed in handle_list_of_fields()
-    return false;
-  }
-  void vers_set_up_2(THD *thd, bool is_create_table_ind)
-  {
-    DBUG_ASSERT(part_type == VERSIONING_PARTITION);
-    DBUG_ASSERT(vers_info && vers_info->initialized());
-    // build freelist
-    List_iterator<partition_element> it(partitions);
-    partition_element *el;
-    bool rotate= false;
-    while ((el= it++))
-    {
-      if (el == vers_info->now_part)
-        continue;
-      if (el == vers_info->hist_part)
-      {
-        if (!is_create_table_ind && !table->file->vers_part_free_slow(el))
-          rotate= true;
-        continue;
-      }
-      if (is_create_table_ind || table->file->vers_part_free_slow(el))
-        vers_info->free_parts.push_back(el);
-    }
-    if (rotate)
-      vers_rotate_part(thd);
-  }
+  bool vers_set_up_1(THD *thd);
+  void vers_set_up_2(THD *thd, bool is_create_table_ind);
 };
 
 uint32 get_next_partition_id_range(struct st_partition_iter* part_iter);

@@ -98,12 +98,65 @@ select * from t1 partition (p1) for system_time all;
 x
 create or replace table t1 (x int)
 with system versioning
+engine myisam
 partition by system_time limit 1 (
 partition p0 as of now,
-partition p1 versioning);
+partition p1 versioning,
+partition p2 versioning);
 insert into t1 values (1), (2);
+select * from t1 partition (p0);
+x
+1
+2
+delete from t1;
+select * from t1 partition (p1) for system_time all;
+x
+1
+select * from t1 partition (p2) for system_time all;
+x
+2
+insert into t1 values (3);
 delete from t1;
 show warnings;
 Level	Code	Message
-Warning	4040	Using full partition `p1`, need more VERSIONING partitions!
+Warning	4040	Using full partition `p2`, need more VERSIONING partitions!
+select * from t1 partition (p2) for system_time all;
+x
+2
+3
+create or replace table t1 (x int)
+with system versioning
+engine myisam
+partition by system_time limit 1 (
+partition p0 as of now,
+partition p1 versioning default,
+partition p2 versioning default);
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: multiple `DEFAULT` partitions
+create or replace table t1 (x int)
+with system versioning
+engine myisam
+partition by system_time limit 1 (
+partition p0 as of now,
+partition p1 versioning,
+partition p2 versioning default);
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `x` int(11) DEFAULT NULL,
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+/*!50500 PARTITION BY SYSTEM_TIME LIMIT 1
+(PARTITION p0 AS OF NOW ENGINE = MyISAM,
+ PARTITION p1 VERSIONING ENGINE = MyISAM,
+ PARTITION p2 VERSIONING DEFAULT ENGINE = MyISAM) */
+insert into t1 values (4), (5);
+delete from t1;
+select * from t1 partition (p2) for system_time all;
+x
+4
+select * from t1 partition (p1) for system_time all;
+x
+5
 drop table t1;
