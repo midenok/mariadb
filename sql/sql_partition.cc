@@ -1668,31 +1668,9 @@ bool fix_partition_func(THD *thd, TABLE *table,
     const char *error_str;
     if (part_info->column_list)
     {
-      if (part_info->part_type == VERSIONING_PARTITION)
-      {
-        if (!table->versioned())
-        {
-          my_error(ER_VERSIONING_REQUIRED, MYF(0), "`BY SYSTEM_TIME` partitioning");
-          goto end;
-        }
-        if (part_info->num_parts != 2)
-        {
-          my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "unexpected number of partitions (expected 2)");
-          goto end;
-        }
-        if (part_info->default_partition_id == UINT32_MAX)
-        {
-          my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "no `AS OF NOW` partition defined");
-          goto end;
-        }
-        DBUG_ASSERT(part_info->num_parts == part_info->partitions.elements);
-        DBUG_ASSERT(part_info->default_partition_id < part_info->num_parts);
-
-        Field *sys_trx_end= table->vers_end_field();
-        part_info->part_field_list.empty();
-        part_info->part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
-        sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG;
-      }
+      if (part_info->part_type == VERSIONING_PARTITION &&
+        part_info->vers_set_up_1(thd))
+        goto end;
       List_iterator<char> it(part_info->part_field_list);
       if (unlikely(handle_list_of_fields(thd, it, table, part_info, FALSE)))
         goto end;
@@ -1777,6 +1755,8 @@ bool fix_partition_func(THD *thd, TABLE *table,
   set_up_partition_key_maps(table, part_info);
   set_up_partition_func_pointers(part_info);
   set_up_range_analysis_info(part_info);
+  if (part_info->part_type == VERSIONING_PARTITION)
+    part_info->vers_set_up_2(thd, is_create_table_ind);
   table->file->set_part_info(part_info);
   result= FALSE;
 end:
@@ -2563,7 +2543,12 @@ char *generate_partition_syntax(THD *thd, partition_info *part_info,
     {
       err+= add_string(fptr, "INTERVAL ");
       err+= add_int(fptr, vers_info->interval);
-      err+= add_string(fptr, " SECOND");
+      err+= add_string(fptr, " SECOND ");
+    }
+    if (vers_info->limit)
+    {
+      err+= add_string(fptr, "LIMIT ");
+      err+= add_int(fptr, vers_info->limit);
     }
   }
   else if (part_info->part_expr)
@@ -3420,17 +3405,16 @@ int vers_get_partition_id(partition_info *part_info,
   DBUG_ENTER("vers_get_partition_id");
   Field *sys_trx_end= part_info->part_field_array[0];
   DBUG_ASSERT(sys_trx_end);
-  DBUG_ASSERT(part_info->num_parts == 2 && part_info->default_partition_id < 2);
-  DBUG_ASSERT(part_info->vers_info);
+  DBUG_ASSERT(part_info->table);
   Vers_part_info *vers_info= part_info->vers_info;
-  DBUG_ASSERT(vers_info->historical_id != UINT32_MAX);
+  DBUG_ASSERT(vers_info && vers_info->initialized());
   DBUG_ASSERT(sys_trx_end->table && sys_trx_end->table->versioned());
 
   bool historical= !(sys_trx_end->is_max() || sys_trx_end->is_null());
-  if (historical && vers_info->interval)
+  if (historical && vers_info->limit)
   {
     THD *thd= current_thd;
-    partition_element *elem= vers_info->elem_history;
+    partition_element *part= vers_info->hist_part;
     switch (thd->lex->sql_command)
     {
     case SQLCOM_DELETE:
@@ -3438,9 +3422,9 @@ int vers_get_partition_id(partition_info *part_info,
     case SQLCOM_UPDATE:
     case SQLCOM_UPDATE_MULTI:
       // FIXME: thd->start_time is reset on each stmt, not transaction
-      if (elem->vers_min_time + vers_info->interval < thd->start_time)
+      if (!part_info->table->file->vers_part_free_slow(part))
       {
-        part_info->vers_rotate_histpart(thd);
+        part_info->vers_rotate_part(thd);
       }
       break;
     default:
@@ -3449,8 +3433,8 @@ int vers_get_partition_id(partition_info *part_info,
   }
   // new rows have NULL in sys_trx_end
   *part_id= sys_trx_end->is_max() || sys_trx_end->is_null() ?
-    part_info->default_partition_id :
-    vers_info->historical_id;
+    vers_info->now_part->id :
+    vers_info->hist_part->id;
   DBUG_PRINT("exit",("partition: %d", *part_id));
   DBUG_RETURN(0);
 }

@@ -1,7 +1,7 @@
 --source include/have_innodb.inc
 --source include/have_partition.inc
 
-# check InnoDB versioning and conventional partitioning
+### check InnoDB versioning and conventional partitioning
 
 create table t1 (x int)
 with system versioning
@@ -21,8 +21,9 @@ select * from t1 for system_time all;
 select * from t1 partition (p0) for system_time all;
 select * from t1 partition (p1) for system_time all;
 
-# check server-level partitioning
+### check server-level partitioning
 
+# create errors
 --error ER_VERSIONING_REQUIRED
 create or replace table t1 (x int)
 partition by system_time (
@@ -56,6 +57,7 @@ partition by system_time (
     partition p0 versioning,
     partition p1 versioning);
 
+# insertion, deletion
 create or replace table t1 (x int)
 with system versioning
 partition by system_time (
@@ -85,6 +87,19 @@ select * from t1 partition (p1);
 delete from t1;
 select * from t1 partition (p0) for system_time all;
 select * from t1 partition (p1) for system_time all;
+
+# rotation by LIMIT
+create or replace table t1 (x int)
+with system versioning
+partition by system_time limit 1 (
+    partition p0 as of now,
+    partition p1 versioning);
+
+--disable_warnings
+insert into t1 values (1), (2);
+delete from t1;
+show warnings;
+--enable_warnings
 
 drop table t1;
 

@@ -4975,8 +4975,9 @@ part_type_def:
         | LIST_SYM part_column_list
           { Lex->part_info->part_type= LIST_PARTITION; }
         | SYSTEM_TIME_SYM
-          { if (Lex->part_info->vers_setup(thd)) MYSQL_YYABORT; }
+          { if (Lex->part_info->vers_init_info(thd)) MYSQL_YYABORT; }
           opt_versioning_interval
+          opt_versioning_limit
         ;
 
 opt_linear:
@@ -5184,6 +5185,7 @@ part_definition:
               MYSQL_YYABORT;
             }
             p_elem->part_state= PART_NORMAL;
+            p_elem->id= part_info->partitions.elements - 1;
             part_info->curr_part_elem= p_elem;
             part_info->current_partition= p_elem;
             part_info->use_default_partitions= FALSE;
@@ -5262,7 +5264,7 @@ opt_part_values:
             }
             else
             {
-              part_info->vers_setup(thd);
+              part_info->vers_init_info(thd);
               // FIXME: ALTER TABLE
               DBUG_ASSERT(0);
             }
@@ -5273,7 +5275,7 @@ opt_part_values:
                   "BY SYSTEM_TIME", "multiple `AS OF NOW` partitions"));
             part_info->default_partition_id= part_info->partitions.elements - 1;
             DBUG_ASSERT(part_info->vers_info);
-            part_info->vers_info->elem_now= elem;
+            part_info->vers_info->now_part= elem;
           }
         | VERSIONING_SYM
           {
@@ -5287,15 +5289,14 @@ opt_part_values:
             }
             else
             {
-              part_info->vers_setup(thd);
+              part_info->vers_init_info(thd);
               // FIXME: ALTER TABLE
               DBUG_ASSERT(0);
             }
             partition_element *elem= part_info->curr_part_elem;
             elem->type= partition_element::VERSIONING;
             DBUG_ASSERT(part_info->vers_info);
-            part_info->vers_info->elem_history= elem;
-            part_info->vers_info->historical_id= part_info->partitions.elements - 1;
+            part_info->vers_info->hist_part= elem;
           }
         | DEFAULT
          {
@@ -5542,6 +5543,7 @@ sub_part_definition:
               mem_alloc_error(sizeof(partition_element));
               MYSQL_YYABORT;
             }
+            sub_p_elem->id= curr_part->subpartitions.elements - 1;
             part_info->curr_part_elem= sub_p_elem;
             part_info->use_default_subpartitions= FALSE;
             part_info->use_default_num_subpartitions= FALSE;
@@ -5604,6 +5606,17 @@ opt_versioning_interval:
            if (get_interval_value($2, $3, &interval))
              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "wrong INTERVAL value"));
            if (part_info->vers_set_interval(interval))
+             MYSQL_YYABORT;
+         }
+       ;
+
+opt_versioning_limit:
+         /* empty */ {}
+       | LIMIT ulonglong_num
+         {
+           partition_info *part_info= Lex->part_info;
+           DBUG_ASSERT(part_info->part_type == VERSIONING_PARTITION);
+           if (part_info->vers_set_limit($2))
              MYSQL_YYABORT;
          }
        ;

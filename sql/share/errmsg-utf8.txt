@@ -7261,3 +7261,5 @@ ER_NON_VERSIONED_FIELD_IN_VERSIONED_QUERY
 ER_PARTITION_WRONG_TYPE
         eng "Wrong partition type, expected type: %`s"
 
+WARN_VERS_PART_FULL
+        eng "Using full partition %`s, need more VERSIONING partitions!"

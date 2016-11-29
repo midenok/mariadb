@@ -114,6 +114,28 @@ partition_info *partition_info::get_clone(THD *thd)
       part_clone->list_val_list.push_back(new_val, mem_root);
     }
   }
+  if (part_type == VERSIONING_PARTITION && vers_info)
+  {
+    clone->vers_info= new (mem_root) Vers_part_info(*vers_info);
+    List_iterator<partition_element> it(clone->partitions);
+    List_iterator<partition_element> free_it(vers_info->free_parts);
+    partition_element *free_part= free_it++;
+    while ((part= it++))
+    {
+      if (vers_info->now_part && part->id == vers_info->now_part->id)
+        clone->vers_info->now_part= part;
+      else
+      {
+        if (vers_info->hist_part && part->id == vers_info->hist_part->id)
+          clone->vers_info->hist_part= part;
+        if (free_part && free_part->id == part->id)
+        {
+          clone->vers_info->free_parts.push_back(part, mem_root);
+          free_part= free_it++;
+        }
+      } // else
+    } // while ((part= it++))
+  } // if (part_type == VERSIONING_PARTITION ...
   DBUG_RETURN(clone);
 }
 
@@ -1058,7 +1080,7 @@ bool partition_info::has_unique_name(partition_element *element)
   DBUG_RETURN(TRUE);
 }
 
-bool partition_info::vers_setup(THD * thd)
+bool partition_info::vers_init_info(THD * thd)
 {
   part_type= VERSIONING_PARTITION;
   list_of_part_fields= TRUE;
@@ -1105,8 +1127,33 @@ bool partition_info::vers_set_interval(const INTERVAL & i)
   return false;
 }
 
-bool partition_info::vers_rotate_histpart(THD * thd)
+bool partition_info::vers_set_limit(ulonglong limit)
 {
+  if (limit < 1)
+  {
+    my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "non-positive LIMIT");
+    return true;
+  }
+  DBUG_ASSERT(vers_info);
+
+  vers_info->limit= limit;
+  return false;
+}
+
+bool partition_info::vers_rotate_part(THD * thd)
+{
+  DBUG_ASSERT(vers_info && vers_info->initialized());
+  if (vers_info->free_parts.is_empty())
+  {
+    push_warning_printf(thd,
+      Sql_condition::WARN_LEVEL_WARN,
+      WARN_VERS_PART_FULL,
+      ER_THD(thd, WARN_VERS_PART_FULL),
+      vers_info->hist_part->partition_name);
+    return false;
+  }
+
+  vers_info->hist_part= vers_info->free_parts.pop();
   return false;
 }
 

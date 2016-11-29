@@ -43,7 +43,7 @@ create or replace table t1 (x int)
 with system versioning
 partition by system_time (
 partition p0 as of now);
-ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: unexpected number of partitions (expected 2)
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: unexpected number of partitions (expected > 1)
 create or replace table t1 (x int)
 with system versioning
 partition by system_time (
@@ -96,4 +96,14 @@ x
 1
 select * from t1 partition (p1) for system_time all;
 x
+create or replace table t1 (x int)
+with system versioning
+partition by system_time limit 1 (
+partition p0 as of now,
+partition p1 versioning);
+insert into t1 values (1), (2);
+delete from t1;
+show warnings;
+Level	Code	Message
+Warning	4040	Using full partition `p1`, need more VERSIONING partitions!
 drop table t1;

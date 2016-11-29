@@ -4225,6 +4225,8 @@ public:
 
   virtual bool versioned() const
   { DBUG_ASSERT(ht); return partition_ht()->flags & HTON_SUPPORTS_SYS_VERSIONING; }
+  virtual bool vers_part_free_slow(void *hist_part)
+  { DBUG_ASSERT(0); return false; }
 protected:
   Handler_share *get_ha_share_ptr();
   void set_ha_share_ptr(Handler_share *arg_ha_share);

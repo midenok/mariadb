@@ -1287,6 +1287,26 @@ public:
     return m_innodb;
   }
 
+  virtual bool vers_part_free_slow(void *_hist_part)
+  {
+    partition_element *hist_part= reinterpret_cast<partition_element *>(_hist_part);
+    DBUG_ASSERT(hist_part && hist_part->type == partition_element::VERSIONING);
+    DBUG_ASSERT(m_part_info && m_part_info->vers_info);
+    Vers_part_info *vers_info= m_part_info->vers_info;
+    uint32 part_id= hist_part->id;
+    DBUG_ASSERT(part_id < m_tot_parts);
+    if (vers_info->limit)
+    {
+      handler *file= m_file[part_id];
+      DBUG_ASSERT(bitmap_is_set(&(m_part_info->read_partitions), part_id));
+      file->info(HA_STATUS_TIME | HA_STATUS_VARIABLE |
+                 HA_STATUS_VARIABLE_EXTRA | HA_STATUS_NO_LOCK);
+
+      return file->stats.records < vers_info->limit;
+    }
+    return true;
+  }
+
   friend int cmp_key_rowid_part_id(void *ptr, uchar *ref1, uchar *ref2);
 };
 
