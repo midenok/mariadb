@@ -5270,11 +5270,10 @@ opt_part_values:
             }
             partition_element *elem= part_info->curr_part_elem;
             elem->type= partition_element::AS_OF_NOW;
-            if (part_info->default_partition_id != UINT32_MAX)
+            DBUG_ASSERT(part_info->vers_info);
+            if (part_info->vers_info->now_part)
                 my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0),
                   "BY SYSTEM_TIME", "multiple `AS OF NOW` partitions"));
-            part_info->default_partition_id= part_info->partitions.elements - 1;
-            DBUG_ASSERT(part_info->vers_info);
             part_info->vers_info->now_part= elem;
           }
         | VERSIONING_SYM
@@ -5629,7 +5628,7 @@ opt_default_hist_part:
               my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0),
                 "BY SYSTEM_TIME", "multiple `DEFAULT` partitions"));
             part_info->vers_info->hist_part= part_info->curr_part_elem;
-            part_info->default_partition_id= part_info->curr_part_elem->id;
+            part_info->vers_info->hist_default= part_info->curr_part_elem->id;
           }
         ;
 

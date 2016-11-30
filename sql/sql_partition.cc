@@ -1669,7 +1669,7 @@ bool fix_partition_func(THD *thd, TABLE *table,
     if (part_info->column_list)
     {
       if (part_info->part_type == VERSIONING_PARTITION &&
-        part_info->vers_set_up_1(thd))
+        part_info->vers_setup_1(thd))
         goto end;
       List_iterator<char> it(part_info->part_field_list);
       if (unlikely(handle_list_of_fields(thd, it, table, part_info, FALSE)))
@@ -1756,7 +1756,7 @@ bool fix_partition_func(THD *thd, TABLE *table,
   set_up_partition_func_pointers(part_info);
   set_up_range_analysis_info(part_info);
   if (part_info->part_type == VERSIONING_PARTITION)
-    part_info->vers_set_up_2(thd, is_create_table_ind);
+    part_info->vers_setup_2(thd, is_create_table_ind);
   table->file->set_part_info(part_info);
   result= FALSE;
 end:
@@ -2379,7 +2379,8 @@ static int add_partition_values(File fptr, partition_info *part_info,
       break;
     case partition_element::VERSIONING:
       err+= add_string(fptr, " VERSIONING");
-      if (part_info->default_partition_id == p_elem->id)
+      DBUG_ASSERT(part_info->vers_info);
+      if (part_info->vers_info->hist_default == p_elem->id)
         err+= add_string(fptr, " DEFAULT");
       break;
     default:
@@ -3426,7 +3427,7 @@ int vers_get_partition_id(partition_info *part_info,
       // FIXME: thd->start_time is reset on each stmt, not transaction
       if (!part_info->table->file->vers_part_free_slow(part))
       {
-        part_info->vers_rotate_part(thd);
+        part_info->vers_part_rotate(thd);
       }
       break;
     default:

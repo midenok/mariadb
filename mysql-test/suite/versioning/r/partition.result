@@ -103,12 +103,16 @@ partition by system_time limit 1 (
 partition p0 as of now,
 partition p1 versioning,
 partition p2 versioning);
+Warnings:
+Warning	4041	No `DEFAULT` for `VERSIONING` partitions. Setting `p1` as default.
 insert into t1 values (1), (2);
 select * from t1 partition (p0);
 x
 1
 2
 delete from t1;
+Warnings:
+Note	4042	Switching from partition `p1` to `p2`
 select * from t1 partition (p1) for system_time all;
 x
 1
@@ -117,8 +121,7 @@ x
 2
 insert into t1 values (3);
 delete from t1;
-show warnings;
-Level	Code	Message
+Warnings:
 Warning	4040	Using full partition `p2`, need more VERSIONING partitions!
 select * from t1 partition (p2) for system_time all;
 x
@@ -153,6 +156,8 @@ t1	CREATE TABLE `t1` (
  PARTITION p2 VERSIONING DEFAULT ENGINE = MyISAM) */
 insert into t1 values (4), (5);
 delete from t1;
+Warnings:
+Note	4042	Switching from partition `p2` to `p1`
 select * from t1 partition (p2) for system_time all;
 x
 4

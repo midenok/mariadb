@@ -40,7 +40,8 @@ struct Vers_part_info : public Sql_alloc
     interval(0),
     limit(0),
     now_part(NULL),
-    hist_part(NULL)
+    hist_part(NULL),
+    hist_default(UINT32_MAX)
   {
     free_parts.empty();
   }
@@ -48,7 +49,8 @@ struct Vers_part_info : public Sql_alloc
     interval(src.interval),
     limit(src.limit),
     now_part(NULL),
-    hist_part(NULL)
+    hist_part(NULL),
+    hist_default(src.hist_default)
   {
     free_parts.empty();
   }
@@ -71,6 +73,7 @@ struct Vers_part_info : public Sql_alloc
   ulonglong limit;
   partition_element *now_part;
   partition_element *hist_part;
+  uint32 hist_default;
   List<partition_element> free_parts;
 };
 
@@ -243,10 +246,6 @@ public:
   uint num_full_part_fields;
 
   uint has_null_part_id;
-  /*
-    System Versioning: also specifies AS OF NOW partition
-    for `BY SYSTEM_TIME` partitioning.
-  */
   uint32 default_partition_id;
   /*
     This variable is used to calculate the partition id when using
@@ -439,9 +438,9 @@ public:
   bool vers_init_info(THD *thd);
   bool vers_set_interval(const INTERVAL &i);
   bool vers_set_limit(ulonglong limit);
-  bool vers_rotate_part(THD *thd);
-  bool vers_set_up_1(THD *thd);
-  void vers_set_up_2(THD *thd, bool is_create_table_ind);
+  bool vers_part_rotate(THD *thd);
+  bool vers_setup_1(THD *thd);
+  void vers_setup_2(THD *thd, bool is_create_table_ind);
 };
 
 uint32 get_next_partition_id_range(struct st_partition_iter* part_iter);

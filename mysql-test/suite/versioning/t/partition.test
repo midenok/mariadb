@@ -104,10 +104,7 @@ select * from t1 partition (p1) for system_time all;
 select * from t1 partition (p2) for system_time all;
 
 insert into t1 values (3);
---disable_warnings
 delete from t1;
-show warnings;
---enable_warnings
 select * from t1 partition (p2) for system_time all;
 
 # DEFAULT partition

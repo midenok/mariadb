@@ -1085,7 +1085,6 @@ bool partition_info::vers_init_info(THD * thd)
   part_type= VERSIONING_PARTITION;
   list_of_part_fields= TRUE;
   column_list= TRUE;
-  default_partition_id= UINT32_MAX;
   vers_info= new (thd->mem_root) Vers_part_info;
   if (!vers_info)
   {
@@ -1140,7 +1139,7 @@ bool partition_info::vers_set_limit(ulonglong limit)
   return false;
 }
 
-bool partition_info::vers_rotate_part(THD * thd)
+bool partition_info::vers_part_rotate(THD * thd)
 {
   DBUG_ASSERT(vers_info && vers_info->initialized());
   if (vers_info->free_parts.is_empty())
@@ -1153,11 +1152,20 @@ bool partition_info::vers_rotate_part(THD * thd)
     return false;
   }
 
-  vers_info->hist_part= vers_info->free_parts.pop();
+  partition_element *free_part= vers_info->free_parts.pop();
+
+  push_warning_printf(thd,
+    Sql_condition::WARN_LEVEL_NOTE,
+    WARN_VERS_PART_ROTATION,
+    ER_THD(thd, WARN_VERS_PART_ROTATION),
+    vers_info->hist_part->partition_name,
+    free_part->partition_name);
+
+  vers_info->hist_part= free_part;
   return false;
 }
 
-bool partition_info::vers_set_up_1(THD * thd)
+bool partition_info::vers_setup_1(THD * thd)
 {
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);
   if (!table->versioned())
@@ -1165,18 +1173,6 @@ bool partition_info::vers_set_up_1(THD * thd)
     my_error(ER_VERSIONING_REQUIRED, MYF(0), "`BY SYSTEM_TIME` partitioning");
     return true;
   }
-  if (num_parts < 2)
-  {
-    my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "unexpected number of partitions (expected > 1)");
-    return true;
-  }
-  DBUG_ASSERT(vers_info);
-  if (!vers_info->now_part)
-  {
-    my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "no `AS OF NOW` partition defined");
-    return true;
-  }
-  DBUG_ASSERT(num_parts == partitions.elements);
   Field *sys_trx_end= table->vers_end_field();
   part_field_list.empty();
   part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
@@ -1184,34 +1180,22 @@ bool partition_info::vers_set_up_1(THD * thd)
   return false;
 }
 
-void partition_info::vers_set_up_2(THD * thd, bool is_create_table_ind)
+void partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 {
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);
-  DBUG_ASSERT(vers_info && vers_info->initialized(false));
+  DBUG_ASSERT(vers_info && vers_info->initialized() && vers_info->hist_default != UINT32_MAX);
   // build freelist
   List_iterator<partition_element> it(partitions);
   partition_element *el;
-  bool rotate= false;
   while ((el= it++))
   {
-    if (el == vers_info->now_part)
+    if (el == vers_info->now_part || el == vers_info->hist_part)
       continue;
-    if (el == vers_info->hist_part)
-    {
-      if (!is_create_table_ind && !table->file->vers_part_free_slow(el))
-        rotate= true;
-      continue;
-    }
     if (is_create_table_ind || table->file->vers_part_free_slow(el))
-    {
-      if (vers_info->hist_part)
-        vers_info->free_parts.push_back(el);
-      else
-        vers_info->hist_part= el;
-    }
+      vers_info->free_parts.push_back(el);
   }
-  if (rotate)
-    vers_rotate_part(thd);
+  if (!table->file->vers_part_free_slow(vers_info->hist_part))
+    vers_part_rotate(thd);
 }
 
 
@@ -1820,6 +1804,8 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
   uint i, tot_partitions;
   bool result= TRUE, table_engine_set;
   char *same_name;
+  uint32 hist_parts= 0;
+  const char* hist_default= NULL;
   DBUG_ENTER("partition_info::check_partition_info");
   DBUG_ASSERT(default_engine_type != partition_hton);
 
@@ -1923,6 +1909,23 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
     my_error(ER_SAME_NAME_PARTITION, MYF(0), same_name);
     goto end;
   }
+
+  if (part_type == VERSIONING_PARTITION)
+  {
+    if (num_parts < 2)
+    {
+      my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "unexpected number of partitions (expected > 1)");
+      goto end;
+    }
+    DBUG_ASSERT(vers_info);
+    if (!vers_info->now_part)
+    {
+      my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "no `AS OF NOW` partition defined");
+      goto end;
+    }
+    DBUG_ASSERT(vers_info->initialized(false));
+    DBUG_ASSERT(num_parts == partitions.elements);
+  }
   i= 0;
   {
     List_iterator<partition_element> part_it(partitions);
@@ -2003,6 +2006,18 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
           }
         }
       }
+      if (part_type == VERSIONING_PARTITION &&
+        part_elem->type == partition_element::VERSIONING)
+      {
+        hist_parts++;
+        if (vers_info->hist_default == UINT32_MAX)
+        {
+          vers_info->hist_default= part_elem->id;
+          hist_default= part_elem->partition_name;
+        }
+        if (vers_info->hist_default == part_elem->id)
+          vers_info->hist_part= part_elem;
+      }
     } while (++i < num_parts);
     if (!table_engine_set &&
         num_parts_not_set != 0 &&
@@ -2039,6 +2054,26 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
                  (part_type == LIST_PARTITION &&
                   check_list_constants(thd))))
       goto end;
+  }
+
+  if (hist_parts > 1)
+  {
+    if (vers_info->limit == 0 && vers_info->interval == 0)
+    {
+      push_warning_printf(thd,
+        Sql_condition::WARN_LEVEL_WARN,
+        WARN_VERS_PARAMETERS,
+        ER_THD(thd, WARN_VERS_PARAMETERS),
+        "no rotation condition for multiple `VERSIONING` partitions.");
+    }
+    if (hist_default)
+    {
+      push_warning_printf(thd,
+        Sql_condition::WARN_LEVEL_WARN,
+        WARN_VERS_PARAMETERS,
+        "No `DEFAULT` for `VERSIONING` partitions. Setting `%s` as default.",
+        hist_default);
+    }
   }
   result= FALSE;
 end:
