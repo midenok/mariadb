@@ -5716,9 +5716,9 @@ ER_TOO_MANY_PARTITIONS_ERROR
         ger "Es wurden zu vielen Partitionen (einschließlich Unterpartitionen) definiert"
         swe "För många partitioner (inkluderande subpartitioner) definierades"
 ER_SUBPARTITION_ERROR
-        eng "It is only possible to mix RANGE/LIST partitioning with HASH/KEY partitioning for subpartitioning"
-        ger "RANGE/LIST-Partitionierung kann bei Unterpartitionen nur zusammen mit HASH/KEY-Partitionierung verwendet werden"
-        swe "Det är endast möjligt att blanda RANGE/LIST partitionering med HASH/KEY partitionering för subpartitionering"
+        eng "It is only possible to mix RANGE/LIST/SYSTEM_TIME partitioning with HASH/KEY partitioning for subpartitioning"
+        ger "RANGE/LIST-Partitionierung kann bei Unterpartitionen nur zusammen mit HASH/KEY/SYSTEM_TIME-Partitionierung verwendet werden"
+        swe "Det är endast möjligt att blanda RANGE/LIST/SYSTEM_TIME partitionering med HASH/KEY partitionering för subpartitionering"
 ER_CANT_CREATE_HANDLER_FILE
         eng "Failed to create specific handler file"
         ger "Erzeugen einer spezifischen Handler-Datei fehlgeschlagen"

@@ -1319,6 +1319,24 @@ static void set_up_partition_func_pointers(partition_info *part_info)
           part_info->get_subpartition_id= get_partition_id_hash_sub;
       }
     }
+    else if (part_info->part_type == VERSIONING_PARTITION)
+    {
+      part_info->get_part_partition_id= vers_get_partition_id;
+      if (part_info->list_of_subpart_fields)
+      {
+        if (part_info->linear_hash_ind)
+          part_info->get_subpartition_id= get_partition_id_linear_key_sub;
+        else
+          part_info->get_subpartition_id= get_partition_id_key_sub;
+      }
+      else
+      {
+        if (part_info->linear_hash_ind)
+          part_info->get_subpartition_id= get_partition_id_linear_hash_sub;
+        else
+          part_info->get_subpartition_id= get_partition_id_hash_sub;
+      }
+    }
     else /* LIST Partitioning */
     {
       if (part_info->column_list)

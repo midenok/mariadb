@@ -1846,7 +1846,8 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
   }
   if (unlikely(is_sub_partitioned() &&
               (!(part_type == RANGE_PARTITION || 
-                 part_type == LIST_PARTITION))))
+                 part_type == LIST_PARTITION ||
+                 part_type == VERSIONING_PARTITION))))
   {
     /* Only RANGE and LIST partitioning can be subpartitioned */
     my_error(ER_SUBPARTITION_ERROR, MYF(0));
