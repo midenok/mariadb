@@ -3403,6 +3403,11 @@ partititon_err:
   if (outparam->no_replicate || !binlog_filter->db_ok(outparam->s->db.str))
     outparam->s->cached_row_logging_check= 0;   // No row based replication
 
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+  if (outparam->part_info && outparam->part_info->part_type == VERSIONING_PARTITION)
+    outparam->part_info->vers_setup_2(thd, is_create_table);
+#endif
+
   /* Increment the opened_tables counter, only when open flags set. */
   if (db_stat)
     thd->status_var.opened_tables++;

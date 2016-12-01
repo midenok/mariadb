@@ -124,16 +124,13 @@ partition_info *partition_info::get_clone(THD *thd)
     {
       if (vers_info->now_part && part->id == vers_info->now_part->id)
         clone->vers_info->now_part= part;
-      else
+      else if (vers_info->hist_part && part->id == vers_info->hist_part->id)
+        clone->vers_info->hist_part= part;
+      else if (free_part && free_part->id == part->id)
       {
-        if (vers_info->hist_part && part->id == vers_info->hist_part->id)
-          clone->vers_info->hist_part= part;
-        if (free_part && free_part->id == part->id)
-        {
-          clone->vers_info->free_parts.push_back(part, mem_root);
-          free_part= free_it++;
-        }
-      } // else
+        clone->vers_info->free_parts.push_back(part, mem_root);
+        free_part= free_it++;
+      }
     } // while ((part= it++))
   } // if (part_type == VERSIONING_PARTITION ...
   DBUG_RETURN(clone);
@@ -1183,7 +1180,7 @@ bool partition_info::vers_setup_1(THD * thd)
 void partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 {
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);
-  DBUG_ASSERT(vers_info && vers_info->initialized() && vers_info->hist_default != UINT32_MAX);
+  DBUG_ASSERT(vers_info && vers_info->initialized(is_create_table_ind) && vers_info->hist_default != UINT32_MAX);
   // build freelist
   List_iterator<partition_element> it(partitions);
   partition_element *el;
@@ -1191,10 +1188,12 @@ void partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
   {
     if (el == vers_info->now_part || el == vers_info->hist_part)
       continue;
+    if (!vers_info->hist_part && el->id == vers_info->hist_default)
+      vers_info->hist_part= el;
     if (is_create_table_ind || table->file->vers_part_free_slow(el))
-      vers_info->free_parts.push_back(el);
+      vers_info->free_parts.push_back(el, &table->mem_root);
   }
-  if (!table->file->vers_part_free_slow(vers_info->hist_part))
+  if (!is_create_table_ind && !table->file->vers_part_free_slow(vers_info->hist_part))
     vers_part_rotate(thd);
 }
 

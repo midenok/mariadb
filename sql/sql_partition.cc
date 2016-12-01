@@ -1755,8 +1755,6 @@ bool fix_partition_func(THD *thd, TABLE *table,
   set_up_partition_key_maps(table, part_info);
   set_up_partition_func_pointers(part_info);
   set_up_range_analysis_info(part_info);
-  if (part_info->part_type == VERSIONING_PARTITION)
-    part_info->vers_setup_2(thd, is_create_table_ind);
   table->file->set_part_info(part_info);
   result= FALSE;
 end:
