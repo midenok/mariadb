@@ -1293,16 +1293,23 @@ public:
     DBUG_ASSERT(hist_part && hist_part->type == partition_element::VERSIONING);
     DBUG_ASSERT(m_part_info && m_part_info->vers_info);
     Vers_part_info *vers_info= m_part_info->vers_info;
-    uint32 part_id= hist_part->id;
-    DBUG_ASSERT(part_id < m_tot_parts);
     if (vers_info->limit)
     {
-      handler *file= m_file[part_id];
-      DBUG_ASSERT(bitmap_is_set(&(m_part_info->read_partitions), part_id));
-      file->info(HA_STATUS_TIME | HA_STATUS_VARIABLE |
-                 HA_STATUS_VARIABLE_EXTRA | HA_STATUS_NO_LOCK);
+      uint32 sub_factor= m_part_info->num_subparts ? m_part_info->num_subparts : 1;
+      uint32 part_id= hist_part->id * sub_factor;
+      uint32 part_id_end= part_id + sub_factor;
+      DBUG_ASSERT(part_id_end <= m_tot_parts);
+      ulonglong part_recs= 0;
+      for (; part_id < part_id_end; ++part_id)
+      {
+        handler *file= m_file[part_id];
+        DBUG_ASSERT(bitmap_is_set(&(m_part_info->read_partitions), part_id));
+        file->info(HA_STATUS_TIME | HA_STATUS_VARIABLE |
+          HA_STATUS_VARIABLE_EXTRA | HA_STATUS_NO_LOCK);
 
-      return file->stats.records < vers_info->limit;
+        part_recs+= file->stats.records;
+      }
+      return part_recs < vers_info->limit;
     }
     return true;
   }

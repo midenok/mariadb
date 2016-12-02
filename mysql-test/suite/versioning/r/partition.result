@@ -164,4 +164,36 @@ x
 select * from t1 partition (p1) for system_time all;
 x
 5
+create or replace table t1 (x int)
+with system versioning
+engine myisam
+partition by system_time limit 1
+subpartition by key (x)
+subpartitions 2 (
+partition p0 as of now,
+partition p1 versioning default,
+partition p2 versioning);
+insert into t1 (x) values (1), (2), (3);
+select * from t1 partition (p0sp0);
+x
+1
+3
+select * from t1 partition (p0sp1);
+x
+2
+delete from t1;
+Warnings:
+Note	4042	Switching from partition `p1` to `p2`
+Warning	4040	Using full partition `p2`, need more VERSIONING partitions!
+select * from t1 partition (p1sp0) for system_time all;
+x
+1
+select * from t1 partition (p1sp1) for system_time all;
+x
+select * from t1 partition (p2sp0) for system_time all;
+x
+3
+select * from t1 partition (p2sp1) for system_time all;
+x
+2
 drop table t1;
