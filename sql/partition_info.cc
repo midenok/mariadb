@@ -30,6 +30,7 @@
 #include "sql_parse.h"                        // test_if_data_home_dir
 #include "sql_acl.h"                          // *_ACL
 #include "sql_base.h"                         // fill_record
+#include "sql_statistics.h"                   // vers_stat_end
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE
 #include "ha_partition.h"
@@ -1136,7 +1137,8 @@ bool partition_info::vers_set_limit(ulonglong limit)
   return false;
 }
 
-bool partition_info::vers_part_rotate(THD * thd)
+partition_element*
+partition_info::vers_part_rotate(THD * thd)
 {
   DBUG_ASSERT(vers_info && vers_info->initialized());
   if (vers_info->free_parts.is_empty())
@@ -1146,7 +1148,7 @@ bool partition_info::vers_part_rotate(THD * thd)
       WARN_VERS_PART_FULL,
       ER_THD(thd, WARN_VERS_PART_FULL),
       vers_info->hist_part->partition_name);
-    return false;
+    return vers_info->hist_part;
   }
 
   partition_element *free_part= vers_info->free_parts.pop();
@@ -1159,7 +1161,7 @@ bool partition_info::vers_part_rotate(THD * thd)
     free_part->partition_name);
 
   vers_info->hist_part= free_part;
-  return false;
+  return vers_info->hist_part;
 }
 
 bool partition_info::vers_setup_1(THD * thd)
@@ -1177,15 +1179,61 @@ bool partition_info::vers_setup_1(THD * thd)
   return false;
 }
 
-void partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
+bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 {
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);
   DBUG_ASSERT(vers_info && vers_info->initialized(is_create_table_ind) && vers_info->hist_default != UINT32_MAX);
+  DBUG_ASSERT(table && table->s);
+  if (!table->versioned_by_sql())
+  {
+    my_error(ER_VERS_WRONG_PARAMS, MYF(0), table->s->table_name.str, "selected engine is not supported in `BY SYSTEM_TIME` partitioning");
+    return true;
+  }
   // build freelist
   List_iterator<partition_element> it(partitions);
   partition_element *el;
   while ((el= it++))
   {
+    DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
+    if (el->type == partition_element::VERSIONING)
+    {
+      DBUG_ASSERT(!el->stat_trx_end);
+      el->stat_trx_end= new (&table->mem_root)
+        Stat_timestampf(table->s->vers_end_field()->field_name, table->s);
+
+      uint32 sub_factor= num_subparts ? num_subparts : 1;
+      uint32 part_id= el->id * sub_factor;
+      uint32 part_id_end= part_id + sub_factor;
+      for (; part_id < part_id_end; ++part_id)
+      {
+        handler *file= table->file->part_handler(part_id);
+        int rc= file->ha_rnd_init(true);
+        if (!rc)
+        {
+          while ((rc= file->ha_rnd_next(table->record[0])) != HA_ERR_END_OF_FILE)
+          {
+            if (thd->killed)
+            {
+              file->ha_rnd_end();
+              return true;
+            }
+            if (rc)
+            {
+              if (rc == HA_ERR_RECORD_DELETED)
+                continue;
+              break;
+            }
+            el->stat_trx_end->update(table->vers_end_field());
+          }
+          file->ha_rnd_end();
+        }
+        if (rc != HA_ERR_END_OF_FILE)
+        {
+          my_error(ER_INTERNAL_ERROR, MYF(0), "partition/subpartition scan failed in versioned partitions setup");
+          return true;
+        }
+      }
+    }
     if (el == vers_info->now_part || el == vers_info->hist_part)
       continue;
     if (!vers_info->hist_part && el->id == vers_info->hist_default)
@@ -1195,6 +1243,7 @@ void partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
   }
   if (!is_create_table_ind && !table->file->vers_part_free_slow(vers_info->hist_part))
     vers_part_rotate(thd);
+  return false;
 }
 
 

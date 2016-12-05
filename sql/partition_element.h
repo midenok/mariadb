@@ -90,6 +90,29 @@ typedef struct p_elem_val
 
 struct st_ddl_log_memory_entry;
 
+class Stat_timestampf : public Sql_alloc
+{
+  static const uint buf_size= 4 + (TIME_SECOND_PART_DIGITS + 1) / 2;
+  uchar min_buf[buf_size];
+  uchar max_buf[buf_size];
+  Field_timestampf min_value;
+  Field_timestampf max_value;
+
+public:
+  Stat_timestampf(const char *field_name, TABLE_SHARE *share) :
+    min_value(min_buf, NULL, 0, Field::NONE, field_name, share, 6),
+    max_value(max_buf, NULL, 0, Field::NONE, field_name, share, 6)
+  {
+    min_value.set_max();
+    memset(max_buf, 0, buf_size);
+  }
+  void update(Field *from)
+  {
+    from->update_min(&min_value, false);
+    from->update_max(&max_value, false);
+  }
+};
+
 class partition_element :public Sql_alloc {
 public:
   List<partition_element> subpartitions;
@@ -120,7 +143,7 @@ public:
   };
 
   elem_type type;
-  my_time_t vers_min_time;
+  Stat_timestampf *stat_trx_end;
 
   partition_element()
   : part_max_rows(0), part_min_rows(0), range_value(0),
@@ -132,7 +155,7 @@ public:
     signed_flag(FALSE), max_value(FALSE),
     id(UINT32_MAX),
     type(CONVENTIONAL),
-    vers_min_time(0)
+    stat_trx_end(NULL)
   {
   }
   partition_element(partition_element *part_elem)
@@ -150,7 +173,7 @@ public:
     has_null_value(FALSE),
     id(part_elem->id),
     type(part_elem->type),
-    vers_min_time(part_elem->vers_min_time)
+    stat_trx_end(NULL)
   {
   }
   ~partition_element() {}

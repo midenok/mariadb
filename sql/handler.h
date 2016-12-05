@@ -4227,6 +4227,8 @@ public:
   { DBUG_ASSERT(ht); return partition_ht()->flags & HTON_SUPPORTS_SYS_VERSIONING; }
   virtual bool vers_part_free_slow(void *hist_part)
   { DBUG_ASSERT(0); return false; }
+  virtual handler* part_handler(uint32 part_id)
+  { DBUG_ASSERT(0); return NULL; }
 protected:
   Handler_share *get_ha_share_ptr();
   void set_ha_share_ptr(Handler_share *arg_ha_share);

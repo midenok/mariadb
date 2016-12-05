@@ -3430,24 +3430,37 @@ int vers_get_partition_id(partition_info *part_info,
   DBUG_ASSERT(sys_trx_end->table && sys_trx_end->table->versioned());
 
   bool historical= !(sys_trx_end->is_max() || sys_trx_end->is_null());
-  if (historical && vers_info->limit)
+  if (historical)
   {
-    THD *thd= current_thd;
     partition_element *part= vers_info->hist_part;
-    switch (thd->lex->sql_command)
+    THD *thd= current_thd;
+    if (vers_info->interval)
     {
-    case SQLCOM_DELETE:
-    case SQLCOM_DELETE_MULTI:
-    case SQLCOM_UPDATE:
-    case SQLCOM_UPDATE_MULTI:
       // FIXME: thd->start_time is reset on each stmt, not transaction
-      if (!part_info->table->file->vers_part_free_slow(part))
+      if (part_info->vers_interval_exceed())
       {
-        part_info->vers_part_rotate(thd);
+        part= part_info->vers_part_rotate(thd);
       }
-      break;
-    default:
-      ;
+      DBUG_ASSERT(part->stat_trx_end);
+      part->stat_trx_end->update(sys_trx_end);
+    }
+    // FIXME: wrong sequential IFs 
+    if (vers_info->limit)
+    {
+      switch (thd->lex->sql_command)
+      {
+      case SQLCOM_DELETE:
+      case SQLCOM_DELETE_MULTI:
+      case SQLCOM_UPDATE:
+      case SQLCOM_UPDATE_MULTI:
+        if (part_info->vers_limit_exceed())
+        {
+          part= part_info->vers_part_rotate(thd);
+        }
+        break;
+      default:
+        ;
+      }
     }
   }
   // new rows have NULL in sys_trx_end

@@ -438,9 +438,18 @@ public:
   bool vers_init_info(THD *thd);
   bool vers_set_interval(const INTERVAL &i);
   bool vers_set_limit(ulonglong limit);
-  bool vers_part_rotate(THD *thd);
+  partition_element* vers_part_rotate(THD *thd);
   bool vers_setup_1(THD *thd);
-  void vers_setup_2(THD *thd, bool is_create_table_ind);
+  bool vers_setup_2(THD *thd, bool is_create_table_ind);
+  bool vers_limit_exceed()
+  {
+    DBUG_ASSERT(vers_info && vers_info->initialized());
+    return !table->file->vers_part_free_slow(vers_info->hist_part);
+  }
+  bool vers_interval_exceed()
+  {
+    return false;
+  }
 };
 
 uint32 get_next_partition_id_range(struct st_partition_iter* part_iter);

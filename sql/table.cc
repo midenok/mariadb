@@ -3404,8 +3404,14 @@ partititon_err:
     outparam->s->cached_row_logging_check= 0;   // No row based replication
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE
-  if (outparam->part_info && outparam->part_info->part_type == VERSIONING_PARTITION)
-    outparam->part_info->vers_setup_2(thd, is_create_table);
+  if (outparam->part_info &&
+    outparam->part_info->part_type == VERSIONING_PARTITION &&
+    outparam->part_info->vers_setup_2(thd, is_create_table))
+  {
+    error= OPEN_FRM_OPEN_ERROR;
+    error_reported= true;
+    goto err;
+  }
 #endif
 
   /* Increment the opened_tables counter, only when open flags set. */

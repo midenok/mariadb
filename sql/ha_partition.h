@@ -1314,6 +1314,12 @@ public:
     return true;
   }
 
+  virtual handler* part_handler(uint32 part_id)
+  {
+    DBUG_ASSERT(part_id < m_tot_parts);
+    return m_file[part_id];
+  }
+
   friend int cmp_key_rowid_part_id(void *ptr, uchar *ref1, uchar *ref2);
 };
 
