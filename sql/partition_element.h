@@ -111,6 +111,14 @@ public:
     from->update_min(&min_value, false);
     from->update_max(&max_value, false);
   }
+  my_time_t min_time()
+  {
+    return min_value.get_timestamp();
+  }
+  my_time_t max_time()
+  {
+    return max_value.get_timestamp();
+  }
 };
 
 class partition_element :public Sql_alloc {

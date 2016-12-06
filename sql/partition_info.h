@@ -444,11 +444,20 @@ public:
   bool vers_limit_exceed()
   {
     DBUG_ASSERT(vers_info && vers_info->initialized());
+    if (!vers_info->limit)
+      return false;
     return !table->file->vers_part_free_slow(vers_info->hist_part);
   }
-  bool vers_interval_exceed()
+  bool vers_interval_exceed(Field *sys_trx_end)
   {
-    return false;
+    DBUG_ASSERT(vers_info && vers_info->initialized());
+    if (!vers_info->interval)
+      return false;
+    Stat_timestampf *stat_trx_end= vers_info->hist_part->stat_trx_end;
+    DBUG_ASSERT(stat_trx_end);
+    my_time_t hist_interval= sys_trx_end->get_timestamp();
+    hist_interval-= stat_trx_end->min_time();
+    return hist_interval > vers_info->interval;
   }
 };
 

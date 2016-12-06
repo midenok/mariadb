@@ -3427,46 +3427,40 @@ int vers_get_partition_id(partition_info *part_info,
   DBUG_ASSERT(part_info->table);
   Vers_part_info *vers_info= part_info->vers_info;
   DBUG_ASSERT(vers_info && vers_info->initialized());
-  DBUG_ASSERT(sys_trx_end->table && sys_trx_end->table->versioned());
+  DBUG_ASSERT(sys_trx_end->table == part_info->table && part_info->table->versioned());
+  DBUG_ASSERT(part_info->table->vers_end_field() == sys_trx_end);
 
-  bool historical= !(sys_trx_end->is_max() || sys_trx_end->is_null());
-  if (historical)
+  // new rows have NULL in sys_trx_end
+  if (sys_trx_end->is_max() || sys_trx_end->is_null())
+  {
+    *part_id= vers_info->now_part->id;
+  }
+  else // row is historical
   {
     partition_element *part= vers_info->hist_part;
     THD *thd= current_thd;
-    if (vers_info->interval)
+    switch (thd->lex->sql_command)
     {
-      // FIXME: thd->start_time is reset on each stmt, not transaction
-      if (part_info->vers_interval_exceed())
+    case SQLCOM_DELETE:
+    case SQLCOM_DELETE_MULTI:
+    case SQLCOM_UPDATE:
+    case SQLCOM_UPDATE_MULTI:
+      if (part_info->vers_limit_exceed() || part_info->vers_interval_exceed(sys_trx_end))
       {
         part= part_info->vers_part_rotate(thd);
       }
-      DBUG_ASSERT(part->stat_trx_end);
-      part->stat_trx_end->update(sys_trx_end);
-    }
-    // FIXME: wrong sequential IFs 
-    if (vers_info->limit)
-    {
-      switch (thd->lex->sql_command)
+      if (vers_info->interval)
       {
-      case SQLCOM_DELETE:
-      case SQLCOM_DELETE_MULTI:
-      case SQLCOM_UPDATE:
-      case SQLCOM_UPDATE_MULTI:
-        if (part_info->vers_limit_exceed())
-        {
-          part= part_info->vers_part_rotate(thd);
-        }
-        break;
-      default:
-        ;
+        DBUG_ASSERT(part->stat_trx_end);
+        part->stat_trx_end->update(sys_trx_end);
       }
+      break;
+    default:
+      ;
     }
+    *part_id= vers_info->hist_part->id;
   }
-  // new rows have NULL in sys_trx_end
-  *part_id= sys_trx_end->is_max() || sys_trx_end->is_null() ?
-    vers_info->now_part->id :
-    vers_info->hist_part->id;
+
   DBUG_PRINT("exit",("partition: %d", *part_id));
   DBUG_RETURN(0);
 }

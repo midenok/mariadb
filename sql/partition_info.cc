@@ -1201,36 +1201,44 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
       el->stat_trx_end= new (&table->mem_root)
         Stat_timestampf(table->s->vers_end_field()->field_name, table->s);
 
-      uint32 sub_factor= num_subparts ? num_subparts : 1;
-      uint32 part_id= el->id * sub_factor;
-      uint32 part_id_end= part_id + sub_factor;
-      for (; part_id < part_id_end; ++part_id)
-      {
-        handler *file= table->file->part_handler(part_id);
-        int rc= file->ha_rnd_init(true);
-        if (!rc)
+      if (!is_create_table_ind)
+      { // scan table for min/max sys_trx_end
+        uint32 sub_factor= num_subparts ? num_subparts : 1;
+        uint32 part_id= el->id * sub_factor;
+        uint32 part_id_end= part_id + sub_factor;
+        for (; part_id < part_id_end; ++part_id)
         {
-          while ((rc= file->ha_rnd_next(table->record[0])) != HA_ERR_END_OF_FILE)
+          handler *file= table->file->part_handler(part_id);
+          int rc= file->ha_external_lock(thd, F_RDLCK);
+          if (rc)
+            goto error;
+          rc= file->ha_rnd_init(true);
+          if (!rc)
           {
-            if (thd->killed)
+            while ((rc= file->ha_rnd_next(table->record[0])) != HA_ERR_END_OF_FILE)
             {
-              file->ha_rnd_end();
-              return true;
+              if (thd->killed)
+              {
+                file->ha_rnd_end();
+                return true;
+              }
+              if (rc)
+              {
+                if (rc == HA_ERR_RECORD_DELETED)
+                  continue;
+                break;
+              }
+              el->stat_trx_end->update(table->vers_end_field());
             }
-            if (rc)
-            {
-              if (rc == HA_ERR_RECORD_DELETED)
-                continue;
-              break;
-            }
-            el->stat_trx_end->update(table->vers_end_field());
+            file->ha_rnd_end();
           }
-          file->ha_rnd_end();
-        }
-        if (rc != HA_ERR_END_OF_FILE)
-        {
-          my_error(ER_INTERNAL_ERROR, MYF(0), "partition/subpartition scan failed in versioned partitions setup");
-          return true;
+          file->ha_external_lock(thd, F_UNLCK);
+          if (rc != HA_ERR_END_OF_FILE)
+          {
+          error:
+            my_error(ER_INTERNAL_ERROR, MYF(0), "partition/subpartition scan failed in versioned partitions setup");
+            return true;
+          }
         }
       }
     }
