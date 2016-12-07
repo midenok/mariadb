@@ -130,6 +130,32 @@ x
 create or replace table t1 (x int)
 with system versioning
 engine myisam
+partition by system_time interval 1 second (
+partition p0 as of now,
+partition p1 versioning default,
+partition p2 versioning);
+insert into t1 values (1), (2), (3);
+select * from t1 partition (p0);
+x
+1
+2
+3
+delete from t1;
+select * from t1 partition (p1) for system_time all;
+x
+1
+2
+3
+insert into t1 values (4);
+delete from t1;
+Warnings:
+Note	4042	Switching from partition `p1` to `p2`
+select * from t1 partition (p2) for system_time all;
+x
+4
+create or replace table t1 (x int)
+with system versioning
+engine myisam
 partition by system_time limit 1 (
 partition p0 as of now,
 partition p1 versioning default,

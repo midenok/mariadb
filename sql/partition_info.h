@@ -452,7 +452,7 @@ public:
       part= vers_info->hist_part;
     }
     // TODO: cache thread-shared part_recs and increment on INSERT
-    return table->file->part_recs_slow(part) > vers_info->limit;
+    return table->file->part_recs_slow(part) >= vers_info->limit;
   }
   bool vers_interval_exceed(my_time_t max_time, partition_element *part= NULL)
   {
