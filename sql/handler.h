@@ -4225,7 +4225,7 @@ public:
 
   virtual bool versioned() const
   { DBUG_ASSERT(ht); return partition_ht()->flags & HTON_SUPPORTS_SYS_VERSIONING; }
-  virtual bool vers_part_free_slow(void *hist_part)
+  virtual ha_rows part_recs_slow(void *hist_part)
   { DBUG_ASSERT(0); return false; }
   virtual handler* part_handler(uint32 part_id)
   { DBUG_ASSERT(0); return NULL; }

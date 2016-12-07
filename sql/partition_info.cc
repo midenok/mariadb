@@ -1246,10 +1246,10 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
       continue;
     if (!vers_info->hist_part && el->id == vers_info->hist_default)
       vers_info->hist_part= el;
-    if (is_create_table_ind || table->file->vers_part_free_slow(el))
+    if (is_create_table_ind || (!vers_limit_exceed(el) && !vers_interval_exceed(el)))
       vers_info->free_parts.push_back(el, &table->mem_root);
   }
-  if (!is_create_table_ind && !table->file->vers_part_free_slow(vers_info->hist_part))
+  if (!is_create_table_ind && (vers_limit_exceed() || vers_interval_exceed()))
     vers_part_rotate(thd);
   return false;
 }

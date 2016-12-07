@@ -441,23 +441,42 @@ public:
   partition_element* vers_part_rotate(THD *thd);
   bool vers_setup_1(THD *thd);
   bool vers_setup_2(THD *thd, bool is_create_table_ind);
-  bool vers_limit_exceed()
+  bool vers_limit_exceed(partition_element *part= NULL)
   {
-    DBUG_ASSERT(vers_info && vers_info->initialized());
+    DBUG_ASSERT(vers_info);
     if (!vers_info->limit)
       return false;
-    return !table->file->vers_part_free_slow(vers_info->hist_part);
+    if (!part)
+    {
+      DBUG_ASSERT(vers_info->initialized());
+      part= vers_info->hist_part;
+    }
+    // TODO: cache thread-shared part_recs and increment on INSERT
+    return table->file->part_recs_slow(part) > vers_info->limit;
   }
-  bool vers_interval_exceed(Field *sys_trx_end)
+  bool vers_interval_exceed(my_time_t max_time, partition_element *part= NULL)
   {
-    DBUG_ASSERT(vers_info && vers_info->initialized());
+    DBUG_ASSERT(vers_info);
     if (!vers_info->interval)
       return false;
-    Stat_timestampf *stat_trx_end= vers_info->hist_part->stat_trx_end;
-    DBUG_ASSERT(stat_trx_end);
-    my_time_t hist_interval= sys_trx_end->get_timestamp();
-    hist_interval-= stat_trx_end->min_time();
-    return hist_interval > vers_info->interval;
+    if (!part)
+    {
+      DBUG_ASSERT(vers_info->initialized());
+      part= vers_info->hist_part;
+    }
+    DBUG_ASSERT(part->stat_trx_end);
+    max_time-= part->stat_trx_end->min_time();
+    return max_time > vers_info->interval;
+  }
+  bool vers_interval_exceed(partition_element *part)
+  {
+    DBUG_ASSERT(part->stat_trx_end);
+    return vers_interval_exceed(part->stat_trx_end->max_time(), part);
+  }
+  bool vers_interval_exceed()
+  {
+    DBUG_ASSERT(vers_info && vers_info->initialized());
+    return vers_interval_exceed(vers_info->hist_part);
   }
 };
 

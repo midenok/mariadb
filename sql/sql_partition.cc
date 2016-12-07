@@ -3445,7 +3445,7 @@ int vers_get_partition_id(partition_info *part_info,
     case SQLCOM_DELETE_MULTI:
     case SQLCOM_UPDATE:
     case SQLCOM_UPDATE_MULTI:
-      if (part_info->vers_limit_exceed() || part_info->vers_interval_exceed(sys_trx_end))
+      if (part_info->vers_limit_exceed() || part_info->vers_interval_exceed(sys_trx_end->get_timestamp()))
       {
         part= part_info->vers_part_rotate(thd);
       }
