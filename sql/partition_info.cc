@@ -1179,6 +1179,7 @@ bool partition_info::vers_setup_1(THD * thd)
   return false;
 }
 
+// setup at open stage (TABLE_SHARE is initialized)
 bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 {
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);

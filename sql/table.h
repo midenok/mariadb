@@ -546,6 +546,9 @@ struct TABLE_STATISTICS_CB
   bool histograms_are_read;   
 };
 
+#ifndef UINT32_MAX
+#define UINT32_MAX             (4294967295U)
+#endif
 
 /**
   This structure is shared between different table objects. There is one
@@ -727,19 +730,13 @@ struct TABLE_SHARE
   bool versioned;
   uint16 row_start_field;
   uint16 row_end_field;
+  uint32 hist_part_id;
+  ha_rows *part_rows;
 
-  void enable_system_versioning(uint16 row_start, uint row_end)
+  void vers_init()
   {
-    versioned = true;
-    row_start_field = row_start;
-    row_end_field = row_end;
-  }
-
-  void disable_system_versioning()
-  {
-    versioned = false;
-    row_start_field = 0;
-    row_end_field = 0;
+    hist_part_id= UINT32_MAX;
+    ha_rows *part_rows= NULL;
   }
 
   Field *vers_start_field()

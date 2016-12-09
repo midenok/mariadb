@@ -2367,9 +2367,13 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
   share->db_plugin= se_plugin;
 
   /* Set system versioning information. */
+  vers_init();
+
   if (system_period == NULL)
   {
-    share->disable_system_versioning();
+    versioned= false;
+    row_start_field = 0;
+    row_end_field = 0;
   }
   else
   {
@@ -2378,9 +2382,10 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
     uint16 row_end= uint2korr(system_period + sizeof(uint16));
     if (row_start >= share->fields || row_end >= share->fields)
       goto err;
-    DBUG_PRINT("info", ("Columns with system versioning: [%d, %d]", row_start,
-                        row_end));
-    share->enable_system_versioning(row_start, row_end);
+    DBUG_PRINT("info", ("Columns with system versioning: [%d, %d]", row_start, row_end));
+    versioned= true;
+    row_start_field = row_start;
+    row_end_field = row_end;
     vers_start_field()->flags|= VERS_SYS_START_FLAG;
     vers_end_field()->flags|= VERS_SYS_END_FLAG;
   } // if (system_period == NULL)
