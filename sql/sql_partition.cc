@@ -3439,16 +3439,33 @@ int vers_get_partition_id(partition_info *part_info,
   {
     partition_element *part= vers_info->hist_part;
     THD *thd= current_thd;
+    TABLE *table= part_info->table;
+
     switch (thd->lex->sql_command)
     {
     case SQLCOM_DELETE:
     case SQLCOM_DELETE_MULTI:
     case SQLCOM_UPDATE:
     case SQLCOM_UPDATE_MULTI:
-      if (part_info->vers_limit_exceed() || part_info->vers_interval_exceed(sys_trx_end->get_timestamp()))
+      mysql_mutex_lock(&table->s->LOCK_rotation);
+      if (table->s->busy_rotation)
       {
-        part= part_info->vers_part_rotate(thd);
+        table->s->vers_wait_rotation();
+        part_info->vers_hist_part();
       }
+      else
+      {
+        table->s->busy_rotation= true;
+        mysql_mutex_unlock(&table->s->LOCK_rotation);
+        if (part_info->vers_limit_exceed() || part_info->vers_interval_exceed(sys_trx_end->get_timestamp()))
+        {
+          part= part_info->vers_part_rotate(thd);
+        }
+        mysql_mutex_lock(&table->s->LOCK_rotation);
+        mysql_cond_broadcast(&table->s->COND_rotation);
+        table->s->busy_rotation= false;
+      }
+      mysql_mutex_unlock(&table->s->LOCK_rotation);
       if (vers_info->interval)
       {
         DBUG_ASSERT(part->stat_trx_end);

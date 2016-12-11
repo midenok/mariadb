@@ -117,21 +117,15 @@ partition_info *partition_info::get_clone(THD *thd)
   }
   if (part_type == VERSIONING_PARTITION && vers_info)
   {
+    // clone Vers_part_info; set now_part, hist_part
     clone->vers_info= new (mem_root) Vers_part_info(*vers_info);
     List_iterator<partition_element> it(clone->partitions);
-    List_iterator<partition_element> free_it(vers_info->free_parts);
-    partition_element *free_part= free_it++;
     while ((part= it++))
     {
       if (vers_info->now_part && part->id == vers_info->now_part->id)
         clone->vers_info->now_part= part;
       else if (vers_info->hist_part && part->id == vers_info->hist_part->id)
         clone->vers_info->hist_part= part;
-      else if (free_part && free_part->id == part->id)
-      {
-        clone->vers_info->free_parts.push_back(part, mem_root);
-        free_part= free_it++;
-      }
     } // while ((part= it++))
   } // if (part_type == VERSIONING_PARTITION ...
   DBUG_RETURN(clone);
@@ -1140,8 +1134,8 @@ bool partition_info::vers_set_limit(ulonglong limit)
 partition_element*
 partition_info::vers_part_rotate(THD * thd)
 {
-  DBUG_ASSERT(vers_info && vers_info->initialized());
-  if (vers_info->free_parts.is_empty())
+  DBUG_ASSERT(table && table->s);
+  if (table->s->free_parts.is_empty())
   {
     push_warning_printf(thd,
       Sql_condition::WARN_LEVEL_WARN,
@@ -1151,16 +1145,17 @@ partition_info::vers_part_rotate(THD * thd)
     return vers_info->hist_part;
   }
 
-  partition_element *free_part= vers_info->free_parts.pop();
+  table->s->vers_part_rotate();
+  const char* old_part_name= vers_info->hist_part->partition_name;
+  vers_hist_part();
 
   push_warning_printf(thd,
     Sql_condition::WARN_LEVEL_NOTE,
     WARN_VERS_PART_ROTATION,
     ER_THD(thd, WARN_VERS_PART_ROTATION),
-    vers_info->hist_part->partition_name,
-    free_part->partition_name);
+    old_part_name,
+    vers_info->hist_part->partition_name);
 
-  vers_info->hist_part= free_part;
   return vers_info->hist_part;
 }
 
@@ -1179,6 +1174,52 @@ bool partition_info::vers_setup_1(THD * thd)
   return false;
 }
 
+
+// scan table for min/max sys_trx_end
+inline
+bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
+{
+  uint32 sub_factor= num_subparts ? num_subparts : 1;
+  uint32 part_id= part->id * sub_factor;
+  uint32 part_id_end= part_id + sub_factor;
+  for (; part_id < part_id_end; ++part_id)
+  {
+    handler *file= table->file->part_handler(part_id);
+    int rc= file->ha_external_lock(thd, F_RDLCK);
+    if (rc)
+      goto error;
+    rc= file->ha_rnd_init(true);
+    if (!rc)
+    {
+      while ((rc= file->ha_rnd_next(table->record[0])) != HA_ERR_END_OF_FILE)
+      {
+        if (thd->killed)
+        {
+          file->ha_rnd_end();
+          return true;
+        }
+        if (rc)
+        {
+          if (rc == HA_ERR_RECORD_DELETED)
+            continue;
+          break;
+        }
+        part->stat_trx_end->update(table->vers_end_field());
+      }
+      file->ha_rnd_end();
+    }
+    file->ha_external_lock(thd, F_UNLCK);
+    if (rc != HA_ERR_END_OF_FILE)
+    {
+    error:
+      my_error(ER_INTERNAL_ERROR, MYF(0), "partition/subpartition scan failed in versioned partitions setup");
+      return true;
+    }
+  }
+  return false;
+}
+
+
 // setup at open stage (TABLE_SHARE is initialized)
 bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 {
@@ -1190,68 +1231,53 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     my_error(ER_VERS_WRONG_PARAMS, MYF(0), table->s->table_name.str, "selected engine is not supported in `BY SYSTEM_TIME` partitioning");
     return true;
   }
-  // build freelist
-  List_iterator<partition_element> it(partitions);
-  partition_element *el;
-  while ((el= it++))
+  mysql_mutex_lock(&table->s->LOCK_rotation);
+  if (table->s->busy_rotation)
   {
-    DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
-    if (el->type == partition_element::VERSIONING)
+    table->s->vers_wait_rotation();
+    vers_hist_part();
+  }
+  else
+  {
+    table->s->busy_rotation= true;
+    mysql_mutex_unlock(&table->s->LOCK_rotation);
+    // build freelist, scan min/max, assign hist_part
+    List_iterator<partition_element> it(partitions);
+    partition_element *el;
+    while ((el= it++))
     {
-      DBUG_ASSERT(!el->stat_trx_end);
-      el->stat_trx_end= new (&table->mem_root)
-        Stat_timestampf(table->s->vers_end_field()->field_name, table->s);
-
-      if (!is_create_table_ind)
-      { // scan table for min/max sys_trx_end
-        uint32 sub_factor= num_subparts ? num_subparts : 1;
-        uint32 part_id= el->id * sub_factor;
-        uint32 part_id_end= part_id + sub_factor;
-        for (; part_id < part_id_end; ++part_id)
-        {
-          handler *file= table->file->part_handler(part_id);
-          int rc= file->ha_external_lock(thd, F_RDLCK);
-          if (rc)
-            goto error;
-          rc= file->ha_rnd_init(true);
-          if (!rc)
-          {
-            while ((rc= file->ha_rnd_next(table->record[0])) != HA_ERR_END_OF_FILE)
-            {
-              if (thd->killed)
-              {
-                file->ha_rnd_end();
-                return true;
-              }
-              if (rc)
-              {
-                if (rc == HA_ERR_RECORD_DELETED)
-                  continue;
-                break;
-              }
-              el->stat_trx_end->update(table->vers_end_field());
-            }
-            file->ha_rnd_end();
-          }
-          file->ha_external_lock(thd, F_UNLCK);
-          if (rc != HA_ERR_END_OF_FILE)
-          {
-          error:
-            my_error(ER_INTERNAL_ERROR, MYF(0), "partition/subpartition scan failed in versioned partitions setup");
-            return true;
-          }
-        }
+      DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
+      if (el->type == partition_element::VERSIONING)
+      {
+        DBUG_ASSERT(!el->stat_trx_end);
+        el->stat_trx_end= new (&table->mem_root)
+          Stat_timestampf(table->s->vers_end_field()->field_name, table->s);
+        if (!is_create_table_ind && vers_scan_min_max(thd, el))
+          return true;
+      }
+      if (el == vers_info->now_part || el == vers_info->hist_part)
+        continue;
+      if (!vers_info->hist_part && el->id == vers_info->hist_default)
+      {
+        vers_info->hist_part= el;
+      }
+      if (is_create_table_ind || (
+        table->s->free_parts_init &&
+        !vers_limit_exceed(el) &&
+        !vers_interval_exceed(el)))
+      {
+        table->s->free_parts.push_back((void *) el->id, &table->mem_root);
       }
     }
-    if (el == vers_info->now_part || el == vers_info->hist_part)
-      continue;
-    if (!vers_info->hist_part && el->id == vers_info->hist_default)
-      vers_info->hist_part= el;
-    if (is_create_table_ind || (!vers_limit_exceed(el) && !vers_interval_exceed(el)))
-      vers_info->free_parts.push_back(el, &table->mem_root);
+    table->s->hist_part_id= vers_info->hist_part->id;
+    if (!is_create_table_ind && (vers_limit_exceed() || vers_interval_exceed()))
+      vers_part_rotate(thd);
+    table->s->free_parts_init= false;
+    mysql_mutex_lock(&table->s->LOCK_rotation);
+    mysql_cond_broadcast(&table->s->COND_rotation);
+    table->s->busy_rotation= false;
   }
-  if (!is_create_table_ind && (vers_limit_exceed() || vers_interval_exceed()))
-    vers_part_rotate(thd);
+  mysql_mutex_unlock(&table->s->LOCK_rotation);
   return false;
 }
 

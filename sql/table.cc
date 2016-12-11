@@ -422,6 +422,9 @@ void TABLE_SHARE::destroy()
   DBUG_ENTER("TABLE_SHARE::destroy");
   DBUG_PRINT("info", ("db: %s table: %s", db.str, table_name.str));
 
+  if (versioned)
+    vers_destroy();
+
   if (ha_share)
   {
     delete ha_share;
@@ -2367,8 +2370,6 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
   share->db_plugin= se_plugin;
 
   /* Set system versioning information. */
-  vers_init();
-
   if (system_period == NULL)
   {
     versioned= false;
@@ -2384,6 +2385,7 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
       goto err;
     DBUG_PRINT("info", ("Columns with system versioning: [%d, %d]", row_start, row_end));
     versioned= true;
+    vers_init();
     row_start_field = row_start;
     row_end_field = row_end;
     vers_start_field()->flags|= VERS_SYS_START_FLAG;

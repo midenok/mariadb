@@ -43,7 +43,6 @@ struct Vers_part_info : public Sql_alloc
     hist_part(NULL),
     hist_default(UINT32_MAX)
   {
-    free_parts.empty();
   }
   Vers_part_info(Vers_part_info &src) :
     interval(src.interval),
@@ -52,7 +51,6 @@ struct Vers_part_info : public Sql_alloc
     hist_part(NULL),
     hist_default(src.hist_default)
   {
-    free_parts.empty();
   }
   bool initialized(bool fully= true)
   {
@@ -74,7 +72,6 @@ struct Vers_part_info : public Sql_alloc
   partition_element *now_part;
   partition_element *hist_part;
   uint32 hist_default;
-  List<partition_element> free_parts;
 };
 
 class partition_info : public Sql_alloc
@@ -441,6 +438,31 @@ public:
   partition_element* vers_part_rotate(THD *thd);
   bool vers_setup_1(THD *thd);
   bool vers_setup_2(THD *thd, bool is_create_table_ind);
+  bool vers_scan_min_max(THD *thd, partition_element *part);
+
+  partition_element *vers_hist_part()
+  {
+    DBUG_ASSERT(table && table->s);
+    DBUG_ASSERT(vers_info && vers_info->initialized());
+    DBUG_ASSERT(table->s->hist_part_id != UINT32_MAX);
+    if (table->s->hist_part_id == vers_info->hist_part->id)
+      return vers_info->hist_part;
+
+    List_iterator<partition_element> it(partitions);
+    partition_element *el;
+    while ((el= it++))
+    {
+      DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
+      if (el->type == partition_element::VERSIONING &&
+        el->id == table->s->hist_part_id)
+      {
+        vers_info->hist_part= el;
+        return vers_info->hist_part;
+      }
+    }
+    DBUG_ASSERT(0);
+    return NULL;
+  }
   bool vers_limit_exceed(partition_element *part= NULL)
   {
     DBUG_ASSERT(vers_info);
@@ -449,7 +471,7 @@ public:
     if (!part)
     {
       DBUG_ASSERT(vers_info->initialized());
-      part= vers_info->hist_part;
+      part= vers_hist_part();
     }
     // TODO: cache thread-shared part_recs and increment on INSERT
     return table->file->part_recs_slow(part) >= vers_info->limit;
@@ -462,7 +484,7 @@ public:
     if (!part)
     {
       DBUG_ASSERT(vers_info->initialized());
-      part= vers_info->hist_part;
+      part= vers_hist_part();
     }
     DBUG_ASSERT(part->stat_trx_end);
     max_time-= part->stat_trx_end->min_time();
@@ -475,8 +497,7 @@ public:
   }
   bool vers_interval_exceed()
   {
-    DBUG_ASSERT(vers_info && vers_info->initialized());
-    return vers_interval_exceed(vers_info->hist_part);
+    return vers_interval_exceed(vers_hist_part());
   }
 };
 

@@ -731,12 +731,26 @@ struct TABLE_SHARE
   uint16 row_start_field;
   uint16 row_end_field;
   uint32 hist_part_id;
-  ha_rows *part_rows;
+  List<void> free_parts;
+  bool free_parts_init;
+  bool busy_rotation;
+  mysql_mutex_t LOCK_rotation;
+  mysql_cond_t COND_rotation;
 
   void vers_init()
   {
     hist_part_id= UINT32_MAX;
-    ha_rows *part_rows= NULL;
+    busy_rotation= false;
+    free_parts.empty();
+    free_parts_init= true;
+    mysql_mutex_init(key_TABLE_SHARE_LOCK_rotation, &LOCK_rotation, MY_MUTEX_INIT_FAST);
+    mysql_cond_init(key_TABLE_SHARE_COND_rotation, &COND_rotation, NULL);
+  }
+
+  void vers_destroy()
+  {
+    mysql_mutex_destroy(&LOCK_rotation);
+    mysql_cond_destroy(&COND_rotation);
   }
 
   Field *vers_start_field()
@@ -747,6 +761,17 @@ struct TABLE_SHARE
   Field *vers_end_field()
   {
     return field[row_end_field];
+  }
+
+  void vers_part_rotate()
+  {
+    hist_part_id= (ulong)(void *)(free_parts.pop());
+  }
+
+  void vers_wait_rotation()
+  {
+    while (busy_rotation)
+      mysql_cond_wait(&COND_rotation, &LOCK_rotation);
   }
 
   /**
