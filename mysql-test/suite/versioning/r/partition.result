@@ -61,6 +61,18 @@ with system versioning
 partition by system_time (
 partition p0 as of now,
 partition p1 versioning);
+alter table t1 add partition (
+partition p2 as of now);
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: multiple `AS OF NOW` partitions
+alter table t1 add partition (
+partition p2 versioning default);
+Warnings:
+Warning	4041	Maybe missing parameters: no rotation condition for multiple `VERSIONING` partitions.
+alter table t1 drop partition p0;
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: `AS OF NOW` partition can not be dropped
+alter table t1 drop partition p2;
+alter table t1 drop partition p1;
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: one `AS OF NOW` and at least one `VERSIONING` partition required
 insert into t1 values (1);
 select * from t1;
 x

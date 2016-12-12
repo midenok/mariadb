@@ -1889,6 +1889,7 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
   bool result= TRUE, table_engine_set;
   char *same_name;
   uint32 hist_parts= 0;
+  uint32 now_parts= 0;
   const char* hist_default= NULL;
   DBUG_ENTER("partition_info::check_partition_info");
   DBUG_ASSERT(default_engine_type != partition_hton);
@@ -2091,17 +2092,24 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
           }
         }
       }
-      if (part_type == VERSIONING_PARTITION &&
-        part_elem->type == partition_element::VERSIONING)
+      if (part_type == VERSIONING_PARTITION)
       {
-        hist_parts++;
-        if (vers_info->hist_default == UINT32_MAX)
+        if (part_elem->type == partition_element::VERSIONING)
         {
-          vers_info->hist_default= part_elem->id;
-          hist_default= part_elem->partition_name;
+          hist_parts++;
+          if (vers_info->hist_default == UINT32_MAX)
+          {
+            vers_info->hist_default= part_elem->id;
+            hist_default= part_elem->partition_name;
+          }
+          if (vers_info->hist_default == part_elem->id)
+            vers_info->hist_part= part_elem;
         }
-        if (vers_info->hist_default == part_elem->id)
-          vers_info->hist_part= part_elem;
+        else
+        {
+          DBUG_ASSERT(part_elem->type == partition_element::AS_OF_NOW);
+          now_parts++;
+        }
       }
     } while (++i < num_parts);
     if (!table_engine_set &&
@@ -2159,6 +2167,11 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
         "No `DEFAULT` for `VERSIONING` partitions. Setting `%s` as default.",
         hist_default);
     }
+  }
+  if (now_parts > 1)
+  {
+    my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "multiple `AS OF NOW` partitions");
+    goto end;
   }
   result= FALSE;
 end:

@@ -29,7 +29,7 @@ create or replace table t1 (x int)
 partition by system_time (
     partition p0 as of now,
     partition p1 versioning);
-    
+
 create or replace table t1 (x int);
 --error ER_VERSIONING_REQUIRED
 alter table t1
@@ -57,13 +57,27 @@ partition by system_time (
     partition p0 versioning,
     partition p1 versioning);
 
-# insertion, deletion
 create or replace table t1 (x int)
 with system versioning
 partition by system_time (
     partition p0 as of now,
     partition p1 versioning);
 
+# alter table
+--error ER_VERS_WRONG_PARAMS
+alter table t1 add partition (
+    partition p2 as of now);
+
+alter table t1 add partition (
+    partition p2 versioning default);
+
+--error ER_VERS_WRONG_PARAMS
+alter table t1 drop partition p0;
+alter table t1 drop partition p2;
+--error ER_VERS_WRONG_PARAMS
+alter table t1 drop partition p1;
+
+# insertion, deletion
 insert into t1 values (1);
 select * from t1;
 select * from t1 partition (p0);

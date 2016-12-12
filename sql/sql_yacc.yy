@@ -5269,9 +5269,6 @@ opt_part_values:
             partition_element *elem= part_info->curr_part_elem;
             elem->type= partition_element::AS_OF_NOW;
             DBUG_ASSERT(part_info->vers_info);
-            if (part_info->vers_info->now_part)
-                my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0),
-                  "BY SYSTEM_TIME", "multiple `AS OF NOW` partitions"));
             part_info->vers_info->now_part= elem;
           }
         | VERSIONING_SYM

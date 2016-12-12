@@ -5340,16 +5340,27 @@ that are reorganised.
       List_iterator<partition_element> part_it(tab_part_info->partitions);
 
       tab_part_info->is_auto_partitioned= FALSE;
-      if (!(tab_part_info->part_type == RANGE_PARTITION ||
-            tab_part_info->part_type == LIST_PARTITION))
+      if (tab_part_info->part_type == VERSIONING_PARTITION)
       {
-        my_error(ER_ONLY_ON_RANGE_LIST_PARTITION, MYF(0), "DROP");
-        goto err;
+        if (num_parts_dropped >= tab_part_info->num_parts - 1)
+        {
+          my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "one `AS OF NOW` and at least one `VERSIONING` partition required");
+          goto err;
+        }
       }
-      if (num_parts_dropped >= tab_part_info->num_parts)
+      else
       {
-        my_error(ER_DROP_LAST_PARTITION, MYF(0));
-        goto err;
+        if (!(tab_part_info->part_type == RANGE_PARTITION ||
+              tab_part_info->part_type == LIST_PARTITION))
+        {
+          my_error(ER_ONLY_ON_RANGE_LIST_PARTITION, MYF(0), "DROP");
+          goto err;
+        }
+        if (num_parts_dropped >= tab_part_info->num_parts)
+        {
+          my_error(ER_DROP_LAST_PARTITION, MYF(0));
+          goto err;
+        }
       }
       do
       {
@@ -5357,6 +5368,11 @@ that are reorganised.
         if (is_name_in_list(part_elem->partition_name,
                             alter_info->partition_names))
         {
+          if (part_elem->type == partition_element::AS_OF_NOW)
+          {
+            my_error(ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "`AS OF NOW` partition can not be dropped");
+            goto err;
+          }
           /*
             Set state to indicate that the partition is to be dropped.
           */
