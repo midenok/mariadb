@@ -5265,8 +5265,6 @@ opt_part_values:
             else
             {
               part_info->vers_init_info(thd);
-              // FIXME: ALTER TABLE
-              DBUG_ASSERT(0);
             }
             partition_element *elem= part_info->curr_part_elem;
             elem->type= partition_element::AS_OF_NOW;
@@ -5289,8 +5287,6 @@ opt_part_values:
             else
             {
               part_info->vers_init_info(thd);
-              // FIXME: ALTER TABLE
-              DBUG_ASSERT(0);
             }
             part_info->curr_part_elem->type= partition_element::VERSIONING;
           }

@@ -1146,6 +1146,7 @@ partition_info::vers_part_rotate(THD * thd)
   }
 
   table->s->vers_part_rotate();
+  DBUG_ASSERT(table->s->hist_part_id < num_parts);
   const char* old_part_name= vers_info->hist_part->partition_name;
   vers_hist_part();
 
@@ -1266,7 +1267,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
         !vers_limit_exceed(el) &&
         !vers_interval_exceed(el)))
       {
-        table->s->free_parts.push_back((void *) el->id, &table->mem_root);
+        table->s->free_parts.push_back((void *) el->id, &table->s->mem_root);
       }
     }
     table->s->hist_part_id= vers_info->hist_part->id;

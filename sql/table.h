@@ -765,6 +765,7 @@ struct TABLE_SHARE
 
   void vers_part_rotate()
   {
+    DBUG_ASSERT(!free_parts.is_empty());
     hist_part_id= (ulong)(void *)(free_parts.pop());
   }
 

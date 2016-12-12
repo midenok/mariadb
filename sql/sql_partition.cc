@@ -8580,5 +8580,4 @@ uint get_partition_field_store_length(Field *field)
     store_length+= HA_KEY_BLOB_LENGTH;
   return store_length;
 }
-
 #endif
