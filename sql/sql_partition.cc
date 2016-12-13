@@ -3447,6 +3447,7 @@ int vers_get_partition_id(partition_info *part_info,
     case SQLCOM_DELETE_MULTI:
     case SQLCOM_UPDATE:
     case SQLCOM_UPDATE_MULTI:
+    case SQLCOM_ALTER_TABLE:
       mysql_mutex_lock(&table->s->LOCK_rotation);
       if (table->s->busy_rotation)
       {
