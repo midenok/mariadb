@@ -681,8 +681,6 @@ public:
   { DBUG_ASSERT(0); return false; }
   virtual bool is_max()
   { DBUG_ASSERT(0); return false; }
-  virtual my_time_t get_timestamp(const uchar *pos= NULL, ulong *sec_part= NULL) const
-  { DBUG_ASSERT(0); return 0; }
 
   uchar		*ptr;			// Position to field in record
   /**
@@ -947,6 +945,9 @@ public:
     return bitmap_is_set(table->has_value_set, field_index);
   }
   virtual void set_explicit_default(Item *value);
+
+  virtual my_time_t get_timestamp(const uchar *pos= NULL, ulong *sec_part= NULL) const
+  { DBUG_ASSERT(0); return 0; }
 
   /**
      Evaluates the @c INSERT default function and stores the result in the
