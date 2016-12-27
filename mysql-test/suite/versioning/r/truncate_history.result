@@ -48,6 +48,21 @@ call truncate_history_of_t();
 select * from t for system_time all;
 a
 6
+set @ts1 = now(6);
+update t set a=7;
+set @ts2 = now(6);
+update t set a=8;
+truncate t for system_time timestamp from '1-1-1' to @ts1;
+select * from t for system_time all;
+a
+8
+7
+update t set a=9;
+truncate t for system_time timestamp between '1-1-1' and @ts2;
+select * from t for system_time all;
+a
+9
+8
 create or replace table t (a int) with system versioning engine=innodb;
 insert into t values (1);
 update t set a=2;
@@ -81,5 +96,20 @@ call truncate_history_of_t();
 select * from t for system_time all;
 a
 6
+set @ts1 = now(6);
+update t set a=7;
+set @ts2 = now(6);
+update t set a=8;
+truncate t for system_time timestamp from '1-1-1' to @ts1;
+select * from t for system_time all;
+a
+8
+7
+update t set a=9;
+truncate t for system_time timestamp between '1-1-1' and @ts2;
+select * from t for system_time all;
+a
+9
+8
 drop table t;
 drop procedure truncate_history_of_t;
