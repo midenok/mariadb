@@ -267,12 +267,20 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
       select_lex->vers_conditions.type != FOR_SYSTEM_TIME_UNSPECIFIED;
   if (truncate_history)
   {
+    TABLE *table= table_list->table;
+    DBUG_ASSERT(table);
+
+    if (table->versioned_by_engine() &&
+        table->file->check_table_binlog_row_based(1))
+    {
+      my_error(ER_VERS_WRONG_PARAMS, MYF(0), "TRUNCATE FOR SYSTEM_TIME",
+               "InnoDB versioned table do not support row-based replication");
+      DBUG_RETURN(TRUE);
+    }
+
     DBUG_ASSERT(!conds);
     if (vers_setup_select(thd, table_list, &conds, select_lex))
       DBUG_RETURN(TRUE);
-
-    TABLE *table= table_list->table;
-    DBUG_ASSERT(table);
 
     // trx_sees() in InnoDB reads sys_trx_start
     if (!table->versioned_by_sql() &&
