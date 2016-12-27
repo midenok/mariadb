@@ -273,8 +273,8 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
     if (table->versioned_by_engine() &&
         table->file->check_table_binlog_row_based(1))
     {
-      my_error(ER_VERS_WRONG_PARAMS, MYF(0), "TRUNCATE FOR SYSTEM_TIME",
-               "InnoDB versioned table do not support row-based replication");
+      my_error(ER_VERS_NOT_ALLOWED, MYF(0),
+               "TRUNCATE FOR SYSTEM_TIME with row-based replication");
       DBUG_RETURN(TRUE);
     }
 
