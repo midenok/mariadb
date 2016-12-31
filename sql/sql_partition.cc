@@ -1715,6 +1715,8 @@ bool fix_partition_func(THD *thd, TABLE *table,
     else if (part_info->part_type == VERSIONING_PARTITION)
     {
       error_str= partition_keywords[PKW_SYSTEM_TIME].str;
+      if (unlikely(part_info->check_range_constants(thd)))
+        goto end;
     }
     else
     {
@@ -7578,6 +7580,7 @@ static void set_up_range_analysis_info(partition_info *part_info)
   switch (part_info->part_type) {
   case RANGE_PARTITION:
   case LIST_PARTITION:
+  case VERSIONING_PARTITION:
     if (!part_info->column_list)
     {
       if (part_info->part_expr->get_monotonicity_info() != NON_MONOTONIC)
@@ -7878,7 +7881,7 @@ int get_part_iter_for_interval_cols_via_map(partition_info *part_info,
   uint full_length= 0;
   DBUG_ENTER("get_part_iter_for_interval_cols_via_map");
 
-  if (part_info->part_type == RANGE_PARTITION)
+  if (part_info->part_type == RANGE_PARTITION || part_info->part_type == VERSIONING_PARTITION)
   {
     get_col_endpoint= get_partition_id_cols_range_for_endpoint;
     part_iter->get_next= get_next_partition_id_range;
@@ -7921,7 +7924,7 @@ int get_part_iter_for_interval_cols_via_map(partition_info *part_info,
   }
   if (flags & NO_MAX_RANGE)
   {
-    if (part_info->part_type == RANGE_PARTITION)
+    if (part_info->part_type == RANGE_PARTITION || part_info->part_type == VERSIONING_PARTITION)
       part_iter->part_nums.end= part_info->num_parts;
     else /* LIST_PARTITION */
     {

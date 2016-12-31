@@ -182,8 +182,9 @@ public:
     LIST_PART_ENTRY *list_array;
     part_column_list_val *range_col_array;
     part_column_list_val *list_col_array;
-    Vers_part_info *vers_info;
   };
+
+  Vers_part_info *vers_info;
   
   /********************************************
    * INTERVAL ANALYSIS

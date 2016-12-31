@@ -1077,6 +1077,7 @@ bool partition_info::vers_init_info(THD * thd)
   part_type= VERSIONING_PARTITION;
   list_of_part_fields= TRUE;
   column_list= TRUE;
+  num_columns= 1;
   vers_info= new (thd->mem_root) Vers_part_info;
   if (!vers_info)
   {
@@ -1253,8 +1254,22 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
         DBUG_ASSERT(!el->stat_trx_end);
         el->stat_trx_end= new (&table->mem_root)
           Stat_timestampf(table->s->vers_end_field()->field_name, table->s);
-        if (!is_create_table_ind && vers_scan_min_max(thd, el))
-          return true;
+        if (!is_create_table_ind)
+        {
+          if (vers_scan_min_max(thd, el))
+            return true;
+          curr_list_object= 0;
+          part_column_list_val *col_val= add_column_value(thd);
+          my_time_t part_value= el->stat_trx_end->max_time() + 1;
+          // FIXME: part_value == 1 when el have no records
+          init_col_val(col_val, new (&table->mem_root) Item_int(thd, (ulonglong) part_value));
+        }
+      }
+      else if (!is_create_table_ind)
+      {
+        DBUG_ASSERT(el->type == partition_element::AS_OF_NOW);
+        part_column_list_val *col_val= add_column_value(thd);
+        init_col_val(col_val, new (&table->mem_root) Item_int(thd, (ulonglong) 0));
       }
       if (el == vers_info->now_part || el == vers_info->hist_part)
         continue;
@@ -2142,7 +2157,7 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
 
   if (add_or_reorg_part)
   {
-    if (unlikely((part_type == RANGE_PARTITION &&
+    if (unlikely(((part_type == RANGE_PARTITION || part_type == VERSIONING_PARTITION) &&
                   check_range_constants(thd)) ||
                  (part_type == LIST_PARTITION &&
                   check_list_constants(thd))))

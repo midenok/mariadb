@@ -5270,6 +5270,10 @@ opt_part_values:
             elem->type= partition_element::AS_OF_NOW;
             DBUG_ASSERT(part_info->vers_info);
             part_info->vers_info->now_part= elem;
+            if (part_info->init_column_part(thd))
+            {
+              MYSQL_YYABORT;
+            }
           }
         | VERSIONING_SYM
           {
@@ -5286,6 +5290,10 @@ opt_part_values:
               part_info->vers_init_info(thd);
             }
             part_info->curr_part_elem->type= partition_element::VERSIONING;
+            if (part_info->init_column_part(thd))
+            {
+              MYSQL_YYABORT;
+            }
           }
           opt_default_hist_part
         | DEFAULT
