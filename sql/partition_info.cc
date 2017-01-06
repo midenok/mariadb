@@ -1173,6 +1173,26 @@ bool partition_info::vers_setup_1(THD * thd)
   part_field_list.empty();
   part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
   sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG; // needed in handle_list_of_fields()
+
+  List_iterator<partition_element> it(partitions);
+  partition_element *el;
+  MYSQL_TIME t;
+  memset(&t, 0, sizeof(t));
+  t.year= 2001;
+  t.month= 1;
+  t.day= 1;
+  while ((el= it++))
+  {
+    DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
+    curr_part_elem= el;
+    init_column_part(thd);
+
+    el->list_val_list.empty();
+    el->list_val_list.push_back(curr_list_val, thd->mem_root);
+    part_column_list_val *col_val= add_column_value(thd);
+    init_col_val(col_val, new (thd->mem_root) Item_datetime_literal(thd, &t));
+    t.second++;
+  }
   return false;
 }
 
@@ -1258,19 +1278,19 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
         {
           if (vers_scan_min_max(thd, el))
             return true;
-          curr_list_object= 0;
-          part_column_list_val *col_val= add_column_value(thd);
-          my_time_t part_value= el->stat_trx_end->max_time() + 1;
-          // FIXME: part_value == 1 when el have no records
-          init_col_val(col_val, new (&table->mem_root) Item_int(thd, (ulonglong) part_value));
+          //curr_list_object= 0;
+          //part_column_list_val *col_val= add_column_value(thd);
+          //my_time_t part_value= el->stat_trx_end->max_time() + 1;
+          //// FIXME: part_value == 1 when el have no records
+          //init_col_val(col_val, new (&table->mem_root) Item_int(thd, (ulonglong) part_value));
         }
       }
-      else if (!is_create_table_ind)
-      {
-        DBUG_ASSERT(el->type == partition_element::AS_OF_NOW);
-        part_column_list_val *col_val= add_column_value(thd);
-        init_col_val(col_val, new (&table->mem_root) Item_int(thd, (ulonglong) 0));
-      }
+      //else if (!is_create_table_ind)
+      //{
+      //  DBUG_ASSERT(el->type == partition_element::AS_OF_NOW);
+      //  part_column_list_val *col_val= add_column_value(thd);
+      //  init_col_val(col_val, new (&table->mem_root) Item_int(thd, (ulonglong) 0));
+      //}
       if (el == vers_info->now_part || el == vers_info->hist_part)
         continue;
       if (!vers_info->hist_part && el->id == vers_info->hist_default)
