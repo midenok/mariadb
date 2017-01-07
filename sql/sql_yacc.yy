@@ -5289,13 +5289,15 @@ opt_part_values:
             {
               part_info->vers_init_info(thd);
             }
+            DBUG_ASSERT(part_info->vers_info);
+            if (part_info->vers_info->now_part)
+              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "AS OF NOW partition is not last"));
             part_info->curr_part_elem->type= partition_element::VERSIONING;
             if (part_info->init_column_part(thd))
             {
               MYSQL_YYABORT;
             }
           }
-          opt_default_hist_part
         | DEFAULT
          {
             LEX *lex= Lex;
@@ -5618,20 +5620,6 @@ opt_versioning_limit:
              MYSQL_YYABORT;
          }
        ;
-
-opt_default_hist_part:
-          /* empty */ {}
-        | DEFAULT
-          {
-            partition_info *part_info= Lex->part_info;
-            DBUG_ASSERT(part_info && part_info->vers_info && part_info->curr_part_elem);
-            if (part_info->vers_info->hist_part)
-              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0),
-                "BY SYSTEM_TIME", "multiple `DEFAULT` partitions"));
-            part_info->vers_info->hist_part= part_info->curr_part_elem;
-            part_info->vers_info->hist_default= part_info->curr_part_elem->id;
-          }
-        ;
 
 /*
  End of partition parser part

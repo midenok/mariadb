@@ -40,16 +40,14 @@ struct Vers_part_info : public Sql_alloc
     interval(0),
     limit(0),
     now_part(NULL),
-    hist_part(NULL),
-    hist_default(UINT32_MAX)
+    hist_part(NULL)
   {
   }
   Vers_part_info(Vers_part_info &src) :
     interval(src.interval),
     limit(src.limit),
     now_part(NULL),
-    hist_part(NULL),
-    hist_default(src.hist_default)
+    hist_part(NULL)
   {
   }
   bool initialized(bool fully= true)
@@ -71,7 +69,6 @@ struct Vers_part_info : public Sql_alloc
   ulonglong limit;
   partition_element *now_part;
   partition_element *hist_part;
-  uint32 hist_default;
 };
 
 class partition_info : public Sql_alloc
@@ -440,6 +437,7 @@ public:
   bool vers_setup_1(THD *thd);
   bool vers_setup_2(THD *thd, bool is_create_table_ind);
   bool vers_scan_min_max(THD *thd, partition_element *part);
+  bool part_empty(THD *thd, partition_element *part, bool &result);
 
   partition_element *vers_hist_part()
   {

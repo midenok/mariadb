@@ -2397,9 +2397,6 @@ static int add_partition_values(File fptr, partition_info *part_info,
       break;
     case partition_element::VERSIONING:
       err+= add_string(fptr, " VERSIONING");
-      DBUG_ASSERT(part_info->vers_info);
-      if (part_info->vers_info->hist_default == p_elem->id)
-        err+= add_string(fptr, " DEFAULT");
       break;
     default:
       DBUG_ASSERT(0 && "wrong p_elem->type");

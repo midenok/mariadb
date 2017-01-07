@@ -1180,7 +1180,7 @@ bool partition_info::vers_setup_1(THD * thd)
   memset(&t, 0, sizeof(t));
   t.year= 2001;
   t.month= 1;
-  t.day= 1;
+  t.day= 7;
   while ((el= it++))
   {
     DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
@@ -1191,6 +1191,7 @@ bool partition_info::vers_setup_1(THD * thd)
     el->list_val_list.push_back(curr_list_val, thd->mem_root);
     part_column_list_val *col_val= add_column_value(thd);
     init_col_val(col_val, new (thd->mem_root) Item_datetime_literal(thd, &t));
+    t.year= 2017;
     t.second++;
   }
   return false;
@@ -1241,12 +1242,47 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
   return false;
 }
 
+inline
+bool partition_info::part_empty(THD *thd, partition_element *part, bool &result)
+{
+  uint32 sub_factor= num_subparts ? num_subparts : 1;
+  uint32 part_id= part->id * sub_factor;
+  uint32 part_id_end= part_id + sub_factor;
+  for (; part_id < part_id_end; ++part_id)
+  {
+    handler *file= table->file->part_handler(part_id);
+    int rc= file->ha_external_lock(thd, F_RDLCK);
+    if (rc)
+      goto error;
+    rc= file->ha_rnd_init(true);
+    if (!rc)
+    {
+      rc= file->ha_rnd_next(table->record[1]);
+      file->ha_rnd_end();
+      if (rc == 0)
+      {
+        result= false;
+        return false;
+      }
+    }
+    file->ha_external_lock(thd, F_UNLCK);
+    if (rc != HA_ERR_END_OF_FILE)
+    {
+    error:
+      my_error(ER_INTERNAL_ERROR, MYF(0), "partition_info::have_records() failed");
+      return true;
+    }
+  }
+  result= true;
+  return false;
+}
+
 
 // setup at open stage (TABLE_SHARE is initialized)
 bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 {
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);
-  DBUG_ASSERT(vers_info && vers_info->initialized(is_create_table_ind) && vers_info->hist_default != UINT32_MAX);
+  DBUG_ASSERT(vers_info && vers_info->initialized(is_create_table_ind));
   DBUG_ASSERT(table && table->s);
   if (!table->versioned_by_sql())
   {
@@ -1293,7 +1329,18 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
       //}
       if (el == vers_info->now_part || el == vers_info->hist_part)
         continue;
-      if (!vers_info->hist_part && el->id == vers_info->hist_default)
+      if (vers_info->hist_part)
+      {
+        if (!is_create_table_ind)
+        {
+          bool empty;
+          if (part_empty(thd, el, empty))
+            return true;
+          if (!empty)
+            vers_info->hist_part= el;
+        }
+      }
+      else
       {
         vers_info->hist_part= el;
       }
@@ -1304,7 +1351,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
       {
         table->s->free_parts.push_back((void *) el->id, &table->s->mem_root);
       }
-    }
+    } // while
     table->s->hist_part_id= vers_info->hist_part->id;
     if (!is_create_table_ind && (vers_limit_exceed() || vers_interval_exceed()))
       vers_part_rotate(thd);
@@ -2132,13 +2179,9 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
         if (part_elem->type == partition_element::VERSIONING)
         {
           hist_parts++;
-          if (vers_info->hist_default == UINT32_MAX)
-          {
-            vers_info->hist_default= part_elem->id;
-            hist_default= part_elem->partition_name;
-          }
-          if (vers_info->hist_default == part_elem->id)
-            vers_info->hist_part= part_elem;
+          vers_info->hist_part= part_elem;
+          // FIXME:
+          DBUG_ASSERT(0);
         }
         else
         {
