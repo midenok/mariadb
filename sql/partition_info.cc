@@ -1179,7 +1179,7 @@ bool partition_info::vers_setup_1(THD * thd)
   partition_element *el;
   MYSQL_TIME t;
   memset(&t, 0, sizeof(t));
-  my_time_t ts= 0;
+  my_time_t ts= TIMESTAMP_MAX_VALUE - partitions.elements;
   while ((el= it++))
   {
     DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
@@ -1188,15 +1188,20 @@ bool partition_info::vers_setup_1(THD * thd)
     el->list_val_list.empty();
     el->list_val_list.push_back(curr_list_val, thd->mem_root);
     part_column_list_val *col_val= add_column_value(thd);
+    ++ts;
     if (el->type == partition_element::AS_OF_NOW)
     {
       col_val->max_value= true;
-      ts= TIMESTAMP_MAX_VALUE;
+      DBUG_ASSERT(ts == TIMESTAMP_MAX_VALUE);
     }
-    else
-      ++ts;
     thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
-    init_col_val(col_val, new (thd->mem_root) Item_datetime_literal(thd, &t));
+    Item *item_expression= new (thd->mem_root) Item_datetime_literal(thd, &t);
+    /* FIXME: we initialize col_val with bogus Item to make fix_partition_func() and check_range_constants() happy.
+       Later in vers_setup_2() it is initialized with real value Item. */
+    /* FIXME: TIME_RESULT in col_val is expensive. It should be INT_RESULT
+       (got to be fixed when InnoDB is supported). */
+    init_col_val(col_val, item_expression);
+    DBUG_ASSERT(item_expression == el->list_val_item());
   }
   return false;
 }
@@ -1204,11 +1209,12 @@ bool partition_info::vers_setup_1(THD * thd)
 
 // scan table for min/max sys_trx_end
 inline
-bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
+bool partition_info::vers_scan_min_max(THD *thd, partition_element *part, bool &empty)
 {
   uint32 sub_factor= num_subparts ? num_subparts : 1;
   uint32 part_id= part->id * sub_factor;
   uint32 part_id_end= part_id + sub_factor;
+  empty= true;
   for (; part_id < part_id_end; ++part_id)
   {
     handler *file= table->file->part_handler(part_id);
@@ -1220,6 +1226,8 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
     {
       while ((rc= file->ha_rnd_next(table->record[0])) != HA_ERR_END_OF_FILE)
       {
+        if (empty)
+          empty= false;
         if (thd->killed)
         {
           file->ha_rnd_end();
@@ -1246,41 +1254,6 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
   return false;
 }
 
-inline
-bool partition_info::part_empty(THD *thd, partition_element *part, bool &result)
-{
-  uint32 sub_factor= num_subparts ? num_subparts : 1;
-  uint32 part_id= part->id * sub_factor;
-  uint32 part_id_end= part_id + sub_factor;
-  for (; part_id < part_id_end; ++part_id)
-  {
-    handler *file= table->file->part_handler(part_id);
-    int rc= file->ha_external_lock(thd, F_RDLCK);
-    if (rc)
-      goto error;
-    rc= file->ha_rnd_init(true);
-    if (!rc)
-    {
-      rc= file->ha_rnd_next(table->record[1]);
-      file->ha_rnd_end();
-      if (rc == 0)
-      {
-        result= false;
-        return false;
-      }
-    }
-    file->ha_external_lock(thd, F_UNLCK);
-    if (rc != HA_ERR_END_OF_FILE)
-    {
-    error:
-      my_error(ER_INTERNAL_ERROR, MYF(0), "partition_info::have_records() failed");
-      return true;
-    }
-  }
-  result= true;
-  return false;
-}
-
 
 // setup at open stage (TABLE_SHARE is initialized)
 bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
@@ -1303,56 +1276,57 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
   {
     table->s->busy_rotation= true;
     mysql_mutex_unlock(&table->s->LOCK_rotation);
+
+    MYSQL_TIME t;
+    memset(&t, 0, sizeof(t));
+
     // build freelist, scan min/max, assign hist_part
     List_iterator<partition_element> it(partitions);
     partition_element *el;
-    while ((el= it++))
+    while ((el= it++) && el->type == partition_element::VERSIONING)
     {
+      bool empty= true;
       DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
-      if (el->type == partition_element::VERSIONING)
+      DBUG_ASSERT(!el->stat_trx_end);
+      el->stat_trx_end= new (&table->mem_root)
+        Stat_timestampf(table->s->vers_end_field()->field_name, table->s);
+
+      if (!is_create_table_ind)
       {
-        DBUG_ASSERT(!el->stat_trx_end);
-        el->stat_trx_end= new (&table->mem_root)
-          Stat_timestampf(table->s->vers_end_field()->field_name, table->s);
-        if (!is_create_table_ind)
+        if (vers_scan_min_max(thd, el, empty))
+          return true;
+        if (!empty)
         {
-          if (vers_scan_min_max(thd, el))
-            return true;
-          //curr_list_object= 0;
-          //part_column_list_val *col_val= add_column_value(thd);
-          //my_time_t part_value= el->stat_trx_end->max_time() + 1;
-          //// FIXME: part_value == 1 when el have no records
-          //init_col_val(col_val, new (&table->mem_root) Item_int(thd, (ulonglong) part_value));
+          DBUG_ASSERT(el->list_val_list.elements == 1);
+          curr_list_val= static_cast<part_elem_value*>(el->list_val_list.first_node()->info);
+          part_column_list_val *col_val= curr_list_val->col_val_array;
+          DBUG_ASSERT(col_val);
+          my_time_t ts= el->stat_trx_end->max_time() + 1;
+          thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
+          Item *item_expression= new (thd->mem_root) Item_datetime_literal(thd, &t);
+          init_col_val(col_val, item_expression);
+          DBUG_ASSERT(item_expression == el->list_val_item());
         }
       }
-      //else if (!is_create_table_ind)
-      //{
-      //  DBUG_ASSERT(el->type == partition_element::AS_OF_NOW);
-      //  part_column_list_val *col_val= add_column_value(thd);
-      //  init_col_val(col_val, new (&table->mem_root) Item_int(thd, (ulonglong) 0));
-      //}
-      if (el == vers_info->now_part || el == vers_info->hist_part)
-        continue;
+
       if (vers_info->hist_part)
       {
-        if (!is_create_table_ind)
-        {
-          bool empty;
-          if (part_empty(thd, el, empty))
-            return true;
-          if (!empty)
-            vers_info->hist_part= el;
-        }
+        if (!empty)
+          goto set_hist_part;
       }
       else
       {
+      set_hist_part:
         vers_info->hist_part= el;
+        continue;
       }
+
       if (is_create_table_ind || (
         table->s->free_parts_init &&
         !vers_limit_exceed(el) &&
         !vers_interval_exceed(el)))
       {
+        // FIXME: do we need free_parts now?
         table->s->free_parts.push_back((void *) el->id, &table->s->mem_root);
       }
     } // while

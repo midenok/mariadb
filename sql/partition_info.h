@@ -436,8 +436,7 @@ public:
   partition_element* vers_part_rotate(THD *thd);
   bool vers_setup_1(THD *thd);
   bool vers_setup_2(THD *thd, bool is_create_table_ind);
-  bool vers_scan_min_max(THD *thd, partition_element *part);
-  bool part_empty(THD *thd, partition_element *part, bool &result);
+  bool vers_scan_min_max(THD *thd, partition_element *part, bool &empty);
 
   partition_element *vers_hist_part()
   {
