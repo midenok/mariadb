@@ -21,6 +21,7 @@
 #endif
 
 #include <my_global.h>
+#include <tztime.h>
 #include "sql_priv.h"
 // Required to get server definitions for mysql/plugin.h right
 #include "sql_plugin.h"
@@ -1178,21 +1179,24 @@ bool partition_info::vers_setup_1(THD * thd)
   partition_element *el;
   MYSQL_TIME t;
   memset(&t, 0, sizeof(t));
-  t.year= 2001;
-  t.month= 1;
-  t.day= 7;
+  my_time_t ts= 0;
   while ((el= it++))
   {
     DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
     curr_part_elem= el;
     init_column_part(thd);
-
     el->list_val_list.empty();
     el->list_val_list.push_back(curr_list_val, thd->mem_root);
     part_column_list_val *col_val= add_column_value(thd);
+    if (el->type == partition_element::AS_OF_NOW)
+    {
+      col_val->max_value= true;
+      ts= TIMESTAMP_MAX_VALUE;
+    }
+    else
+      ++ts;
+    thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
     init_col_val(col_val, new (thd->mem_root) Item_datetime_literal(thd, &t));
-    t.year= 2017;
-    t.second++;
   }
   return false;
 }
@@ -1282,7 +1286,7 @@ bool partition_info::part_empty(THD *thd, partition_element *part, bool &result)
 bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 {
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);
-  DBUG_ASSERT(vers_info && vers_info->initialized(is_create_table_ind));
+  DBUG_ASSERT(vers_info && vers_info->initialized(false));
   DBUG_ASSERT(table && table->s);
   if (!table->versioned_by_sql())
   {
@@ -1972,7 +1976,6 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
   char *same_name;
   uint32 hist_parts= 0;
   uint32 now_parts= 0;
-  const char* hist_default= NULL;
   DBUG_ENTER("partition_info::check_partition_info");
   DBUG_ASSERT(default_engine_type != partition_hton);
 
@@ -2179,9 +2182,6 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
         if (part_elem->type == partition_element::VERSIONING)
         {
           hist_parts++;
-          vers_info->hist_part= part_elem;
-          // FIXME:
-          DBUG_ASSERT(0);
         }
         else
         {
@@ -2236,14 +2236,6 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
         WARN_VERS_PARAMETERS,
         ER_THD(thd, WARN_VERS_PARAMETERS),
         "no rotation condition for multiple `VERSIONING` partitions.");
-    }
-    if (hist_default)
-    {
-      push_warning_printf(thd,
-        Sql_condition::WARN_LEVEL_WARN,
-        WARN_VERS_PARAMETERS,
-        "No `DEFAULT` for `VERSIONING` partitions. Setting `%s` as default.",
-        hist_default);
     }
   }
   if (now_parts > 1)
