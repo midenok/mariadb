@@ -546,6 +546,8 @@ struct TABLE_STATISTICS_CB
   bool histograms_are_read;   
 };
 
+class Vers_field_stats;
+
 #ifndef UINT32_MAX
 #define UINT32_MAX             (4294967295U)
 #endif
@@ -732,6 +734,8 @@ struct TABLE_SHARE
   uint16 row_end_field;
   uint32 hist_part_id;
   List<void> free_parts;
+  Vers_field_stats** stat_trx_end;
+
   bool free_parts_init;
   bool busy_rotation;
   mysql_mutex_t LOCK_rotation;
@@ -743,6 +747,7 @@ struct TABLE_SHARE
     busy_rotation= false;
     free_parts.empty();
     free_parts_init= true;
+    stat_trx_end= NULL;
     mysql_mutex_init(key_TABLE_SHARE_LOCK_rotation, &LOCK_rotation, MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_TABLE_SHARE_COND_rotation, &COND_rotation, NULL);
   }

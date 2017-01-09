@@ -474,6 +474,18 @@ public:
     // TODO: cache thread-shared part_recs and increment on INSERT
     return table->file->part_recs_slow(part) >= vers_info->limit;
   }
+  Vers_field_stats& vers_stat_trx_end(uint32 part_element_id)
+  {
+    DBUG_ASSERT(table && table->s && table->s->stat_trx_end);
+    Vers_field_stats* res= table->s->stat_trx_end[part_element_id];
+    DBUG_ASSERT(res);
+    return *res;
+  }
+  Vers_field_stats& vers_stat_trx_end(partition_element *part)
+  {
+    DBUG_ASSERT(part);
+    return vers_stat_trx_end(part->id);
+  }
   bool vers_interval_exceed(my_time_t max_time, partition_element *part= NULL)
   {
     DBUG_ASSERT(vers_info);
@@ -484,14 +496,12 @@ public:
       DBUG_ASSERT(vers_info->initialized());
       part= vers_hist_part();
     }
-    DBUG_ASSERT(part->stat_trx_end);
-    max_time-= part->stat_trx_end->min_time();
+    max_time-= vers_stat_trx_end(part).min_time();
     return max_time > vers_info->interval;
   }
   bool vers_interval_exceed(partition_element *part)
   {
-    DBUG_ASSERT(part->stat_trx_end);
-    return vers_interval_exceed(part->stat_trx_end->max_time(), part);
+    return vers_interval_exceed(vers_stat_trx_end(part).max_time(), part);
   }
   bool vers_interval_exceed()
   {

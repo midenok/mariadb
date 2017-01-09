@@ -1215,6 +1215,7 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part, bool &
   uint32 part_id= part->id * sub_factor;
   uint32 part_id_end= part_id + sub_factor;
   empty= true;
+  DBUG_ASSERT(table->s->stat_trx_end);
   for (; part_id < part_id_end; ++part_id)
   {
     handler *file= table->file->part_handler(part_id);
@@ -1239,7 +1240,7 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part, bool &
             continue;
           break;
         }
-        part->stat_trx_end->update(table->vers_end_field());
+        vers_stat_trx_end(part).update_unguarded(table->vers_end_field());
       }
       file->ha_rnd_end();
     }
@@ -1279,6 +1280,12 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 
     MYSQL_TIME t;
     memset(&t, 0, sizeof(t));
+    DBUG_ASSERT(part_field_list.elements == 1);
+
+    DBUG_ASSERT(partitions.elements > 1);
+    DBUG_ASSERT(!table->s->stat_trx_end);
+    table->s->stat_trx_end= static_cast<Vers_field_stats**>(
+      alloc_root(&table->s->mem_root, sizeof(void *) * (partitions.elements - 1)));
 
     // build freelist, scan min/max, assign hist_part
     List_iterator<partition_element> it(partitions);
@@ -1287,9 +1294,9 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     {
       bool empty= true;
       DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
-      DBUG_ASSERT(!el->stat_trx_end);
-      el->stat_trx_end= new (&table->mem_root)
-        Stat_timestampf(table->s->vers_end_field()->field_name, table->s);
+      Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
+        Vers_field_stats(table->s->vers_end_field()->field_name, table->s);
+      table->s->stat_trx_end[el->id]= stat_trx_end;
 
       if (!is_create_table_ind)
       {
@@ -1297,15 +1304,11 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
           return true;
         if (!empty)
         {
-          DBUG_ASSERT(el->list_val_list.elements == 1);
-          curr_list_val= static_cast<part_elem_value*>(el->list_val_list.first_node()->info);
-          part_column_list_val *col_val= curr_list_val->col_val_array;
-          DBUG_ASSERT(col_val);
-          my_time_t ts= el->stat_trx_end->max_time() + 1;
+          my_time_t ts= stat_trx_end->max_time() + 1;
           thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
-          Item *item_expression= new (thd->mem_root) Item_datetime_literal(thd, &t);
-          init_col_val(col_val, item_expression);
-          DBUG_ASSERT(item_expression == el->list_val_item());
+          Item_datetime_literal *val_item= static_cast<Item_datetime_literal*>(el->list_val_item());
+          DBUG_ASSERT(val_item);
+          val_item->set_time(&t);
         }
       }
 

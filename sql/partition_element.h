@@ -90,38 +90,57 @@ typedef struct p_elem_val
 
 struct st_ddl_log_memory_entry;
 
-class Stat_timestampf : public Sql_alloc
+class Vers_field_stats : public Sql_alloc
 {
   static const uint buf_size= 4 + (TIME_SECOND_PART_DIGITS + 1) / 2;
   uchar min_buf[buf_size];
   uchar max_buf[buf_size];
   Field_timestampf min_value;
   Field_timestampf max_value;
+  mysql_rwlock_t lock;
 
 public:
-  Stat_timestampf(const char *field_name, TABLE_SHARE *share) :
+  Vers_field_stats(const char *field_name, TABLE_SHARE *share) :
     min_value(min_buf, NULL, 0, Field::NONE, field_name, share, 6),
     max_value(max_buf, NULL, 0, Field::NONE, field_name, share, 6)
   {
     min_value.set_max();
     memset(max_buf, 0, buf_size);
+    mysql_rwlock_init(key_rwlock_LOCK_vers_stats, &lock);
   }
-  void update(Field *from)
+  ~Vers_field_stats()
+  {
+    mysql_rwlock_destroy(&lock);
+  }
+  void update_unguarded(Field *from)
   {
     from->update_min(&min_value, false);
     from->update_max(&max_value, false);
   }
+  void update(Field *from)
+  {
+    mysql_rwlock_wrlock(&lock);
+    update_unguarded(from);
+    mysql_rwlock_unlock(&lock);
+  }
   my_time_t min_time()
   {
-    return min_value.get_timestamp();
+    mysql_rwlock_rdlock(&lock);
+    my_time_t res= min_value.get_timestamp();
+    mysql_rwlock_unlock(&lock);
+    return res;
   }
   my_time_t max_time()
   {
-    return max_value.get_timestamp();
+    mysql_rwlock_rdlock(&lock);
+    my_time_t res= max_value.get_timestamp();
+    mysql_rwlock_unlock(&lock);
+    return res;
   }
 };
 
-class partition_element :public Sql_alloc {
+class partition_element :public Sql_alloc
+{
 public:
   List<partition_element> subpartitions;
   List<part_elem_value> list_val_list;
@@ -151,7 +170,6 @@ public:
   };
 
   elem_type type;
-  Stat_timestampf *stat_trx_end;
 
   partition_element()
   : part_max_rows(0), part_min_rows(0), range_value(0),
@@ -162,12 +180,10 @@ public:
     nodegroup_id(UNDEF_NODEGROUP), has_null_value(FALSE),
     signed_flag(FALSE), max_value(FALSE),
     id(UINT32_MAX),
-    type(CONVENTIONAL),
-    stat_trx_end(NULL)
-  {
-  }
+    type(CONVENTIONAL)
+  {}
   partition_element(partition_element *part_elem)
-  : part_max_rows(part_elem->part_max_rows),
+    : part_max_rows(part_elem->part_max_rows),
     part_min_rows(part_elem->part_min_rows),
     range_value(0), partition_name(NULL),
     tablespace_name(part_elem->tablespace_name),
@@ -180,10 +196,8 @@ public:
     nodegroup_id(part_elem->nodegroup_id),
     has_null_value(FALSE),
     id(part_elem->id),
-    type(part_elem->type),
-    stat_trx_end(NULL)
-  {
-  }
+    type(part_elem->type)
+  {}
   ~partition_element() {}
 
   Item *list_val_item()

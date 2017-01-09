@@ -3541,6 +3541,10 @@ public:
   { return  val_decimal_from_date(decimal_value); }
   int save_in_field(Field *field, bool no_conversions)
   { return save_date_in_field(field); }
+  void set_time(MYSQL_TIME *ltime)
+  {
+    cached_time= *ltime;
+  }
 };
 
 

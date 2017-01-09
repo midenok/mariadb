@@ -3421,6 +3421,7 @@ int vers_get_partition_id(partition_info *part_info,
                           longlong *func_value)
 {
   DBUG_ENTER("vers_get_partition_id");
+  DBUG_ASSERT(part_info);
   Field *sys_trx_end= part_info->part_field_array[0];
   DBUG_ASSERT(sys_trx_end);
   DBUG_ASSERT(part_info->table);
@@ -3468,8 +3469,7 @@ int vers_get_partition_id(partition_info *part_info,
       mysql_mutex_unlock(&table->s->LOCK_rotation);
       if (vers_info->interval)
       {
-        DBUG_ASSERT(part->stat_trx_end);
-        part->stat_trx_end->update(sys_trx_end);
+        part_info->vers_stat_trx_end(part).update(sys_trx_end);
       }
       break;
     default:
