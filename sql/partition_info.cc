@@ -1198,8 +1198,14 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
   {
     DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
     ++ts;
-    if (added && el->type == partition_element::VERSIONING)
+    if (added)
     {
+      if (el->type == partition_element::AS_OF_NOW)
+      {
+        DBUG_ASSERT(ts == TIMESTAMP_MAX_VALUE);
+        el->id= id;
+        break;
+      }
       if (!el->empty)
       {
         ++id;
@@ -1211,9 +1217,16 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
         Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
           Vers_field_stats(table->s->vers_end_field()->field_name, table->s);
         table->s->stat_trx_end[id]= stat_trx_end;
+        el->id= id++;
+        goto create_col_val;
       }
+      thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
+      static_cast<Item_datetime_literal *>(el->list_val_item())->set_time(&t);
+      ++id;
+      continue;
     }
-    el->id= id++;
+
+  create_col_val:
     curr_part_elem= el;
     init_column_part(thd);
     el->list_val_list.empty();
