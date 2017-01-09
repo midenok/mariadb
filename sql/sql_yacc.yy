@@ -5265,8 +5265,8 @@ opt_part_values:
             }
             else
             {
-              part_info->vers_init_info(thd);
-              elem->id= UINT32_MAX;
+              // FIXME: other ALTER commands?
+              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0), "BY SYSTEM_TIME", "AS OF NOW partition can not be added"));
             }
             elem->type= partition_element::AS_OF_NOW;
             DBUG_ASSERT(part_info->vers_info);

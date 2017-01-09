@@ -161,6 +161,7 @@ public:
   bool signed_flag;                          // Range value signed
   bool max_value;                            // MAXVALUE range
   uint32 id;
+  bool empty;
 
   enum elem_type
   {
@@ -180,6 +181,7 @@ public:
     nodegroup_id(UNDEF_NODEGROUP), has_null_value(FALSE),
     signed_flag(FALSE), max_value(FALSE),
     id(UINT32_MAX),
+    empty(true),
     type(CONVENTIONAL)
   {}
   partition_element(partition_element *part_elem)
@@ -196,6 +198,7 @@ public:
     nodegroup_id(part_elem->nodegroup_id),
     has_null_value(FALSE),
     id(part_elem->id),
+    empty(part_elem->empty),
     type(part_elem->type)
   {}
   ~partition_element() {}

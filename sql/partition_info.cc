@@ -1162,7 +1162,7 @@ partition_info::vers_part_rotate(THD * thd)
   return vers_info->hist_part;
 }
 
-bool partition_info::vers_setup_1(THD * thd, bool alter)
+bool partition_info::vers_setup_1(THD * thd, uint32 added)
 {
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);
 
@@ -1172,16 +1172,20 @@ bool partition_info::vers_setup_1(THD * thd, bool alter)
     return true;
   }
 
-  if (!alter)
+  if (added)
+  {
+    DBUG_ASSERT(partitions.elements > added + 1);
+    Vers_field_stats** old_array= table->s->stat_trx_end;
+    table->s->stat_trx_end= static_cast<Vers_field_stats**>(
+      alloc_root(&table->s->mem_root, sizeof(void *) * (partitions.elements - 1)));
+    memcpy(table->s->stat_trx_end, old_array, sizeof(void *) * (partitions.elements - added - 1));
+  }
+  else
   {
     Field *sys_trx_end= table->vers_end_field();
     part_field_list.empty();
     part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
     sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG; // needed in handle_list_of_fields()
-  }
-  else
-  {
-    DBUG_ASSERT(vers_info && vers_info->initialized());
   }
 
   List_iterator<partition_element> it(partitions);
@@ -1194,10 +1198,20 @@ bool partition_info::vers_setup_1(THD * thd, bool alter)
   {
     DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
     ++ts;
-    if (alter && el->id <= vers_info->hist_part->id)
+    if (added && el->type == partition_element::VERSIONING)
     {
-      ++id;
-      continue;
+      if (!el->empty)
+      {
+        ++id;
+        continue;
+      }
+      if (el->id == UINT32_MAX)
+      {
+        DBUG_ASSERT(table && table->s);
+        Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
+          Vers_field_stats(table->s->vers_end_field()->field_name, table->s);
+        table->s->stat_trx_end[id]= stat_trx_end;
+      }
     }
     el->id= id++;
     curr_part_elem= el;
@@ -1225,12 +1239,12 @@ bool partition_info::vers_setup_1(THD * thd, bool alter)
 
 // scan table for min/max sys_trx_end
 inline
-bool partition_info::vers_scan_min_max(THD *thd, partition_element *part, bool &empty)
+bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
 {
   uint32 sub_factor= num_subparts ? num_subparts : 1;
   uint32 part_id= part->id * sub_factor;
   uint32 part_id_end= part_id + sub_factor;
-  empty= true;
+  DBUG_ASSERT(part->empty);
   DBUG_ASSERT(table->s->stat_trx_end);
   for (; part_id < part_id_end; ++part_id)
   {
@@ -1243,8 +1257,8 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part, bool &
     {
       while ((rc= file->ha_rnd_next(table->record[0])) != HA_ERR_END_OF_FILE)
       {
-        if (empty)
-          empty= false;
+        if (part->empty)
+          part->empty= false;
         if (thd->killed)
         {
           file->ha_rnd_end();
@@ -1321,7 +1335,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
         }
         continue;
       }
-      bool empty= true;
+
       DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
       Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
         Vers_field_stats(table->s->vers_end_field()->field_name, table->s);
@@ -1329,9 +1343,9 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 
       if (!is_create_table_ind)
       {
-        if (vers_scan_min_max(thd, el, empty))
+        if (vers_scan_min_max(thd, el))
           return true;
-        if (!empty)
+        if (!el->empty)
         {
           my_time_t ts= stat_trx_end->max_time() + 1;
           thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
@@ -1343,7 +1357,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 
       if (vers_info->hist_part)
       {
-        if (!empty)
+        if (!el->empty)
           goto set_hist_part;
       }
       else
