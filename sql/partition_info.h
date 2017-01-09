@@ -434,7 +434,7 @@ public:
   bool vers_set_interval(const INTERVAL &i);
   bool vers_set_limit(ulonglong limit);
   partition_element* vers_part_rotate(THD *thd);
-  bool vers_setup_1(THD *thd);
+  bool vers_setup_1(THD *thd, bool alter= false);
   bool vers_setup_2(THD *thd, bool is_create_table_ind);
   bool vers_scan_min_max(THD *thd, partition_element *part, bool &empty);
 

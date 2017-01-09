@@ -5721,7 +5721,7 @@ the generated partition syntax in a correct manner.
         tab_part_info->use_default_num_subpartitions= FALSE;
       }
 
-      if (tab_part_info->vers_setup_1(thd))
+      if (tab_part_info->vers_setup_1(thd, true))
         goto err;
 
       if (tab_part_info->check_partition_info(thd, (handlerton**)NULL,

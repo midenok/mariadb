@@ -1162,33 +1162,49 @@ partition_info::vers_part_rotate(THD * thd)
   return vers_info->hist_part;
 }
 
-bool partition_info::vers_setup_1(THD * thd)
+bool partition_info::vers_setup_1(THD * thd, bool alter)
 {
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);
+
   if (!table->versioned())
   {
     my_error(ER_VERSIONING_REQUIRED, MYF(0), "`BY SYSTEM_TIME` partitioning");
     return true;
   }
-  Field *sys_trx_end= table->vers_end_field();
-  part_field_list.empty();
-  part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
-  sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG; // needed in handle_list_of_fields()
+
+  if (!alter)
+  {
+    Field *sys_trx_end= table->vers_end_field();
+    part_field_list.empty();
+    part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
+    sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG; // needed in handle_list_of_fields()
+  }
+  else
+  {
+    DBUG_ASSERT(vers_info && vers_info->initialized());
+  }
 
   List_iterator<partition_element> it(partitions);
   partition_element *el;
   MYSQL_TIME t;
   memset(&t, 0, sizeof(t));
   my_time_t ts= TIMESTAMP_MAX_VALUE - partitions.elements;
+  uint32 id= 0;
   while ((el= it++))
   {
     DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
+    ++ts;
+    if (alter && el->id <= vers_info->hist_part->id)
+    {
+      ++id;
+      continue;
+    }
+    el->id= id++;
     curr_part_elem= el;
     init_column_part(thd);
     el->list_val_list.empty();
     el->list_val_list.push_back(curr_list_val, thd->mem_root);
     part_column_list_val *col_val= add_column_value(thd);
-    ++ts;
     if (el->type == partition_element::AS_OF_NOW)
     {
       col_val->max_value= true;
@@ -1282,16 +1298,29 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     memset(&t, 0, sizeof(t));
     DBUG_ASSERT(part_field_list.elements == 1);
 
-    DBUG_ASSERT(partitions.elements > 1);
-    DBUG_ASSERT(!table->s->stat_trx_end);
-    table->s->stat_trx_end= static_cast<Vers_field_stats**>(
-      alloc_root(&table->s->mem_root, sizeof(void *) * (partitions.elements - 1)));
+    bool dont_stat= true;
+    if (!table->s->stat_trx_end)
+    {
+      DBUG_ASSERT(partitions.elements > 1);
+      table->s->stat_trx_end= static_cast<Vers_field_stats**>(
+        alloc_root(&table->s->mem_root, sizeof(void *) * (partitions.elements - 1)));
+      dont_stat= false;
+    }
 
     // build freelist, scan min/max, assign hist_part
     List_iterator<partition_element> it(partitions);
     partition_element *el;
     while ((el= it++) && el->type == partition_element::VERSIONING)
     {
+      if (dont_stat)
+      {
+        if (el->id == table->s->hist_part_id)
+        {
+          vers_info->hist_part= el;
+          break;
+        }
+        continue;
+      }
       bool empty= true;
       DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
       Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
@@ -1333,10 +1362,13 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
         table->s->free_parts.push_back((void *) el->id, &table->s->mem_root);
       }
     } // while
-    table->s->hist_part_id= vers_info->hist_part->id;
-    if (!is_create_table_ind && (vers_limit_exceed() || vers_interval_exceed()))
-      vers_part_rotate(thd);
-    table->s->free_parts_init= false;
+    if (!dont_stat)
+    {
+      table->s->hist_part_id= vers_info->hist_part->id;
+      if (!is_create_table_ind && (vers_limit_exceed() || vers_interval_exceed()))
+        vers_part_rotate(thd);
+      table->s->free_parts_init= false;
+    }
     mysql_mutex_lock(&table->s->LOCK_rotation);
     mysql_cond_broadcast(&table->s->COND_rotation);
     table->s->busy_rotation= false;
