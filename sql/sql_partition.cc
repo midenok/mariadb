@@ -5284,6 +5284,7 @@ that are reorganised.
           }
         } while (++part_no < num_orig_partitions);
       }
+
       /*
         Need to concatenate the lists here to make it possible to check the
         partition info for correctness using check_partition_info.
@@ -5293,6 +5294,21 @@ that are reorganised.
         partition configuration is made.
       */
       {
+        partition_element *now_part= NULL;
+        if (tab_part_info->part_type == VERSIONING_PARTITION)
+        {
+          List_iterator<partition_element> it(tab_part_info->partitions);
+          partition_element *el;
+          while ((el= it++))
+          {
+            if (el->type == partition_element::AS_OF_NOW)
+            {
+              DBUG_ASSERT(tab_part_info->vers_info && el == tab_part_info->vers_info->now_part);
+              it.remove();
+              now_part= el;
+            }
+          }
+        }
         List_iterator<partition_element> alt_it(alt_part_info->partitions);
         uint part_count= 0;
         do
@@ -5307,6 +5323,15 @@ that are reorganised.
           }
         } while (++part_count < num_new_partitions);
         tab_part_info->num_parts+= num_new_partitions;
+        if (tab_part_info->part_type == VERSIONING_PARTITION)
+        {
+          DBUG_ASSERT(now_part);
+          if (tab_part_info->partitions.push_back(now_part, thd->mem_root))
+          {
+            mem_alloc_error(1);
+            goto err;
+          }
+        }
       }
       /*
         If we specify partitions explicitly we don't use defaults anymore.
@@ -5695,6 +5720,10 @@ the generated partition syntax in a correct manner.
         tab_part_info->use_default_subpartitions= FALSE;
         tab_part_info->use_default_num_subpartitions= FALSE;
       }
+
+      if (tab_part_info->vers_setup_1(thd))
+        goto err;
+
       if (tab_part_info->check_partition_info(thd, (handlerton**)NULL,
                                               table->file, 0, TRUE))
       {
