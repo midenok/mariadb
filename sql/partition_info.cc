@@ -1330,6 +1330,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     DBUG_ASSERT(part_field_list.elements == 1);
 
     bool dont_stat= true;
+    bool stat_updated= false;
     if (!table->s->stat_trx_end)
     {
       DBUG_ASSERT(partitions.elements > 1);
@@ -1371,6 +1372,8 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
           DBUG_ASSERT(val_item);
           val_item->set_time(&t);
           col_val.fixed= 0;
+          if (!stat_updated)
+            stat_updated= true;
         }
       }
 
@@ -1388,6 +1391,12 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     } // while
     if (!dont_stat)
     {
+      if (stat_updated)
+      {
+        Field *f= part_field_array[0];
+        bitmap_set_bit(f->table->write_set, f->field_index);
+        check_range_constants(thd);
+      }
       table->s->hist_part_id= vers_info->hist_part->id;
       if (!is_create_table_ind && (vers_limit_exceed() || vers_interval_exceed()))
         vers_part_rotate(thd);
