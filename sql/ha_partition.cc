@@ -4173,14 +4173,17 @@ int ha_partition::write_row(uchar * buf)
   error= m_file[part_id]->ha_write_row(buf);
   if (have_auto_increment && !table->s->next_number_keypart)
     set_auto_increment_if_higher(table->next_number_field);
-  if (!error && table->versioned_by_sql())
+  if (!error && m_part_info->part_type == VERSIONING_PARTITION)
   {
     uint sub_factor= m_part_info->num_subparts ? m_part_info->num_subparts : 1;
     DBUG_ASSERT(m_tot_parts == m_part_info->num_parts * sub_factor);
     uint lpart_id= part_id / sub_factor;
     DBUG_ASSERT(m_part_info->vers_info && m_part_info->vers_info->now_part);
     if (lpart_id < m_part_info->vers_info->now_part->id)
-      m_part_info->vers_stat_trx_end(lpart_id).update(table->vers_end_field());
+    {
+      m_part_info->vers_stat_trx(STAT_TRX_START, lpart_id).update(table->vers_start_field());
+      m_part_info->vers_stat_trx(STAT_TRX_END, lpart_id).update(table->vers_end_field());
+    }
   }
   reenable_binlog(thd);
 exit:

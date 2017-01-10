@@ -733,7 +733,7 @@ struct TABLE_SHARE
   uint16 row_start_field;
   uint16 row_end_field;
   uint32 hist_part_id;
-  Vers_field_stats** stat_trx_end;
+  Vers_field_stats** stat_trx;
 
   bool busy_rotation;
   mysql_mutex_t LOCK_rotation;
@@ -743,7 +743,7 @@ struct TABLE_SHARE
   {
     hist_part_id= UINT32_MAX;
     busy_rotation= false;
-    stat_trx_end= NULL;
+    stat_trx= NULL;
     mysql_mutex_init(key_TABLE_SHARE_LOCK_rotation, &LOCK_rotation, MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_TABLE_SHARE_COND_rotation, &COND_rotation, NULL);
   }

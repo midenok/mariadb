@@ -1078,7 +1078,7 @@ bool partition_info::vers_init_info(THD * thd)
   part_type= VERSIONING_PARTITION;
   list_of_part_fields= TRUE;
   column_list= TRUE;
-  num_columns= 1;
+  num_columns= 2;
   vers_info= new (thd->mem_root) Vers_part_info;
   if (!vers_info)
   {
@@ -1177,17 +1177,22 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
   if (added)
   {
     DBUG_ASSERT(partitions.elements > added + 1);
-    Vers_field_stats** old_array= table->s->stat_trx_end;
-    table->s->stat_trx_end= static_cast<Vers_field_stats**>(
-      alloc_root(&table->s->mem_root, sizeof(void *) * (partitions.elements - 1)));
-    memcpy(table->s->stat_trx_end, old_array, sizeof(void *) * (partitions.elements - added - 1));
+    Vers_field_stats** old_array= table->s->stat_trx;
+    table->s->stat_trx= static_cast<Vers_field_stats**>(
+      alloc_root(&table->s->mem_root, sizeof(void *) * (partitions.elements - 1) * num_columns));
+    memcpy(table->s->stat_trx, old_array, sizeof(void *) * (partitions.elements - added - 1) * num_columns);
   }
   else
   {
+    Field *sys_trx_start= table->vers_start_field();
     Field *sys_trx_end= table->vers_end_field();
     part_field_list.empty();
+    part_field_list.push_back(const_cast<char *>(sys_trx_start->field_name), thd->mem_root);
     part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
-    sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG; // needed in handle_list_of_fields()
+    DBUG_ASSERT(part_field_list.elements == num_columns);
+    // needed in handle_list_of_fields()
+    sys_trx_start->flags|= GET_FIXED_FIELDS_FLAG;
+    sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG;
   }
 
   List_iterator<partition_element> it(partitions);
@@ -1216,16 +1221,22 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
       if (el->id == UINT32_MAX)
       {
         DBUG_ASSERT(table && table->s);
+        Vers_field_stats *stat_trx_start= new (&table->s->mem_root)
+          Vers_field_stats(table->s->vers_start_field()->field_name, table->s);
         Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
           Vers_field_stats(table->s->vers_end_field()->field_name, table->s);
-        table->s->stat_trx_end[id]= stat_trx_end;
+        table->s->stat_trx[id * num_columns + STAT_TRX_START]= stat_trx_start;
+        table->s->stat_trx[id * num_columns + STAT_TRX_END]= stat_trx_end;
         el->id= id++;
         goto create_col_val;
       }
       thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
-      part_column_list_val &col_val= el->get_col_val(0);
-      static_cast<Item_datetime_literal *>(col_val.item_expression)->set_time(&t);
-      col_val.fixed= 0;
+      for (uint i= 0; i < num_columns; ++i)
+      {
+        part_column_list_val &col_val= el->get_col_val(i);
+        static_cast<Item_datetime_literal *>(col_val.item_expression)->set_time(&t);
+        col_val.fixed= 0;
+      }
       ++id;
       continue;
     }
@@ -1235,20 +1246,23 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
     init_column_part(thd);
     el->list_val_list.empty();
     el->list_val_list.push_back(curr_list_val, thd->mem_root);
-    part_column_list_val *col_val= add_column_value(thd);
-    if (el->type == partition_element::AS_OF_NOW)
-    {
-      col_val->max_value= true;
-      DBUG_ASSERT(ts == TIMESTAMP_MAX_VALUE);
-    }
     thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
-    Item *item_expression= new (thd->mem_root) Item_datetime_literal(thd, &t);
-    /* FIXME: we initialize col_val with bogus Item to make fix_partition_func() and check_range_constants() happy.
-       Later in vers_setup_2() it is initialized with real value Item. */
-    /* FIXME: TIME_RESULT in col_val is expensive. It should be INT_RESULT
-       (got to be fixed when InnoDB is supported). */
-    init_col_val(col_val, item_expression);
-    DBUG_ASSERT(item_expression == el->get_col_val(0).item_expression);
+    for (uint i= 0; i < num_columns; ++i)
+    {
+      part_column_list_val *col_val= add_column_value(thd);
+      if (el->type == partition_element::AS_OF_NOW)
+      {
+        col_val->max_value= true;
+        DBUG_ASSERT(ts == TIMESTAMP_MAX_VALUE);
+      }
+      Item *item_expression= new (thd->mem_root) Item_datetime_literal(thd, &t);
+      /* FIXME: we initialize col_val with bogus Item to make fix_partition_func() and check_range_constants() happy.
+         Later in vers_setup_2() it is initialized with real value Item. */
+      /* FIXME: TIME_RESULT in col_val is expensive. It should be INT_RESULT
+        (got to be fixed when InnoDB is supported). */
+      init_col_val(col_val, item_expression);
+      DBUG_ASSERT(item_expression == el->get_col_val(i).item_expression);
+    }
   }
   return false;
 }
@@ -1262,7 +1276,7 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
   uint32 part_id= part->id * sub_factor;
   uint32 part_id_end= part_id + sub_factor;
   DBUG_ASSERT(part->empty);
-  DBUG_ASSERT(table->s->stat_trx_end);
+  DBUG_ASSERT(table->s->stat_trx);
   for (; part_id < part_id_end; ++part_id)
   {
     handler *file= table->file->part_handler(part_id);
@@ -1287,7 +1301,8 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
             continue;
           break;
         }
-        vers_stat_trx_end(part).update_unguarded(table->vers_end_field());
+        vers_stat_trx(STAT_TRX_START, part).update_unguarded(table->vers_start_field());
+        vers_stat_trx(STAT_TRX_END, part).update_unguarded(table->vers_end_field());
       }
       file->ha_rnd_end();
     }
@@ -1300,6 +1315,22 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
     }
   }
   return false;
+}
+
+inline
+void partition_info::vers_update_range(THD *thd, partition_element *el, stat_trx_field fld)
+{
+  MYSQL_TIME t;
+  memset(&t, 0, sizeof(t));
+  DBUG_ASSERT(table && table->s && table->s->stat_trx);
+  Vers_field_stats *stat_trx_x= table->s->stat_trx[el->id * num_columns + fld];
+  my_time_t ts= stat_trx_x->max_time() + 1;
+  thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
+  part_column_list_val &col_val= el->get_col_val(fld);
+  Item_datetime_literal *val_item= static_cast<Item_datetime_literal*>(col_val.item_expression);
+  DBUG_ASSERT(val_item);
+  val_item->set_time(&t);
+  col_val.fixed= 0;
 }
 
 
@@ -1325,17 +1356,15 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     table->s->busy_rotation= true;
     mysql_mutex_unlock(&table->s->LOCK_rotation);
 
-    MYSQL_TIME t;
-    memset(&t, 0, sizeof(t));
-    DBUG_ASSERT(part_field_list.elements == 1);
+    DBUG_ASSERT(part_field_list.elements == num_columns);
 
     bool dont_stat= true;
     bool stat_updated= false;
-    if (!table->s->stat_trx_end)
+    if (!table->s->stat_trx)
     {
       DBUG_ASSERT(partitions.elements > 1);
-      table->s->stat_trx_end= static_cast<Vers_field_stats**>(
-        alloc_root(&table->s->mem_root, sizeof(void *) * (partitions.elements - 1)));
+      table->s->stat_trx= static_cast<Vers_field_stats**>(
+        alloc_root(&table->s->mem_root, sizeof(void *) * (partitions.elements - 1) * num_columns));
       dont_stat= false;
     }
 
@@ -1355,9 +1384,14 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
       }
 
       DBUG_ASSERT(el->type != partition_element::CONVENTIONAL);
-      Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
-        Vers_field_stats(table->s->vers_end_field()->field_name, table->s);
-      table->s->stat_trx_end[el->id]= stat_trx_end;
+      {
+        Vers_field_stats *stat_trx_start= new (&table->s->mem_root)
+          Vers_field_stats(table->s->vers_start_field()->field_name, table->s);
+        Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
+          Vers_field_stats(table->s->vers_end_field()->field_name, table->s);
+        table->s->stat_trx[el->id * num_columns + STAT_TRX_START]= stat_trx_start;
+        table->s->stat_trx[el->id * num_columns + STAT_TRX_END]= stat_trx_end;
+      }
 
       if (!is_create_table_ind)
       {
@@ -1365,13 +1399,8 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
           return true;
         if (!el->empty)
         {
-          my_time_t ts= stat_trx_end->max_time() + 1;
-          thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
-          part_column_list_val &col_val= el->get_col_val(0);
-          Item_datetime_literal *val_item= static_cast<Item_datetime_literal*>(col_val.item_expression);
-          DBUG_ASSERT(val_item);
-          val_item->set_time(&t);
-          col_val.fixed= 0;
+          vers_update_range(thd, el, STAT_TRX_START);
+          vers_update_range(thd, el, STAT_TRX_END);
           if (!stat_updated)
             stat_updated= true;
         }
@@ -1393,8 +1422,11 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     {
       if (stat_updated)
       {
-        Field *f= part_field_array[0];
-        bitmap_set_bit(f->table->write_set, f->field_index);
+        for (uint i= 0; i < num_columns; ++i)
+        {
+          Field *f= part_field_array[i];
+          bitmap_set_bit(f->table->write_set, f->field_index);
+        }
         check_range_constants(thd);
       }
       table->s->hist_part_id= vers_info->hist_part->id;

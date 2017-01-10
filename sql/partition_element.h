@@ -139,6 +139,12 @@ public:
   }
 };
 
+enum stat_trx_field
+{
+  STAT_TRX_START= 0,
+  STAT_TRX_END
+};
+
 class partition_element :public Sql_alloc
 {
 public:
