@@ -1137,8 +1137,11 @@ partition_element*
 partition_info::vers_part_rotate(THD * thd)
 {
   DBUG_ASSERT(table && table->s);
-  if (table->s->free_parts.is_empty())
+  DBUG_ASSERT(vers_info && vers_info->initialized());
+
+  if (table->s->hist_part_id >= vers_info->now_part->id - 1)
   {
+    DBUG_ASSERT(table->s->hist_part_id == vers_info->now_part->id - 1);
     push_warning_printf(thd,
       Sql_condition::WARN_LEVEL_WARN,
       WARN_VERS_PART_FULL,
@@ -1147,8 +1150,7 @@ partition_info::vers_part_rotate(THD * thd)
     return vers_info->hist_part;
   }
 
-  table->s->vers_part_rotate();
-  DBUG_ASSERT(table->s->hist_part_id < num_parts);
+  table->s->hist_part_id++;
   const char* old_part_name= vers_info->hist_part->partition_name;
   vers_hist_part();
 
@@ -1383,22 +1385,12 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
         vers_info->hist_part= el;
         continue;
       }
-
-      if (is_create_table_ind || (
-        table->s->free_parts_init &&
-        !vers_limit_exceed(el) &&
-        !vers_interval_exceed(el)))
-      {
-        // FIXME: do we need free_parts now?
-        table->s->free_parts.push_back((void *) el->id, &table->s->mem_root);
-      }
     } // while
     if (!dont_stat)
     {
       table->s->hist_part_id= vers_info->hist_part->id;
       if (!is_create_table_ind && (vers_limit_exceed() || vers_interval_exceed()))
         vers_part_rotate(thd);
-      table->s->free_parts_init= false;
     }
     mysql_mutex_lock(&table->s->LOCK_rotation);
     mysql_cond_broadcast(&table->s->COND_rotation);
