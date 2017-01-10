@@ -203,15 +203,13 @@ public:
   {}
   ~partition_element() {}
 
-  Item *list_val_item()
+  part_column_list_val& get_col_val(uint idx)
   {
     DBUG_ASSERT(type != CONVENTIONAL);
     DBUG_ASSERT(list_val_list.elements == 1);
     part_elem_value *ev= static_cast<part_elem_value*>(list_val_list.first_node()->info);
     DBUG_ASSERT(ev && ev->col_val_array);
-    Item* item= ev->col_val_array[0].item_expression;
-    DBUG_ASSERT(item);
-    return item;
+    return ev->col_val_array[idx];
   }
 };
 

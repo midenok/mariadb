@@ -1221,7 +1221,9 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
         goto create_col_val;
       }
       thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
-      static_cast<Item_datetime_literal *>(el->list_val_item())->set_time(&t);
+      part_column_list_val &col_val= el->get_col_val(0);
+      static_cast<Item_datetime_literal *>(col_val.item_expression)->set_time(&t);
+      col_val.fixed= 0;
       ++id;
       continue;
     }
@@ -1244,7 +1246,7 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
     /* FIXME: TIME_RESULT in col_val is expensive. It should be INT_RESULT
        (got to be fixed when InnoDB is supported). */
     init_col_val(col_val, item_expression);
-    DBUG_ASSERT(item_expression == el->list_val_item());
+    DBUG_ASSERT(item_expression == el->get_col_val(0).item_expression);
   }
   return false;
 }
@@ -1362,9 +1364,11 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
         {
           my_time_t ts= stat_trx_end->max_time() + 1;
           thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
-          Item_datetime_literal *val_item= static_cast<Item_datetime_literal*>(el->list_val_item());
+          part_column_list_val &col_val= el->get_col_val(0);
+          Item_datetime_literal *val_item= static_cast<Item_datetime_literal*>(col_val.item_expression);
           DBUG_ASSERT(val_item);
           val_item->set_time(&t);
+          col_val.fixed= 0;
         }
       }
 
