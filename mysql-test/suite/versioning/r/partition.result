@@ -70,6 +70,27 @@ partition pn as of now);
 alter table t1 add partition (
 partition p1 as of now);
 ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: AS OF NOW partition can not be added
+alter table t1 add partition (
+partition p1 versioning);
+Warnings:
+Warning	4041	Maybe missing parameters: no rotation condition for multiple `VERSIONING` partitions.
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `x` int(11) DEFAULT NULL,
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+/*!50500 PARTITION BY SYSTEM_TIME 
+(PARTITION p0 VERSIONING ENGINE = MyISAM,
+ PARTITION p1 VERSIONING ENGINE = MyISAM,
+ PARTITION pn AS OF NOW ENGINE = MyISAM) */
+alter table t1 drop partition pn;
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: `AS OF NOW` partition can not be dropped
+alter table t1 drop partition p1;
+alter table t1 drop partition p0;
+ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: one `AS OF NOW` and at least one `VERSIONING` partition required
 insert into t1 values (1);
 select * from t1;
 x
