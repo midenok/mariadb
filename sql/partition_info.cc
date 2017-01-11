@@ -1429,14 +1429,8 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     if (!dont_stat)
     {
       if (col_val_updated)
-      {
-        for (uint i= 0; i < num_columns; ++i)
-        {
-          Field *f= part_field_array[i];
-          bitmap_set_bit(f->table->write_set, f->field_index);
-        }
-        check_range_constants(thd);
-      }
+        table->s->stat_serial++;
+
       table->s->hist_part_id= vers_info->hist_part->id;
       if (!is_create_table_ind && (vers_limit_exceed() || vers_interval_exceed()))
         vers_part_rotate(thd);

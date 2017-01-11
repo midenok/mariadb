@@ -4178,12 +4178,7 @@ int ha_partition::write_row(uchar * buf)
     uint sub_factor= m_part_info->num_subparts ? m_part_info->num_subparts : 1;
     DBUG_ASSERT(m_tot_parts == m_part_info->num_parts * sub_factor);
     uint lpart_id= part_id / sub_factor;
-    DBUG_ASSERT(m_part_info->vers_info && m_part_info->vers_info->now_part);
-    if (lpart_id < m_part_info->vers_info->now_part->id)
-    {
-      m_part_info->vers_stat_trx(STAT_TRX_START, lpart_id).update(table->vers_start_field());
-      m_part_info->vers_stat_trx(STAT_TRX_END, lpart_id).update(table->vers_end_field());
-    }
+    m_part_info->vers_update_stats(thd, lpart_id);
   }
   reenable_binlog(thd);
 exit:

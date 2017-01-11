@@ -40,14 +40,16 @@ struct Vers_part_info : public Sql_alloc
     interval(0),
     limit(0),
     now_part(NULL),
-    hist_part(NULL)
+    hist_part(NULL),
+    stat_serial(0)
   {
   }
   Vers_part_info(Vers_part_info &src) :
     interval(src.interval),
     limit(src.limit),
     now_part(NULL),
-    hist_part(NULL)
+    hist_part(NULL),
+    stat_serial(src.stat_serial)
   {
   }
   bool initialized(bool fully= true)
@@ -69,6 +71,7 @@ struct Vers_part_info : public Sql_alloc
   ulonglong limit;
   partition_element *now_part;
   partition_element *hist_part;
+  ulonglong stat_serial;
 };
 
 class partition_info : public Sql_alloc
@@ -462,6 +465,17 @@ public:
     DBUG_ASSERT(0);
     return NULL;
   }
+  partition_element *get_partition(uint part_id)
+  {
+    List_iterator<partition_element> it(partitions);
+    partition_element *el;
+    while ((el= it++))
+    {
+      if (el->id == part_id)
+        return el;
+    }
+    return NULL;
+  }
   bool vers_limit_exceed(partition_element *part= NULL)
   {
     DBUG_ASSERT(vers_info);
@@ -507,6 +521,44 @@ public:
   bool vers_interval_exceed()
   {
     return vers_interval_exceed(vers_hist_part());
+  }
+  void vers_update_stats(THD *thd, partition_element *el)
+  {
+    DBUG_ASSERT(vers_info && vers_info->initialized());
+    DBUG_ASSERT(table && table->s);
+    DBUG_ASSERT(el);
+    mysql_rwlock_wrlock(&table->s->LOCK_stat_serial);
+    vers_stat_trx(STAT_TRX_START, el->id).update(table->vers_start_field());
+    if (el->id < vers_info->now_part->id)
+      vers_stat_trx(STAT_TRX_END, el->id).update(table->vers_end_field());
+    table->s->stat_serial++;
+    mysql_rwlock_unlock(&table->s->LOCK_stat_serial);
+    vers_update_col_vals(thd, el);
+  }
+  void vers_update_stats(THD *thd, uint part_id)
+  {
+    vers_update_stats(thd, get_partition(part_id));
+  }
+  void vers_update_range_constants(THD *thd)
+  {
+    DBUG_ASSERT(vers_info && vers_info->initialized());
+    DBUG_ASSERT(table && table->s);
+
+    mysql_rwlock_rdlock(&table->s->LOCK_stat_serial);
+    if (vers_info->stat_serial == table->s->stat_serial)
+    {
+      mysql_rwlock_unlock(&table->s->LOCK_stat_serial);
+      return;
+    }
+
+    for (uint i= 0; i < num_columns; ++i)
+    {
+      Field *f= part_field_array[i];
+      bitmap_set_bit(f->table->write_set, f->field_index);
+    }
+    check_range_constants(thd);
+    vers_info->stat_serial= table->s->stat_serial;
+    mysql_rwlock_unlock(&table->s->LOCK_stat_serial);
   }
 };
 

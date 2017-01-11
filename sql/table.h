@@ -734,24 +734,29 @@ struct TABLE_SHARE
   uint16 row_end_field;
   uint32 hist_part_id;
   Vers_field_stats** stat_trx;
+  ulonglong stat_serial;
 
   bool busy_rotation;
   mysql_mutex_t LOCK_rotation;
   mysql_cond_t COND_rotation;
+  mysql_rwlock_t LOCK_stat_serial;
 
   void vers_init()
   {
     hist_part_id= UINT32_MAX;
     busy_rotation= false;
     stat_trx= NULL;
+    stat_serial= 0;
     mysql_mutex_init(key_TABLE_SHARE_LOCK_rotation, &LOCK_rotation, MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_TABLE_SHARE_COND_rotation, &COND_rotation, NULL);
+    mysql_rwlock_init(key_rwlock_LOCK_stat_serial, &LOCK_stat_serial);
   }
 
   void vers_destroy()
   {
     mysql_mutex_destroy(&LOCK_rotation);
     mysql_cond_destroy(&COND_rotation);
+    mysql_rwlock_destroy(&LOCK_stat_serial);
   }
 
   Field *vers_start_field()

@@ -3440,7 +3440,6 @@ int vers_get_partition_id(partition_info *part_info,
   }
   else // row is historical
   {
-    partition_element *part= vers_info->hist_part;
     THD *thd= current_thd;
     TABLE *table= part_info->table;
 
@@ -3463,11 +3462,8 @@ int vers_get_partition_id(partition_info *part_info,
         mysql_mutex_unlock(&table->s->LOCK_rotation);
         if (part_info->vers_limit_exceed() || part_info->vers_interval_exceed(sys_trx_end->get_timestamp()))
         {
-          part= part_info->vers_part_rotate(thd);
+          part_info->vers_part_rotate(thd);
         }
-        // FIXME: do we need stat update here? (note: duplicated in ha_write_row())
-        part_info->vers_stat_trx(STAT_TRX_START, part).update(sys_trx_start);
-        part_info->vers_stat_trx(STAT_TRX_END, part).update(sys_trx_end);
         mysql_mutex_lock(&table->s->LOCK_rotation);
         mysql_cond_broadcast(&table->s->COND_rotation);
         table->s->busy_rotation= false;
