@@ -1199,7 +1199,7 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
   partition_element *el;
   MYSQL_TIME t;
   memset(&t, 0, sizeof(t));
-  my_time_t ts= TIMESTAMP_MAX_VALUE - partitions.elements + 1;
+  my_time_t ts= TIMESTAMP_MAX_VALUE - partitions.elements;
   uint32 id= 0;
   while ((el= it++))
   {
@@ -1321,13 +1321,13 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
 }
 
 inline
-void partition_info::vers_update_range(THD *thd, partition_element *el, stat_trx_field fld)
+void partition_info::vers_update_col_val(THD *thd, partition_element *el, stat_trx_field fld)
 {
   MYSQL_TIME t;
   memset(&t, 0, sizeof(t));
   DBUG_ASSERT(table && table->s && table->s->stat_trx);
-  Vers_field_stats *stat_trx_x= table->s->stat_trx[el->id * num_columns + fld];
-  my_time_t ts= stat_trx_x->max_time() + 1;
+  Vers_field_stats *stat_trx_x= table->s->stat_trx[(el->id + 1) * num_columns + fld];
+  my_time_t ts= stat_trx_x->min_time();
   thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
   part_column_list_val &col_val= el->get_col_val(fld);
   Item_datetime_literal *val_item= static_cast<Item_datetime_literal*>(col_val.item_expression);
@@ -1362,7 +1362,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     DBUG_ASSERT(part_field_list.elements == num_columns);
 
     bool dont_stat= true;
-    bool stat_updated= false;
+    bool col_val_updated= false;
     if (!table->s->stat_trx)
     {
       DBUG_ASSERT(partitions.elements > 1);
@@ -1373,8 +1373,8 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 
     // build freelist, scan min/max, assign hist_part
     List_iterator<partition_element> it(partitions);
-    partition_element *el;
-    while ((el= it++) && el->type == partition_element::VERSIONING)
+    partition_element *el= NULL, *prev;
+    while ((prev= el, el= it++) && el->type == partition_element::VERSIONING)
     {
       if (dont_stat)
       {
@@ -1400,12 +1400,12 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
       {
         if (vers_scan_min_max(thd, el))
           return true;
-        if (!el->empty)
+        if (!el->empty && prev)
         {
-          vers_update_range(thd, el, STAT_TRX_START);
-          vers_update_range(thd, el, STAT_TRX_END);
-          if (!stat_updated)
-            stat_updated= true;
+          DBUG_ASSERT(el->id == prev->id + 1);
+          vers_update_col_val(thd, prev, STAT_TRX_START);
+          vers_update_col_val(thd, prev, STAT_TRX_END);
+          col_val_updated= true;
         }
       }
 
@@ -1423,7 +1423,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     } // while
     if (!dont_stat)
     {
-      if (stat_updated)
+      if (col_val_updated)
       {
         for (uint i= 0; i < num_columns; ++i)
         {

@@ -437,7 +437,7 @@ public:
   bool vers_setup_1(THD *thd, uint32 added= 0);
   bool vers_setup_2(THD *thd, bool is_create_table_ind);
   bool vers_scan_min_max(THD *thd, partition_element *part);
-  void vers_update_range(THD * thd, partition_element * el, stat_trx_field fld);
+  void vers_update_col_val(THD * thd, partition_element * el, stat_trx_field fld);
 
   partition_element *vers_hist_part()
   {
