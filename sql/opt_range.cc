@@ -3985,7 +3985,7 @@ int find_used_partitions(PART_PRUNE_PARAM *ppar, SEL_ARG *key_tree)
         simply set res= -1 as if the mapper had returned that.
         TODO: What to do here is defined in WL#4065.
       */
-      if (ppar->arg_stack[0]->part == 0)
+      if (ppar->arg_stack[0]->part == 0 || ppar->part_info->part_type == VERSIONING_PARTITION)
       {
         uint32 i;
         uint32 store_length_array[MAX_KEY];
