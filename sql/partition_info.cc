@@ -1199,7 +1199,7 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
   partition_element *el;
   MYSQL_TIME t;
   memset(&t, 0, sizeof(t));
-  my_time_t ts= TIMESTAMP_MAX_VALUE - partitions.elements;
+  my_time_t ts= TIMESTAMP_MAX_VALUE - partitions.elements + 1;
   uint32 id= 0;
   while ((el= it++))
   {
@@ -1209,7 +1209,6 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
     {
       if (el->type == partition_element::AS_OF_NOW)
       {
-        DBUG_ASSERT(ts == TIMESTAMP_MAX_VALUE);
         el->id= id;
         break;
       }
@@ -1253,7 +1252,11 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
       if (el->type == partition_element::AS_OF_NOW)
       {
         col_val->max_value= true;
-        DBUG_ASSERT(ts == TIMESTAMP_MAX_VALUE);
+        col_val->item_expression= NULL;
+        col_val->column_value= NULL;
+        col_val->part_info= NULL;
+        col_val->fixed= 1;
+        continue;
       }
       Item *item_expression= new (thd->mem_root) Item_datetime_literal(thd, &t);
       /* FIXME: we initialize col_val with bogus Item to make fix_partition_func() and check_range_constants() happy.
