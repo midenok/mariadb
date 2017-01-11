@@ -1317,23 +1317,40 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
   return false;
 }
 
-void partition_info::vers_update_col_vals(THD * thd, partition_element * el)
+void partition_info::vers_update_col_vals(THD *thd, partition_element *el0, partition_element *el1)
 {
   MYSQL_TIME t;
   memset(&t, 0, sizeof(t));
   DBUG_ASSERT(table && table->s && table->s->stat_trx);
-  DBUG_ASSERT(el->id + 1 < partitions.elements);
-  const uint idx= (el->id + 1) * num_columns;
+  DBUG_ASSERT(!el0 || el1->id == el0->id + 1);
+  const uint idx= el1->id * num_columns;
+  my_time_t ts;
+  part_column_list_val *col_val;
+  Item_datetime_literal *val_item;
+  Vers_field_stats *stat_trx_x;
   for (uint i= 0; i < num_columns; ++i)
   {
-    Vers_field_stats *stat_trx_x= table->s->stat_trx[idx + i];
-    my_time_t ts= stat_trx_x->min_time();
-    thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
-    part_column_list_val &col_val= el->get_col_val(i);
-    Item_datetime_literal *val_item= static_cast<Item_datetime_literal*>(col_val.item_expression);
-    DBUG_ASSERT(val_item);
-    val_item->set_time(&t);
-    col_val.fixed= 0;
+    stat_trx_x= table->s->stat_trx[idx + i];
+    if (el0)
+    {
+      ts= stat_trx_x->min_time();
+      thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
+      col_val= &el0->get_col_val(i);
+      val_item= static_cast<Item_datetime_literal*>(col_val->item_expression);
+      DBUG_ASSERT(val_item);
+      if (val_item->set_lower(&t))
+        col_val->fixed= 0;
+    }
+    col_val= &el1->get_col_val(i);
+    if (!col_val->max_value)
+    {
+      ts= stat_trx_x->max_time() + 1;
+      thd->variables.time_zone->gmt_sec_to_TIME(&t, ts);
+      val_item= static_cast<Item_datetime_literal*>(col_val->item_expression);
+      DBUG_ASSERT(val_item);
+      if (val_item->set_higher(&t))
+        col_val->fixed= 0;
+    }
   }
 }
 
@@ -1400,10 +1417,9 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
       {
         if (vers_scan_min_max(thd, el))
           return true;
-        if (!el->empty && prev)
+        if (!el->empty)
         {
-          DBUG_ASSERT(el->id == prev->id + 1);
-          vers_update_col_vals(thd, prev);
+          vers_update_col_vals(thd, prev, el);
           col_val_updated= true;
         }
       }

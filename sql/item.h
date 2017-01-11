@@ -3545,6 +3545,8 @@ public:
   {
     cached_time= *ltime;
   }
+  bool set_lower(MYSQL_TIME *ltime);
+  bool set_higher(MYSQL_TIME *ltime);
 };
 
 

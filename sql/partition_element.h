@@ -112,16 +112,18 @@ public:
   {
     mysql_rwlock_destroy(&lock);
   }
-  void update_unguarded(Field *from)
+  bool update_unguarded(Field *from)
   {
-    from->update_min(&min_value, false);
-    from->update_max(&max_value, false);
+    return
+      from->update_min(&min_value, false) +
+      from->update_max(&max_value, false);
   }
-  void update(Field *from)
+  bool update(Field *from)
   {
     mysql_rwlock_wrlock(&lock);
-    update_unguarded(from);
+    bool res= update_unguarded(from);
     mysql_rwlock_unlock(&lock);
+    return res;
   }
   my_time_t min_time()
   {

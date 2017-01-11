@@ -440,7 +440,7 @@ public:
   bool vers_setup_1(THD *thd, uint32 added= 0);
   bool vers_setup_2(THD *thd, bool is_create_table_ind);
   bool vers_scan_min_max(THD *thd, partition_element *part);
-  void vers_update_col_vals(THD * thd, partition_element * el);
+  void vers_update_col_vals(THD *thd, partition_element *el0, partition_element *el1);
 
   partition_element *vers_hist_part()
   {
@@ -528,12 +528,17 @@ public:
     DBUG_ASSERT(table && table->s);
     DBUG_ASSERT(el);
     mysql_rwlock_wrlock(&table->s->LOCK_stat_serial);
-    vers_stat_trx(STAT_TRX_START, el->id).update(table->vers_start_field());
+    bool updated=
+      vers_stat_trx(STAT_TRX_START, el->id).update(table->vers_start_field());
     if (el->id < vers_info->now_part->id)
-      vers_stat_trx(STAT_TRX_END, el->id).update(table->vers_end_field());
-    table->s->stat_serial++;
+      updated+= vers_stat_trx(STAT_TRX_END, el->id).update(table->vers_end_field());
+    if (updated)
+      table->s->stat_serial++;
     mysql_rwlock_unlock(&table->s->LOCK_stat_serial);
-    vers_update_col_vals(thd, el);
+    if (updated)
+      vers_update_col_vals(thd,
+        el->id > 0 ? get_partition(el->id - 1) : NULL,
+        el);
   }
   void vers_update_stats(THD *thd, uint part_id)
   {
