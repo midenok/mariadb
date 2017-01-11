@@ -1256,8 +1256,8 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
         continue;
       }
       Item *item_expression= new (thd->mem_root) Item_datetime_literal(thd, &t);
-      /* FIXME: we initialize col_val with bogus Item to make fix_partition_func() and check_range_constants() happy.
-         Later in vers_setup_2() it is initialized with real value Item. */
+      /* We initialize col_val with bogus max value to make fix_partition_func() and check_range_constants() happy.
+         Later in vers_setup_2() it is initialized with real stat value if there will be any. */
       /* FIXME: TIME_RESULT in col_val is expensive. It should be INT_RESULT
         (got to be fixed when InnoDB is supported). */
       init_col_val(col_val, item_expression);

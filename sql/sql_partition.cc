@@ -3430,7 +3430,6 @@ int vers_get_partition_id(partition_info *part_info,
   Vers_part_info *vers_info= part_info->vers_info;
   DBUG_ASSERT(vers_info && vers_info->initialized());
   DBUG_ASSERT(sys_trx_end->table == part_info->table && part_info->table->versioned());
-  // FIXME: is it correct?
   DBUG_ASSERT(part_info->table->vers_start_field() == sys_trx_start);
   DBUG_ASSERT(part_info->table->vers_end_field() == sys_trx_end);
 
@@ -5287,7 +5286,6 @@ that are reorganised.
           }
         } while (++part_no < num_orig_partitions);
       }
-
       /*
         Need to concatenate the lists here to make it possible to check the
         partition info for correctness using check_partition_info.
