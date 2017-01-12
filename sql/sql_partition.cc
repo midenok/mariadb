@@ -151,12 +151,11 @@ int get_part_iter_for_interval_via_walking(partition_info *part_info,
                                            PARTITION_ITERATOR *part_iter);
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE
-static int cmp_rec_and_tuple(part_column_list_val *val, uint32 nvals_in_rec, bool disj= false);
+static int cmp_rec_and_tuple(part_column_list_val *val, uint32 nvals_in_rec);
 static int cmp_rec_and_tuple_prune(part_column_list_val *val,
                                    uint32 n_vals_in_rec,
                                    bool is_left_endpoint,
-                                   bool include_endpoint,
-                                   bool disj= false);
+                                   bool include_endpoint);
 
 /*
   Convert constants in VALUES definition to the character set the
@@ -7714,31 +7713,23 @@ uint32 store_tuple_to_record(Field **pfield,
 
 /**
   RANGE(columns) partitioning: compare partition value bound and probe tuple.
-  VERSIONING partitioning: disjunction of comparisons of partition values and probe tuple.
 
   @param val           Partition column values.
   @param nvals_in_rec  Number of (prefix) fields to compare.
-  @param disj          Disjunction mode.
 
-  Normal mode:
   @return Less than/Equal to/Greater than 0 if the record is L/E/G than val.
-
-  Disjunction mode:
-  @return Less than 0 if any of probe tuple columns is less than partition values;
-          Greater than 0 if all probe tuple columns are greater than partition values;
-          Equal to 0 otherwise.
 
   @note The partition value bound is always a full tuple (but may include the
   MAXVALUE special value). The probe tuple may be a prefix of partitioning
   tuple.
 */
 
-static int cmp_rec_and_tuple(part_column_list_val *val, uint32 nvals_in_rec, bool disj)
+static int cmp_rec_and_tuple(part_column_list_val *val, uint32 nvals_in_rec)
 {
   partition_info *part_info= val->part_info;
   Field **field= part_info->part_field_array;
   Field **fields_end= field + nvals_in_rec;
-  int all_res= disj ? 1 : 0;
+  int res;
 
   for (; field != fields_end; field++, val++)
   {
@@ -7751,23 +7742,12 @@ static int cmp_rec_and_tuple(part_column_list_val *val, uint32 nvals_in_rec, boo
       return -1;
     }
     if (val->null_value)
-    {
-      if (disj)
-        continue;
       return +1;
-    }
-    int res= (*field)->cmp((const uchar*)val->column_value);
-    if (disj)
-    {
-      if (res < 0)
-        return res;
-      if (res == 0)
-        all_res= 0;
-    }
-    else if (res)
+    res= (*field)->cmp((const uchar*)val->column_value);
+    if (res)
       return res;
   }
-  return all_res;
+  return 0;
 }
 
 
@@ -7780,7 +7760,6 @@ static int cmp_rec_and_tuple(part_column_list_val *val, uint32 nvals_in_rec, boo
                             part_tuple <= rec)
   @param  include_endpoint  If endpoint is included (part_tuple <= rec or
                             rec <= part_tuple)
-  @param  disj              Disjunction mode comparison
 
   @return Less than/Equal to/Greater than 0 if the record is L/E/G than
   the partition tuple.
@@ -7792,12 +7771,11 @@ static int cmp_rec_and_tuple(part_column_list_val *val, uint32 nvals_in_rec, boo
 static int cmp_rec_and_tuple_prune(part_column_list_val *val,
                                    uint32 n_vals_in_rec,
                                    bool is_left_endpoint,
-                                   bool include_endpoint,
-                                   bool disj)
+                                   bool include_endpoint)
 {
   int cmp;
   Field **field;
-  if ((cmp= cmp_rec_and_tuple(val, n_vals_in_rec, disj)))
+  if ((cmp= cmp_rec_and_tuple(val, n_vals_in_rec)))
     return cmp;
   field= val->part_info->part_field_array + n_vals_in_rec;
   if (!(*field))
@@ -7862,12 +7840,10 @@ typedef uint32 (*get_col_endpoint_func)(partition_info*, bool left_endpoint,
   get_partition_id_range_for_endpoint.
 */
 
-inline
-uint32 get_partition_id_cols_range_for_endpoint0(partition_info *part_info,
+uint32 get_partition_id_cols_range_for_endpoint(partition_info *part_info,
                                                 bool is_left_endpoint,
                                                 bool include_endpoint,
-                                                uint32 nparts,
-                                                bool disj)
+                                                uint32 nparts)
 {
   uint min_part_id= 0, max_part_id= part_info->num_parts, loc_part_id;
   part_column_list_val *range_col_array= part_info->range_col_array;
@@ -7883,8 +7859,7 @@ uint32 get_partition_id_cols_range_for_endpoint0(partition_info *part_info,
                                        loc_part_id * num_columns,
                                      nparts,
                                      is_left_endpoint,
-                                     include_endpoint,
-                                     disj))
+                                     include_endpoint))
       min_part_id= loc_part_id + 1;
     else
       max_part_id= loc_part_id;
@@ -7896,13 +7871,13 @@ uint32 get_partition_id_cols_range_for_endpoint0(partition_info *part_info,
               (0 > cmp_rec_and_tuple_prune(range_col_array +
                                              loc_part_id * num_columns,
                                            nparts, is_left_endpoint,
-                                           include_endpoint, disj)));
+                                           include_endpoint)));
   /* Given value must be GREATER THAN or EQUAL to the previous partition. */
   DBUG_ASSERT(loc_part_id == 0 ||
               (0 <= cmp_rec_and_tuple_prune(range_col_array +
                                               (loc_part_id - 1) * num_columns,
                                             nparts, is_left_endpoint,
-                                            include_endpoint, disj)));
+                                            include_endpoint)));
 
   if (!is_left_endpoint)
   {
@@ -7913,21 +7888,6 @@ uint32 get_partition_id_cols_range_for_endpoint0(partition_info *part_info,
   DBUG_RETURN(loc_part_id);
 }
 
-uint32 get_partition_id_cols_range_for_endpoint(partition_info *part_info,
-                                                bool is_left_endpoint,
-                                                bool include_endpoint,
-                                                uint32 nparts)
-{
-  return get_partition_id_cols_range_for_endpoint0(part_info, is_left_endpoint, include_endpoint, nparts, false);
-}
-
-uint32 get_partition_id_cols_range_for_endpoint_disj(partition_info *part_info,
-                                                bool is_left_endpoint,
-                                                bool include_endpoint,
-                                                uint32 nparts)
-{
-  return get_partition_id_cols_range_for_endpoint0(part_info, is_left_endpoint, include_endpoint, nparts, true);
-}
 
 int get_part_iter_for_interval_cols_via_map(partition_info *part_info,
                                             bool is_subpart,
@@ -7943,14 +7903,9 @@ int get_part_iter_for_interval_cols_via_map(partition_info *part_info,
   uint full_length= 0;
   DBUG_ENTER("get_part_iter_for_interval_cols_via_map");
 
-  if (part_info->part_type == RANGE_PARTITION)
+  if (part_info->part_type == RANGE_PARTITION || part_info->part_type == VERSIONING_PARTITION)
   {
     get_col_endpoint= get_partition_id_cols_range_for_endpoint;
-    part_iter->get_next= get_next_partition_id_range;
-  }
-  else if (part_info->part_type == VERSIONING_PARTITION)
-  {
-    get_col_endpoint= get_partition_id_cols_range_for_endpoint_disj;
     part_iter->get_next= get_next_partition_id_range;
   }
   else if (part_info->part_type == LIST_PARTITION)
