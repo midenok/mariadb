@@ -360,7 +360,7 @@ public:
   char *find_duplicate_field();
   char *find_duplicate_name();
   bool check_engine_mix(handlerton *engine_type, bool default_engine);
-  bool check_range_constants(THD *thd);
+  bool check_range_constants(THD *thd, bool init= true);
   bool check_list_constants(THD *thd);
   bool check_partition_info(THD *thd, handlerton **eng_type,
                             handler *file, HA_CREATE_INFO *info,
@@ -528,17 +528,20 @@ public:
     DBUG_ASSERT(table && table->s);
     DBUG_ASSERT(el);
     mysql_rwlock_wrlock(&table->s->LOCK_stat_serial);
+    el->empty= false;
     bool updated=
       vers_stat_trx(STAT_TRX_START, el->id).update(table->vers_start_field());
-    if (el->id < vers_info->now_part->id)
+    if (el->type == partition_element::VERSIONING)
       updated+= vers_stat_trx(STAT_TRX_END, el->id).update(table->vers_end_field());
     if (updated)
       table->s->stat_serial++;
     mysql_rwlock_unlock(&table->s->LOCK_stat_serial);
-    if (updated)
+    if (updated && el->type == partition_element::VERSIONING)
+    {
       vers_update_col_vals(thd,
         el->id > 0 ? get_partition(el->id - 1) : NULL,
         el);
+    }
   }
   void vers_update_stats(THD *thd, uint part_id)
   {
@@ -561,7 +564,7 @@ public:
       Field *f= part_field_array[i];
       bitmap_set_bit(f->table->write_set, f->field_index);
     }
-    check_range_constants(thd);
+    check_range_constants(thd, false);
     vers_info->stat_serial= table->s->stat_serial;
     mysql_rwlock_unlock(&table->s->LOCK_stat_serial);
   }

@@ -3464,7 +3464,7 @@ bool prune_partitions(THD *thd, TABLE *table, Item *pprune_cond)
   {
     Query_arena *backup_stmt_arena_ptr= thd->stmt_arena;
     Query_arena backup_arena;
-    Query_arena part_func_arena(&table->mem_root,
+    Query_arena part_func_arena(&part_info->table->s->mem_root,
                                 Query_arena::STMT_INITIALIZED);
     thd->set_n_backup_active_arena(&part_func_arena, &backup_arena);
     thd->stmt_arena= &part_func_arena;
