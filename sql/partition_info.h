@@ -526,17 +526,15 @@ public:
   {
     DBUG_ASSERT(vers_info && vers_info->initialized());
     DBUG_ASSERT(table && table->s);
-    DBUG_ASSERT(el);
+    DBUG_ASSERT(el && el->type == partition_element::VERSIONING);
     mysql_rwlock_wrlock(&table->s->LOCK_stat_serial);
     el->empty= false;
     bool updated=
-      vers_stat_trx(STAT_TRX_START, el->id).update(table->vers_start_field());
-    if (el->type == partition_element::VERSIONING)
-      updated+= vers_stat_trx(STAT_TRX_END, el->id).update(table->vers_end_field());
+      vers_stat_trx(STAT_TRX_END, el->id).update(table->vers_end_field());
     if (updated)
       table->s->stat_serial++;
     mysql_rwlock_unlock(&table->s->LOCK_stat_serial);
-    if (updated && el->type == partition_element::VERSIONING)
+    if (updated)
     {
       vers_update_col_vals(thd,
         el->id > 0 ? get_partition(el->id - 1) : NULL,
@@ -545,7 +543,9 @@ public:
   }
   void vers_update_stats(THD *thd, uint part_id)
   {
-    vers_update_stats(thd, get_partition(part_id));
+    DBUG_ASSERT(vers_info && vers_info->initialized());
+    if (part_id < vers_info->now_part->id)
+      vers_update_stats(thd, get_partition(part_id));
   }
   void vers_update_range_constants(THD *thd)
   {

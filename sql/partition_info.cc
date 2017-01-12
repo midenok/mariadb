@@ -1078,7 +1078,7 @@ bool partition_info::vers_init_info(THD * thd)
   part_type= VERSIONING_PARTITION;
   list_of_part_fields= TRUE;
   column_list= TRUE;
-  num_columns= 2;
+  num_columns= 1;
   vers_info= new (thd->mem_root) Vers_part_info;
   if (!vers_info)
   {
@@ -1184,14 +1184,11 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
   }
   else
   {
-    Field *sys_trx_start= table->vers_start_field();
     Field *sys_trx_end= table->vers_end_field();
     part_field_list.empty();
-    part_field_list.push_back(const_cast<char *>(sys_trx_start->field_name), thd->mem_root);
     part_field_list.push_back(const_cast<char *>(sys_trx_end->field_name), thd->mem_root);
     DBUG_ASSERT(part_field_list.elements == num_columns);
     // needed in handle_list_of_fields()
-    sys_trx_start->flags|= GET_FIXED_FIELDS_FLAG;
     sys_trx_end->flags|= GET_FIXED_FIELDS_FLAG;
   }
 
@@ -1215,11 +1212,8 @@ bool partition_info::vers_setup_1(THD * thd, uint32 added)
       if (el->id == UINT32_MAX || el->type == partition_element::AS_OF_NOW)
       {
         DBUG_ASSERT(table && table->s);
-        Vers_field_stats *stat_trx_start= new (&table->s->mem_root)
-          Vers_field_stats(table->s->vers_start_field()->field_name, table->s);
         Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
           Vers_field_stats(table->s->vers_end_field()->field_name, table->s);
-        table->s->stat_trx[id * num_columns + STAT_TRX_START]= stat_trx_start;
         table->s->stat_trx[id * num_columns + STAT_TRX_END]= stat_trx_end;
         el->id= id++;
         if (el->type == partition_element::AS_OF_NOW)
@@ -1301,7 +1295,6 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
             continue;
           break;
         }
-        vers_stat_trx(STAT_TRX_START, part).update_unguarded(table->vers_start_field());
         vers_stat_trx(STAT_TRX_END, part).update_unguarded(table->vers_end_field());
       }
       file->ha_rnd_end();
@@ -1405,11 +1398,8 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
       }
 
       {
-        Vers_field_stats *stat_trx_start= new (&table->s->mem_root)
-          Vers_field_stats(table->s->vers_start_field()->field_name, table->s);
         Vers_field_stats *stat_trx_end= new (&table->s->mem_root)
           Vers_field_stats(table->s->vers_end_field()->field_name, table->s);
-        table->s->stat_trx[el->id * num_columns + STAT_TRX_START]= stat_trx_start;
         table->s->stat_trx[el->id * num_columns + STAT_TRX_END]= stat_trx_end;
       }
 

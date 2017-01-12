@@ -3423,14 +3423,12 @@ int vers_get_partition_id(partition_info *part_info,
 {
   DBUG_ENTER("vers_get_partition_id");
   DBUG_ASSERT(part_info);
-  Field *sys_trx_start= part_info->part_field_array[STAT_TRX_START];
   Field *sys_trx_end= part_info->part_field_array[STAT_TRX_END];
   DBUG_ASSERT(sys_trx_end);
   DBUG_ASSERT(part_info->table);
   Vers_part_info *vers_info= part_info->vers_info;
   DBUG_ASSERT(vers_info && vers_info->initialized());
   DBUG_ASSERT(sys_trx_end->table == part_info->table && part_info->table->versioned());
-  DBUG_ASSERT(part_info->table->vers_start_field() == sys_trx_start);
   DBUG_ASSERT(part_info->table->vers_end_field() == sys_trx_end);
 
   // new rows have NULL in sys_trx_end

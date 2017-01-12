@@ -143,8 +143,7 @@ public:
 
 enum stat_trx_field
 {
-  STAT_TRX_START= 0,
-  STAT_TRX_END
+  STAT_TRX_END= 0
 };
 
 class partition_element :public Sql_alloc

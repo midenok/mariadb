@@ -3462,17 +3462,7 @@ bool prune_partitions(THD *thd, TABLE *table, Item *pprune_cond)
 
   if (part_info->part_type == VERSIONING_PARTITION)
   {
-    Query_arena *backup_stmt_arena_ptr= thd->stmt_arena;
-    Query_arena backup_arena;
-    Query_arena part_func_arena(&part_info->table->s->mem_root,
-                                Query_arena::STMT_INITIALIZED);
-    thd->set_n_backup_active_arena(&part_func_arena, &backup_arena);
-    thd->stmt_arena= &part_func_arena;
-
     part_info->vers_update_range_constants(thd);
-
-    thd->stmt_arena= backup_stmt_arena_ptr;
-    thd->restore_active_arena(&part_func_arena, &backup_arena);
   }
   
   dbug_tmp_use_all_columns(table, old_sets, 
