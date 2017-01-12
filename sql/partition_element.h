@@ -192,7 +192,7 @@ public:
     type(CONVENTIONAL)
   {}
   partition_element(partition_element *part_elem)
-    : part_max_rows(part_elem->part_max_rows),
+  : part_max_rows(part_elem->part_max_rows),
     part_min_rows(part_elem->part_min_rows),
     range_value(0), partition_name(NULL),
     tablespace_name(part_elem->tablespace_name),
