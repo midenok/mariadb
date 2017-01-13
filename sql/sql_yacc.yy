@@ -11289,10 +11289,7 @@ table_primary_ident:
               MYSQL_YYABORT;
             Select->add_joined_table($$);
             if ($6)
-            {
               $$->vers_conditions= Lex->vers_conditions;
-              Select->vers_conditions= Lex->vers_conditions;
-            }
           }
         ;
 
