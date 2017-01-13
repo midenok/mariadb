@@ -25457,7 +25457,7 @@ void st_select_lex::print(THD *thd, String *str, enum_query_type query_type)
   if (vers_conditions.unwrapped)
   {
     // versioning conditions are already unwrapped to WHERE clause
-    str->append(STRING_WITH_LEN(" for system_time all "));
+    str->append(STRING_WITH_LEN(" query for system_time all "));
   }
 
   if (order_list.elements)

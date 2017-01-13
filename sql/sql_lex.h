@@ -2851,7 +2851,7 @@ public:
   Window_spec *win_spec;
 
   /* System Versioning */
-  vers_select_conds_t *vers_conditions;
+  vers_select_conds_t vers_conditions;
 
   inline void free_set_stmt_mem_root()
   {
