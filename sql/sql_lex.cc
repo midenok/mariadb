@@ -753,6 +753,8 @@ void lex_start(THD *thd)
   lex->frame_bottom_bound= NULL;
   lex->win_spec= NULL;
 
+  lex->vers_conditions= NULL;
+
   lex->is_lex_started= TRUE;
   DBUG_VOID_RETURN;
 }

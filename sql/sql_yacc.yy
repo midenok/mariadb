@@ -8785,7 +8785,7 @@ table_expression:
           opt_group_clause
           opt_having_clause
           opt_window_clause
-          opt_for_system_time_clause
+          opt_query_for_system_time_clause
         ;
 
 opt_table_expression:
@@ -8831,75 +8831,86 @@ trans_or_timestamp:
           }
         ;
 
+opt_query_for_system_time_clause:
+          /* empty */
+          {}
+        | QUERY_SYM FOR_SYSTEM_TIME_SYM
+          {
+            Lex->vers_conditions= &Lex->current_select->vers_conditions;
+          }
+          for_system_time_expr
+          {
+            Lex->vers_conditions= NULL;
+          }
+        ;
+
 opt_for_system_time_clause:
           /* empty */
           {}
         | FOR_SYSTEM_TIME_SYM
-          AS OF_SYM
-          trans_or_timestamp simple_expr
           {
-            Lex->current_select->vers_conditions.init(FOR_SYSTEM_TIME_AS_OF, $4, $5);
+            Lex->vers_conditions= &Lex->current_select->vers_conditions;
           }
-        | FOR_SYSTEM_TIME_SYM
-          AS OF_SYM
-          NOW_SYM
+          for_system_time_expr
           {
+            Lex->vers_conditions= NULL;
+          }
+        ;
+
+for_system_time_expr:
+          AS OF_SYM trans_or_timestamp simple_expr
+          {
+            DBUG_ASSERT(Lex->vers_conditions);
+            Lex->vers_conditions->init(FOR_SYSTEM_TIME_AS_OF, $3, $4);
+          }
+        | AS OF_SYM NOW_SYM
+          {
+            DBUG_ASSERT(Lex->vers_conditions);
             Item *item= new (thd->mem_root) Item_func_now_local(thd, 6);
             if (item == NULL)
               MYSQL_YYABORT;
-            Lex->current_select->vers_conditions.init(FOR_SYSTEM_TIME_AS_OF, UNIT_TIMESTAMP, item);
+            Lex->vers_conditions->init(FOR_SYSTEM_TIME_AS_OF, UNIT_TIMESTAMP, item);
           }
-        | FOR_SYSTEM_TIME_SYM ALL
+        | ALL
           {
-            Lex->current_select->vers_conditions.init(FOR_SYSTEM_TIME_ALL, UNIT_TIMESTAMP);
+            DBUG_ASSERT(Lex->vers_conditions);
+            Lex->vers_conditions->init(FOR_SYSTEM_TIME_ALL, UNIT_TIMESTAMP);
           }
-        | FOR_SYSTEM_TIME_SYM
-          FROM
-          trans_or_timestamp
-          simple_expr
-          TO_SYM
-          trans_or_timestamp
-          simple_expr
+        | FROM trans_or_timestamp simple_expr
+          TO_SYM trans_or_timestamp simple_expr
           {
-            if ($3 != $6)
+            DBUG_ASSERT(Lex->vers_conditions);
+            if ($2 != $5)
             {
               Lex->parse_error(ER_VERS_RANGE_UNITS_MISMATCH);
               MYSQL_YYABORT;
             }
-            Lex->current_select->vers_conditions.init(FOR_SYSTEM_TIME_FROM_TO, $3, $4, $7);
+            Lex->vers_conditions->init(FOR_SYSTEM_TIME_FROM_TO, $2, $3, $6);
           }
-        | FOR_SYSTEM_TIME_SYM
-          trans_or_timestamp
-          FROM
-          simple_expr
-          TO_SYM
-          simple_expr
+        | trans_or_timestamp
+          FROM simple_expr
+          TO_SYM simple_expr
           {
-            Lex->current_select->vers_conditions.init(FOR_SYSTEM_TIME_FROM_TO, $2, $4, $6);
+            DBUG_ASSERT(Lex->vers_conditions);
+            Lex->vers_conditions->init(FOR_SYSTEM_TIME_FROM_TO, $1, $3, $5);
           }
-        | FOR_SYSTEM_TIME_SYM
-          BETWEEN_SYM
-          trans_or_timestamp
-          simple_expr
-          AND_SYM
-          trans_or_timestamp
-          simple_expr
+        | BETWEEN_SYM trans_or_timestamp simple_expr
+          AND_SYM trans_or_timestamp simple_expr
           {
-            if ($3 != $6)
+            DBUG_ASSERT(Lex->vers_conditions);
+            if ($2 != $5)
             {
               Lex->parse_error(ER_VERS_RANGE_UNITS_MISMATCH);
               MYSQL_YYABORT;
             }
-            Lex->current_select->vers_conditions.init(FOR_SYSTEM_TIME_BETWEEN, $3, $4, $7);
+            Lex->vers_conditions->init(FOR_SYSTEM_TIME_BETWEEN, $2, $3, $6);
           }
-        | FOR_SYSTEM_TIME_SYM
-          trans_or_timestamp
-          BETWEEN_SYM
-          simple_expr
-          AND_SYM
-          simple_expr
+        | trans_or_timestamp
+          BETWEEN_SYM simple_expr
+          AND_SYM simple_expr
           {
-            Lex->current_select->vers_conditions.init(FOR_SYSTEM_TIME_BETWEEN, $2, $4, $6);
+            DBUG_ASSERT(Lex->vers_conditions);
+            Lex->vers_conditions->init(FOR_SYSTEM_TIME_BETWEEN, $1, $3, $5);
           }
         ;
 
