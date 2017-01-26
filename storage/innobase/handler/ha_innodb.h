@@ -233,7 +233,7 @@ public:
 	ha_rows estimate_rows_upper_bound();
 
 	// JAN: TODO: MySQL 5.7
-	// int records(ha_rows* num_rows);
+	int records(ha_rows* num_rows);
 
 	void update_create_info(HA_CREATE_INFO* create_info);
 

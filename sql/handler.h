@@ -3279,7 +3279,7 @@ public:
   void ft_end() { ft_handler=NULL; }
   virtual FT_INFO *ft_init_ext(uint flags, uint inx,String *key)
     { return NULL; }
-private:
+public:
   virtual int ft_read(uchar *buf) { return HA_ERR_WRONG_COMMAND; }
   virtual int rnd_next(uchar *buf)=0;
   virtual int rnd_pos(uchar * buf, uchar *pos)=0;
@@ -3986,6 +3986,7 @@ public:
   TABLE_SHARE* get_table_share() { return table_share; }
 protected:
   /* Service methods for use by storage engines. */
+  void ha_statistic_increment(ulong SSV::*offset) const;
   void **ha_data(THD *) const;
   THD *ha_thd(void) const;
 
@@ -4011,7 +4012,7 @@ protected:
 
 public:
   bool check_table_binlog_row_based(bool binlog_row);
-private:
+
   /* Cache result to avoid extra calls */
   inline void mark_trx_read_write()
   {
@@ -4021,6 +4022,8 @@ private:
       mark_trx_read_write_internal();
     }
   }
+
+private:
   void mark_trx_read_write_internal();
   bool check_table_binlog_row_based_internal(bool binlog_row);
 

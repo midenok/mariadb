@@ -350,9 +350,9 @@ public:
 		int	error,
 		myf	errflag);
 
-	bool
-	is_ignorable_error(
-		int	error);
+// 	bool
+// 	is_ignorable_error(
+// 		int	error);
 
 	int
 	start_stmt(
@@ -506,7 +506,7 @@ public:
 	ft_init_ext_with_hints(
 		uint		inx,
 		String*		key,
-		Ft_hints*	hints)
+		void*	hints)
 	{
 		ut_ad(0);
 		return(NULL);
@@ -922,12 +922,12 @@ private:
 	@param[in]	key	Key to match.
 	@param[in]	keypart_map	Which part of the key to use.
 	@return error number or 0. */
-	int
-	index_read_last_map_in_part(
-		uint		part,
-		uchar*		record,
-		const uchar*	key,
-		key_part_map	keypart_map);
+// 	int
+// 	index_read_last_map_in_part(
+// 		uint		part,
+// 		uchar*		record,
+// 		const uchar*	key,
+// 		key_part_map	keypart_map);
 
 	/** Start index scan and return first record from a partition.
 	This routine starts an index scan using a start and end key.
@@ -1221,9 +1221,8 @@ protected:
 		uchar*	record,
 		uchar*	pos);
 
-	int
-	records(
-		ha_rows*	num_rows);
+	ha_rows
+	records();
 
 	int
 	index_next(

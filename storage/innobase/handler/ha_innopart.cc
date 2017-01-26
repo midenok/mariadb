@@ -54,6 +54,21 @@ Created Nov 22, 2013 Mattias Jonsson */
 #include "partition_info.h"
 #include "key.h"
 
+/********************************************************************//**
+Get the upper limit of the MySQL integral and floating-point type.
+@return maximum allowed value for the field */
+UNIV_INTERN
+ulonglong
+innobase_get_int_col_max_value(
+/*===========================*/
+	const Field*	field);	/*!< in: MySQL field */
+
+static
+void set_my_errno(int err)
+{
+	errno = err;
+}
+
 #define INSIDE_HA_INNOPART_CC
 
 /* To be backwards compatible we also fold partition separator on windows. */
@@ -242,7 +257,7 @@ Ha_innopart_share::set_v_templ(
 				innobase_build_v_templ(
 					table, ib_table,
 					m_table_parts[i]->vc_templ,
-					NULL, true, name);
+					NULL, true);
 			}
 		}
 	}
@@ -882,7 +897,7 @@ ha_innopart::initialize_auto_increment(
 		my_error(ER_AUTOINC_READ_FAILED, MYF(0));
 		error = HA_ERR_AUTOINC_READ_FAILED;
 	} else {
-		ib_uint64_t	col_max_value = field->get_max_int_value();
+		ib_uint64_t	col_max_value = innobase_get_int_col_max_value(field);
 
 		update_thd(ha_thd());
 
@@ -1098,7 +1113,7 @@ share_error:
 			by printing a warning in addition to log a message
 			in the errorlog. */
 
-			push_warning_printf(thd, Sql_condition::SL_WARNING,
+			push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
 					    ER_NO_SUCH_INDEX,
 					    "Table %s has a"
 					    " primary key in InnoDB data"
@@ -1173,7 +1188,7 @@ share_error:
 			by printing a warning in addition to log a message
 			in the errorlog. */
 
-			push_warning_printf(thd, Sql_condition::SL_WARNING,
+			push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
 					    ER_NO_SUCH_INDEX,
 					    "InnoDB: Table %s has no"
 					    " primary key in InnoDB data"
@@ -1304,7 +1319,7 @@ ha_innopart::clone(
 
 	DBUG_ENTER("ha_innopart::clone");
 
-	new_handler = dynamic_cast<ha_innopart*>(handler::clone(name,
+	new_handler = static_cast<ha_innopart*>(handler::clone(name,
 							mem_root));
 	if (new_handler != NULL) {
 		ut_ad(new_handler->m_prebuilt != NULL);
@@ -1838,18 +1853,18 @@ ha_innopart::print_error(
 /** Can error be ignored.
 @param[in]	error	Error code to check.
 @return	true if ignorable else false. */
-bool
-ha_innopart::is_ignorable_error(
-	int	error)
-{
-	if (ha_innobase::is_ignorable_error(error)
-	    || error == HA_ERR_NO_PARTITION_FOUND
-	    || error == HA_ERR_NOT_IN_LOCK_PARTITIONS) {
-
-		return(true);
-	}
-	return(false);
-}
+// bool
+// ha_innopart::is_ignorable_error(
+// 	int	error)
+// {
+// 	if (ha_innobase::is_ignorable_error(error)
+// 	    || error == HA_ERR_NO_PARTITION_FOUND
+// 	    || error == HA_ERR_NOT_IN_LOCK_PARTITIONS) {
+// 
+// 		return(true);
+// 	}
+// 	return(false);
+// }
 
 /** Get the index for the current partition
 @param[in]	keynr	MySQL index number.
@@ -1960,7 +1975,7 @@ ha_innopart::change_active_index(
 				m_prebuilt->index->table->name.m_name);
 
 			push_warning_printf(
-				m_user_thd, Sql_condition::SL_WARNING,
+				m_user_thd, Sql_condition::WARN_LEVEL_WARN,
 				HA_ERR_INDEX_CORRUPT,
 				"InnoDB: Index %s for table %s is"
 				" marked as corrupted"
@@ -1969,7 +1984,7 @@ ha_innopart::change_active_index(
 			DBUG_RETURN(HA_ERR_INDEX_CORRUPT);
 		} else {
 			push_warning_printf(
-				m_user_thd, Sql_condition::SL_WARNING,
+				m_user_thd, Sql_condition::WARN_LEVEL_WARN,
 				HA_ERR_TABLE_DEF_CHANGED,
 				"InnoDB: insufficient history for index %u",
 				keynr);
@@ -2181,19 +2196,19 @@ ha_innopart::index_read_idx_map_in_part(
 @param[in]	key		Key to match.
 @param[in]	keypart_map	Which part of the key to use.
 @return	error number or 0. */
-int
-ha_innopart::index_read_last_map_in_part(
-	uint		part,
-	uchar*		record,
-	const uchar*	key,
-	key_part_map	keypart_map)
-{
-	int	error;
-	set_partition(part);
-	error = ha_innobase::index_read_last_map(record, key, keypart_map);
-	update_partition(part);
-	return(error);
-}
+// int
+// ha_innopart::index_read_last_map_in_part(
+// 	uint		part,
+// 	uchar*		record,
+// 	const uchar*	key,
+// 	key_part_map	keypart_map)
+// {
+// 	int	error;
+// 	set_partition(part);
+// 	error = ha_innobase::index_read_last_map(record, key, keypart_map);
+// 	update_partition(part);
+// 	return(error);
+// }
 
 /** Start index scan and return first record from a partition.
 This routine starts an index scan using a start and end key.
@@ -2951,28 +2966,6 @@ int
 ha_innopart::extra(
 	enum ha_extra_function	operation)
 {
-	if (operation == HA_EXTRA_SECONDARY_SORT_ROWID) {
-		/* index_init(sorted=true) must have been called! */
-		ut_ad(m_ordered);
-		ut_ad(m_ordered_rec_buffer != NULL);
-		/* No index_read call must have been done! */
-		ut_ad(m_queue->empty());
-
-		/* If not PK is set as secondary sort, do secondary sort by
-		rowid/ref. */
-
-		ut_ad(m_curr_key_info[1] != NULL
-		      || m_prebuilt->clust_index_was_generated != 0
-		      || m_curr_key_info[0]
-			 == table->key_info + table->s->primary_key);
-
-		if (m_curr_key_info[1] == NULL
-		    && m_prebuilt->clust_index_was_generated) {
-			m_ref_usage = Partition_helper::REF_USED_FOR_SORT;
-			m_queue->m_fun = key_and_rowid_cmp;
-		}
-		return(0);
-	}
 	return(ha_innobase::extra(operation));
 }
 
@@ -3057,17 +3050,16 @@ ha_innopart::truncate()
 /** Total number of rows in all used partitions.
 Returns the exact number of records that this client can see using this
 handler object.
-@param[out]	num_rows	Number of rows.
-@return	0 or error number. */
-int
-ha_innopart::records(
-	ha_rows*	num_rows)
+@return 	Number of rows. */
+ha_rows
+ha_innopart::records()
 {
+    ha_rows num_rows;
 	ha_rows	n_rows;
 	int	err;
 	DBUG_ENTER("ha_innopart::records()");
 
-	*num_rows = 0;
+	num_rows = 0;
 
 	/* The index scan is probably so expensive, so the overhead
 	of the rest of the function is neglectable for each partition.
@@ -3081,12 +3073,11 @@ ha_innopart::records(
 		err = ha_innobase::records(&n_rows);
 		update_partition(i);
 		if (err != 0) {
-			*num_rows = HA_POS_ERROR;
-			DBUG_RETURN(err);
+			DBUG_RETURN(HA_POS_ERROR);
 		}
-		*num_rows += n_rows;
+		num_rows += n_rows;
 	}
-	DBUG_RETURN(0);
+	DBUG_RETURN(num_rows);
 }
 
 /** Estimates the number of index records in a range.
@@ -3148,14 +3139,14 @@ ha_innopart::records_in_range(
 		goto func_exit;
 	}
 
-	heap = mem_heap_create(2 * (key->actual_key_parts * sizeof(dfield_t)
+	heap = mem_heap_create(2 * (key->user_defined_key_parts * sizeof(dfield_t)
 				    + sizeof(dtuple_t)));
 
-	range_start = dtuple_create(heap, key->actual_key_parts);
-	dict_index_copy_types(range_start, index, key->actual_key_parts);
+	range_start = dtuple_create(heap, key->user_defined_key_parts);
+	dict_index_copy_types(range_start, index, key->user_defined_key_parts);
 
-	range_end = dtuple_create(heap, key->actual_key_parts);
-	dict_index_copy_types(range_end, index, key->actual_key_parts);
+	range_end = dtuple_create(heap, key->user_defined_key_parts);
+	dict_index_copy_types(range_end, index, key->user_defined_key_parts);
 
 	row_sel_convert_mysql_key_to_innobase(
 		range_start,
@@ -3487,7 +3478,7 @@ ha_innopart::info_low(
 
 					push_warning_printf(
 						thd,
-						Sql_condition::SL_WARNING,
+						Sql_condition::WARN_LEVEL_WARN,
 						ER_CANT_GET_STAT,
 						"InnoDB: Trying to get the"
 						" free space for partition %s"
@@ -3663,7 +3654,7 @@ ha_innopart::info_low(
 
 			KEY*	key = &table->key_info[i];
 			for (j = 0;
-			     j < key->actual_key_parts;
+			     j < key->user_defined_key_parts;
 			     j++) {
 
 				if ((key->flags & HA_FULLTEXT) != 0) {
@@ -3687,32 +3678,6 @@ ha_innopart::info_low(
 						<< TROUBLESHOOTING_MSG;
 					break;
 				}
-
-				/* innodb_rec_per_key() will use
-				index->stat_n_diff_key_vals[] and the value we
-				pass index->table->stat_n_rows. Both are
-				calculated by ANALYZE and by the background
-				stats gathering thread (which kicks in when too
-				much of the table has been changed). In
-				addition table->stat_n_rows is adjusted with
-				each DML (e.g. ++ on row insert). Those
-				adjustments are not MVCC'ed and not even
-				reversed on rollback. So,
-				index->stat_n_diff_key_vals[] and
-				index->table->stat_n_rows could have been
-				calculated at different time. This is
-				acceptable. */
-				const rec_per_key_t	rec_per_key =
-					innodb_rec_per_key(
-						index, j,
-						max_rows);
-
-				key->set_records_per_key(j, rec_per_key);
-
-				/* The code below is legacy and should be
-				removed together with this comment once we
-				are sure the new floating point rec_per_key,
-				set via set_records_per_key(), works fine. */
 
 				ulong	rec_per_key_int = static_cast<ulong>(
 					innodb_rec_per_key(index, j,
@@ -3872,7 +3837,7 @@ ha_innopart::check(
 			256,
 			"error",
 			table_share->db.str,
-			table->alias,
+			table->alias.c_ptr(),
 			"check",
 			m_is_sub_partitioned ?
 			  "Subpartition %s returned error"
@@ -3901,7 +3866,7 @@ ha_innopart::repair(
 	/* TODO: enable this warning to be clear about what is repaired.
 	Currently disabled to generate smaller test diffs. */
 #ifdef ADD_WARNING_FOR_REPAIR_ONLY_PARTITION
-	push_warning_printf(thd, Sql_condition::SL_WARNING,
+	push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
 			    ER_ILLEGAL_HA,
 			    "Only moving rows from wrong partition to correct"
 			    " partition is supported,"
@@ -3928,7 +3893,7 @@ ha_innopart::repair(
 				256,
 				"error",
 				table_share->db.str,
-				table->alias,
+				table->alias.c_ptr(),
 				"repair",
 				m_is_sub_partitioned ?
 				  "Subpartition %s returned error"

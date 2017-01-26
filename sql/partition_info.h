@@ -382,6 +382,26 @@ public:
                                    uint32 *part_id);
   void report_part_expr_error(bool use_subpart_expr);
   bool has_same_partitioning(partition_info *new_part_info);
+  inline bool is_partition_used(uint part_id) const
+  {
+    return bitmap_is_set(&read_partitions, part_id);
+  }
+  inline bool is_partition_locked(uint part_id) const
+  {
+    return bitmap_is_set(&lock_partitions, part_id);
+  }
+  inline uint num_partitions_used()
+  {
+    return bitmap_bits_set(&read_partitions);
+  }
+  inline uint get_first_used_partition() const
+  {
+    return bitmap_get_first_set(&read_partitions);
+  }
+  inline uint get_next_used_partition(uint part_id) const
+  {
+    return bitmap_get_next_set(&read_partitions, part_id);
+  }
 private:
   static int list_part_cmp(const void* a, const void* b);
   bool set_up_default_partitions(THD *thd, handler *file, HA_CREATE_INFO *info,

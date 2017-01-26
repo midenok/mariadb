@@ -31,7 +31,6 @@
 #define PARTITION_BYTES_IN_POS 2
 
 /* forward declarations */
-typedef struct st_ha_create_information HA_CREATE_INFO;
 typedef struct st_mem_root MEM_ROOT;
 
 static const uint NO_CURRENT_PART_ID= UINT_MAX32;
@@ -270,8 +269,8 @@ public:
     {
       return HA_ERR_WRONG_COMMAND;
     }
-    DBUG_ASSERT(file->table_share->tmp_table != NO_TMP_TABLE ||
-                file->m_lock_type == F_WRLCK);
+    DBUG_ASSERT(file->get_table_share()->tmp_table != NO_TMP_TABLE ||
+                file->get_lock_type() == F_WRLCK);
     file->mark_trx_read_write();
     return truncate_partition_low();
   }
@@ -303,8 +302,8 @@ public:
       my_error(ER_ILLEGAL_HA, MYF(0), create_info->alias);
       return HA_ERR_WRONG_COMMAND;
     }
-    DBUG_ASSERT(file->table_share->tmp_table != NO_TMP_TABLE ||
-                file->m_lock_type != F_UNLCK);
+    DBUG_ASSERT(file->get_table_share()->tmp_table != NO_TMP_TABLE ||
+                file->get_lock_type() != F_UNLCK);
     file->mark_trx_read_write();
     return change_partitions_low(create_info, path, copied, deleted);
   }
@@ -373,7 +372,7 @@ private:
 /// Maps compare function to strict weak ordering required by Priority_queue.
 struct Key_rec_less
 {
-  typedef int (*key_compare_fun)(KEY**, uchar *, uchar *);
+  typedef int (*key_compare_fun)(void*, uchar *, uchar *);
 
   explicit Key_rec_less(KEY **keys)
     : m_keys(keys), m_fun(key_rec_cmp), m_max_at_top(false)
