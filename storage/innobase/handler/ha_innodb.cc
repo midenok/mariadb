@@ -15575,7 +15575,6 @@ These errors will abort the current query:
       case HA_ERR_QUERY_INTERRUPTED:
 For other error codes, the server will fall back to counting records. */
 
-#ifdef MYSQL_57_SELECT_COUNT_OPTIMIZATION
 int
 ha_innobase::records(
 /*==================*/
@@ -15672,7 +15671,6 @@ ha_innobase::records(
 	*num_rows= n_rows;
 	DBUG_RETURN(0);
 }
-#endif /* MYSQL_57_SELECT_COUNT_OPTIMIZATION */
 
 /*********************************************************************//**
 Estimates the number of index records in a range.
