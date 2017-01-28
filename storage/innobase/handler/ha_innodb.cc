@@ -15575,15 +15575,14 @@ These errors will abort the current query:
       case HA_ERR_QUERY_INTERRUPTED:
 For other error codes, the server will fall back to counting records. */
 
-int
-ha_innobase::records(
-/*==================*/
-	ha_rows*			num_rows) /*!< out: number of rows */
+ha_rows
+ha_innobase::records() /*!< out: number of rows */
 {
 	DBUG_ENTER("ha_innobase::records()");
 
 	dberr_t		ret;
 	ulint		n_rows = 0;	/* Record count in this view */
+	ha_rows    	num_rows;
 
 	update_thd();
 
@@ -15594,8 +15593,8 @@ ha_innobase::records(
 			ER_TABLESPACE_DISCARDED,
 			table->s->table_name.str);
 
-		*num_rows = HA_POS_ERROR;
-		DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
+		num_rows = HA_POS_ERROR;
+		DBUG_RETURN(num_rows);
 
 	} else if (m_prebuilt->table->ibd_file_missing) {
 		ib_senderrf(
@@ -15603,8 +15602,8 @@ ha_innobase::records(
 			ER_TABLESPACE_MISSING,
 			table->s->table_name.str);
 
-		*num_rows = HA_POS_ERROR;
-		DBUG_RETURN(HA_ERR_TABLESPACE_MISSING);
+		num_rows = HA_POS_ERROR;
+		DBUG_RETURN(num_rows);
 
 	} else if (m_prebuilt->table->corrupted) {
 		ib_errf(m_user_thd, IB_LOG_LEVEL_WARN,
@@ -15612,8 +15611,8 @@ ha_innobase::records(
 			"Table '%s' is corrupt.",
 			table->s->table_name.str);
 
-		*num_rows = HA_POS_ERROR;
-		DBUG_RETURN(HA_ERR_INDEX_CORRUPT);
+		num_rows = HA_POS_ERROR;
+		DBUG_RETURN(num_rows);
 	}
 
 	TrxInInnoDB	trx_in_innodb(m_prebuilt->trx);
@@ -15628,8 +15627,8 @@ ha_innobase::records(
 		m_prebuilt->trx, index);
 
 	if (!m_prebuilt->index_usable) {
-		*num_rows = HA_POS_ERROR;
-		DBUG_RETURN(HA_ERR_TABLE_DEF_CHANGED);
+		num_rows = HA_POS_ERROR;
+		DBUG_RETURN(num_rows);
 	}
 
 	/* (Re)Build the m_prebuilt->mysql_template if it is null to use
@@ -15648,28 +15647,28 @@ ha_innobase::records(
 	case DB_DEADLOCK:
 	case DB_LOCK_TABLE_FULL:
 	case DB_LOCK_WAIT_TIMEOUT:
-		*num_rows = HA_POS_ERROR;
-		DBUG_RETURN(convert_error_code_to_mysql(ret, 0, m_user_thd));
+		num_rows = HA_POS_ERROR;
+		DBUG_RETURN(num_rows);
 	case DB_INTERRUPTED:
-		*num_rows = HA_POS_ERROR;
-		DBUG_RETURN(HA_ERR_QUERY_INTERRUPTED);
+		num_rows = HA_POS_ERROR;
+		DBUG_RETURN(num_rows);
 	default:
 		/* No other error besides the three below is returned from
 		row_scan_index_for_mysql(). Make a debug catch. */
-		*num_rows = HA_POS_ERROR;
+		num_rows = HA_POS_ERROR;
 		ut_ad(0);
-		DBUG_RETURN(-1);
+		DBUG_RETURN(num_rows);
 	}
 
 	m_prebuilt->trx->op_info = "";
 
 	if (thd_killed(m_user_thd)) {
-		*num_rows = HA_POS_ERROR;
-		DBUG_RETURN(HA_ERR_QUERY_INTERRUPTED);
+		num_rows = HA_POS_ERROR;
+		DBUG_RETURN(num_rows);
 	}
 
-	*num_rows= n_rows;
-	DBUG_RETURN(0);
+	num_rows= n_rows;
+	DBUG_RETURN(num_rows);
 }
 
 /*********************************************************************//**

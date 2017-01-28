@@ -17,13 +17,15 @@
 */
 
 #include "table.h"                           // TABLE_SHARE
+#include "sql_partition.h"                   // LIST_PART_ENTRY, part_id_range
 #include "partition_info.h"                  // NOT_A_PARTITION_ID
-#include "sql_partition.h"          // LIST_PART_ENTRY, part_id_range
 #include "partition_handler.h"
 #include "log.h"                             // sql_print_error
 #include "key.h"                             // key_rec_cmp
 #include "sql_class.h"                       // THD
-#include "myisam.h"                          // MI_MAX_MSG_BUF
+#include <mysql/psi/psi_memory.h>
+
+#define MI_MAX_MSG_BUF      1024
 
 // In sql_class.cc:
 extern "C" int thd_binlog_format(const MYSQL_THD thd);
@@ -32,15 +34,15 @@ extern "C" int thd_binlog_format(const MYSQL_THD thd);
 static const char *opt_op_name[]= {"optimize", "analyze", "check", "repair",
                                    "assign_to_keycache", "preload_keys"};
 
-static PSI_memory_key key_memory_Partition_share;
-static PSI_memory_key key_memory_partition_sort_buffer;
-static PSI_memory_key key_memory_Partition_admin;
+// static PSI_memory_key key_memory_Partition_share;
+// static PSI_memory_key key_memory_partition_sort_buffer;
+// static PSI_memory_key key_memory_Partition_admin;
 #ifdef HAVE_PSI_INTERFACE
 PSI_mutex_key key_partition_auto_inc_mutex;
-static PSI_memory_info all_partitioning_memory[]=
-{ { &key_memory_Partition_share, "Partition_share", 0},
-  { &key_memory_partition_sort_buffer, "partition_sort_buffer", 0},
-  { &key_memory_Partition_admin, "Partition_admin", 0} };
+// static PSI_memory_info all_partitioning_memory[]=
+// { { &key_memory_Partition_share, "Partition_share", 0},
+//   { &key_memory_partition_sort_buffer, "partition_sort_buffer", 0},
+//   { &key_memory_Partition_admin, "Partition_admin", 0} };
 static PSI_mutex_info all_partitioning_mutex[]=
 { { &key_partition_auto_inc_mutex, "Partiton_share::auto_inc_mutex", 0} };
 #endif
@@ -49,40 +51,11 @@ void partitioning_init()
 {
 #ifdef HAVE_PSI_INTERFACE
   int count;
-  count= array_elements(all_partitioning_memory);
-  mysql_memory_register("sql", all_partitioning_memory, count);
+//   count= array_elements(all_partitioning_memory);
+//   mysql_memory_register("sql", all_partitioning_memory, count);
   count= array_elements(all_partitioning_mutex);
   mysql_mutex_register("sql", all_partitioning_mutex, count);
 #endif
-}
-
-
-/*
-  Implementation of Partition_share class.
-*/
-
-Partition_share::Partition_share()
-  : auto_inc_initialized(false),
-  auto_inc_mutex(NULL), next_auto_inc_val(0),
-  partition_name_hash_initialized(false),
-  partition_names(NULL)
-{}
-
-Partition_share::~Partition_share()
-{
-  if (auto_inc_mutex)
-  {
-    mysql_mutex_destroy(auto_inc_mutex);
-    my_free(auto_inc_mutex);
-  }
-  if (partition_names)
-  {
-    my_free(partition_names);
-  }
-  if (partition_name_hash_initialized)
-  {
-    my_hash_free(&partition_name_hash);
-  }
 }
 
 
@@ -105,7 +78,6 @@ bool Partition_share::init_auto_inc_mutex(TABLE_SHARE *table_share)
   }
 #endif /* DBUG_OFF */
   auto_inc_mutex= static_cast<mysql_mutex_t*>(my_malloc(
-                                              key_memory_Partition_share,
                                               sizeof(*auto_inc_mutex),
                                               MYF(MY_WME)));
   if (!auto_inc_mutex)
@@ -210,7 +182,6 @@ bool Partition_share::populate_partition_name_hash(partition_info *part_info)
     tot_names+= part_info->num_parts * num_subparts;
   }
   partition_names= static_cast<const uchar**>(my_malloc(
-                                              key_memory_Partition_share,
                                               part_info->get_tot_partitions() *
                                                 sizeof(*partition_names),
                                               MYF(MY_WME)));
@@ -221,8 +192,7 @@ bool Partition_share::populate_partition_name_hash(partition_info *part_info)
   if (my_hash_init(&partition_name_hash,
                    system_charset_info, tot_names, 0, 0,
                    (my_hash_get_key) get_part_name_from_def,
-                   my_free, HASH_UNIQUE,
-                   key_memory_Partition_share))
+                   my_free, HASH_UNIQUE))
   {
     my_free(partition_names);
     partition_names= NULL;
@@ -312,8 +282,7 @@ bool Partition_share::insert_partition_name_in_hash(const char *name,
     Since we use my_multi_malloc, then my_free(part_def) will also free
     part_name, as a part of my_hash_free.
   */
-  if (!my_multi_malloc(key_memory_Partition_share,
-                       MY_WME,
+  if (!my_multi_malloc(MY_WME,
                        &part_def, sizeof(PART_NAME_DEF),
                        &part_name, part_name_length + 1,
                        NULL))
@@ -993,7 +962,7 @@ bool Partition_helper::print_partition_error(int error, myf errflag)
   if ((error == HA_ERR_NO_PARTITION_FOUND) &&
       ! (thd->lex->alter_info.flags & Alter_info::ALTER_TRUNCATE_PARTITION))
   {
-    m_part_info->print_no_partition_found(m_table);
+    m_part_info->print_no_partition_found(m_table, errflag);
     // print_no_partition_found() reports an error, so we can just return here.
     DBUG_RETURN(false);
   }
@@ -1063,6 +1032,7 @@ bool Partition_helper::print_partition_error(int error, myf errflag)
   DBUG_RETURN(true);
 }
 
+#if 0
 /**
   Implement the partition changes defined by ALTER TABLE of partitions.
 
@@ -1365,6 +1335,7 @@ err:
   close_new_partitions();
   DBUG_RETURN(error);
 }
+#endif
 
 /**
   Copy partitions as part of ALTER TABLE of partitions.
@@ -1461,7 +1432,7 @@ int Partition_helper::check_misplaced_rows(uint read_part_id, bool repair)
 {
   int result= 0;
   THD *thd= get_thd();
-  bool ignore= thd->lex->is_ignore();
+  bool ignore= thd->lex->ignore;
   uint32 correct_part_id;
   longlong func_value;
   ha_rows num_misplaced_rows= 0;
@@ -1479,12 +1450,14 @@ int Partition_helper::check_misplaced_rows(uint read_part_id, bool repair)
   {
     /* Only need to read the partitioning fields. */
     bitmap_union(m_table->read_set, &m_part_info->full_part_field_set);
+#if 0
     /* Fill the base columns of virtual generated columns if necessary */
     for (Field **ptr= m_part_info->full_part_field_array; *ptr; ptr++)
     {
       if ((*ptr)->is_virtual_gcol())
         m_table->mark_gcol_in_maps(*ptr);
     }
+#endif
   }
 
   if ((result= rnd_init_in_part(read_part_id, true)))
@@ -1680,8 +1653,10 @@ int Partition_helper::ph_rnd_next_in_part(uint part_id, uchar *buf)
 {
   int result= rnd_next_in_part(part_id, buf);
 
+#if 0
   if (!result && m_table->has_gcol())
     result= update_generated_read_fields(buf, m_table);
+#endif
 
   return result;
 }
@@ -1708,6 +1683,7 @@ bool Partition_helper::set_altered_partitions()
   return m_part_info->set_read_partitions(&alter_info->partition_names);
 }
 
+#if 0
 /**
   Print a message row formatted for ANALYZE/CHECK/OPTIMIZE/REPAIR TABLE.
 
@@ -1735,14 +1711,14 @@ bool Partition_helper::print_admin_msg(THD* thd,
                                        ...)
 {
   va_list args;
-  Protocol *protocol= thd->get_protocol();
+  Protocol *protocol= thd->protocol;
   uint length;
   size_t msg_length;
   char name[NAME_LEN*2+2];
   char *msgbuf;
   bool error= true;
 
-  if (!(msgbuf= (char*) my_malloc(key_memory_Partition_admin, len, MYF(0))))
+  if (!(msgbuf= (char*) my_malloc(len, MYF(0))))
     return true;
   va_start(args, fmt);
   msg_length= my_vsnprintf(msgbuf, len, fmt, args);
@@ -1750,9 +1726,8 @@ bool Partition_helper::print_admin_msg(THD* thd,
   if (msg_length >= (len - 1))
     goto err;
   msgbuf[len - 1] = 0; // healthy paranoia
-
-
-  if (!thd->get_protocol()->connection_alive())
+  
+  if (!thd->protocol->connection_alive())
   {
     sql_print_error("%s", msgbuf);
     goto err;
@@ -1785,6 +1760,7 @@ err:
   my_free(msgbuf);
   return error;
 }
+#endif
 
 
 /**
@@ -2242,8 +2218,7 @@ int Partition_helper::init_record_priority_queue()
     alloc_len+= m_table->s->max_key_length;
 
     m_ordered_rec_buffer= static_cast<uchar*>(
-                            my_malloc(key_memory_partition_sort_buffer,
-                                      alloc_len,
+                            my_malloc(alloc_len,
                                       MYF(MY_WME)));
     if (!m_ordered_rec_buffer)
     {
@@ -2546,6 +2521,7 @@ int Partition_helper::common_index_read(uchar *buf, bool have_start_key)
   {
     m_start_key.length= calculate_key_len(m_table,
                                           m_handler->active_index,
+                                          NULL,
                                           m_start_key.keypart_map);
     DBUG_PRINT("info", ("have_start_key map %lu find_flag %u len %u",
                         m_start_key.keypart_map, m_start_key.flag,
@@ -2739,6 +2715,7 @@ int Partition_helper::ph_index_read_idx_map(uchar *buf,
     m_start_key.flag= find_flag;
     m_start_key.length= calculate_key_len(m_table,
                                           index,
+                                          NULL,
                                           m_start_key.keypart_map);
 
     get_partition_set(m_table, buf, index, &m_start_key, &m_part_spec);
@@ -2907,7 +2884,7 @@ int Partition_helper::ph_read_range_first(const key_range *start_key,
 
   m_ordered= sorted;
   set_eq_range(eq_range_arg);
-  m_handler->set_end_range(end_key, handler::RANGE_SCAN_ASC);
+  m_handler->set_end_range(end_key);
 
   set_range_key_part(m_curr_key_info[0]->key_part);
   if (have_start_key)
@@ -3725,7 +3702,7 @@ int Partition_helper::handle_ordered_prev(uchar *buf)
   @param[in]  part_id    Partition to report from.
 */
 void
-Partition_helper::get_dynamic_partition_info_low(ha_statistics *stat_info,
+Partition_helper::get_dynamic_partition_info_low(PARTITION_STATS *stat_info,
                                                  ha_checksum *check_sum,
                                                  uint part_id)
 {
@@ -3750,7 +3727,9 @@ Partition_helper::get_dynamic_partition_info_low(ha_statistics *stat_info,
   stat_info->create_time=          part_stat->create_time;
   stat_info->update_time=          part_stat->update_time;
   stat_info->check_time=           part_stat->check_time;
-  if (m_handler->ha_table_flags() & HA_HAS_CHECKSUM)
+  if (get_thd()->variables.old_mode ?
+    m_handler->ha_table_flags() & HA_HAS_OLD_CHECKSUM :
+    m_handler->ha_table_flags() & HA_HAS_NEW_CHECKSUM)
   {
     *check_sum= checksum_in_part(part_id);
   }
@@ -3767,7 +3746,9 @@ Partition_helper::get_dynamic_partition_info_low(ha_statistics *stat_info,
 ha_checksum Partition_helper::ph_checksum() const
 {
   ha_checksum sum= 0;
-  if ((m_handler->ha_table_flags() & HA_HAS_CHECKSUM))
+  if (get_thd()->variables.old_mode ?
+    m_handler->ha_table_flags() & HA_HAS_OLD_CHECKSUM :
+    m_handler->ha_table_flags() & HA_HAS_NEW_CHECKSUM)
   {
     for (uint i= 0; i < m_tot_parts; i++)
     {

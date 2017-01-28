@@ -988,12 +988,7 @@ share_error:
 	    || m_part_share->populate_partition_name_hash(m_part_info)) {
 		goto share_error;
 	}
-	if (m_part_share->auto_inc_mutex == NULL
-	    && table->found_next_number_field != NULL) {
-		if (m_part_share->init_auto_inc_mutex(table_share)) {
-			goto share_error;
-		}
-	}
+
 	unlock_shared_ha_data();
 
 	/* Will be allocated if it is needed in ::update_row(). */
@@ -3070,9 +3065,9 @@ ha_innopart::records()
 	     i = m_part_info->get_next_used_partition(i)) {
 
 		set_partition(i);
-		err = ha_innobase::records(&n_rows);
+		n_rows = ha_innobase::records();
 		update_partition(i);
-		if (err != 0) {
+		if (n_rows == HA_POS_ERROR) {
 			DBUG_RETURN(HA_POS_ERROR);
 		}
 		num_rows += n_rows;
@@ -3837,7 +3832,7 @@ ha_innopart::check(
 			256,
 			"error",
 			table_share->db.str,
-			table->alias.c_ptr(),
+			table->alias,
 			"check",
 			m_is_sub_partitioned ?
 			  "Subpartition %s returned error"
@@ -3893,7 +3888,7 @@ ha_innopart::repair(
 				256,
 				"error",
 				table_share->db.str,
-				table->alias.c_ptr(),
+				table->alias,
 				"repair",
 				m_is_sub_partitioned ?
 				  "Subpartition %s returned error"
