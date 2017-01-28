@@ -26,6 +26,7 @@
 #include "mysqld_error.h"         // ER_ILLEGAL_HA
 #include "priority_queue.h"
 #include "key.h"                  // key_rec_cmp
+#include "ha_partition.h"
 #include <vector>
 
 #define PARTITION_BYTES_IN_POS 2
@@ -65,112 +66,11 @@ enum enum_part_operation {
   PRELOAD_KEYS_PARTS
 };
 
-/** Struct used for partition_name_hash */
-typedef struct st_part_name_def
-{
-  uchar *partition_name;
-  uint length;
-  uint32 part_id;
-  my_bool is_subpart;
-} PART_NAME_DEF;
-
 
 /**
   Initialize partitioning (currently only PSI keys).
 */
 void partitioning_init();
-
-
-/**
-  Partition specific Handler_share.
-*/
-class Partition_share : public Handler_share
-{
-public:
-  Partition_share();
-  ~Partition_share();
-
-  /** Set if auto increment is used an initialized. */
-  bool auto_inc_initialized;
-  /**
-    Mutex protecting next_auto_inc_val.
-    Initialized if table uses auto increment.
-  */
-  mysql_mutex_t *auto_inc_mutex;
-  /** First non reserved auto increment value. */
-  ulonglong next_auto_inc_val;
-  /**
-    Hash of partition names. Initialized by the first handler instance of a
-    table_share calling populate_partition_name_hash().
-    After that it is read-only, i.e. no locking required for reading.
-  */
-  HASH partition_name_hash;
-  /** flag that the name hash is initialized, so it only will do it once. */
-  bool partition_name_hash_initialized;
-
-  /**
-    Initializes and sets auto_inc_mutex.
-    Only needed to be called if the table have an auto increment.
-    Must hold TABLE_SHARE::LOCK_ha_data when calling.
-  */
-  bool init_auto_inc_mutex(TABLE_SHARE *table_share);
-  /**
-    Release reserved auto increment values not used.
-    @param thd             Thread.
-    @param table_share     Table Share
-    @param next_insert_id  Next insert id (first non used auto inc value).
-    @param max_reserved    End of reserved auto inc range.
-  */
-  void release_auto_inc_if_possible(THD *thd, TABLE_SHARE *table_share,
-                                    const ulonglong next_insert_id,
-                                    const ulonglong max_reserved);
-
-  /** lock mutex protecting auto increment value next_auto_inc_val. */
-  inline void lock_auto_inc()
-  {
-    DBUG_ASSERT(auto_inc_mutex);
-    mysql_mutex_lock(auto_inc_mutex);
-  }
-  /** unlock mutex protecting auto increment value next_auto_inc_val. */
-  inline void unlock_auto_inc()
-  {
-    DBUG_ASSERT(auto_inc_mutex);
-    mysql_mutex_unlock(auto_inc_mutex);
-  }
-  /**
-    Populate partition_name_hash with partition and subpartition names
-    from part_info.
-    @param part_info  Partition info containing all partitions metadata.
-
-    @return Operation status.
-      @retval false Success.
-      @retval true  Failure.
-  */
-  bool populate_partition_name_hash(partition_info *part_info);
-  /** Get partition name.
-
-  @param part_id  Partition id (for subpartitioned table only subpartition
-                  names will be returned.)
-
-  @return partition name or NULL if error.
-  */
-  const char *get_partition_name(size_t part_id) const;
-private:
-  const uchar **partition_names;
-  /**
-    Insert [sub]partition name into  partition_name_hash
-    @param name        Partition name.
-    @param part_id     Partition id.
-    @param is_subpart  True if subpartition else partition.
-
-    @return Operation status.
-      @retval false Success.
-      @retval true  Failure.
-  */
-  bool insert_partition_name_in_hash(const char *name,
-                                     uint part_id,
-                                     bool is_subpart);
-};
 
 
 /**
@@ -183,6 +83,8 @@ class Partition_handler :public Sql_alloc
 public:
   Partition_handler() {}
   ~Partition_handler() {}
+  
+  bool init(uint num_parts);
 
   /**
     Get dynamic table information from partition.
@@ -194,8 +96,7 @@ public:
     @note stat_info and check_sum are initialized by caller.
     check_sum is only expected to be updated if HA_HAS_CHECKSUM.
   */
-  virtual void get_dynamic_partition_info(ha_statistics *stat_info,
-                                          ha_checksum *check_sum,
+  virtual void get_dynamic_partition_info(PARTITION_STATS *stat_info,
                                           uint part_id) = 0;
   /**
     Get default number of partitions.
@@ -238,7 +139,7 @@ public:
     @param early      True if called when part_info only created and parsed,
                       but not setup, checked or fixed.
   */
-  virtual void set_part_info(partition_info *part_info, bool early) = 0;
+  virtual void set_part_info(partition_info *part_info) = 0;
   /**
     Initialize partition.
 
@@ -634,10 +535,11 @@ public:
     @param[out] check_sum  Check sum of partition.
     @param[in]  part_id    Partition to report from.
   */
-  virtual void get_dynamic_partition_info_low(ha_statistics *stat_info,
+  virtual void get_dynamic_partition_info_low(PARTITION_STATS *stat_info,
                                               ha_checksum *check_sum,
                                               uint part_id);
 
+#if 0
   /**
     Implement the partition changes defined by ALTER TABLE of partitions.
 
@@ -665,6 +567,7 @@ public:
                                 const char *path,
                                 ulonglong * const copied,
                                 ulonglong * const deleted);
+#endif
   /** @} */
 
 protected:
@@ -759,6 +662,7 @@ protected:
     @return false if error is printed else true.
   */
   bool print_partition_error(int error, myf errflag);
+#if 0
   /**
     Print a message row formatted for ANALYZE/CHECK/OPTIMIZE/REPAIR TABLE.
 
@@ -783,6 +687,7 @@ protected:
                        const char *op_name,
                        const char *fmt,
                        ...);
+#endif
   /**
     Check/fix misplaced rows.
 

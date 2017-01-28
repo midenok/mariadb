@@ -127,6 +127,14 @@ uint32 get_partition_id_range_for_endpoint(partition_info *part_info,
 bool check_part_func_fields(Field **ptr, bool ok_with_charsets);
 bool field_is_partition_charset(Field *field);
 Item* convert_charset_partition_constant(Item *item, CHARSET_INFO *cs);
+/**
+  Append all fields in read_set to string
+
+  @param[in,out] str   String to append to.
+  @param[in]     row   Row to append.
+  @param[in]     table Table containing read_set and fields for the row.
+*/
+void append_row_to_str(String &str, const uchar *row, TABLE *table);
 void mem_alloc_error(size_t size);
 void truncate_partition_filename(char *path);
 

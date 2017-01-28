@@ -23,6 +23,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define ha_innopart_h
 
 #include "partitioning/partition_handler.h"
+#include "ha_partition.h"
 
 /* Forward declarations */
 class Altered_partitions;
@@ -218,7 +219,7 @@ public:
 	register_query_cache_table(
 		THD*			thd,
 		char*			table_key,
-		size_t			key_length,
+		uint			key_length,
 		qc_engine_callback*	call_back,
 		ulonglong*		engine_data)
 	{
@@ -596,13 +597,13 @@ public:
 	/** See Partition_handler. */
 	void
 	get_dynamic_partition_info(
-		ha_statistics*	stat_info,
-		ha_checksum*	check_sum,
+		PARTITION_STATS*	stat_info,
 		uint		part_id)
 	{
+        ha_checksum check_sum;
 		Partition_helper::get_dynamic_partition_info_low(
 			stat_info,
-			check_sum,
+			&check_sum,
 			part_id);
 	}
 
@@ -622,10 +623,9 @@ public:
 
 	void
 	set_part_info(
-		partition_info*	part_info,
-		bool		early)
+		partition_info*	part_info)
 	{
-		Partition_helper::set_part_info_low(part_info, early);
+		Partition_helper::set_part_info_low(part_info, false);
 	}
 
 	void
@@ -1141,26 +1141,26 @@ private:
 	int
 	truncate_partition_low();
 
-	/** Change partitions according to ALTER TABLE ... PARTITION ...
-	Called from Partition_handler::change_partitions().
-	@param[in]	create_info	Table create info.
-	@param[in]	path		Path including db/table_name.
-	@param[out]	copied		Number of copied rows.
-	@param[out]	deleted		Number of deleted rows.
-	@return	0 for success or error code. */
-	int
-	change_partitions_low(
-		HA_CREATE_INFO*		create_info,
-		const char*		path,
-		ulonglong* const	copied,
-		ulonglong* const	deleted)
-	{
-		return(Partition_helper::change_partitions(
-						create_info,
-						path,
-						copied,
-						deleted));
-	}
+// 	/** Change partitions according to ALTER TABLE ... PARTITION ...
+// 	Called from Partition_handler::change_partitions().
+// 	@param[in]	create_info	Table create info.
+// 	@param[in]	path		Path including db/table_name.
+// 	@param[out]	copied		Number of copied rows.
+// 	@param[out]	deleted		Number of deleted rows.
+// 	@return	0 for success or error code. */
+// 	int
+// 	change_partitions_low(
+// 		HA_CREATE_INFO*		create_info,
+// 		const char*		path,
+// 		ulonglong* const	copied,
+// 		ulonglong* const	deleted)
+// 	{
+// 		return(ha_partition::change_partitions(
+// 						create_info,
+// 						path,
+// 						copied,
+// 						deleted, NULL, 0));
+// 	}
 
 	/** Access methods to protected areas in handler to avoid adding
 	friend class Partition_helper in class handler.

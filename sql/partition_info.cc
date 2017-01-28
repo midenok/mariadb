@@ -215,6 +215,48 @@ bool partition_info::set_named_partition_bitmap(const char *part_name,
     @param table_list  Table list pointing to table to prune.
 
   @return Operation status
+    @retval false Success
+    @retval true  Failure
+*/
+bool partition_info::set_read_partitions(List<char> *partition_names)
+{
+  DBUG_ENTER("partition_info::set_read_partitions");
+  if (!partition_names || !partition_names->elements)
+  {
+    DBUG_RETURN(true);
+  }
+
+  uint num_names= partition_names->elements;
+  List_iterator<char> partition_names_it(*partition_names);
+  uint i= 0;
+  /*
+    TODO: When adding support for FK in partitioned tables, the referenced
+    table must probably lock all partitions for read, and also write depending
+    of ON DELETE/UPDATE.
+  */
+  bitmap_clear_all(&read_partitions);
+
+  /* No check for duplicate names or overlapping partitions/subpartitions. */
+
+  DBUG_PRINT("info", ("Searching through partition_name_hash"));
+  do
+  {
+    char *part_name= partition_names_it++;
+    if (add_named_partition(part_name, strlen(part_name)))
+      DBUG_RETURN(true);
+  } while (++i < num_names);
+  DBUG_RETURN(false);
+}
+
+
+
+/**
+  Prune away partitions not mentioned in the PARTITION () clause,
+  if used.
+
+    @param table_list  Table list pointing to table to prune.
+
+  @return Operation status
     @retval true  Failure
     @retval false Success
 */

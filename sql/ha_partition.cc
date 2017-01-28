@@ -158,12 +158,6 @@ static int partition_initialize(void *p)
 bool Partition_share::init(uint num_parts)
 {
   DBUG_ENTER("Partition_share::init");
-  mysql_mutex_init(key_partition_auto_inc_mutex,
-                   &auto_inc_mutex,
-                   MY_MUTEX_INIT_FAST);
-  auto_inc_initialized= false;
-  partition_name_hash_initialized= false;
-  next_auto_inc_val= 0;
   partitions_share_refs= new Parts_share_refs;
   if (!partitions_share_refs)
     DBUG_RETURN(true);
@@ -1244,12 +1238,12 @@ int ha_partition::handle_opt_part(THD *thd, HA_CHECK_OPT *check_opt,
    (modelled after mi_check_print_msg)
    TODO: move this into the handler, or rewrite mysql_admin_table.
 */
-static bool print_admin_msg(THD* thd, uint len,
+bool print_admin_msg(THD* thd, uint len,
                             const char* msg_type,
                             const char* db_name, String &table_name,
                             const char* op_name, const char *fmt, ...)
   ATTRIBUTE_FORMAT(printf, 7, 8);
-static bool print_admin_msg(THD* thd, uint len,
+bool print_admin_msg(THD* thd, uint len,
                             const char* msg_type,
                             const char* db_name, String &table_name,
                             const char* op_name, const char *fmt, ...)

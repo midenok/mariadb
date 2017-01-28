@@ -83,37 +83,119 @@ public:
 class Partition_share : public Handler_share
 {
 public:
-  bool auto_inc_initialized;
-  mysql_mutex_t auto_inc_mutex;                /**< protecting auto_inc val */
-  ulonglong next_auto_inc_val;                 /**< first non reserved value */
-  /**
-    Hash of partition names. Initialized in the first ha_partition::open()
-    for the table_share. After that it is read-only, i.e. no locking required.
-  */
-  bool partition_name_hash_initialized;
-  HASH partition_name_hash;
-  /** Storage for each partitions Handler_share */
-  Parts_share_refs *partitions_share_refs;
-  Partition_share() {}
+  Partition_share()
+    : auto_inc_initialized(false),
+    auto_inc_mutex(NULL), next_auto_inc_val(0),
+    partition_name_hash_initialized(false),
+    partitions_share_refs(NULL),
+    partition_names(NULL)
+  {}
+
   ~Partition_share()
   {
-    DBUG_ENTER("Partition_share::~Partition_share");
-    mysql_mutex_destroy(&auto_inc_mutex);
+    if (auto_inc_mutex)
+    {
+      mysql_mutex_destroy(auto_inc_mutex);
+      my_free(auto_inc_mutex);
+    }
+    if (partition_names)
+    {
+      my_free(partition_names);
+    }
     if (partition_name_hash_initialized)
+    {
       my_hash_free(&partition_name_hash);
+    }
     if (partitions_share_refs)
       delete partitions_share_refs;
-    DBUG_VOID_RETURN;
   }
+  
   bool init(uint num_parts);
-  void lock_auto_inc()
+
+  /** Set if auto increment is used an initialized. */
+  bool auto_inc_initialized;
+  /**
+    Mutex protecting next_auto_inc_val.
+    Initialized if table uses auto increment.
+  */
+  mysql_mutex_t *auto_inc_mutex;
+  /** First non reserved auto increment value. */
+  ulonglong next_auto_inc_val;
+  /**
+    Hash of partition names. Initialized by the first handler instance of a
+    table_share calling populate_partition_name_hash().
+    After that it is read-only, i.e. no locking required for reading.
+  */
+  HASH partition_name_hash;
+  /** flag that the name hash is initialized, so it only will do it once. */
+  bool partition_name_hash_initialized;
+  
+  /** Storage for each partitions Handler_share */
+  Parts_share_refs *partitions_share_refs;
+
+  /**
+    Initializes and sets auto_inc_mutex.
+    Only needed to be called if the table have an auto increment.
+    Must hold TABLE_SHARE::LOCK_ha_data when calling.
+  */
+  // FIXME: call
+  bool init_auto_inc_mutex(TABLE_SHARE *table_share);
+  /**
+    Release reserved auto increment values not used.
+    @param thd             Thread.
+    @param table_share     Table Share
+    @param next_insert_id  Next insert id (first non used auto inc value).
+    @param max_reserved    End of reserved auto inc range.
+  */
+  void release_auto_inc_if_possible(THD *thd, TABLE_SHARE *table_share,
+                                    const ulonglong next_insert_id,
+                                    const ulonglong max_reserved);
+
+  /** lock mutex protecting auto increment value next_auto_inc_val. */
+  inline void lock_auto_inc()
   {
-    mysql_mutex_lock(&auto_inc_mutex);
+    DBUG_ASSERT(auto_inc_mutex);
+    mysql_mutex_lock(auto_inc_mutex);
   }
-  void unlock_auto_inc()
+  /** unlock mutex protecting auto increment value next_auto_inc_val. */
+  inline void unlock_auto_inc()
   {
-    mysql_mutex_unlock(&auto_inc_mutex);
+    DBUG_ASSERT(auto_inc_mutex);
+    mysql_mutex_unlock(auto_inc_mutex);
   }
+  /**
+    Populate partition_name_hash with partition and subpartition names
+    from part_info.
+    @param part_info  Partition info containing all partitions metadata.
+
+    @return Operation status.
+      @retval false Success.
+      @retval true  Failure.
+  */
+  bool populate_partition_name_hash(partition_info *part_info);
+  /** Get partition name.
+
+  @param part_id  Partition id (for subpartitioned table only subpartition
+                  names will be returned.)
+
+  @return partition name or NULL if error.
+  */
+  const char *get_partition_name(size_t part_id) const;
+private:
+  const uchar **partition_names;
+  /**
+    Insert [sub]partition name into  partition_name_hash
+    @param name        Partition name.
+    @param part_id     Partition id.
+    @param is_subpart  True if subpartition else partition.
+
+    @return Operation status.
+      @retval false Success.
+      @retval true  Failure.
+  */
+  bool insert_partition_name_in_hash(const char *name,
+                                     uint part_id,
+                                     bool is_subpart);
 };
 
 
@@ -1308,5 +1390,10 @@ public:
 
   friend int cmp_key_rowid_part_id(void *ptr, uchar *ref1, uchar *ref2);
 };
+
+bool print_admin_msg(THD* thd, uint len,
+                            const char* msg_type,
+                            const char* db_name, String &table_name,
+                            const char* op_name, const char *fmt, ...);
 
 #endif /* HA_PARTITION_INCLUDED */

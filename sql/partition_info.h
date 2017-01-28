@@ -412,9 +412,11 @@ private:
                                        uint start_no);
   char *create_default_subpartition_name(THD *thd, uint subpart_no,
                                          const char *part_name);
+  // FIXME: prune_partition_bitmaps() is duplicate of set_read_partitions()
   bool prune_partition_bitmaps(TABLE_LIST *table_list);
   bool add_named_partition(const char *part_name, uint length);
 public:
+  bool set_read_partitions(List<char> *partition_names);
   bool has_unique_name(partition_element *element);
 
   bool vers_init_info(THD *thd);

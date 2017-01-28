@@ -28,6 +28,14 @@
 #include <sstream>
 #endif
 
+#ifndef MY_ATTRIBUTE
+#if defined(__GNUC__)
+#  define MY_ATTRIBUTE(A) __attribute__(A)
+#else
+#  define MY_ATTRIBUTE(A)
+#endif
+#endif
+
 namespace priority_queue_unittest { class PriorityQueueTest; };
 
 
