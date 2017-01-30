@@ -679,6 +679,10 @@ public:
   virtual int index_last(uchar * buf);
   virtual int index_next_same(uchar * buf, const uchar * key, uint keylen);
 
+  int index_read_last_map(uchar *buf,
+                          const uchar *key,
+                          key_part_map keypart_map);
+
   /*
     read_first_row is virtual method but is only implemented by
     handler.cc, no storage engine has implemented it so neither

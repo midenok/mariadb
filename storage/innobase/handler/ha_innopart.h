@@ -922,12 +922,12 @@ private:
 	@param[in]	key	Key to match.
 	@param[in]	keypart_map	Which part of the key to use.
 	@return error number or 0. */
-// 	int
-// 	index_read_last_map_in_part(
-// 		uint		part,
-// 		uchar*		record,
-// 		const uchar*	key,
-// 		key_part_map	keypart_map);
+	int
+	index_read_last_map_in_part(
+		uint		part,
+		uchar*		record,
+		const uchar*	key,
+		key_part_map	keypart_map);
 
 	/** Start index scan and return first record from a partition.
 	This routine starts an index scan using a start and end key.

@@ -2191,19 +2191,19 @@ ha_innopart::index_read_idx_map_in_part(
 @param[in]	key		Key to match.
 @param[in]	keypart_map	Which part of the key to use.
 @return	error number or 0. */
-// int
-// ha_innopart::index_read_last_map_in_part(
-// 	uint		part,
-// 	uchar*		record,
-// 	const uchar*	key,
-// 	key_part_map	keypart_map)
-// {
-// 	int	error;
-// 	set_partition(part);
-// 	error = ha_innobase::index_read_last_map(record, key, keypart_map);
-// 	update_partition(part);
-// 	return(error);
-// }
+int
+ha_innopart::index_read_last_map_in_part(
+	uint		part,
+	uchar*		record,
+	const uchar*	key,
+	key_part_map	keypart_map)
+{
+	int	error;
+	set_partition(part);
+	error = ha_innobase::index_read_last_map(record, key, keypart_map);
+	update_partition(part);
+	return(error);
+}
 
 /** Start index scan and return first record from a partition.
 This routine starts an index scan using a start and end key.

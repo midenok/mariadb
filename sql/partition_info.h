@@ -22,6 +22,7 @@
 
 #include "sql_class.h"
 #include "partition_element.h"
+#include "sql_partition.h"
 
 class partition_info;
 struct TABLE_LIST;
@@ -402,6 +403,8 @@ public:
   {
     return bitmap_get_next_set(&read_partitions, part_id);
   }
+  bool same_key_column_order(List<Create_field> *create_list);
+
 private:
   static int list_part_cmp(const void* a, const void* b);
   bool set_up_default_partitions(THD *thd, handler *file, HA_CREATE_INFO *info,

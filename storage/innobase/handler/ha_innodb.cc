@@ -149,10 +149,7 @@ TABLE *open_purge_table(THD *thd, const char *db, size_t dblen,
 #include <sstream>
 
 /* for ha_innopart, Native InnoDB Partitioning. */
-/* JAN: TODO: MySQL 5.7 Native InnoDB Partitioning */
-#ifdef HAVE_HA_INNOPART_H
 #include "ha_innopart.h"
-#endif
 
 #include <mysql/plugin.h>
 #include <mysql/service_wsrep.h>
@@ -1712,7 +1709,6 @@ innobase_create_handler(
 	TABLE_SHARE*	table,
 	MEM_ROOT*	mem_root)
 {
-#ifdef MYSQL_INNODB_PARTITIONING
 	/* If the table:
 	1) have type InnoDB (not the generic partition handlerton)
 	2) have partitioning defined
@@ -1730,7 +1726,6 @@ innobase_create_handler(
 		}
 		return(file);
 	}
-#endif
 
 	return(new (mem_root) ha_innobase(hton, table));
 }
@@ -4043,10 +4038,7 @@ innobase_encryption_key_rotation()
 /** Return partitioning flags. */
 static uint innobase_partition_flags()
 {
-	/* JAN: TODO: MYSQL 5.7
-	return(HA_CAN_EXCHANGE_PARTITION | HA_CANNOT_PARTITION_FK);
-	*/
-	return (0);
+	return(HA_CAN_PARTITION);
 }
 
 /** Deprecation message about InnoDB file format related parameters */
