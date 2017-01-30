@@ -860,7 +860,7 @@ ha_innopart::initialize_auto_increment(
 #ifndef DBUG_OFF
 	if (table_share->tmp_table == NO_TMP_TABLE)
 	{
-		mysql_mutex_assert_owner(m_part_share->auto_inc_mutex);
+		mysql_mutex_assert_owner(&m_part_share->auto_inc_mutex);
 	}
 #endif
 
