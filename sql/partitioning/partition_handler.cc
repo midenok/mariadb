@@ -38,7 +38,7 @@ static const char *opt_op_name[]= {"optimize", "analyze", "check", "repair",
 // static PSI_memory_key key_memory_partition_sort_buffer;
 // static PSI_memory_key key_memory_Partition_admin;
 #ifdef HAVE_PSI_INTERFACE
-PSI_mutex_key key_partition_auto_inc_mutex;
+extern PSI_mutex_key key_partition_auto_inc_mutex;
 // static PSI_memory_info all_partitioning_memory[]=
 // { { &key_memory_Partition_share, "Partition_share", 0},
 //   { &key_memory_partition_sort_buffer, "partition_sort_buffer", 0},

@@ -3200,6 +3200,18 @@ protected:
   virtual int index_last(uchar * buf)
    { return  HA_ERR_WRONG_COMMAND; }
   virtual int index_next_same(uchar *buf, const uchar *key, uint keylen);
+  /**
+     @brief
+     The following functions works like index_read, but it find the last
+     row with the current key value or prefix.
+     @returns @see index_read_map().
+  */
+  virtual int index_read_last_map(uchar * buf, const uchar * key,
+                                  key_part_map keypart_map)
+  {
+    uint key_len= calculate_key_len(table, active_index, key, keypart_map);
+    return index_read_last(buf, key, key_len);
+  }
   virtual int close(void)=0;
   inline void update_rows_read()
   {
@@ -4130,6 +4142,11 @@ protected:
   virtual int index_read(uchar * buf, const uchar * key, uint key_len,
                          enum ha_rkey_function find_flag)
    { return  HA_ERR_WRONG_COMMAND; }
+  virtual int index_read_last(uchar * buf, const uchar * key, uint key_len)
+  {
+    my_errno= HA_ERR_WRONG_COMMAND;
+    return HA_ERR_WRONG_COMMAND;
+  }
   friend class ha_partition;
 public:
   /**
