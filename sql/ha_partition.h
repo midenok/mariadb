@@ -77,6 +77,8 @@ public:
 };
 
 
+extern PSI_mutex_key key_partition_auto_inc_mutex;
+
 /**
   Partition specific Handler_share.
 */
@@ -85,19 +87,19 @@ class Partition_share : public Handler_share
 public:
   Partition_share()
     : auto_inc_initialized(false),
-    auto_inc_mutex(NULL), next_auto_inc_val(0),
+    next_auto_inc_val(0),
     partition_name_hash_initialized(false),
     partitions_share_refs(NULL),
     partition_names(NULL)
-  {}
+  {
+    mysql_mutex_init(key_partition_auto_inc_mutex,
+                    &auto_inc_mutex,
+                    MY_MUTEX_INIT_FAST);
+  }
 
   ~Partition_share()
   {
-    if (auto_inc_mutex)
-    {
-      mysql_mutex_destroy(auto_inc_mutex);
-      my_free(auto_inc_mutex);
-    }
+    mysql_mutex_destroy(&auto_inc_mutex);
     if (partition_names)
     {
       my_free(partition_names);
@@ -118,7 +120,7 @@ public:
     Mutex protecting next_auto_inc_val.
     Initialized if table uses auto increment.
   */
-  mysql_mutex_t *auto_inc_mutex;
+  mysql_mutex_t auto_inc_mutex;
   /** First non reserved auto increment value. */
   ulonglong next_auto_inc_val;
   /**
@@ -134,13 +136,6 @@ public:
   Parts_share_refs *partitions_share_refs;
 
   /**
-    Initializes and sets auto_inc_mutex.
-    Only needed to be called if the table have an auto increment.
-    Must hold TABLE_SHARE::LOCK_ha_data when calling.
-  */
-  // FIXME: call
-  bool init_auto_inc_mutex(TABLE_SHARE *table_share);
-  /**
     Release reserved auto increment values not used.
     @param thd             Thread.
     @param table_share     Table Share
@@ -154,14 +149,12 @@ public:
   /** lock mutex protecting auto increment value next_auto_inc_val. */
   inline void lock_auto_inc()
   {
-    DBUG_ASSERT(auto_inc_mutex);
-    mysql_mutex_lock(auto_inc_mutex);
+    mysql_mutex_lock(&auto_inc_mutex);
   }
   /** unlock mutex protecting auto increment value next_auto_inc_val. */
   inline void unlock_auto_inc()
   {
-    DBUG_ASSERT(auto_inc_mutex);
-    mysql_mutex_unlock(auto_inc_mutex);
+    mysql_mutex_unlock(&auto_inc_mutex);
   }
   /**
     Populate partition_name_hash with partition and subpartition names
@@ -1167,7 +1160,6 @@ private:
     ulonglong nr= (((Field_num*) field)->unsigned_flag ||
                    field->val_int() > 0) ? field->val_int() : 0;
     lock_auto_increment();
-    DBUG_ASSERT(part_share->auto_inc_initialized);
     /* must check when the mutex is taken */
     if (nr >= part_share->next_auto_inc_val)
       part_share->next_auto_inc_val= nr + 1;

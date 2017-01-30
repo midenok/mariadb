@@ -60,38 +60,6 @@ void partitioning_init()
 
 
 /**
-  Initialize auto increment mutex in share.
-
-  @return Operation status.
-    @retval true  Failure (out of memory).
-    @retval false Success.
-*/
-
-bool Partition_share::init_auto_inc_mutex(TABLE_SHARE *table_share)
-{
-  DBUG_ENTER("Partition_share::init_auto_inc_mutex");
-  DBUG_ASSERT(!auto_inc_mutex);
-#ifndef DBUG_OFF
-  if (table_share->tmp_table == NO_TMP_TABLE)
-  {
-    mysql_mutex_assert_owner(&table_share->LOCK_ha_data);
-  }
-#endif /* DBUG_OFF */
-  auto_inc_mutex= static_cast<mysql_mutex_t*>(my_malloc(
-                                              sizeof(*auto_inc_mutex),
-                                              MYF(MY_WME)));
-  if (!auto_inc_mutex)
-  {
-    DBUG_RETURN(true);
-  }
-  mysql_mutex_init(key_partition_auto_inc_mutex,
-                   auto_inc_mutex,
-                   MY_MUTEX_INIT_FAST);
-  DBUG_RETURN(false);
-}
-
-
-/**
   Release reserved auto increment values not used.
   @param thd             Thread.
   @param table_share     Table Share
@@ -103,12 +71,10 @@ Partition_share::release_auto_inc_if_possible(THD *thd, TABLE_SHARE *table_share
                                               const ulonglong next_insert_id,
                                               const ulonglong max_reserved)
 {
-  DBUG_ASSERT(auto_inc_mutex);
-
 #ifndef DBUG_OFF
   if (table_share->tmp_table == NO_TMP_TABLE)
   {
-    mysql_mutex_assert_owner(auto_inc_mutex);
+    mysql_mutex_assert_owner(&auto_inc_mutex);
   }
 #endif /* DBUG_OFF */
 
