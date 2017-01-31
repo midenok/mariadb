@@ -4989,7 +4989,7 @@ add_key_field(JOIN *join,
 	return;					// Can't use left join optimize
       optimize= KEY_OPTIMIZE_EXISTS;
     }
-    else
+    else if (field->table->reginfo.join_tab)
     {
       JOIN_TAB *stat=field->table->reginfo.join_tab;
       key_map possible_keys=field->get_possible_keys();
@@ -16792,6 +16792,16 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
   *blob_field= 0;				// End marker
   share->fields= field_count;
   share->column_bitmap_size= bitmap_buffer_size(share->fields);
+
+  if (select_options & OPTION_VERSIONED)
+  {
+    share->versioned= true;
+    share->field= table->field;
+    share->row_start_field= field_count - 2;
+    share->row_end_field= field_count - 1;
+    share->vers_start_field()->flags|= VERS_SYS_START_FLAG | HIDDEN_FLAG;
+    share->vers_end_field()->flags|= VERS_SYS_END_FLAG | HIDDEN_FLAG;
+  }
 
   /* If result table is small; use a heap */
   /* future: storage engine selection can be made dynamic? */

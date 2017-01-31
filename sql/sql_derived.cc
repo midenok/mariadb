@@ -748,16 +748,20 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
     SELECT is last SELECT of UNION).
   */
   thd->create_tmp_table_for_derived= TRUE;
-  if (!(derived->table) &&
-      derived->derived_result->create_result_table(thd, &unit->types, FALSE,
-                                                   (first_select->options |
-                                                   thd->variables.option_bits |
-                                                   TMP_TABLE_ALL_COLUMNS),
-                                                   derived->alias,
-                                                   FALSE, FALSE, FALSE))
-  { 
-    thd->create_tmp_table_for_derived= FALSE;
-    goto exit;
+  if (!(derived->table))
+  {
+    ulonglong options= (first_select->options | thd->variables.option_bits |
+                        TMP_TABLE_ALL_COLUMNS);
+    if (first_select->table_list.first->table->versioned())
+      options|= OPTION_VERSIONED;
+
+    if (derived->derived_result->create_result_table(thd, &unit->types, FALSE,
+                                                     options, derived->alias,
+                                                     FALSE, FALSE, FALSE))
+    {
+      thd->create_tmp_table_for_derived= FALSE;
+      goto exit;
+    }
   }
   thd->create_tmp_table_for_derived= FALSE;
 

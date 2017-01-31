@@ -184,6 +184,7 @@
 #define OPTION_SKIP_REPLICATION         (1ULL << 37) // THD, user
 #define OPTION_RPL_SKIP_PARALLEL        (1ULL << 38)
 #define OPTION_FOUND_COMMENT            (1ULL << 39) // SELECT, intern, parser
+#define OPTION_VERSIONED                (1ULL << 40)
 
 /* The rest of the file is included in the server only */
 #ifndef MYSQL_CLIENT
