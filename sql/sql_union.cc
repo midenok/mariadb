@@ -530,8 +530,9 @@ bool st_select_lex_unit::prepare(THD *thd_arg, select_result *sel_result,
  
   for (;sl; sl= sl->next_select())
   {
-    if (sl->table_list.first->table->versioned() &&
-        thd_arg->lex->sql_command != SQLCOM_CREATE_VIEW)
+    if (sl->table_list.first->table->versioned() // &&
+        // thd_arg->lex->sql_command != SQLCOM_CREATE_VIEW
+        )
     {
       Query_arena backup;
       Query_arena *arena= thd_arg->activate_stmt_arena_if_needed(&backup);

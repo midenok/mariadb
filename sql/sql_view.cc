@@ -605,14 +605,22 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
                                      view->table_name, item->name) &
                     VIEW_ANY_ACL);
 
-        if (fld && !fld->field->table->s->tmp_table)
+        if (!fld)
+          continue;
+        TABLE_SHARE *s= fld->field->table->s;
+        const char *field_name= fld->field->field_name;
+        if (s->tmp_table ||
+            (s->versioned &&
+             (!strcmp(field_name, s->vers_start_field()->field_name) ||
+              !strcmp(field_name, s->vers_end_field()->field_name))))
         {
-
-          final_priv&= fld->have_privileges;
-
-          if (~fld->have_privileges & priv)
-            report_item= item;
+          continue;
         }
+
+        final_priv&= fld->have_privileges;
+
+        if (~fld->have_privileges & priv)
+          report_item= item;
       }
     }
     
