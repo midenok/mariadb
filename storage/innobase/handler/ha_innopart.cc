@@ -926,7 +926,6 @@ ha_innopart::initialize_auto_increment(
 		}
 	}
 
-done:
 	m_part_share->next_auto_inc_val = auto_inc;
 	m_part_share->auto_inc_initialized = true;
 	return(error);
@@ -3051,7 +3050,6 @@ ha_innopart::records()
 {
     ha_rows num_rows;
 	ha_rows	n_rows;
-	int	err;
 	DBUG_ENTER("ha_innopart::records()");
 
 	num_rows = 0;
@@ -3397,8 +3395,7 @@ ha_innopart::info_low(
 					DBUG_RETURN(error);
 				}
 			}
-			set_if_bigger(stats.update_time,
-				(ulong) ib_table->update_time);
+			set_if_bigger(stats.update_time, ib_table->update_time);
 		}
 
 		if (is_analyze || innobase_stats_on_metadata) {

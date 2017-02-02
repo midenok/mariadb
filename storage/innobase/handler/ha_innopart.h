@@ -752,9 +752,15 @@ private:
 	/** Update active partition.
 	Copies needed info from m_prebuilt into the partition specific memory.
 	@param[in]	part_id	Partition to set as active. */
-	void
+	virtual void
 	update_partition(
 		uint	part_id);
+
+	virtual handler* part_handler(uint32 part_id)
+	{
+		set_partition(part_id);
+		return this;
+	}
 
 	/** Helpers needed by Partition_helper, @see partition_handler.h @{ */
 
@@ -1141,6 +1147,7 @@ private:
 	int
 	truncate_partition_low();
 
+// FIXME:
 // 	/** Change partitions according to ALTER TABLE ... PARTITION ...
 // 	Called from Partition_handler::change_partitions().
 // 	@param[in]	create_info	Table create info.

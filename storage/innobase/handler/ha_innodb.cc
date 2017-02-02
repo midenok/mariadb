@@ -3428,6 +3428,7 @@ ha_innobase::~ha_innobase()
 Updates the user_thd field in a handle and also allocates a new InnoDB
 transaction handle if needed, and updates the transaction fields in the
 m_prebuilt struct. */
+inline
 void
 ha_innobase::update_thd(
 /*====================*/
@@ -4038,7 +4039,7 @@ innobase_encryption_key_rotation()
 /** Return partitioning flags. */
 static uint innobase_partition_flags()
 {
-	return(HA_CAN_PARTITION);
+	return(HA_ONLY_VERS_PARTITION);
 }
 
 /** Deprecation message about InnoDB file format related parameters */

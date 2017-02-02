@@ -1037,7 +1037,10 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
     handler *file= table->file->part_handler(part_id);
     int rc= file->ha_external_lock(thd, F_RDLCK);
     if (rc)
+    {
       goto error;
+      file->update_partition(part_id);
+    }
     rc= file->ha_rnd_init(true);
     if (!rc)
     {
@@ -1048,6 +1051,7 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
         if (thd->killed)
         {
           file->ha_rnd_end();
+          file->update_partition(part_id);
           return true;
         }
         if (rc)
@@ -1061,6 +1065,7 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
       file->ha_rnd_end();
     }
     file->ha_external_lock(thd, F_UNLCK);
+    file->update_partition(part_id);
     if (rc != HA_ERR_END_OF_FILE)
     {
     error:
@@ -1115,11 +1120,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
   DBUG_ASSERT(part_type == VERSIONING_PARTITION);
   DBUG_ASSERT(vers_info && vers_info->initialized(false));
   DBUG_ASSERT(table && table->s);
-  if (!table->versioned_by_sql())
-  {
-    my_error(ER_VERS_WRONG_PARAMS, MYF(0), table->s->table_name.str, "selected engine is not supported in `BY SYSTEM_TIME` partitioning");
-    return true;
-  }
+
   mysql_mutex_lock(&table->s->LOCK_rotation);
   if (table->s->busy_rotation)
   {
