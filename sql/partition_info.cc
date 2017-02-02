@@ -1034,12 +1034,12 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
   DBUG_ASSERT(table->s->stat_trx);
   for (; part_id < part_id_end; ++part_id)
   {
-    handler *file= table->file->part_handler(part_id);
-    int rc= file->ha_external_lock(thd, F_RDLCK);
+    handler *file= table->file->part_handler(part_id); // requires update_partition() for ha_innopart
+    int rc= file->ha_external_lock(thd, F_RDLCK); // requires ha_commit_trans() for ha_innobase
     if (rc)
     {
-      goto error;
       file->update_partition(part_id);
+      goto lock_fail;
     }
     rc= file->ha_rnd_init(true);
     if (!rc)
@@ -1052,6 +1052,7 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
         {
           file->ha_rnd_end();
           file->update_partition(part_id);
+          ha_commit_trans(thd, false);
           return true;
         }
         if (rc)
@@ -1068,11 +1069,13 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
     file->update_partition(part_id);
     if (rc != HA_ERR_END_OF_FILE)
     {
-    error:
+      ha_commit_trans(thd, false);
+    lock_fail:
       my_error(ER_INTERNAL_ERROR, MYF(0), "partition/subpartition scan failed in versioned partitions setup");
       return true;
     }
   }
+  ha_commit_trans(thd, false);
   return false;
 }
 
