@@ -467,7 +467,7 @@ protected:
 	void reset_template();
 
 protected:
-	inline void update_thd(THD* thd);
+	void update_thd(THD* thd);
 	void update_thd();
 
 	int general_fetch(uchar* buf, uint direction, uint match_mode);
