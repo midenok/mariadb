@@ -16498,7 +16498,10 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
       distinct=0;				// Can't use distinct
   }
 
+  if (select_options & OPTION_VERSIONED)
+    param->field_count+= 2;
   field_count=param->field_count+param->func_count+param->sum_func_count;
+
   hidden_field_count=param->hidden_field_count;
 
   /*
@@ -16785,6 +16788,38 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
       total_uneven_bit_length= 0;
     }
   }
+  if (select_options & OPTION_VERSIONED)
+  {
+    Field *s= new (thd->mem_root)
+        Field_timestampf(NULL, NULL, 0, Field::NONE, "sys_trx_start", share,
+                         MAX_DATETIME_PRECISION);
+    if (!s)
+      goto err;
+    s->flags|= VERS_SYS_START_FLAG | HIDDEN_FLAG;
+    reclength+= s->pack_length();
+    s->init(table);
+    s->field_index= fieldnr++;
+    null_count++;
+    *(reg_field++)= s;
+
+    Field *e= new (thd->mem_root)
+        Field_timestampf(NULL, NULL, 0, Field::NONE, "sys_trx_end", share,
+                         MAX_DATETIME_PRECISION);
+    if (!e)
+      goto err;
+    e->flags|= VERS_SYS_END_FLAG | HIDDEN_FLAG;
+    reclength+= e->pack_length();
+    e->init(table);
+    e->field_index= fieldnr++;
+    null_count++;
+    *(reg_field++)= e;
+
+    share->versioned= true;
+    share->field= table->field;
+    share->row_start_field= field_count - 2;
+    share->row_end_field= field_count - 1;
+  }
+
   DBUG_ASSERT(fieldnr == (uint) (reg_field - table->field));
   DBUG_ASSERT(field_count >= (uint) (reg_field - table->field));
   field_count= fieldnr;
@@ -16792,16 +16827,6 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
   *blob_field= 0;				// End marker
   share->fields= field_count;
   share->column_bitmap_size= bitmap_buffer_size(share->fields);
-
-  if (select_options & OPTION_VERSIONED)
-  {
-    share->versioned= true;
-    share->field= table->field;
-    share->row_start_field= field_count - 2;
-    share->row_end_field= field_count - 1;
-    share->vers_start_field()->flags|= VERS_SYS_START_FLAG | HIDDEN_FLAG;
-    share->vers_end_field()->flags|= VERS_SYS_END_FLAG | HIDDEN_FLAG;
-  }
 
   /* If result table is small; use a heap */
   /* future: storage engine selection can be made dynamic? */
