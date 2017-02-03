@@ -4989,7 +4989,7 @@ add_key_field(JOIN *join,
 	return;					// Can't use left join optimize
       optimize= KEY_OPTIMIZE_EXISTS;
     }
-    else if (field->table->reginfo.join_tab)
+    else// if (field->table->reginfo.join_tab)
     {
       JOIN_TAB *stat=field->table->reginfo.join_tab;
       key_map possible_keys=field->get_possible_keys();
@@ -16498,7 +16498,22 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
       distinct=0;				// Can't use distinct
   }
 
-  if (select_options & OPTION_VERSIONED)
+  TABLE *versioned_table= NULL;
+  {
+    // TODO: improve this algorithm
+    List_iterator<Item> it(fields);
+    while (Item *item= it++)
+    {
+      if (item->type() == Item::FIELD_ITEM)
+      {
+        Item_field *item_field= (Item_field *)item;
+        if (item_field->field->table->versioned())
+          versioned_table= item_field->field->table;
+      }
+    }
+  }
+
+  if (versioned_table)
     param->field_count+= 2;
   field_count=param->field_count+param->func_count+param->sum_func_count;
 
@@ -16788,30 +16803,30 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
       total_uneven_bit_length= 0;
     }
   }
-  if (select_options & OPTION_VERSIONED)
+
+  if (versioned_table)
   {
-    Field *s= new (thd->mem_root)
-        Field_timestampf(NULL, NULL, 0, Field::NONE, "sys_trx_start", share,
-                         MAX_DATETIME_PRECISION);
-    if (!s)
+    Field *s_orig = versioned_table->s->vers_start_field();
+    Field *e_orig = versioned_table->s->vers_end_field();
+    s_orig->init(versioned_table);
+    e_orig->init(versioned_table);
+
+    Field *s= create_tmp_field_from_field(thd, s_orig, s_orig->field_name,
+                                          table, NULL);
+    Field *e= create_tmp_field_from_field(thd, e_orig, e_orig->field_name,
+                                          table, NULL);
+    if (!s || !e)
       goto err;
     s->flags|= VERS_SYS_START_FLAG | HIDDEN_FLAG;
-    reclength+= s->pack_length();
-    s->init(table);
-    s->field_index= fieldnr++;
-    null_count++;
-    *(reg_field++)= s;
-
-    Field *e= new (thd->mem_root)
-        Field_timestampf(NULL, NULL, 0, Field::NONE, "sys_trx_end", share,
-                         MAX_DATETIME_PRECISION);
-    if (!e)
-      goto err;
     e->flags|= VERS_SYS_END_FLAG | HIDDEN_FLAG;
+    reclength+= s->pack_length();
     reclength+= e->pack_length();
+    s->init(table);
     e->init(table);
+    s->field_index= fieldnr++;
     e->field_index= fieldnr++;
-    null_count++;
+    null_count += 2;
+    *(reg_field++)= s;
     *(reg_field++)= e;
 
     share->versioned= true;
