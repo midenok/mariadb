@@ -1709,6 +1709,7 @@ innobase_create_handler(
 	TABLE_SHARE*	table,
 	MEM_ROOT*	mem_root)
 {
+#if 0
 	/* If the table:
 	1) have type InnoDB (not the generic partition handlerton)
 	2) have partitioning defined
@@ -1726,8 +1727,24 @@ innobase_create_handler(
 		}
 		return(file);
 	}
-
+#endif
 	return(new (mem_root) ha_innobase(hton, table));
+}
+
+static
+handler*
+innobase_upgrade_handler(
+	handler*	hnd,
+	MEM_ROOT*	mem_root)
+{
+	ha_innopart* file = new (mem_root) ha_innopart(
+		static_cast<ha_innobase *>(hnd));
+	if (file && file->init_partitioning(mem_root))
+	{
+		delete file;
+		return(NULL);
+	}
+	return file;
 }
 
 /* General functions */
@@ -4173,6 +4190,7 @@ innobase_init(
 	innobase_hton->vers_query_trx_id = vtq_query_trx_id;
 	innobase_hton->vers_query_commit_ts = vtq_query_commit_ts;
 	innobase_hton->vers_trx_sees = vtq_trx_sees;
+	innobase_hton->vers_upgrade_handler = innobase_upgrade_handler;
 
 	innodb_remember_check_sysvar_funcs();
 

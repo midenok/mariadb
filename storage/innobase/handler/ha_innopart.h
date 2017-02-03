@@ -194,6 +194,9 @@ public:
 		handlerton*	hton,
 		TABLE_SHARE*	table_arg);
 
+	ha_innopart(
+		ha_innobase*	innobase);
+
 	~ha_innopart();
 
 	/** Clone this handler, used when needing more than one cursor

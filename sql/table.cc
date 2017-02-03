@@ -3246,6 +3246,12 @@ enum open_frm_error open_table_from_share(THD *thd, TABLE_SHARE *share,
     }
     outparam->part_info->is_auto_partitioned= share->auto_partitioned;
     DBUG_PRINT("info", ("autopartitioned: %u", share->auto_partitioned));
+    if (outparam->part_info->part_type == VERSIONING_PARTITION &&
+      share->db_type()->vers_upgrade_handler)
+    {
+      outparam->file= share->db_type()->vers_upgrade_handler(
+        outparam->file, &outparam->mem_root);
+    }
     /* 
       We should perform the fix_partition_func in either local or
       caller's arena depending on work_part_info_used value.

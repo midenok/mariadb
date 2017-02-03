@@ -829,6 +829,25 @@ ha_innopart::ha_innopart(
 	m_share = NULL;
 }
 
+ha_innopart::ha_innopart(
+	ha_innobase*	innobase)
+	:
+	ha_innobase(*innobase),
+	Partition_helper(this),
+	m_ins_node_parts(),
+	m_upd_node_parts(),
+	m_blob_heap_parts(),
+	m_trx_id_parts(),
+	m_row_read_type_parts(),
+	m_sql_stat_start_parts(),
+	m_pcur(),
+	m_clust_pcur(),
+	m_new_partitions()
+{
+	m_int_table_flags &=	~(HA_INNOPART_DISABLED_TABLE_FLAGS);
+	m_share = NULL;
+}
+
 /** Destruct ha_innopart handler. */
 ha_innopart::~ha_innopart()
 {}
