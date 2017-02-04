@@ -1035,9 +1035,14 @@ JOIN::prepare(TABLE_LIST *tables_init,
     remove_redundant_subquery_clauses(select_lex);
   }
 
-  /* Handle FOR SYSTEM_TIME clause. */
-  if (vers_setup_select(thd, tables_list, &conds, select_lex) < 0)
-    DBUG_RETURN(-1);
+  {
+    /* Handle FOR SYSTEM_TIME clause. */
+    TABLE_LIST *tl= tables_list;
+    if (tl && tl->is_view() && tl->is_merged_derived())
+      tl= tl->view->select_lex.table_list.first;
+    if (vers_setup_select(thd, tl, &conds, select_lex) < 0)
+      DBUG_RETURN(-1);
+  }
 
   /*
     TRUE if the SELECT list mixes elements with and without grouping,
