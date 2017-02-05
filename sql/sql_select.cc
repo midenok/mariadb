@@ -4994,7 +4994,7 @@ add_key_field(JOIN *join,
 	return;					// Can't use left join optimize
       optimize= KEY_OPTIMIZE_EXISTS;
     }
-    else// if (field->table->reginfo.join_tab)
+    else
     {
       JOIN_TAB *stat=field->table->reginfo.join_tab;
       key_map possible_keys=field->get_possible_keys();
