@@ -98,6 +98,7 @@ public:
   */
   virtual void get_dynamic_partition_info(PARTITION_STATS *stat_info,
                                           uint part_id) = 0;
+                                          
   /**
     Get default number of partitions.
 
@@ -219,6 +220,8 @@ public:
   */
   virtual uint alter_flags(uint flags) const
   { return 0; }
+
+  int info(uint flag);
 
 private:
   /**

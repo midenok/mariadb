@@ -502,8 +502,10 @@ exit:
     @retval != 0 Error code
 */
 
+// FIXME: duplicate of ha_partition::update_row()
 int Partition_helper::ph_update_row(const uchar *old_data, uchar *new_data)
 {
+  THD *thd= get_thd();
   uint32 new_part_id, old_part_id;
   int error= 0;
   longlong func_value;
@@ -517,12 +519,14 @@ int Partition_helper::ph_update_row(const uchar *old_data, uchar *new_data)
                                    m_part_info, &old_part_id, &new_part_id,
                                    &func_value)))
   {
-    DBUG_RETURN(error);
+    m_part_info->err_value= func_value;
+    goto exit;
   }
+  DBUG_ASSERT(bitmap_is_set(&(m_part_info->read_partitions), old_part_id));
   if (!bitmap_is_set(&(m_part_info->lock_partitions), new_part_id))
   {
     error= HA_ERR_NOT_IN_LOCK_PARTITIONS;
-    DBUG_RETURN(error);
+    goto exit;
   }
 
   /*
@@ -552,7 +556,10 @@ int Partition_helper::ph_update_row(const uchar *old_data, uchar *new_data)
   if (new_part_id == old_part_id)
   {
     DBUG_PRINT("info", ("Update in partition %d", new_part_id));
+    tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
     error= update_row_in_part(new_part_id, old_data, new_data);
+    reenable_binlog(thd);
+    goto exit;
   }
   else
   {
@@ -569,15 +576,36 @@ int Partition_helper::ph_update_row(const uchar *old_data, uchar *new_data)
     */
     m_table->next_number_field= NULL;
     DBUG_PRINT("info", ("Update from partition %d to partition %d",
-                        old_part_id, new_part_id));
+			old_part_id, new_part_id));
+    tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
     error= write_row_in_part(new_part_id, new_data);
+    reenable_binlog(thd);
     m_table->next_number_field= saved_next_number_field;
-    if (!error)
+    if (error)
+      goto exit;
+
+    if (m_part_info->part_type == VERSIONING_PARTITION)
     {
-      error= delete_row_in_part(old_part_id, old_data);
+      uint sub_factor= m_part_info->num_subparts ? m_part_info->num_subparts : 1;
+      DBUG_ASSERT(m_tot_parts == m_part_info->num_parts * sub_factor);
+      uint lpart_id= new_part_id / sub_factor;
+      // lpart_id is VERSIONING partition because new_part_id != old_part_id
+      m_part_info->vers_update_stats(thd, lpart_id);
+    }
+
+    tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
+    error= delete_row_in_part(old_part_id, old_data);
+    reenable_binlog(thd);
+    if (error)
+    {
+#ifdef IN_THE_FUTURE
+      (void) m_file[new_part_id]->delete_last_inserted_row(new_data);
+#endif
+      goto exit;
     }
   }
 
+exit:
   /*
     if updating an auto_increment column, update
     m_part_share->next_auto_inc_val if needed.
@@ -3724,3 +3752,243 @@ ha_checksum Partition_helper::ph_checksum() const
   return sum;
 }
 
+
+// FIXME: duplicate of ha_partition::info()
+int Partition_helper::info(uint flag)
+{
+  uint no_lock_flag= flag & HA_STATUS_NO_LOCK;
+  uint extra_var_flag= flag & HA_STATUS_VARIABLE_EXTRA;
+  DBUG_ENTER("ha_partition::info");
+
+#ifndef DBUG_OFF
+  if (bitmap_is_set_all(&(m_part_info->read_partitions)))
+    DBUG_PRINT("info", ("All partitions are used"));
+#endif /* DBUG_OFF */
+  if (flag & HA_STATUS_AUTO)
+  {
+    bool auto_inc_is_first_in_idx= (table_share->next_number_keypart == 0);
+    DBUG_PRINT("info", ("HA_STATUS_AUTO"));
+    if (!table->found_next_number_field)
+      stats.auto_increment_value= 0;
+    else if (part_share->auto_inc_initialized)
+    {
+      lock_auto_increment();
+      stats.auto_increment_value= part_share->next_auto_inc_val;
+      unlock_auto_increment();
+    }
+    else
+    {
+      lock_auto_increment();
+      /* to avoid two concurrent initializations, check again when locked */
+      if (part_share->auto_inc_initialized)
+        stats.auto_increment_value= part_share->next_auto_inc_val;
+      else
+      {
+        /*
+          The auto-inc mutex in the table_share is locked, so we do not need
+          to have the handlers locked.
+          HA_STATUS_NO_LOCK is not checked, since we cannot skip locking
+          the mutex, because it is initialized.
+        */
+        handler *file, **file_array;
+        ulonglong auto_increment_value= 0;
+        file_array= m_file;
+        DBUG_PRINT("info",
+                   ("checking all partitions for auto_increment_value"));
+        do
+        {
+          file= *file_array;
+          file->info(HA_STATUS_AUTO | no_lock_flag);
+          set_if_bigger(auto_increment_value,
+                        file->stats.auto_increment_value);
+        } while (*(++file_array));
+
+        DBUG_ASSERT(auto_increment_value);
+        stats.auto_increment_value= auto_increment_value;
+        if (auto_inc_is_first_in_idx)
+        {
+          set_if_bigger(part_share->next_auto_inc_val,
+                        auto_increment_value);
+          part_share->auto_inc_initialized= true;
+          DBUG_PRINT("info", ("initializing next_auto_inc_val to %lu",
+                       (ulong) part_share->next_auto_inc_val));
+        }
+      }
+      unlock_auto_increment();
+    }
+  }
+  if (flag & HA_STATUS_VARIABLE)
+  {
+    uint i;
+    DBUG_PRINT("info", ("HA_STATUS_VARIABLE"));
+    /*
+      Calculates statistical variables
+      records:           Estimate of number records in table
+      We report sum (always at least 2 if not empty)
+      deleted:           Estimate of number holes in the table due to
+      deletes
+      We report sum
+      data_file_length:  Length of data file, in principle bytes in table
+      We report sum
+      index_file_length: Length of index file, in principle bytes in
+      indexes in the table
+      We report sum
+      delete_length: Length of free space easily used by new records in table
+      We report sum
+      mean_record_length:Mean record length in the table
+      We calculate this
+      check_time:        Time of last check (only applicable to MyISAM)
+      We report last time of all underlying handlers
+    */
+    handler *file;
+    stats.records= 0;
+    stats.deleted= 0;
+    stats.data_file_length= 0;
+    stats.index_file_length= 0;
+    stats.check_time= 0;
+    stats.delete_length= 0;
+    for (i= bitmap_get_first_set(&m_part_info->read_partitions);
+         i < m_tot_parts;
+         i= bitmap_get_next_set(&m_part_info->read_partitions, i))
+    {
+      file= m_file[i];
+      file->info(HA_STATUS_VARIABLE | no_lock_flag | extra_var_flag);
+      stats.records+= file->stats.records;
+      stats.deleted+= file->stats.deleted;
+      stats.data_file_length+= file->stats.data_file_length;
+      stats.index_file_length+= file->stats.index_file_length;
+      stats.delete_length+= file->stats.delete_length;
+      if (file->stats.check_time > stats.check_time)
+        stats.check_time= file->stats.check_time;
+    }
+    if (stats.records && stats.records < 2 &&
+        !(m_file[0]->ha_table_flags() & HA_STATS_RECORDS_IS_EXACT))
+      stats.records= 2;
+    if (stats.records > 0)
+      stats.mean_rec_length= (ulong) (stats.data_file_length / stats.records);
+    else
+      stats.mean_rec_length= 0;
+  }
+  if (flag & HA_STATUS_CONST)
+  {
+    DBUG_PRINT("info", ("HA_STATUS_CONST"));
+    /*
+      Recalculate loads of constant variables. MyISAM also sets things
+      directly on the table share object.
+
+      Check whether this should be fixed since handlers should not
+      change things directly on the table object.
+
+      Monty comment: This should NOT be changed!  It's the handlers
+      responsibility to correct table->s->keys_xxxx information if keys
+      have been disabled.
+
+      The most important parameters set here is records per key on
+      all indexes. block_size and primar key ref_length.
+
+      For each index there is an array of rec_per_key.
+      As an example if we have an index with three attributes a,b and c
+      we will have an array of 3 rec_per_key.
+      rec_per_key[0] is an estimate of number of records divided by
+      number of unique values of the field a.
+      rec_per_key[1] is an estimate of the number of records divided
+      by the number of unique combinations of the fields a and b.
+      rec_per_key[2] is an estimate of the number of records divided
+      by the number of unique combinations of the fields a,b and c.
+
+      Many handlers only set the value of rec_per_key when all fields
+      are bound (rec_per_key[2] in the example above).
+
+      If the handler doesn't support statistics, it should set all of the
+      above to 0.
+
+      We first scans through all partitions to get the one holding most rows.
+      We will then allow the handler with the most rows to set
+      the rec_per_key and use this as an estimate on the total table.
+
+      max_data_file_length:     Maximum data file length
+      We ignore it, is only used in
+      SHOW TABLE STATUS
+      max_index_file_length:    Maximum index file length
+      We ignore it since it is never used
+      block_size:               Block size used
+      We set it to the value of the first handler
+      ref_length:               We set this to the value calculated
+      and stored in local object
+      create_time:              Creation time of table
+
+      So we calculate these constants by using the variables from the
+      handler with most rows.
+    */
+    handler *file, **file_array;
+    ulonglong max_records= 0;
+    uint32 i= 0;
+    uint32 handler_instance= 0;
+
+    file_array= m_file;
+    do
+    {
+      file= *file_array;
+      /* Get variables if not already done */
+      if (!(flag & HA_STATUS_VARIABLE) ||
+          !bitmap_is_set(&(m_part_info->read_partitions),
+                         (file_array - m_file)))
+        file->info(HA_STATUS_VARIABLE | no_lock_flag | extra_var_flag);
+      if (file->stats.records > max_records)
+      {
+        max_records= file->stats.records;
+        handler_instance= i;
+      }
+      i++;
+    } while (*(++file_array));
+    /*
+      Sort the array of part_ids by number of records in
+      in descending order.
+    */
+    my_qsort2((void*) m_part_ids_sorted_by_num_of_records,
+              m_tot_parts,
+              sizeof(uint32),
+              (qsort2_cmp) compare_number_of_records,
+              this);
+
+    file= m_file[handler_instance];
+    file->info(HA_STATUS_CONST | no_lock_flag);
+    stats.block_size= file->stats.block_size;
+    stats.create_time= file->stats.create_time;
+    ref_length= m_ref_length;
+  }
+  if (flag & HA_STATUS_ERRKEY)
+  {
+    handler *file= m_file[m_last_part];
+    DBUG_PRINT("info", ("info: HA_STATUS_ERRKEY"));
+    /*
+      This flag is used to get index number of the unique index that
+      reported duplicate key
+      We will report the errkey on the last handler used and ignore the rest
+      Note: all engines does not support HA_STATUS_ERRKEY, so set errkey.
+    */
+    file->errkey= errkey;
+    file->info(HA_STATUS_ERRKEY | no_lock_flag);
+    errkey= file->errkey;
+  }
+  if (flag & HA_STATUS_TIME)
+  {
+    handler *file, **file_array;
+    DBUG_PRINT("info", ("info: HA_STATUS_TIME"));
+    /*
+      This flag is used to set the latest update time of the table.
+      Used by SHOW commands
+      We will report the maximum of these times
+    */
+    stats.update_time= 0;
+    file_array= m_file;
+    do
+    {
+      file= *file_array;
+      file->info(HA_STATUS_TIME | no_lock_flag);
+      if (file->stats.update_time > stats.update_time)
+	stats.update_time= file->stats.update_time;
+    } while (*(++file_array));
+  }
+  DBUG_RETURN(0);
+}
