@@ -453,6 +453,17 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
     goto err;
   }
 
+  /* Implicitly add versioning fields in needed */
+  if (tables->table->versioned())
+  {
+    select_lex->item_list.push_back(new (thd->mem_root) Item_field(
+        thd, &select_lex->context, NULL, NULL,
+        tables->table->s->vers_start_field()->field_name));
+    select_lex->item_list.push_back(new (thd->mem_root) Item_field(
+        thd, &select_lex->context, NULL, NULL,
+        tables->table->s->vers_end_field()->field_name));
+  }
+
   view= lex->unlink_first_table(&link_to_local);
 
   if (check_db_dir_existence(view->db))
@@ -2027,7 +2038,14 @@ bool insert_view_fields(THD *thd, List<Item> *list, TABLE_LIST *view)
   {
     Item_field *fld;
     if ((fld= entry->item->field_for_view_update()))
+    {
+      TABLE_SHARE *s= fld->context->table_list->table->s;
+      if (s->versioned &&
+          (!strcmp(fld->name, s->vers_start_field()->field_name) ||
+           !strcmp(fld->name, s->vers_end_field()->field_name)))
+        continue;
       list->push_back(fld, thd->mem_root);
+    }
     else
     {
       my_error(ER_NON_INSERTABLE_TABLE, MYF(0), view->alias, "INSERT");

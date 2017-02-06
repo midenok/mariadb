@@ -530,33 +530,6 @@ bool st_select_lex_unit::prepare(THD *thd_arg, select_result *sel_result,
  
   for (;sl; sl= sl->next_select())
   {
-    if (sl->table_list.first->table->versioned() // &&
-        // thd_arg->lex->sql_command != SQLCOM_CREATE_VIEW
-        )
-    {
-      // Query_arena backup;
-      // Query_arena *arena= thd_arg->activate_stmt_arena_if_needed(&backup);
-      // TABLE_SHARE *share= sl->table_list.first->table->s;
-      // uint elements= sl->item_list.elements;
-      // if (elements < 2 ||
-      //     sl->item_list.elem(elements - 2)->type() != Item::FIELD_ITEM ||
-      //     sl->item_list.elem(elements - 1)->type() != Item::FIELD_ITEM ||
-      //     strcmp(((Item_field *)sl->item_list.elem(elements - 2))->field_name,
-      //            share->vers_start_field()->field_name) ||
-      //     strcmp(((Item_field *)sl->item_list.elem(elements - 1))->field_name,
-      //            share->vers_end_field()->field_name))
-      // {
-      //   sl->item_list.push_back(new (thd_arg->mem_root) Item_field(
-      //       thd, &sl->context, NULL, NULL,
-      //       share->vers_start_field()->field_name));
-      //   sl->item_list.push_back(new (thd_arg->mem_root) Item_field(
-      //       thd, &sl->context, NULL, NULL,
-      //       share->vers_end_field()->field_name));
-      // }
-      // if (arena)
-      //   thd_arg->restore_active_arena(arena, &backup);
-    }
-
     bool can_skip_order_by;
     sl->options|=  SELECT_NO_UNLOCK;
     JOIN *join= new JOIN(thd_arg, sl->item_list, 

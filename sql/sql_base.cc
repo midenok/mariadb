@@ -7501,6 +7501,17 @@ insert_fields(THD *thd, Name_resolution_context *context, const char *db_name,
         if (f->field->flags & HIDDEN_FLAG)
           continue;
       }
+      if (item->type() == Item::REF_ITEM)
+      {
+        Item_ref *f= static_cast<Item_ref *>(item);
+        if ((*f->ref)->type() == Item::FIELD_ITEM)
+        {
+          Item_field *ff= (Item_field *)*(f->ref);
+          DBUG_ASSERT(ff->field);
+          if (ff->field->flags & HIDDEN_FLAG)
+            continue;
+        }
+      }
 
       /* cache the table for the Item_fields inserted by expanding stars */
       if (item->type() == Item::FIELD_ITEM && tables->cacheable_table)

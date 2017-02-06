@@ -684,6 +684,13 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
     DBUG_RETURN(0);
   }
 
+  vers_select_conds_t *vers_conds_for_view= NULL;
+  if (tables && tables->is_view() && !thd->stmt_arena->is_stmt_prepare())
+  {
+    vers_conds_for_view= &tables->vers_conditions;
+    tables = tables->view->select_lex.table_list.first;
+  }
+
   for (table= tables; table; table= table->next_local)
   {
     if (table->table && table->table->versioned())
@@ -759,8 +766,11 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
     if (table->table && table->table->versioned())
     {
       vers_select_conds_t &vers_conditions=
-        table->vers_conditions.type == FOR_SYSTEM_TIME_UNSPECIFIED ?
-          slex->vers_conditions : table->vers_conditions;
+          vers_conds_for_view
+              ? *vers_conds_for_view
+              : table->vers_conditions.type == FOR_SYSTEM_TIME_UNSPECIFIED
+                    ? slex->vers_conditions
+                    : table->vers_conditions;
 
       if (vers_conditions.type == FOR_SYSTEM_TIME_BEFORE &&
           thd->lex->sql_command != SQLCOM_TRUNCATE)
@@ -1003,6 +1013,10 @@ JOIN::prepare(TABLE_LIST *tables_init,
   join_list= &select_lex->top_join_list;
   union_part= unit_arg->is_union();
 
+  /* Handle FOR SYSTEM_TIME clause. */
+  if (vers_setup_select(thd, tables_list, &conds, select_lex) < 0)
+    DBUG_RETURN(-1);
+
   if (select_lex->handle_derived(thd->lex, DT_PREPARE))
     DBUG_RETURN(1);
 
@@ -1033,15 +1047,6 @@ JOIN::prepare(TABLE_LIST *tables_init,
       !thd->lex->is_view_context_analysis())                           // 3)
   {
     remove_redundant_subquery_clauses(select_lex);
-  }
-
-  {
-    /* Handle FOR SYSTEM_TIME clause. */
-    TABLE_LIST *tl= tables_list;
-    if (tl && tl->is_view() && tl->is_merged_derived())
-      tl= tl->view->select_lex.table_list.first;
-    if (vers_setup_select(thd, tl, &conds, select_lex) < 0)
-      DBUG_RETURN(-1);
   }
 
   /*
@@ -16503,23 +16508,6 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
       distinct=0;				// Can't use distinct
   }
 
-  TABLE *versioned_table= NULL;
-  {
-    // TODO: improve this algorithm
-    List_iterator<Item> it(fields);
-    while (Item *item= it++)
-    {
-      if (item->type() == Item::FIELD_ITEM)
-      {
-        Item_field *item_field= (Item_field *)item;
-        if (item_field->field->table->versioned())
-          versioned_table= item_field->field->table;
-      }
-    }
-  }
-
-  if (versioned_table)
-    param->field_count+= 2;
   field_count=param->field_count+param->func_count+param->sum_func_count;
 
   hidden_field_count=param->hidden_field_count;
@@ -16613,6 +16601,8 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
   List_iterator_fast<Item> li(fields);
   Item *item;
   Field **tmp_from_field=from_field;
+  Field *sys_trx_start= NULL;
+  Field *sys_trx_end= NULL;
   while ((item=li++))
   {
     Item::Type type=item->type();
@@ -16728,6 +16718,20 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
 	  goto err;				// Got OOM
 	continue;				// Some kind of const item
       }
+
+      if (type == Item::FIELD_ITEM)
+      {
+        Item_field *item_field= (Item_field *)item;
+        Field *field= item_field->field;
+        TABLE_SHARE *s= field->table->s;
+        if (s->versioned)
+        {
+          if (field->flags & VERS_SYS_START_FLAG && fieldnr == field_count - 2)
+            sys_trx_start= new_field;
+          if (field->flags & VERS_SYS_END_FLAG && fieldnr == field_count - 1)
+            sys_trx_end= new_field;
+        }
+      }
       if (type == Item::SUM_FUNC_ITEM)
       {
         Item_sum *agg_item= (Item_sum *) item;
@@ -16809,31 +16813,10 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
     }
   }
 
-  if (versioned_table)
+  if (sys_trx_start && sys_trx_end)
   {
-    Field *s_orig = versioned_table->s->vers_start_field();
-    Field *e_orig = versioned_table->s->vers_end_field();
-    s_orig->init(versioned_table);
-    e_orig->init(versioned_table);
-
-    Field *s= create_tmp_field_from_field(thd, s_orig, s_orig->field_name,
-                                          table, NULL);
-    Field *e= create_tmp_field_from_field(thd, e_orig, e_orig->field_name,
-                                          table, NULL);
-    if (!s || !e)
-      goto err;
-    s->flags|= VERS_SYS_START_FLAG | HIDDEN_FLAG;
-    e->flags|= VERS_SYS_END_FLAG | HIDDEN_FLAG;
-    reclength+= s->pack_length();
-    reclength+= e->pack_length();
-    s->init(table);
-    e->init(table);
-    s->field_index= fieldnr++;
-    e->field_index= fieldnr++;
-    null_count += 2;
-    *(reg_field++)= s;
-    *(reg_field++)= e;
-
+    sys_trx_start->flags|= VERS_SYS_START_FLAG | HIDDEN_FLAG;
+    sys_trx_end->flags|= VERS_SYS_END_FLAG | HIDDEN_FLAG;
     share->versioned= true;
     share->field= table->field;
     share->row_start_field= field_count - 2;
