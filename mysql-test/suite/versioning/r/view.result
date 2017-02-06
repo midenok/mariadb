@@ -43,11 +43,13 @@ prepare stmt from 'select * from vt1';
 execute stmt;
 x
 drop prepare stmt;
-select * from t1 query for system_time as of timestamp @ts1;
+select * from t1 query for system_time as of timestamp @t1;
 x
-select * from vt1 query for system_time as of timestamp @ts1;
+1
+select * from vt1 query for system_time as of timestamp @t1;
 x
-prepare stmt from 'select * from vt1 query for system_time as of timestamp @ts1';
+1
+prepare stmt from 'select * from vt1 query for system_time as of timestamp @t1';
 execute stmt;
 x
 drop prepare stmt;

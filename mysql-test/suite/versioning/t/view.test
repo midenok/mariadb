@@ -32,9 +32,9 @@ prepare stmt from 'select * from vt1 query for system_time all'; execute stmt; d
 select * from vt1;
 prepare stmt from 'select * from vt1'; execute stmt; drop prepare stmt;
 
-select * from t1 query for system_time as of timestamp @ts1;
-select * from vt1 query for system_time as of timestamp @ts1;
-prepare stmt from 'select * from vt1 query for system_time as of timestamp @ts1'; execute stmt; drop prepare stmt;
+select * from t1 query for system_time as of timestamp @t1;
+select * from vt1 query for system_time as of timestamp @t1;
+prepare stmt from 'select * from vt1 query for system_time as of timestamp @t1'; execute stmt; drop prepare stmt;
 
 create or replace view vt1 as select * from t1;
 select * from vt1 query for system_time all;
