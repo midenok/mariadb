@@ -48,4 +48,3 @@ select * from vt1 query for system_time all;
 
 drop view vt1;
 drop table t1;
-

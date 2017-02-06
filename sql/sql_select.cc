@@ -1013,10 +1013,6 @@ JOIN::prepare(TABLE_LIST *tables_init,
   join_list= &select_lex->top_join_list;
   union_part= unit_arg->is_union();
 
-  /* Handle FOR SYSTEM_TIME clause. */
-  if (vers_setup_select(thd, tables_list, &conds, select_lex) < 0)
-    DBUG_RETURN(-1);
-
   if (select_lex->handle_derived(thd->lex, DT_PREPARE))
     DBUG_RETURN(1);
 
@@ -1048,6 +1044,10 @@ JOIN::prepare(TABLE_LIST *tables_init,
   {
     remove_redundant_subquery_clauses(select_lex);
   }
+
+  /* Handle FOR SYSTEM_TIME clause. */
+  if (vers_setup_select(thd, tables_list, &conds, select_lex) < 0)
+    DBUG_RETURN(-1);
 
   /*
     TRUE if the SELECT list mixes elements with and without grouping,

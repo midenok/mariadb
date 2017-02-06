@@ -529,7 +529,7 @@ bool st_select_lex_unit::prepare(THD *thd_arg, select_result *sel_result,
   sl->context.resolve_in_select_list= TRUE;
  
   for (;sl; sl= sl->next_select())
-  {
+  {  
     bool can_skip_order_by;
     sl->options|=  SELECT_NO_UNLOCK;
     JOIN *join= new JOIN(thd_arg, sl->item_list, 
