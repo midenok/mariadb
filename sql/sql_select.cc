@@ -688,7 +688,7 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
   if (tables && tables->is_view() && !thd->stmt_arena->is_stmt_prepare())
   {
     vers_conds_for_view= &tables->vers_conditions;
-    tables = tables->view->select_lex.table_list.first;
+    tables= tables->view->select_lex.table_list.first;
   }
 
   for (table= tables; table; table= table->next_local)
