@@ -7503,12 +7503,14 @@ insert_fields(THD *thd, Name_resolution_context *context, const char *db_name,
       }
       if (item->type() == Item::REF_ITEM)
       {
-        Item_ref *f= static_cast<Item_ref *>(item);
-        if ((*f->ref)->type() == Item::FIELD_ITEM)
+        Item *i= item;
+        while (i->type() == Item::REF_ITEM)
+          i= *((Item_ref *)i)->ref;
+        if (i->type() == Item::FIELD_ITEM)
         {
-          Item_field *ff= (Item_field *)*(f->ref);
-          DBUG_ASSERT(ff->field);
-          if (ff->field->flags & HIDDEN_FLAG)
+          Item_field *f= (Item_field *)i;
+          DBUG_ASSERT(f->field);
+          if (f->field->flags & HIDDEN_FLAG)
             continue;
         }
       }

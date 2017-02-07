@@ -684,10 +684,8 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
     DBUG_RETURN(0);
   }
 
-  vers_select_conds_t *view_conds= NULL;
-  if (tables && tables->is_view() && !thd->stmt_arena->is_stmt_prepare())
+  while (tables && tables->is_view() && !thd->stmt_arena->is_stmt_prepare())
   {
-    // view_conds= &tables->vers_conditions;
     tables= tables->view->select_lex.table_list.first;
   }
 
@@ -766,11 +764,8 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
     if (table->table && table->table->versioned())
     {
       vers_select_conds_t &vers_conditions=
-          view_conds
-              ? *view_conds
-              : table->vers_conditions.type == FOR_SYSTEM_TIME_UNSPECIFIED
-                    ? slex->vers_conditions
-                    : table->vers_conditions;
+        table->vers_conditions.type == FOR_SYSTEM_TIME_UNSPECIFIED
+            ? slex->vers_conditions : table->vers_conditions;
 
       if (vers_conditions.type == FOR_SYSTEM_TIME_BEFORE &&
           thd->lex->sql_command != SQLCOM_TRUNCATE)
@@ -800,10 +795,7 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
         }
 
         if (vers_conditions.type == FOR_SYSTEM_TIME_ALL)
-        {
-          vers_conditions.unwrapped= true;
           continue;
-        }
       }
 
       COND** dst_cond= where_expr;
@@ -963,8 +955,6 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
 
   if (arena)
     thd->restore_active_arena(arena, &backup);
-
-  slex->vers_conditions.unwrapped= true;
 
   DBUG_RETURN(0);
 #undef newx
@@ -25454,12 +25444,6 @@ void st_select_lex::print(THD *thd, String *str, enum_query_type query_type)
     else
       str->append(having_value != Item::COND_FALSE ? "1" : "0");
   }
-
-  // if (vers_conditions.unwrapped)
-  // {
-  //   // versioning conditions are already unwrapped to WHERE clause
-  //   str->append(STRING_WITH_LEN(" query for system_time all "));
-  // }
 
   if (order_list.elements)
   {
