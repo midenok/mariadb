@@ -196,7 +196,9 @@ extern "C" int cmp_key_rowid_part_id(void *ptr, uchar *ref1, uchar *ref2);
 
 class ha_partition :public handler
 {
-private:
+  friend class ha_innopart;
+
+protected:
   enum partition_index_scan_type
   {
     partition_index_read= 0,
@@ -381,7 +383,15 @@ public:
                  partition_info *part_info_arg,
                  ha_partition *clone_arg,
                  MEM_ROOT *clone_mem_root_arg);
-   ~ha_partition();
+    ha_partition(handler &hnd)
+      :handler(hnd)
+    {
+      DBUG_ENTER("ha_partition::ha_partition(table)");
+      init_alloc_root(&m_mem_root, 512, 512, MYF(0));
+      init_handler_variables();
+      DBUG_VOID_RETURN;
+    }
+    ~ha_partition();
   /*
     A partition handler has no characteristics in itself. It only inherits
     those from the underlying handlers. Here we set-up those constants to
@@ -1385,7 +1395,32 @@ public:
   }
 
   friend int cmp_key_rowid_part_id(void *ptr, uchar *ref1, uchar *ref2);
-};
+
+  // merged from Partition_helper
+protected:
+  /** Convenience pointer to table from m_handler (i.e. m_handler->table). */
+  TABLE *m_table;
+
+public:
+  void
+  get_dynamic_partition_info_low(PARTITION_STATS *stat_info,
+                                                 ha_checksum *check_sum,
+                                                 uint part_id);
+
+  void set_part_info_low(partition_info *part_info,
+                                         bool early);
+
+  bool open_partitioning(Partition_share *part_share);
+  void close_partitioning();
+  bool set_altered_partitions();
+  inline bool init_partitioning(MEM_ROOT *mem_root)
+  {
+#ifndef DBUG_OFF
+    m_key_not_found_partitions.bitmap= NULL;
+#endif
+    return false;
+  }
+}; // ha_partition
 
 bool print_admin_msg(THD* thd, uint len,
                             const char* msg_type,

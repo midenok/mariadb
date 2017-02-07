@@ -186,9 +186,14 @@ truncate_partition.
 InnoDB specific functions related to partitioning is implemented here. */
 class ha_innopart:
 	public ha_innobase,
-	public Partition_helper,
 	public Partition_handler
 {
+	friend handler* innobase_upgrade_handler(
+		handler*	hnd,
+		MEM_ROOT*	mem_root);
+protected:
+	ha_partition m_ha_part;
+
 public:
 	ha_innopart(
 		handlerton*	hton,
@@ -431,7 +436,7 @@ public:
 		bool			eq_range_arg,
 		bool			sorted)
 	{
-		return(Partition_helper::ph_read_range_first(
+		return(m_ha_part.read_range_first(
 						start_key,
 						end_key,
 						eq_range_arg,
@@ -442,14 +447,14 @@ public:
 	position(
 		const uchar*	record)
 	{
-		Partition_helper::ph_position(record);
+		m_ha_part.position(record);
 	}
 
 	int
 	rnd_pos_by_record(
 		uchar*	record)
 	{
-		return(Partition_helper::ph_rnd_pos_by_record(record));
+		return(m_ha_part.rnd_pos_by_record(record));
 	}
 
 	/* TODO: Implement these! */
@@ -572,14 +577,14 @@ public:
 	int
 	read_range_next()
 	{
-		return(Partition_helper::ph_read_range_next());
+		return(m_ha_part.read_range_next());
 	}
 
 	uint32
 	calculate_key_hash_value(
 		Field**	field_array)
 	{
-		return(Partition_helper::ph_calculate_key_hash_value(field_array));
+		return(m_ha_part.calculate_key_hash_value(field_array));
 	}
 
 	Table_flags
@@ -591,7 +596,7 @@ public:
 	void
 	release_auto_increment()
 	{
-		Partition_helper::ph_release_auto_increment();
+		m_ha_part.release_auto_increment();
 	}
 
 	/** Implementing Partition_handler interface @see partition_handler.h
@@ -603,10 +608,9 @@ public:
 		PARTITION_STATS*	stat_info,
 		uint		part_id)
 	{
-        ha_checksum check_sum;
-		Partition_helper::get_dynamic_partition_info_low(
+		m_ha_part.get_dynamic_partition_info_low(
 			stat_info,
-			&check_sum,
+			NULL,
 			part_id);
 	}
 
@@ -628,7 +632,7 @@ public:
 	set_part_info(
 		partition_info*	part_info)
 	{
-		Partition_helper::set_part_info_low(part_info, false);
+		m_ha_part.set_part_info_low(part_info, false);
 	}
 
 	void
@@ -636,7 +640,7 @@ public:
 		partition_info*	part_info,
 		bool		early)
 	{
-		Partition_helper::set_part_info_low(part_info, early);
+		m_ha_part.set_part_info_low(part_info, early);
 	}
 
 	handler*
@@ -1102,13 +1106,13 @@ private:
 	rnd_init(
 		bool	scan)
 	{
-		return(Partition_helper::ph_rnd_init(scan));
+		return(m_ha_part.rnd_init(scan));
 	}
 
 	int
 	rnd_end()
 	{
-		return(Partition_helper::ph_rnd_end());
+		return(m_ha_part.rnd_end());
 	}
 
 	int
@@ -1126,7 +1130,7 @@ private:
 	write_row(
 		uchar*	record)
 	{
-		return(Partition_helper::ph_write_row(record));
+		return(m_ha_part.write_row(record));
 	}
 
 	int
@@ -1134,14 +1138,14 @@ private:
 		const uchar*	old_record,
 		uchar*		new_record)
 	{
-		return(Partition_helper::ph_update_row(old_record, new_record));
+		return(m_ha_part.update_row(old_record, new_record));
 	}
 
 	int
 	delete_row(
 		const uchar*	record)
 	{
-		return(Partition_helper::ph_delete_row(record));
+		return(m_ha_part.delete_row(record));
 	}
 	/** @} */
 
@@ -1223,7 +1227,7 @@ protected:
 	rnd_next(
 		uchar*	record)
 	{
-		return(Partition_helper::ph_rnd_next(record));
+		return(m_ha_part.rnd_next(record));
 	}
 
 	int
@@ -1238,7 +1242,7 @@ protected:
 	index_next(
 		uchar*	record)
 	{
-		return(Partition_helper::ph_index_next(record));
+		return(m_ha_part.index_next(record));
 	}
 
 	int
@@ -1247,28 +1251,28 @@ protected:
 		const uchar*	key,
 		uint		keylen)
 	{
-		return(Partition_helper::ph_index_next_same(record, key, keylen));
+		return(m_ha_part.index_next_same(record, key, keylen));
 	}
 
 	int
 	index_prev(
 		uchar*	record)
 	{
-		return(Partition_helper::ph_index_prev(record));
+		return(m_ha_part.index_prev(record));
 	}
 
 	int
 	index_first(
 		uchar*	record)
 	{
-		return(Partition_helper::ph_index_first(record));
+		return(m_ha_part.index_first(record));
 	}
 
 	int
 	index_last(
 		uchar*	record)
 	{
-		return(Partition_helper::ph_index_last(record));
+		return(m_ha_part.index_last(record));
 	}
 
 	int
@@ -1277,7 +1281,7 @@ protected:
 		const uchar*	key,
 		key_part_map	keypart_map)
 	{
-		return(Partition_helper::ph_index_read_last_map(
+		return(m_ha_part.index_read_last_map(
 						record,
 						key,
 						keypart_map));
@@ -1290,7 +1294,7 @@ protected:
 		key_part_map		keypart_map,
 		enum ha_rkey_function	find_flag)
 	{
-		return(Partition_helper::ph_index_read_map(
+		return(m_ha_part.index_read_map(
 				buf,
 				key,
 				keypart_map,
@@ -1305,7 +1309,7 @@ protected:
 		key_part_map		keypart_map,
 		enum ha_rkey_function	find_flag)
 	{
-		return(Partition_helper::ph_index_read_idx_map(
+		return(m_ha_part.index_read_idx_map(
 				buf,
 				index,
 				key,
@@ -1324,5 +1328,11 @@ protected:
 	info_low(
 		uint	flag,
 		bool	is_analyze);
+
+	void
+	get_auto_increment_first_field(ulonglong increment,
+					ulonglong nb_desired_values,
+					ulonglong *first_value,
+					ulonglong *nb_reserved_values);
 };
 #endif /* ha_innopart_h */

@@ -247,6 +247,56 @@ ha_partition::ha_partition(handlerton *hton, TABLE_SHARE *share)
 }
 
 
+/**
+  Initialize the partitioning helper for use after the table is opened.
+
+  @param part_share  Partitioning share (used for auto increment).
+
+  @return Operation status.
+    @retval false for success otherwise true.
+*/
+
+bool ha_partition::open_partitioning(Partition_share *_part_share)
+{
+  m_table= get_table();
+  DBUG_ASSERT(m_part_info == m_table->part_info);
+  part_share= _part_share;
+  m_tot_parts= m_part_info->get_tot_partitions();
+  if (bitmap_init(&m_key_not_found_partitions, NULL, m_tot_parts, false))
+  {
+    return true;
+  }
+  bitmap_clear_all(&m_key_not_found_partitions);
+  m_key_not_found= false;
+  m_is_sub_partitioned= m_part_info->is_sub_partitioned();
+  auto_increment_lock= false;
+  auto_increment_safe_stmt_log_lock= false;
+  m_pkey_is_clustered= handler::primary_key_is_clustered();
+  m_part_spec.start_part= NOT_A_PARTITION_ID;
+  m_part_spec.end_part= NOT_A_PARTITION_ID;
+  //m_index_scan_type= PARTITION_NO_INDEX_SCAN;
+  m_start_key.key= NULL;
+  m_start_key.length= 0;
+  m_scan_value= 3;
+  //m_reverse_order= false;
+  m_curr_key_info[0]= NULL;
+  m_curr_key_info[1]= NULL;
+  m_curr_key_info[2]= NULL;
+  m_top_entry= NO_CURRENT_PART_ID;
+  //m_ref_usage= REF_NOT_USED;
+  m_rec_length= m_table->s->reclength;
+  return false;
+}
+
+
+void ha_partition::close_partitioning()
+{
+  bitmap_free(&m_key_not_found_partitions);
+  DBUG_ASSERT(!m_ordered_rec_buffer);
+  destroy_record_priority_queue();
+}
+
+
 /*
   Constructor method
 
@@ -368,6 +418,7 @@ void ha_partition::init_handler_variables()
   part_share= NULL;
   m_new_partitions_share_refs.empty();
   m_part_ids_sorted_by_num_of_records= NULL;
+  m_table= NULL;
 
 #ifdef DONT_HAVE_TO_BE_INITALIZED
   m_start_key.flag= 0;
@@ -9111,6 +9162,100 @@ int ha_partition::check_for_upgrade(HA_CHECK_OPT *check_opt)
 }
 
 
+/**
+  Get statistics from a specific partition.
+
+  @param[out] stat_info  Area to report values into.
+  @param[out] check_sum  Check sum of partition.
+  @param[in]  part_id    Partition to report from.
+*/
+void
+ha_partition::get_dynamic_partition_info_low(PARTITION_STATS *stat_info,
+                                                 ha_checksum *check_sum,
+                                                 uint part_id)
+{
+  ha_statistics *part_stat= &stats;
+  DBUG_ASSERT(bitmap_is_set(&m_part_info->read_partitions, part_id));
+  DBUG_ASSERT(bitmap_is_subset(&m_part_info->read_partitions,
+                               &m_part_info->lock_partitions));
+  DBUG_ASSERT(bitmap_is_subset(&m_part_info->lock_partitions,
+                               &m_part_info->read_partitions));
+  bitmap_clear_all(&m_part_info->read_partitions);
+  bitmap_set_bit(&m_part_info->read_partitions, part_id);
+  info(HA_STATUS_TIME |
+                  HA_STATUS_VARIABLE |
+                  HA_STATUS_VARIABLE_EXTRA |
+                  HA_STATUS_NO_LOCK);
+  stat_info->records=              part_stat->records;
+  stat_info->mean_rec_length=      part_stat->mean_rec_length;
+  stat_info->data_file_length=     part_stat->data_file_length;
+  stat_info->max_data_file_length= part_stat->max_data_file_length;
+  stat_info->index_file_length=    part_stat->index_file_length;
+  stat_info->delete_length=        part_stat->delete_length;
+  stat_info->create_time=          part_stat->create_time;
+  stat_info->update_time=          part_stat->update_time;
+  stat_info->check_time=           part_stat->check_time;
+  if (check_sum &&
+    (ha_thd()->variables.old_mode ?
+    ha_table_flags() & HA_HAS_OLD_CHECKSUM :
+    ha_table_flags() & HA_HAS_NEW_CHECKSUM))
+  {
+    *check_sum= m_file[part_id]->checksum();
+  }
+  bitmap_copy(&m_part_info->read_partitions, &m_part_info->lock_partitions);
+}
+
+
+/**
+  Set partition info.
+
+  To be called from Partition_handler.
+
+  @param  part_info  Partition info to use.
+  @param  early      True if called when part_info only created and parsed,
+                     but not setup, checked or fixed.
+  */
+void ha_partition::set_part_info_low(partition_info *part_info,
+                                         bool early)
+{
+  /* 
+    ha_partition will set m_tot_parts from the .par file during creating
+    the new handler.
+    And this call can be earlier than the partition_default_handling(),
+    so get_tot_partitions() may return zero.
+  */
+  if (m_tot_parts == 0 &&
+      (m_part_info == NULL || !early))
+  {
+    m_tot_parts= part_info->get_tot_partitions();
+  }
+  m_part_info= part_info;
+  m_is_sub_partitioned= m_part_info->is_sub_partitioned();
+}
+
+
+/** Set used partitions bitmap from Alter_info.
+
+  @return false if success else true.
+*/
+
+bool ha_partition::set_altered_partitions()
+{
+  Alter_info *alter_info= &ha_thd()->lex->alter_info;
+
+  if ((alter_info->flags & Alter_info::ALTER_ADMIN_PARTITION) == 0 ||
+      (alter_info->flags & Alter_info::ALTER_ALL_PARTITION))
+  {
+    /*
+      Full table command, not ALTER TABLE t <cmd> PARTITION <partition list>.
+      All partitions are already set, so do nothing.
+    */
+    return false;
+  }
+  return m_part_info->set_read_partitions(&alter_info->partition_names);
+}
+
+
 struct st_mysql_storage_engine partition_storage_engine=
 { MYSQL_HANDLERTON_INTERFACE_VERSION };
 
@@ -9132,4 +9277,4 @@ maria_declare_plugin(partition)
 }
 maria_declare_plugin_end;
 
-#endif
+#endif // WITH_PARTITION_STORAGE_ENGINE

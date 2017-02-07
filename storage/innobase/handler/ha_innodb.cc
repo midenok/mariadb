@@ -1731,7 +1731,7 @@ innobase_create_handler(
 	return(new (mem_root) ha_innobase(hton, table));
 }
 
-static
+
 handler*
 innobase_upgrade_handler(
 	handler*	hnd,
@@ -1739,7 +1739,7 @@ innobase_upgrade_handler(
 {
 	ha_innopart* file = new (mem_root) ha_innopart(
 		static_cast<ha_innobase *>(hnd));
-	if (file && file->init_partitioning(mem_root))
+	if (file && file->m_ha_part.init_partitioning(mem_root))
 	{
 		delete file;
 		return(NULL);
