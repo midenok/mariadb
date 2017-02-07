@@ -186,14 +186,12 @@ truncate_partition.
 InnoDB specific functions related to partitioning is implemented here. */
 class ha_innopart:
 	public ha_innobase,
+	public ha_partition,
 	public Partition_handler
 {
 	friend handler* innobase_upgrade_handler(
 		handler*	hnd,
 		MEM_ROOT*	mem_root);
-protected:
-	ha_partition m_ha_part;
-
 public:
 	ha_innopart(
 		handlerton*	hton,
@@ -436,7 +434,7 @@ public:
 		bool			eq_range_arg,
 		bool			sorted)
 	{
-		return(m_ha_part.read_range_first(
+		return(ha_partition::read_range_first(
 						start_key,
 						end_key,
 						eq_range_arg,
@@ -447,14 +445,14 @@ public:
 	position(
 		const uchar*	record)
 	{
-		m_ha_part.position(record);
+		ha_partition::position(record);
 	}
 
 	int
 	rnd_pos_by_record(
 		uchar*	record)
 	{
-		return(m_ha_part.rnd_pos_by_record(record));
+		return(ha_partition::rnd_pos_by_record(record));
 	}
 
 	/* TODO: Implement these! */
@@ -577,14 +575,14 @@ public:
 	int
 	read_range_next()
 	{
-		return(m_ha_part.read_range_next());
+		return(ha_partition::read_range_next());
 	}
 
 	uint32
 	calculate_key_hash_value(
 		Field**	field_array)
 	{
-		return(m_ha_part.calculate_key_hash_value(field_array));
+		return(ha_partition::calculate_key_hash_value(field_array));
 	}
 
 	Table_flags
@@ -596,7 +594,7 @@ public:
 	void
 	release_auto_increment()
 	{
-		m_ha_part.release_auto_increment();
+		ha_partition::release_auto_increment();
 	}
 
 	/** Implementing Partition_handler interface @see partition_handler.h
@@ -608,7 +606,7 @@ public:
 		PARTITION_STATS*	stat_info,
 		uint		part_id)
 	{
-		m_ha_part.get_dynamic_partition_info_low(
+		ha_partition::get_dynamic_partition_info_low(
 			stat_info,
 			NULL,
 			part_id);
@@ -632,7 +630,7 @@ public:
 	set_part_info(
 		partition_info*	part_info)
 	{
-		m_ha_part.set_part_info_low(part_info, false);
+		ha_partition::set_part_info_low(part_info, false);
 	}
 
 	void
@@ -640,7 +638,7 @@ public:
 		partition_info*	part_info,
 		bool		early)
 	{
-		m_ha_part.set_part_info_low(part_info, early);
+		ha_partition::set_part_info_low(part_info, early);
 	}
 
 	handler*
@@ -1106,13 +1104,13 @@ private:
 	rnd_init(
 		bool	scan)
 	{
-		return(m_ha_part.rnd_init(scan));
+		return(ha_partition::rnd_init(scan));
 	}
 
 	int
 	rnd_end()
 	{
-		return(m_ha_part.rnd_end());
+		return(ha_partition::rnd_end());
 	}
 
 	int
@@ -1130,7 +1128,7 @@ private:
 	write_row(
 		uchar*	record)
 	{
-		return(m_ha_part.write_row(record));
+		return(ha_partition::write_row(record));
 	}
 
 	int
@@ -1138,14 +1136,14 @@ private:
 		const uchar*	old_record,
 		uchar*		new_record)
 	{
-		return(m_ha_part.update_row(old_record, new_record));
+		return(ha_partition::update_row(old_record, new_record));
 	}
 
 	int
 	delete_row(
 		const uchar*	record)
 	{
-		return(m_ha_part.delete_row(record));
+		return(ha_partition::delete_row(record));
 	}
 	/** @} */
 
@@ -1227,7 +1225,7 @@ protected:
 	rnd_next(
 		uchar*	record)
 	{
-		return(m_ha_part.rnd_next(record));
+		return(ha_partition::rnd_next(record));
 	}
 
 	int
@@ -1242,7 +1240,7 @@ protected:
 	index_next(
 		uchar*	record)
 	{
-		return(m_ha_part.index_next(record));
+		return(ha_partition::index_next(record));
 	}
 
 	int
@@ -1251,28 +1249,28 @@ protected:
 		const uchar*	key,
 		uint		keylen)
 	{
-		return(m_ha_part.index_next_same(record, key, keylen));
+		return(ha_partition::index_next_same(record, key, keylen));
 	}
 
 	int
 	index_prev(
 		uchar*	record)
 	{
-		return(m_ha_part.index_prev(record));
+		return(ha_partition::index_prev(record));
 	}
 
 	int
 	index_first(
 		uchar*	record)
 	{
-		return(m_ha_part.index_first(record));
+		return(ha_partition::index_first(record));
 	}
 
 	int
 	index_last(
 		uchar*	record)
 	{
-		return(m_ha_part.index_last(record));
+		return(ha_partition::index_last(record));
 	}
 
 	int
@@ -1281,7 +1279,7 @@ protected:
 		const uchar*	key,
 		key_part_map	keypart_map)
 	{
-		return(m_ha_part.index_read_last_map(
+		return(ha_partition::index_read_last_map(
 						record,
 						key,
 						keypart_map));
@@ -1294,7 +1292,7 @@ protected:
 		key_part_map		keypart_map,
 		enum ha_rkey_function	find_flag)
 	{
-		return(m_ha_part.index_read_map(
+		return(ha_partition::index_read_map(
 				buf,
 				key,
 				keypart_map,
@@ -1309,7 +1307,7 @@ protected:
 		key_part_map		keypart_map,
 		enum ha_rkey_function	find_flag)
 	{
-		return(m_ha_part.index_read_idx_map(
+		return(ha_partition::index_read_idx_map(
 				buf,
 				index,
 				key,
@@ -1334,5 +1332,84 @@ protected:
 					ulonglong nb_desired_values,
 					ulonglong *first_value,
 					ulonglong *nb_reserved_values);
+
+	// overriders common to ha_innobase and ha_partition
+
+	virtual bool get_error_message(int a, String* b)
+	{
+		return ha_innobase::get_error_message(a, b);
+	}
+	virtual double read_time(uint a, uint b, ha_rows c)
+	{
+		return ha_innobase::read_time(a, b, c);
+	}
+	virtual const key_map* keys_to_use_for_scanning()
+	{
+		return ha_innobase::keys_to_use_for_scanning();
+	}
+	virtual row_type get_row_type() const
+	{
+		return ha_innobase::get_row_type();
+	}
+	virtual const char* index_type(uint a)
+	{
+		return ha_innobase::index_type(a);
+	}
+	virtual int info(uint a)
+	{
+		return ha_innobase::info(a);
+	}
+	virtual char* update_table_comment(const char* a)
+	{
+		return ha_innobase::update_table_comment(a);
+	}
+	virtual void init_table_handle_for_HANDLER()
+	{
+		ha_innobase::init_table_handle_for_HANDLER();
+	}
+	virtual ulong index_flags(uint a, uint b, bool c) const
+	{
+		return ha_innobase::index_flags(a, b, c);
+	}
+	virtual uint max_supported_keys() const
+	{
+		return ha_innobase::max_supported_keys();
+	}
+	virtual uint max_supported_key_length() const
+	{
+		return ha_innobase::max_supported_key_length();
+	}
+	virtual uint max_supported_key_part_length() const
+	{
+		return ha_innobase::max_supported_key_part_length();
+	}
+	virtual uint lock_count() const
+	{
+		return ha_innobase::lock_count();
+	}
+	virtual uint8 table_cache_type()
+	{
+		return ha_innobase::table_cache_type();
+	}
+	virtual bool primary_key_is_clustered()
+	{
+		return ha_innobase::primary_key_is_clustered();
+	}
+	virtual int rename_table(const char* a, const char* b)
+	{
+		return ha_innobase::rename_table(a, b);
+	}
+	virtual int delete_table(const char* a)
+	{
+		return ha_innobase::delete_table(a);
+	}
+	virtual int reset_auto_increment(ulonglong a)
+	{
+		return ha_innobase::reset_auto_increment(a);
+	}
+	virtual int analyze(THD* a, HA_CHECK_OPT* b)
+	{
+		return ha_innobase::analyze(a, b);
+	}
 };
 #endif /* ha_innopart_h */

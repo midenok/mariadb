@@ -1728,7 +1728,9 @@ innobase_create_handler(
 		return(file);
 	}
 #endif
-	return(new (mem_root) ha_innobase(hton, table));
+	ha_innobase *innobase= new (mem_root) ha_innobase(hton, table);
+	innobase->self= innobase;
+	return(innobase);
 }
 
 
@@ -1737,9 +1739,10 @@ innobase_upgrade_handler(
 	handler*	hnd,
 	MEM_ROOT*	mem_root)
 {
+	ut_a(hnd && hnd->self);
 	ha_innopart* file = new (mem_root) ha_innopart(
-		static_cast<ha_innobase *>(hnd));
-	if (file && file->m_ha_part.init_partitioning(mem_root))
+		static_cast<ha_innobase *>(hnd->self));
+	if (file && file->ha_partition::init_partitioning(mem_root))
 	{
 		delete file;
 		return(NULL);
@@ -7376,9 +7379,11 @@ ha_innobase::clone(
 	MEM_ROOT*	mem_root)	/*!< in: memory context */
 {
 	DBUG_ENTER("ha_innobase::clone");
+	handler *hnd = handler::clone(name, mem_root);
+	ut_a(hnd && hnd->self);
 
 	ha_innobase*	new_handler = static_cast<ha_innobase*>(
-		handler::clone(name, mem_root));
+		hnd->self);
 
 	if (new_handler != NULL) {
 		DBUG_ASSERT(new_handler->m_prebuilt != NULL);

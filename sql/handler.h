@@ -2850,7 +2850,8 @@ public:
     pushed_idx_cond(NULL),
     pushed_idx_cond_keyno(MAX_KEY),
     auto_inc_intervals_count(0),
-    m_psi(NULL), m_lock_type(F_UNLCK), ha_share(NULL)
+    m_psi(NULL), m_lock_type(F_UNLCK), ha_share(NULL),
+    self(NULL)
   {
     DBUG_PRINT("info",
                ("handler created F_UNLCK %d F_RDLCK %d F_WRLCK %d",
@@ -4263,11 +4264,15 @@ public:
   { DBUG_ASSERT(0); return NULL; }
   virtual void update_partition(uint	part_id)
   {}
+
 protected:
   Handler_share *get_ha_share_ptr();
   void set_ha_share_ptr(Handler_share *arg_ha_share);
   void lock_shared_ha_data();
   void unlock_shared_ha_data();
+
+public:
+  void *self;
 };
 
 #include "multi_range_read.h"

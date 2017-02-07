@@ -838,7 +838,8 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd)
   tdc_remove_table(thd, TDC_RT_REMOVE_NOT_OWN, first_table->db,
                    first_table->table_name, FALSE);
 
-  partition= (ha_partition*) first_table->table->file;
+  DBUG_ASSERT(first_table->table->file && first_table->table->file->self);
+  partition= static_cast<ha_partition*>(first_table->table->file->self);
   /* Invoke the handler method responsible for truncating the partition. */
   if ((error= partition->truncate_partition(alter_info, &binlog_stmt)))
     partition->print_error(error, MYF(0));

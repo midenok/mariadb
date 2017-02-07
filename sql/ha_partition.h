@@ -194,7 +194,7 @@ private:
 
 extern "C" int cmp_key_rowid_part_id(void *ptr, uchar *ref1, uchar *ref2);
 
-class ha_partition :public handler
+class ha_partition :public virtual handler
 {
   friend class ha_innopart;
 

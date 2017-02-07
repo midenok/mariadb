@@ -9232,7 +9232,7 @@ ha_innopart::check_if_supported_inplace_alter(
 	/* We cannot allow INPLACE to change order of KEY partitioning fields! */
 	if ((ha_alter_info->handler_flags
 	     & Alter_inplace_info::ALTER_STORED_COLUMN_ORDER)
-	    && !m_ha_part.m_part_info->same_key_column_order(
+	    && !ha_partition::m_part_info->same_key_column_order(
 				&ha_alter_info->alter_info->create_list)) {
 
 		DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
@@ -9245,17 +9245,17 @@ ha_innopart::check_if_supported_inplace_alter(
 		| Alter_inplace_info::DROP_PK_INDEX))) {
 
 		/* Check partition by key(). */
-		if ((m_ha_part.m_part_info->part_type == HASH_PARTITION)
-		    && m_ha_part.m_part_info->list_of_part_fields
-		    && m_ha_part.m_part_info->part_field_list.is_empty()) {
+		if ((ha_partition::m_part_info->part_type == HASH_PARTITION)
+		    && ha_partition::m_part_info->list_of_part_fields
+		    && ha_partition::m_part_info->part_field_list.is_empty()) {
 
 			DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
 		}
 
 		/* Check sub-partition by key(). */
-		if ((m_ha_part.m_part_info->subpart_type == HASH_PARTITION)
-		    && m_ha_part.m_part_info->list_of_subpart_fields
-		    && m_ha_part.m_part_info->subpart_field_list.is_empty()) {
+		if ((ha_partition::m_part_info->subpart_type == HASH_PARTITION)
+		    && ha_partition::m_part_info->list_of_subpart_fields
+		    && ha_partition::m_part_info->subpart_field_list.is_empty()) {
 
 			DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
 		}
@@ -9296,13 +9296,13 @@ ha_innopart::prepare_inplace_alter_table(
 	/* Clean up all ins/upd nodes. */
 	clear_ins_upd_nodes();
 	/* Based on Sql_alloc class, return NULL for new on failure. */
-	ctx_parts = new ha_innopart_inplace_ctx(thd, m_ha_part.m_tot_parts);
+	ctx_parts = new ha_innopart_inplace_ctx(thd, ha_partition::m_tot_parts);
 	if (!ctx_parts) {
 		DBUG_RETURN(HA_ALTER_ERROR);
 	}
 
 	uint ctx_array_size = sizeof(inplace_alter_handler_ctx*)
-				* (m_ha_part.m_tot_parts + 1);
+				* (ha_partition::m_tot_parts + 1);
 	ctx_parts->ctx_array =
 		static_cast<inplace_alter_handler_ctx**>(
 					ut_malloc(ctx_array_size,
@@ -9316,7 +9316,7 @@ ha_innopart::prepare_inplace_alter_table(
 
 	ctx_parts->prebuilt_array = static_cast<row_prebuilt_t**>(
 					ut_malloc(sizeof(row_prebuilt_t*)
-							* m_ha_part.m_tot_parts,
+							* ha_partition::m_tot_parts,
 					mem_key_partitioning));
 	if (!ctx_parts->prebuilt_array) {
 		DBUG_RETURN(HA_ALTER_ERROR);
@@ -9326,7 +9326,7 @@ ha_innopart::prepare_inplace_alter_table(
 	/* Create new prebuilt for the rest of the partitions.
 	It is needed for the current implementation of
 	ha_innobase::commit_inplace_alter_table(). */
-	for (uint i = 1; i < m_ha_part.m_tot_parts; i++) {
+	for (uint i = 1; i < ha_partition::m_tot_parts; i++) {
 		row_prebuilt_t* tmp_prebuilt;
 		tmp_prebuilt = row_create_prebuilt(
 					m_part_share->get_table_part(i),
@@ -9342,7 +9342,7 @@ ha_innopart::prepare_inplace_alter_table(
 	const char*	save_data_file_name =
 		ha_alter_info->create_info->data_file_name;
 
-	for (uint i = 0; i < m_ha_part.m_tot_parts; i++) {
+	for (uint i = 0; i < ha_partition::m_tot_parts; i++) {
 		m_prebuilt = ctx_parts->prebuilt_array[i];
 		m_prebuilt_ptr = ctx_parts->prebuilt_array + i;
 		ha_alter_info->handler_ctx = ctx_parts->ctx_array[i];
@@ -9397,7 +9397,7 @@ ha_innopart::inplace_alter_table(
 
 	ctx_parts = static_cast<ha_innopart_inplace_ctx*>(
 					ha_alter_info->handler_ctx);
-	for (uint i = 0; i < m_ha_part.m_tot_parts; i++) {
+	for (uint i = 0; i < ha_partition::m_tot_parts; i++) {
 		m_prebuilt = ctx_parts->prebuilt_array[i];
 		ha_alter_info->handler_ctx = ctx_parts->ctx_array[i];
 		set_partition(i);
@@ -9454,7 +9454,7 @@ ha_innopart::commit_inplace_alter_table(
 		goto end;
 	}
 	/* Rollback is done for each partition. */
-	for (uint i = 0; i < m_ha_part.m_tot_parts; i++) {
+	for (uint i = 0; i < ha_partition::m_tot_parts; i++) {
 		m_prebuilt = ctx_parts->prebuilt_array[i];
 		ha_alter_info->handler_ctx = ctx_parts->ctx_array[i];
 		set_partition(i);
@@ -9469,7 +9469,7 @@ end:
 	/* Move the ownership of the new tables back to
 	the m_part_share. */
 	ha_innobase_inplace_ctx*	ctx;
-	for (uint i = 0; i < m_ha_part.m_tot_parts; i++) {
+	for (uint i = 0; i < ha_partition::m_tot_parts; i++) {
 		/* TODO: Fix to only use one prebuilt (i.e. make inplace
 		alter partition aware instead of using multiple prebuilt
 		copies... */
