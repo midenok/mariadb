@@ -453,7 +453,7 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
     goto err;
   }
 
-  /* Implicitly add versioning fields in needed */
+  /* Implicitly add versioning fields if needed */
   if (tables->table->versioned())
   {
     select_lex->item_list.push_back(new (thd->mem_root) Item_field(

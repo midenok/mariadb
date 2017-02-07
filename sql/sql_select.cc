@@ -684,10 +684,10 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
     DBUG_RETURN(0);
   }
 
-  vers_select_conds_t *vers_conds_for_view= NULL;
+  vers_select_conds_t *view_conds= NULL;
   if (tables && tables->is_view() && !thd->stmt_arena->is_stmt_prepare())
   {
-    vers_conds_for_view= &tables->vers_conditions;
+    view_conds= &tables->vers_conditions;
     tables= tables->view->select_lex.table_list.first;
   }
 
@@ -766,8 +766,8 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
     if (table->table && table->table->versioned())
     {
       vers_select_conds_t &vers_conditions=
-          vers_conds_for_view
-              ? *vers_conds_for_view
+          view_conds
+              ? *view_conds
               : table->vers_conditions.type == FOR_SYSTEM_TIME_UNSPECIFIED
                     ? slex->vers_conditions
                     : table->vers_conditions;
@@ -16509,7 +16509,6 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
   }
 
   field_count=param->field_count+param->func_count+param->sum_func_count;
-
   hidden_field_count=param->hidden_field_count;
 
   /*
