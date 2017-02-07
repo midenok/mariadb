@@ -456,17 +456,20 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
   /* Implicitly add versioning fields if needed */
   {
     TABLE_LIST *tl = tables;
-    while (tl->is_view())
+    while (tl && tl->is_view())
       tl = tl->view->select_lex.table_list.first;
-    TABLE_SHARE *s= tl->table->s;
-    if (s->versioned)
+    if (tl && tl->table)
     {
-      select_lex->item_list.push_back(
-          new (thd->mem_root) Item_field(thd, &select_lex->context, NULL, NULL,
-                                         s->vers_start_field()->field_name));
-      select_lex->item_list.push_back(
-          new (thd->mem_root) Item_field(thd, &select_lex->context, NULL, NULL,
-                                         s->vers_end_field()->field_name));
+      TABLE_SHARE *s= tl->table->s;
+      if (s->versioned)
+      {
+        select_lex->item_list.push_back(new (thd->mem_root) Item_field(
+            thd, &select_lex->context, NULL, NULL,
+            s->vers_start_field()->field_name));
+        select_lex->item_list.push_back(new (thd->mem_root) Item_field(
+            thd, &select_lex->context, NULL, NULL,
+            s->vers_end_field()->field_name));
+      }
     }
   }
 

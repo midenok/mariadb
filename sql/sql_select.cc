@@ -25294,7 +25294,7 @@ void TABLE_LIST::print(THD *thd, table_map eliminated_tables, String *str,
 
       append_identifier(thd, str, t_alias, strlen(t_alias));
     }
-    if (table->versioned())
+    if (table && table->versioned())
     {
       // versioning conditions are already unwrapped to WHERE clause
       str->append(" FOR SYSTEM_TIME ALL");
