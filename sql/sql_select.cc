@@ -687,7 +687,7 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
   vers_select_conds_t *view_conds= NULL;
   if (tables && tables->is_view() && !thd->stmt_arena->is_stmt_prepare())
   {
-    view_conds= &tables->vers_conditions;
+    // view_conds= &tables->vers_conditions;
     tables= tables->view->select_lex.table_list.first;
   }
 
@@ -25304,6 +25304,8 @@ void TABLE_LIST::print(THD *thd, table_map eliminated_tables, String *str,
 
       append_identifier(thd, str, t_alias, strlen(t_alias));
     }
+    if (table->versioned())
+      str->append(" FOR SYSTEM_TIME ALL");
 
     if (index_hints)
     {
@@ -25453,11 +25455,11 @@ void st_select_lex::print(THD *thd, String *str, enum_query_type query_type)
       str->append(having_value != Item::COND_FALSE ? "1" : "0");
   }
 
-  if (vers_conditions.unwrapped)
-  {
-    // versioning conditions are already unwrapped to WHERE clause
-    str->append(STRING_WITH_LEN(" query for system_time all "));
-  }
+  // if (vers_conditions.unwrapped)
+  // {
+  //   // versioning conditions are already unwrapped to WHERE clause
+  //   str->append(STRING_WITH_LEN(" query for system_time all "));
+  // }
 
   if (order_list.elements)
   {
