@@ -764,8 +764,8 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
     if (table->table && table->table->versioned())
     {
       vers_select_conds_t &vers_conditions=
-        table->vers_conditions.type == FOR_SYSTEM_TIME_UNSPECIFIED
-            ? slex->vers_conditions : table->vers_conditions;
+        table->vers_conditions.type == FOR_SYSTEM_TIME_UNSPECIFIED ?
+            slex->vers_conditions : table->vers_conditions;
 
       if (vers_conditions.type == FOR_SYSTEM_TIME_BEFORE &&
           thd->lex->sql_command != SQLCOM_TRUNCATE)
@@ -25295,7 +25295,10 @@ void TABLE_LIST::print(THD *thd, table_map eliminated_tables, String *str,
       append_identifier(thd, str, t_alias, strlen(t_alias));
     }
     if (table->versioned())
+    {
+      // versioning conditions are already unwrapped to WHERE clause
       str->append(" FOR SYSTEM_TIME ALL");
+    }
 
     if (index_hints)
     {
