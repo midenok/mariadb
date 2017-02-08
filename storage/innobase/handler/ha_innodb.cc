@@ -1742,11 +1742,7 @@ innobase_upgrade_handler(
 	ut_a(hnd && hnd->self);
 	ha_innopart* file = new (mem_root) ha_innopart(
 		static_cast<ha_innobase *>(hnd->self));
-	if (file && file->ha_partition::init_partitioning(mem_root))
-	{
-		delete file;
-		return(NULL);
-	}
+
 	return file;
 }
 

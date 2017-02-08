@@ -828,6 +828,9 @@ ha_innopart::ha_innopart(
 	And make it impossible to use legacy share functionality. */
 
 	m_share = NULL;
+	#ifndef DBUG_OFF
+	m_key_not_found_partitions.bitmap= NULL;
+	#endif
 }
 
 ha_innopart::ha_innopart(
@@ -848,6 +851,9 @@ ha_innopart::ha_innopart(
 {
 	m_int_table_flags &=	~(HA_INNOPART_DISABLED_TABLE_FLAGS);
 	m_share = NULL;
+	#ifndef DBUG_OFF
+	m_key_not_found_partitions.bitmap= NULL;
+	#endif
 }
 
 /** Destruct ha_innopart handler. */

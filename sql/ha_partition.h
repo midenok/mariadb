@@ -1413,13 +1413,6 @@ public:
   bool open_partitioning(Partition_share *part_share);
   void close_partitioning();
   bool set_altered_partitions();
-  inline bool init_partitioning(MEM_ROOT *mem_root)
-  {
-#ifndef DBUG_OFF
-    m_key_not_found_partitions.bitmap= NULL;
-#endif
-    return false;
-  }
 }; // ha_partition
 
 bool print_admin_msg(THD* thd, uint len,
