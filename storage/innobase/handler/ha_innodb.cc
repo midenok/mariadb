@@ -8910,6 +8910,7 @@ ha_innobase::write_row(
 
 	trx_t*		trx = thd_to_trx(m_user_thd);
 	TrxInInnoDB	trx_in_innodb(trx);
+	ins_mode_t	vers_set_fields;
 
 	if (trx_in_innodb.is_aborted()) {
 
@@ -9110,8 +9111,14 @@ no_commit:
 
 	innobase_srv_conc_enter_innodb(m_prebuilt);
 
+	vers_set_fields = table->versioned() &&
+		(sql_command != SQLCOM_DELETE ||
+		(m_int_table_flags & HA_INNOPART_DISABLED_TABLE_FLAGS)) ?
+			ROW_INS_VERSIONED :
+			ROW_INS_NORMAL;
+
 	/* Step-5: Execute insert graph that will result in actual insert. */
-	error = row_insert_for_mysql((byte*) record, m_prebuilt);
+	error = row_insert_for_mysql((byte*) record, m_prebuilt, vers_set_fields);
 
 	DEBUG_SYNC(m_user_thd, "ib_after_row_insert");
 
@@ -9887,6 +9894,7 @@ ha_innobase::update_row(
 
 	upd_t*		uvect = row_get_prebuilt_update_vector(m_prebuilt);
 	ib_uint64_t	autoinc;
+	bool		vers_set_fields;
 
 	/* Build an update vector from the modified fields in the rows
 	(uses m_upd_buf of the handle) */
@@ -9912,11 +9920,14 @@ ha_innobase::update_row(
 
 	innobase_srv_conc_enter_innodb(m_prebuilt);
 
-	error = row_update_for_mysql((byte*) old_row, m_prebuilt);
+	vers_set_fields = m_prebuilt->upd_node->versioned &&
+		(m_int_table_flags & HA_INNOPART_DISABLED_TABLE_FLAGS);
 
-	if (error == DB_SUCCESS && m_prebuilt->upd_node->versioned) {
+	error = row_update_for_mysql((byte*) old_row, m_prebuilt, vers_set_fields);
+
+	if (error == DB_SUCCESS && vers_set_fields) {
 		if (trx->id != static_cast<trx_id_t>(table->vers_start_field()->val_int()))
-			error = row_insert_for_mysql((byte*) old_row, m_prebuilt, true);
+			error = row_insert_for_mysql((byte*) old_row, m_prebuilt, ROW_INS_HISTORICAL);
 	}
 
 	if (error == DB_SUCCESS && autoinc) {
@@ -10032,11 +10043,13 @@ ha_innobase::delete_row(
 
 	innobase_srv_conc_enter_innodb(m_prebuilt);
 
-	bool delete_history_row =
-		table->versioned() && !table->vers_end_field()->is_max();
+	bool vers_set_fields =
+		table->versioned() &&
+		(m_int_table_flags & HA_INNOPART_DISABLED_TABLE_FLAGS) &&
+		table->vers_end_field()->is_max();
 
 	error = row_update_for_mysql(
-		(byte *)record, m_prebuilt, delete_history_row);
+		(byte *)record, m_prebuilt, vers_set_fields);
 
 	innobase_srv_conc_exit_innodb(m_prebuilt);
 

@@ -1141,6 +1141,17 @@ private:
 	delete_row(
 		const uchar*	record)
 	{
+		ut_a(table);
+		if (table->versioned() && table->vers_end_field()->is_max()) {
+			trx_t* trx = thd_to_trx(ha_thd());
+			if (!trx->id)
+				trx_start_if_not_started_xa(trx, true);
+			ut_a(table->record[0] == record);
+			store_record(table, record[1]);
+			ut_a(trx->id);
+			table->vers_end_field()->store(trx->id, true);
+			return Partition_helper::ph_update_row(table->record[1], table->record[0]);
+		}
 		return(Partition_helper::ph_delete_row(record));
 	}
 	/** @} */
