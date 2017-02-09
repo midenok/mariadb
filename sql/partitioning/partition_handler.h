@@ -221,8 +221,6 @@ public:
   virtual uint alter_flags(uint flags) const
   { return 0; }
 
-  int info(uint flag);
-
 private:
   /**
     Truncate partition.
