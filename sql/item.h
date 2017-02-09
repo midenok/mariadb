@@ -5526,6 +5526,9 @@ protected:
   TYPELIB *enum_set_typelib;
   Field::geometry_type geometry_type;
 
+  bool sys_trx_start;
+  bool sys_trx_end;
+
   void get_full_info(Item *item);
 
   /* It is used to count decimal precision in join_types */
@@ -5566,8 +5569,9 @@ public:
   static enum_field_types get_real_type(Item *);
   Field::geometry_type get_geometry_type() const { return geometry_type; };
   Item* get_copy(THD *thd, MEM_ROOT *mem_root) { return 0; }
+  bool is_sys_trx_start() const { return sys_trx_start; }
+  bool is_sys_trx_end() const { return sys_trx_end; }
 };
-
 
 class st_select_lex;
 void mark_select_range_as_dependent(THD *thd,
