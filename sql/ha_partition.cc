@@ -158,6 +158,9 @@ static int partition_initialize(void *p)
 bool Partition_share::init(uint num_parts)
 {
   DBUG_ENTER("Partition_share::init");
+  auto_inc_initialized= false;
+  partition_name_hash_initialized= false;
+  next_auto_inc_val= 0;
   partitions_share_refs= new Parts_share_refs;
   if (!partitions_share_refs)
     DBUG_RETURN(true);
