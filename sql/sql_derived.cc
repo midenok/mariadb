@@ -710,6 +710,17 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
            cursor= cursor->next_local)
         cursor->outer_join|= JOIN_TYPE_OUTER;
     }
+    if (!thd->stmt_arena->is_sp_execute() && !derived->is_view() &&
+        sl->table_list.first->table->versioned())
+    {
+      TABLE_LIST *tl= sl->table_list.first;
+      sl->item_list.push_back(new (thd->mem_root) Item_field(
+          thd, &sl->context, tl->db, tl->alias,
+          tl->table->s->vers_start_field()->field_name));
+      sl->item_list.push_back(new (thd->mem_root) Item_field(
+          thd, &sl->context, tl->db, tl->alias,
+          tl->table->s->vers_end_field()->field_name));
+    }
   }
 
   unit->derived= derived;

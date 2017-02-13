@@ -811,8 +811,19 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
       Name_resolution_context *context= slex->parent_lex->current_context();
       DBUG_ASSERT(context);
 
-      Item *row_start= newx Item_field(thd, context, fstart);
-      Item *row_end= newx Item_field(thd, context, fend);
+      Item *row_start= NULL;
+      Item *row_end= NULL;
+      if (table->is_derived() && !table->is_recursive_with_table())
+      {
+        row_start=
+            newx Item_field(thd, context, NULL, NULL, fstart->field_name);
+        row_end= newx Item_field(thd, context, NULL, NULL, fend->field_name);
+      }
+      else
+      {
+        row_start= newx Item_field(thd, context, fstart);
+        row_end= newx Item_field(thd, context, fend);
+      }
       Item *row_end2= row_end;
 
       if (table->table->versioned_by_sql())

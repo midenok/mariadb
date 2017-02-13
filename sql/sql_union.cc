@@ -532,26 +532,6 @@ bool st_select_lex_unit::prepare(THD *thd_arg, select_result *sel_result,
   {
     bool can_skip_order_by;
     sl->options|= SELECT_NO_UNLOCK;
-    if (instantiate_tmp_table)
-    {
-      if (TABLE_LIST *tl= sl->table_list.first)
-      {
-        if (TABLE *t= tl->table)
-        {
-          if (t->versioned())
-          {
-            const char *db= tl->db;
-            const char *alias= tl->alias;
-            sl->item_list.push_back(new (thd->mem_root) Item_field(
-                thd, &sl->context, db, alias,
-                t->s->vers_start_field()->field_name));
-            sl->item_list.push_back(new (thd->mem_root) Item_field(
-                thd, &sl->context, db, alias,
-                t->s->vers_end_field()->field_name));
-          }
-        }
-      }
-    }
     JOIN *join= new JOIN(thd_arg, sl->item_list, 
 			 sl->options | thd_arg->variables.option_bits | additional_options,
 			 tmp_result);
