@@ -5573,6 +5573,7 @@ public:
   bool is_sys_trx_end() const { return sys_trx_end; }
 };
 
+
 class st_select_lex;
 void mark_select_range_as_dependent(THD *thd,
                                     st_select_lex *last_select,
