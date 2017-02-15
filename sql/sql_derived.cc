@@ -710,9 +710,12 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
            cursor= cursor->next_local)
         cursor->outer_join|= JOIN_TYPE_OUTER;
     }
-    if (!thd->stmt_arena->is_sp_execute() && !derived->is_view() &&
-        sl->table_list.first->table->versioned())
+    if ((thd->stmt_arena->is_stmt_prepare() ||
+         !thd->stmt_arena->is_stmt_execute()) &&
+        !derived->is_view() && sl->table_list.first->table->versioned())
     {
+      Query_arena backup;
+      Query_arena *arena= thd->activate_stmt_arena_if_needed(&backup);
       TABLE_LIST *tl= sl->table_list.first;
       sl->item_list.push_back(new (thd->mem_root) Item_field(
           thd, &sl->context, tl->db, tl->alias,
@@ -720,6 +723,8 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
       sl->item_list.push_back(new (thd->mem_root) Item_field(
           thd, &sl->context, tl->db, tl->alias,
           tl->table->s->vers_end_field()->field_name));
+      if (arena)
+        thd->restore_active_arena(arena, &backup);
     }
   }
 
