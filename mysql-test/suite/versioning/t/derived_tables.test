@@ -35,7 +35,7 @@ as
   select e.emp_id, e.name, e.mgr
   from emp as e
   where name = 'john'
-  union 
+  union
   select ee.emp_id, ee.name, ee.mgr
   from emp as ee, ancestors as a
   where ee.mgr = a.emp_id
@@ -49,7 +49,7 @@ as
   select e.emp_id, e.name, e.mgr
   from emp as e
   where name = 'john'
-  union 
+  union
   select ee.emp_id, ee.name, ee.mgr
   from emp as ee, ancestors as a
   where ee.mgr = a.emp_id
@@ -65,7 +65,7 @@ as
   select e.emp_id, e.name, e.mgr
   from emp as e for system_time as of timestamp @ts
   where name = 'bill'
-  union 
+  union
   select ee.emp_id, ee.name, ee.mgr
   from emp as ee for system_time as of timestamp @ts, ancestors as a for system_time as of timestamp @ts
   where ee.mgr = a.emp_id
@@ -79,7 +79,7 @@ as
   select e.emp_id, e.name, e.mgr
   from emp as e for system_time as of timestamp @ts
   where name = 'bill'
-  union 
+  union
   select ee.emp_id, ee.name, ee.mgr
   from emp as ee for system_time as of timestamp @ts, ancestors as a for system_time as of timestamp @ts
   where ee.mgr = a.emp_id
