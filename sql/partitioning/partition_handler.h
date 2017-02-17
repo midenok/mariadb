@@ -154,62 +154,6 @@ public:
 
 
   /**
-    Truncate partitions.
-
-    Truncate all partitions matching table->part_info->read_partitions.
-    Handler level wrapper for truncating partitions, will ensure that
-    mark_trx_read_write() is called and also checks locking assertions.
-
-    @return Operation status.
-      @retval    0  Success.
-      @retval != 0  Error code.
-  */
-  int truncate_partition()
-  {
-    handler *file= get_handler();
-    if (!file)
-    {
-      return HA_ERR_WRONG_COMMAND;
-    }
-    DBUG_ASSERT(file->get_table_share()->tmp_table != NO_TMP_TABLE ||
-                file->get_lock_type() == F_WRLCK);
-    file->mark_trx_read_write();
-    return truncate_partition_low();
-  }
-  /**
-    Change partitions.
-
-    Change partitions according to their partition_element::part_state set up
-    in prep_alter_part_table(). Will create new partitions and copy requested
-    partitions there. Also updating part_state to reflect current state.
-
-    Handler level wrapper for changing partitions.
-    This is the reason for having Partition_handler a friend class of handler,
-    mark_trx_read_write() is called and also checks locking assertions.
-    to ensure that mark_trx_read_write() is called and checking the asserts.
-
-    @param[in]     create_info  Table create info.
-    @param[in]     path         Path including table name.
-    @param[out]    copied       Number of rows copied.
-    @param[out]    deleted      Number of rows deleted.
-  */
-  int change_partitions(HA_CREATE_INFO *create_info,
-                        const char *path,
-                        ulonglong * const copied,
-                        ulonglong * const deleted)
-  {
-    handler *file= get_handler();
-    if (!file)
-    {
-      my_error(ER_ILLEGAL_HA, MYF(0), create_info->alias);
-      return HA_ERR_WRONG_COMMAND;
-    }
-    DBUG_ASSERT(file->get_table_share()->tmp_table != NO_TMP_TABLE ||
-                file->get_lock_type() != F_UNLCK);
-    file->mark_trx_read_write();
-    return change_partitions_low(create_info, path, copied, deleted);
-  }
-  /**
     Alter flags.
 
     Given a set of alter table flags, return which is supported.
@@ -540,7 +484,6 @@ public:
                                               ha_checksum *check_sum,
                                               uint part_id);
 
-#if 0
   /**
     Implement the partition changes defined by ALTER TABLE of partitions.
 
@@ -564,11 +507,10 @@ public:
       @retval    0 Success
       @retval != 0 Failure
   */
-  virtual int change_partitions(HA_CREATE_INFO *create_info,
+  int change_partitions(HA_CREATE_INFO *create_info,
                                 const char *path,
                                 ulonglong * const copied,
                                 ulonglong * const deleted);
-#endif
   /** @} */
 
 protected:

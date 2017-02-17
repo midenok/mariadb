@@ -300,6 +300,31 @@ void create_subpartition_name(char *out, const char *in1,
 void set_key_field_ptr(KEY *key_info, const uchar *new_buf,
                        const uchar *old_buf);
 
+/** Set up table for creating a partition.
+Copy info from partition to the table share so the created partition
+has the correct info.
+  @param thd               THD object
+  @param share             Table share to be updated.
+  @param info              Create info to be updated.
+  @param part_elem         partition_element containing the info.
+
+  @return    status
+    @retval  TRUE  Error
+    @retval  FALSE Success
+
+  @details
+    Set up
+    1) Comment on partition
+    2) MAX_ROWS, MIN_ROWS on partition
+    3) Index file name on partition
+    4) Data file name on partition
+*/
+bool set_up_table_before_create(THD *thd,
+                                TABLE_SHARE *share,
+                                const char *partition_name_with_path,
+                                HA_CREATE_INFO *info,
+                                partition_element *part_elem);
+
 extern const LEX_STRING partition_keywords[];
 
 #endif /* SQL_PARTITION_INCLUDED */

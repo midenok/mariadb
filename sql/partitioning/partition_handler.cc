@@ -1023,7 +1023,7 @@ bool Partition_helper::print_partition_error(int error, myf errflag)
   DBUG_RETURN(true);
 }
 
-#if 0
+
 /**
   Implement the partition changes defined by ALTER TABLE of partitions.
 
@@ -1048,6 +1048,7 @@ bool Partition_helper::print_partition_error(int error, myf errflag)
     @retval != 0 Failure
 */
 
+// FIXME: duplicate of ha_partition::change_partitions
 int Partition_helper::change_partitions(HA_CREATE_INFO *create_info,
                                         const char *path,
                                         ulonglong * const copied,
@@ -1226,10 +1227,8 @@ int Partition_helper::change_partitions(HA_CREATE_INFO *create_info,
             '#P#<part_name>[#SP#<subpart_name>] suffix. Remove that suffix
             if it exists.
           */
-          truncate_partition_filename(&m_table->mem_root,
-                                      &sub_elem->data_file_name);
-          truncate_partition_filename(&m_table->mem_root,
-                                      &sub_elem->index_file_name);
+          truncate_partition_filename(sub_elem->data_file_name);
+          truncate_partition_filename(sub_elem->index_file_name);
           /* Notice that sub_elem is already based on part_elem's defaults. */
           error= set_up_table_before_create(thd,
                                             m_table->s,
@@ -1261,10 +1260,8 @@ int Partition_helper::change_partitions(HA_CREATE_INFO *create_info,
                               true);
         DBUG_PRINT("info", ("Add partition %s", part_name_buff));
         /* See comment in subpartition branch above! */
-        truncate_partition_filename(&m_table->mem_root,
-                                    &part_elem->data_file_name);
-        truncate_partition_filename(&m_table->mem_root,
-                                    &part_elem->index_file_name);
+        truncate_partition_filename(part_elem->data_file_name);
+        truncate_partition_filename(part_elem->index_file_name);
         error= set_up_table_before_create(thd,
                                           m_table->s,
                                           part_name_buff,
@@ -1326,7 +1323,7 @@ err:
   close_new_partitions();
   DBUG_RETURN(error);
 }
-#endif
+
 
 /**
   Copy partitions as part of ALTER TABLE of partitions.

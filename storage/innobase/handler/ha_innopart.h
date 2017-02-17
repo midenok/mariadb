@@ -186,8 +186,7 @@ truncate_partition.
 InnoDB specific functions related to partitioning is implemented here. */
 class ha_innopart:
 	public ha_innobase,
-	public Partition_helper,
-	public Partition_handler
+	public Partition_helper
 {
 public:
 	ha_innopart(
@@ -616,12 +615,6 @@ public:
 	{
 		return(HA_PARTITION_FUNCTION_SUPPORTED
 		       | HA_FAST_CHANGE_PARTITION);
-	}
-
-	Partition_handler*
-	get_partition_handler()
-	{
-		return(static_cast<Partition_handler*>(this));
 	}
 
 	void
@@ -1161,28 +1154,88 @@ private:
 	int
 	truncate_partition_low();
 
-// FIXME:
-// 	/** Change partitions according to ALTER TABLE ... PARTITION ...
-// 	Called from Partition_handler::change_partitions().
-// 	@param[in]	create_info	Table create info.
-// 	@param[in]	path		Path including db/table_name.
-// 	@param[out]	copied		Number of copied rows.
-// 	@param[out]	deleted		Number of deleted rows.
-// 	@return	0 for success or error code. */
-// 	int
-// 	change_partitions_low(
-// 		HA_CREATE_INFO*		create_info,
-// 		const char*		path,
-// 		ulonglong* const	copied,
-// 		ulonglong* const	deleted)
-// 	{
-// 		return(ha_partition::change_partitions(
-// 						create_info,
-// 						path,
-// 						copied,
-// 						deleted, NULL, 0));
-// 	}
+	/** Change partitions according to ALTER TABLE ... PARTITION ...
+	Called from Partition_handler::change_partitions().
+	@param[in]	create_info	Table create info.
+	@param[in]	path		Path including db/table_name.
+	@param[out]	copied		Number of copied rows.
+	@param[out]	deleted		Number of deleted rows.
+	@return	0 for success or error code. */
+	int
+	change_partitions_low(
+		HA_CREATE_INFO*		create_info,
+		const char*		path,
+		ulonglong* const	copied,
+		ulonglong* const	deleted)
+	{
+		return(Partition_helper::change_partitions(
+						create_info,
+						path,
+						copied,
+						deleted));
+	}
 
+public:
+	/**
+	Truncate partitions.
+
+	Truncate all partitions matching table->part_info->read_partitions.
+	Handler level wrapper for truncating partitions, will ensure that
+	mark_trx_read_write() is called and also checks locking assertions.
+
+	@return Operation status.
+	@retval    0  Success.
+	@retval != 0  Error code.
+	*/
+	int truncate_partition()
+	{
+		handler *file= get_handler();
+		if (!file)
+		{
+			return HA_ERR_WRONG_COMMAND;
+		}
+		DBUG_ASSERT(file->get_table_share()->tmp_table != NO_TMP_TABLE ||
+				file->get_lock_type() == F_WRLCK);
+		file->mark_trx_read_write();
+		return truncate_partition_low();
+	}
+	/**
+	Change partitions.
+
+	Change partitions according to their partition_element::part_state set up
+	in prep_alter_part_table(). Will create new partitions and copy requested
+	partitions there. Also updating part_state to reflect current state.
+
+	Handler level wrapper for changing partitions.
+	This is the reason for having Partition_handler a friend class of handler,
+	mark_trx_read_write() is called and also checks locking assertions.
+	to ensure that mark_trx_read_write() is called and checking the asserts.
+
+	@param[in]     create_info  Table create info.
+	@param[in]     path         Path including table name.
+	@param[out]    copied       Number of rows copied.
+	@param[out]    deleted      Number of rows deleted.
+	*/
+	int change_partitions(HA_CREATE_INFO *create_info,
+				const char *path,
+				ulonglong * const copied,
+				ulonglong * const deleted,
+				const uchar *pack_frm_data,
+				size_t pack_frm_len)
+	{
+		handler *file= get_handler();
+		if (!file)
+		{
+			my_error(ER_ILLEGAL_HA, MYF(0), create_info->alias);
+			return HA_ERR_WRONG_COMMAND;
+		}
+		DBUG_ASSERT(file->get_table_share()->tmp_table != NO_TMP_TABLE ||
+				file->get_lock_type() != F_UNLCK);
+		file->mark_trx_read_write();
+		return change_partitions_low(create_info, path, copied, deleted);
+	}
+
+private:
 	/** Access methods to protected areas in handler to avoid adding
 	friend class Partition_helper in class handler.
 	@see partition_handler.h @{ */

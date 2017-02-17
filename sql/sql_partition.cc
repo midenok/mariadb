@@ -67,6 +67,7 @@
 #include "opt_range.h"                  // store_key_image_to_rec
 #include "sql_alter.h"                  // Alter_table_ctx
 #include "sql_select.h"
+#include "sql_tablespace.h"             // check_tablespace_name
 
 #include <algorithm>
 using std::max;
@@ -8682,5 +8683,53 @@ uint get_partition_field_store_length(Field *field)
   if (field->real_type() == MYSQL_TYPE_VARCHAR)
     store_length+= HA_KEY_BLOB_LENGTH;
   return store_length;
+}
+
+// FIXME: duplicate of ha_partition::set_up_table_before_create
+bool set_up_table_before_create(THD *thd,
+                                TABLE_SHARE *share,
+                                const char *partition_name_with_path,
+                                HA_CREATE_INFO *info,
+                                partition_element *part_elem)
+{
+  bool error= false;
+  const char *partition_name;
+  DBUG_ENTER("set_up_table_before_create");
+
+  DBUG_ASSERT(part_elem);
+
+  if (!part_elem)
+    DBUG_RETURN(true);
+  share->max_rows= part_elem->part_max_rows;
+  share->min_rows= part_elem->part_min_rows;
+  partition_name= strrchr(partition_name_with_path, FN_LIBCHAR);
+  if ((part_elem->index_file_name &&
+      (error= append_file_to_dir(thd,
+                                 const_cast<const char**>(&part_elem->index_file_name),
+                                 partition_name+1))) ||
+      (part_elem->data_file_name &&
+      (error= append_file_to_dir(thd,
+                                 const_cast<const char**>(&part_elem->data_file_name),
+                                 partition_name+1))))
+  {
+    DBUG_RETURN(error);
+  }
+  if (part_elem->index_file_name != NULL)
+  {
+    info->index_file_name= part_elem->index_file_name;
+  }
+  if (part_elem->data_file_name != NULL)
+  {
+    info->data_file_name= part_elem->data_file_name;
+  }
+  if (part_elem->tablespace_name != NULL)
+  {
+    if (check_tablespace_name(part_elem->tablespace_name) != IDENT_NAME_OK)
+    {
+	    DBUG_RETURN(true);
+    }
+    info->tablespace= part_elem->tablespace_name;
+  }
+  DBUG_RETURN(error);
 }
 #endif
