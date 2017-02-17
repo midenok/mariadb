@@ -9967,8 +9967,8 @@ Item_type_holder::Item_type_holder(THD *thd, Item *item)
   :Item(thd, item),
    Type_handler_hybrid_real_field_type(get_real_type(item)),
    enum_set_typelib(0),
-   sys_trx_start(false),
-   sys_trx_end(false)
+   is_sys_trx_start(false),
+   is_sys_trx_end(false)
 {
   DBUG_ASSERT(item->fixed);
   maybe_null= item->maybe_null;
@@ -9983,9 +9983,9 @@ Item_type_holder::Item_type_holder(THD *thd, Item *item)
   {
     Item_field *item_field= (Item_field*)item->real_item();
     if (item_field->field->flags & VERS_SYS_START_FLAG)
-      sys_trx_start= true;
+      is_sys_trx_start= true;
     else if (item_field->field->flags & VERS_SYS_END_FLAG)
-      sys_trx_end= true;
+      is_sys_trx_end= true;
   }
 }
 

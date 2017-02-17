@@ -16732,9 +16732,9 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
       if (type == Item::TYPE_HOLDER)
       {
         Item_type_holder *ith= (Item_type_holder*)item;
-        if (ith->is_sys_trx_start())
+        if (ith->is_sys_trx_start)
           sys_trx_start= new_field;
-        else if (ith->is_sys_trx_end())
+        else if (ith->is_sys_trx_end)
           sys_trx_end= new_field;
       }
       if (type == Item::SUM_FUNC_ITEM)
