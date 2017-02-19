@@ -1136,6 +1136,9 @@ private:
 	{
 		ut_a(table);
 		if (table->versioned() && table->vers_end_field()->is_max()) {
+			int err = rnd_pos_by_record(const_cast<uchar *>(record));
+			if (err)
+				return err;
 			trx_t* trx = thd_to_trx(ha_thd());
 			if (!trx->id)
 				trx_start_if_not_started_xa(trx, true);
@@ -1267,11 +1270,11 @@ public:
 				if (m_is_sub_partitioned)
 				{
 					List_iterator<partition_element> sub_it(part_elem->subpartitions);
-					uint j= 0, part;
+					uint j= 0/*, part*/;
 					do
 					{
 						partition_element *sub_elem= sub_it++;
-						part= i * num_subparts + j;
+						//part= i * num_subparts + j;
 						create_subpartition_name(part_name_buff, path,
 							part_elem->partition_name,
 							sub_elem->partition_name, name_variant);
@@ -1311,6 +1314,10 @@ public:
 	{
 		return 0;
 	}
+
+	virtual ha_rows
+	part_recs_slow(void *_part_elem);
+
 
 private:
 	/** Access methods to protected areas in handler to avoid adding

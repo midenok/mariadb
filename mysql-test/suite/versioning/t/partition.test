@@ -1,4 +1,4 @@
-### check InnoDB versioning and conventional partitioning
+### check System Versioning and conventional partitioning
 
 create table t1 (x int)
 with system versioning
@@ -74,6 +74,7 @@ alter table t1 add partition (
 alter table t1 add partition (
     partition p1 versioning);
 
+--replace_result InnoDB ${INNODB_OR_MYISAM} MyISAM ${INNODB_OR_MYISAM} bigint(20) ${SYS_TRX_TYPE} timestamp(6) ${SYS_TRX_TYPE}
 show create table t1;
 
 --error ER_VERS_WRONG_PARAMS

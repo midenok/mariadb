@@ -3092,6 +3092,36 @@ ha_innopart::records()
 	DBUG_RETURN(num_rows);
 }
 
+ha_rows
+ha_innopart::part_recs_slow(void *_part_elem)
+{
+	partition_element *part_elem= reinterpret_cast<partition_element *>(_part_elem);
+	DBUG_ASSERT(m_part_info);
+	uint32 sub_factor= m_part_info->num_subparts ? m_part_info->num_subparts : 1;
+	uint32 part_id= part_elem->id * sub_factor;
+	uint32 part_id_end= part_id + sub_factor;
+	DBUG_ASSERT(part_id_end <= m_tot_parts);
+	ha_rows part_recs= 0;
+	uint last_part = m_last_part;
+	for (; part_id < part_id_end; ++part_id)
+	{
+		DBUG_ASSERT(bitmap_is_set(&(m_part_info->read_partitions), part_id));
+		set_partition(part_id);
+		ha_rows n = ha_innobase::records();
+		update_partition(part_id);
+		if (n == HA_POS_ERROR) {
+			return HA_POS_ERROR;
+		}
+		part_recs += n;
+	}
+	if (m_last_part != last_part)
+	{
+		set_partition(last_part);
+		update_partition(last_part);
+	}
+	return part_recs;
+}
+
 /** Estimates the number of index records in a range.
 @param[in]	keynr	Index number.
 @param[in]	min_key	Start key value (or NULL).
