@@ -1316,6 +1316,10 @@ share_error:
 	}
 	info(HA_STATUS_NO_LOCK | HA_STATUS_VARIABLE | HA_STATUS_CONST);
 
+	int error = init_record_priority_queue_for_parts(m_tot_parts);
+	if (error)
+		DBUG_RETURN(error);
+
 	DBUG_RETURN(0);
 }
 
@@ -1408,6 +1412,8 @@ ha_innopart::close()
 	if (thd != NULL) {
 		innobase_release_temporary_latches(ht, thd);
 	}
+
+	destroy_record_priority_queue_for_parts();
 
 	ut_ad(m_pcur_parts == NULL);
 	ut_ad(m_clust_pcur_parts == NULL);
@@ -3107,7 +3113,7 @@ ha_innopart::part_recs_slow(void *_part_elem)
 	{
 		DBUG_ASSERT(bitmap_is_set(&(m_part_info->read_partitions), part_id));
 		set_partition(part_id);
-		ha_rows n = ha_innobase::records();
+		ha_rows n = ha_innobase::records_new();
 		update_partition(part_id);
 		if (n == HA_POS_ERROR) {
 			return HA_POS_ERROR;

@@ -15588,7 +15588,6 @@ ha_innobase::rename_table(
 	DBUG_RETURN(convert_error_code_to_mysql(error, 0, NULL));
 }
 
-#if 0
 /*********************************************************************//**
 Returns the exact number of records that this client can see using this
 handler object.
@@ -15601,7 +15600,7 @@ These errors will abort the current query:
 For other error codes, the server will fall back to counting records. */
 
 ha_rows
-ha_innobase::records() /*!< out: number of rows */
+ha_innobase::records_new() /*!< out: number of rows */
 {
 	DBUG_ENTER("ha_innobase::records()");
 
@@ -15695,7 +15694,6 @@ ha_innobase::records() /*!< out: number of rows */
 	num_rows= n_rows;
 	DBUG_RETURN(num_rows);
 }
-#endif
 
 /*********************************************************************//**
 Estimates the number of index records in a range.
