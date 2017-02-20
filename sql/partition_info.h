@@ -500,8 +500,8 @@ public:
       DBUG_ASSERT(vers_info->initialized());
       part= vers_hist_part();
     }
-    max_time-= vers_stat_trx(STAT_TRX_END, part).min_time();
-    return max_time > vers_info->interval;
+    my_time_t min_time= vers_stat_trx(STAT_TRX_END, part).min_time();
+    return max_time - min_time > vers_info->interval;
   }
   bool vers_interval_exceed(partition_element *part)
   {
@@ -511,15 +511,31 @@ public:
   {
     return vers_interval_exceed(vers_hist_part());
   }
+  bool vers_trx_id_to_ts(THD *thd, Field *in_trx_id, Field_timestamp &out_ts);
   void vers_update_stats(THD *thd, partition_element *el)
   {
     DBUG_ASSERT(vers_info && vers_info->initialized());
     DBUG_ASSERT(table && table->s);
     DBUG_ASSERT(el && el->type == partition_element::VERSIONING);
+    bool updated;
     mysql_rwlock_wrlock(&table->s->LOCK_stat_serial);
     el->empty= false;
-    bool updated=
-      vers_stat_trx(STAT_TRX_END, el->id).update(table->vers_end_field());
+    if (table->versioned_by_engine())
+    {
+      // transaction is not yet pushed to VTQ, so we use now-time
+      my_time_t end_ts= my_time(0);
+
+      uchar buf[8];
+      Field_timestampf fld(buf, NULL, 0, Field::NONE, table->vers_end_field()->field_name, NULL, 6);
+      fld.store_TIME(end_ts, 0);
+      updated=
+        vers_stat_trx(STAT_TRX_END, el->id).update(&fld);
+    }
+    else
+    {
+      updated=
+        vers_stat_trx(STAT_TRX_END, el->id).update(table->vers_end_field());
+    }
     if (updated)
       table->s->stat_serial++;
     mysql_rwlock_unlock(&table->s->LOCK_stat_serial);

@@ -2255,7 +2255,6 @@ int Partition_helper::init_record_priority_queue()
 void Partition_helper::destroy_record_priority_queue()
 {
   DBUG_ENTER("Partition_helper::destroy_record_priority_queue");
-  destroy_record_priority_queue_for_parts();
   if (m_ordered_rec_buffer)
   {
     my_free(m_ordered_rec_buffer);

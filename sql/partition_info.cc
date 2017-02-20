@@ -1041,6 +1041,11 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
       file->update_partition(part_id);
       goto lock_fail;
     }
+
+    table->default_column_bitmaps();
+    bitmap_set_bit(table->read_set, table->vers_end_field()->field_index);
+    file->column_bitmaps_signal();
+
     rc= file->ha_rnd_init(true);
     if (!rc)
     {
@@ -1061,7 +1066,29 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
             continue;
           break;
         }
-        vers_stat_trx(STAT_TRX_END, part).update_unguarded(table->vers_end_field());
+        if (table->vers_end_field()->is_max())
+        {
+          rc= HA_ERR_INTERNAL_ERROR;
+          push_warning_printf(thd,
+            Sql_condition::WARN_LEVEL_WARN,
+            WARN_VERS_PART_NON_HISTORICAL,
+            ER_THD(thd, WARN_VERS_PART_NON_HISTORICAL),
+            part->partition_name);
+          break;
+        }
+        if (table->versioned_by_engine())
+        {
+          uchar buf[8];
+          Field_timestampf fld(buf, NULL, 0, Field::NONE, table->vers_end_field()->field_name, NULL, 6);
+          if (!vers_trx_id_to_ts(thd, table->vers_end_field(), fld))
+          {
+            vers_stat_trx(STAT_TRX_END, part).update_unguarded(&fld);
+          }
+        }
+        else
+        {
+          vers_stat_trx(STAT_TRX_END, part).update_unguarded(table->vers_end_field());
+        }
       }
       file->ha_rnd_end();
     }
@@ -1071,7 +1098,8 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
     {
       ha_commit_trans(thd, false);
     lock_fail:
-      my_error(ER_INTERNAL_ERROR, MYF(0), "partition/subpartition scan failed in versioned partitions setup");
+      // TODO: print rc code
+      my_error(ER_INTERNAL_ERROR, MYF(0), "min/max scan failed in versioned partitions setup (see warnings)");
       return true;
     }
   }
@@ -1124,6 +1152,8 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
   DBUG_ASSERT(vers_info && vers_info->initialized(false));
   DBUG_ASSERT(table && table->s);
 
+  bool error= false;
+
   mysql_mutex_lock(&table->s->LOCK_rotation);
   if (table->s->busy_rotation)
   {
@@ -1170,8 +1200,18 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
 
       if (!is_create_table_ind)
       {
-        if (vers_scan_min_max(thd, el))
-          return true;
+        if (el->type == partition_element::AS_OF_NOW)
+        {
+          uchar buf[8];
+          Field_timestampf fld(buf, NULL, 0, Field::NONE, table->vers_end_field()->field_name, NULL, 6);
+          fld.set_max();
+          vers_stat_trx(STAT_TRX_END, el).update_unguarded(&fld);
+        }
+        else if (vers_scan_min_max(thd, el))
+        {
+          error= true;
+          break;
+        }
         if (!el->empty)
         {
           vers_update_col_vals(thd, prev, el);
@@ -1197,7 +1237,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
       }
     } // while
 
-    if (!dont_stat)
+    if (!error && !dont_stat)
     {
       if (col_val_updated)
         table->s->stat_serial++;
@@ -1211,7 +1251,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
     table->s->busy_rotation= false;
   }
   mysql_mutex_unlock(&table->s->LOCK_rotation);
-  return false;
+  return error;
 }
 
 
@@ -3333,6 +3373,26 @@ static bool has_same_column_order(List<Create_field> *create_list,
     return false;
   }
   return true;
+}
+
+bool partition_info::vers_trx_id_to_ts(THD* thd, Field* in_trx_id, Field_timestamp& out_ts)
+{
+  handlerton *hton= plugin_hton(table->s->db_plugin);
+  DBUG_ASSERT(hton);
+  ulonglong trx_id= in_trx_id->val_int();
+  MYSQL_TIME ts;
+  bool found= hton->vers_query_trx_id(thd, &ts, trx_id, VTQ_COMMIT_TS);
+  if (!found)
+  {
+    push_warning_printf(thd,
+      Sql_condition::WARN_LEVEL_WARN,
+      WARN_VERS_TRX_MISSING,
+      ER_THD(thd, WARN_VERS_TRX_MISSING),
+      trx_id);
+    return true;
+  }
+  out_ts.store_time_dec(&ts, 6);
+  return false;
 }
 
 
