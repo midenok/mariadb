@@ -1709,7 +1709,7 @@ innobase_create_handler(
 	TABLE_SHARE*	table,
 	MEM_ROOT*	mem_root)
 {
-#if 0
+#if MYSQL_INNODB_PARTITIONING
 	/* If the table:
 	1) have type InnoDB (not the generic partition handlerton)
 	2) have partitioning defined
@@ -1728,6 +1728,7 @@ innobase_create_handler(
 		return(file);
 	}
 #endif
+
 	return(new (mem_root) ha_innobase(hton, table));
 }
 
@@ -3445,7 +3446,6 @@ ha_innobase::~ha_innobase()
 Updates the user_thd field in a handle and also allocates a new InnoDB
 transaction handle if needed, and updates the transaction fields in the
 m_prebuilt struct. */
-inline
 void
 ha_innobase::update_thd(
 /*====================*/
