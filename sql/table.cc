@@ -3251,6 +3251,14 @@ enum open_frm_error open_table_from_share(THD *thd, TABLE_SHARE *share,
     {
       outparam->file= share->db_type()->vers_upgrade_handler(
         outparam->file, &outparam->mem_root);
+      if (!outparam->file)
+      {
+        thd->stmt_arena= backup_stmt_arena_ptr;
+        thd->restore_active_arena(&part_func_arena, &backup_arena);
+        my_error(ER_OUTOFMEMORY, MYF(0), 4095);
+        error_reported= TRUE;
+        goto err;
+      }
     }
     /* 
       We should perform the fix_partition_func in either local or

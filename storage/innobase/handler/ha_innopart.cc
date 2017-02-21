@@ -1316,11 +1316,7 @@ share_error:
 	}
 	info(HA_STATUS_NO_LOCK | HA_STATUS_VARIABLE | HA_STATUS_CONST);
 
-	int error = init_record_priority_queue_for_parts(m_tot_parts);
-	if (error)
-		DBUG_RETURN(error);
-
-	DBUG_RETURN(0);
+	DBUG_RETURN(init_record_priority_queue_for_parts(m_tot_parts));
 }
 
 /** Get a cloned ha_innopart handler.

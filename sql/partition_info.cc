@@ -1031,6 +1031,7 @@ bool partition_info::vers_scan_min_max(THD *thd, partition_element *part)
   uint32 part_id= part->id * sub_factor;
   uint32 part_id_end= part_id + sub_factor;
   DBUG_ASSERT(part->empty);
+  DBUG_ASSERT(part->type == partition_element::VERSIONING);
   DBUG_ASSERT(table->s->stat_trx);
   for (; part_id < part_id_end; ++part_id)
   {
@@ -1206,6 +1207,7 @@ bool partition_info::vers_setup_2(THD * thd, bool is_create_table_ind)
           Field_timestampf fld(buf, NULL, 0, Field::NONE, table->vers_end_field()->field_name, NULL, 6);
           fld.set_max();
           vers_stat_trx(STAT_TRX_END, el).update_unguarded(&fld);
+          el->empty= false;
         }
         else if (vers_scan_min_max(thd, el))
         {
