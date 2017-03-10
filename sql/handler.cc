@@ -6627,7 +6627,7 @@ bool Vers_parse_info::check_and_fix_implicit(
   bool integer_fields=
       create_info->db_type->flags & HTON_SUPPORTS_SYS_VERSIONING;
 
-  if (force_versioning) {
+  if (vers_force) {
     declared_with_system_versioning= true;
     create_info->options|= HA_VERSIONED_TABLE;
   }
