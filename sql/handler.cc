@@ -6627,7 +6627,22 @@ bool Vers_parse_info::check_and_fix_implicit(
   bool integer_fields=
       create_info->db_type->flags & HTON_SUPPORTS_SYS_VERSIONING;
 
-  if (vers_force) {
+  SELECT_LEX &slex= thd->lex->select_lex;
+  int vers_tables= 0;
+  bool from_select= slex.item_list.elements ? true : false;
+
+  if (from_select)
+  {
+    for (TABLE_LIST *table= slex.table_list.first; table; table= table->next_local)
+    {
+      if (table->table && table->table->versioned())
+        vers_tables++;
+    }
+  }
+
+  // CREATE ... SELECT: if at least one table in SELECT is versioned,
+  // then created table will be versioned.
+  if (vers_force || vers_tables > 0) {
     declared_with_system_versioning= true;
     create_info->options|= HA_VERSIONED_TABLE;
   }
@@ -6666,8 +6681,8 @@ bool Vers_parse_info::check_and_fix_implicit(
   if (fix_implicit(thd, alter_info, integer_fields))
     return true;
 
-  int not_set= 0;
-  int with= 0;
+  int plain_cols= 0; // column doesn't have WITH or WITHOUT SYSTEM VERSIONING
+  int vers_cols= 0; // column has WITH SYSTEM VERSIONING
   it.rewind();
   while (const Create_field *f= it++)
   {
@@ -6675,20 +6690,23 @@ bool Vers_parse_info::check_and_fix_implicit(
       continue;
 
     if (f->versioning == Column_definition::VERSIONING_NOT_SET)
-      not_set++;
+      plain_cols++;
     else if (f->versioning == Column_definition::WITH_VERSIONING)
-      with++;
+      vers_cols++;
   }
 
   bool table_with_system_versioning=
       generated_as_row.start || generated_as_row.end ||
       period_for_system_time.start || period_for_system_time.end;
 
-  if (!thd->lex->tmp_table() && with == 0 &&
-      (not_set == 0 || !table_with_system_versioning))
+  if (!thd->lex->tmp_table() &&
+    // CREATE from SELECT (Create_fields are not yet added)
+    !from_select &&
+    vers_cols == 0 &&
+    (plain_cols == 0 || !table_with_system_versioning))
   {
     my_error(ER_VERS_WRONG_PARAMS, MYF(0), table_name,
-             "versioned fields missing");
+             "no columns defined with system versioning!");
     return true;
   }
 

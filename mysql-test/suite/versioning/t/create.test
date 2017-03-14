@@ -207,9 +207,28 @@ create or replace table t1 (
 create or replace table t1 (a int) with system versioning;
 create temporary table tmp with system versioning select * from t1;
 
+# CREATE TABLE ... LIKE
 create or replace table t1 (a int) with system versioning;
 create table tt1 like t1;
 show create table tt1;
 drop table tt1;
 
+# CREATE TABLE ... SELECT
+create or replace table t1 (a int) with system versioning;
+create or replace table t2 (b int);
+create or replace table t3 select * from t1, t2;
+show create table t3;
+
+# FIXME: bug with multiple `generated always`
+# create or replace table t1 (
+#   a int,
+#   st timestamp(6) generated always as row start,
+#   en timestamp(6) generated always as row end,
+#   period for system_time (st, en)
+# ) with system versioning;
+# create or replace table t3 select * from t1, t2;
+# show create table t3;
+
 drop table t1;
+drop table t2;
+drop table t3;

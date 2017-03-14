@@ -194,7 +194,7 @@ ERROR HY000: Wrong parameters for `t1`: 'WITH SYSTEM VERSIONING' missing
 create or replace table t1 (
 A int without system versioning
 ) with system versioning;
-ERROR HY000: Wrong parameters for `t1`: versioned fields missing
+ERROR HY000: Wrong parameters for `t1`: no columns defined with system versioning!
 create or replace table t1 (
 A int without system versioning with system versioning
 );
@@ -236,4 +236,18 @@ tt1	CREATE TABLE `tt1` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 drop table tt1;
+create or replace table t1 (a int) with system versioning;
+create or replace table t2 (b int);
+create or replace table t3 select * from t1, t2;
+show create table t3;
+Table	Create Table
+t3	CREATE TABLE `t3` (
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  `a` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 drop table t1;
+drop table t2;
+drop table t3;
