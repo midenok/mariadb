@@ -219,15 +219,14 @@ create or replace table t2 (b int);
 create or replace table t3 select * from t1, t2;
 show create table t3;
 
-# FIXME: bug with multiple `generated always`
-# create or replace table t1 (
-#   a int,
-#   st timestamp(6) generated always as row start,
-#   en timestamp(6) generated always as row end,
-#   period for system_time (st, en)
-# ) with system versioning;
-# create or replace table t3 select * from t1, t2;
-# show create table t3;
+create or replace table t1 (
+  a int,
+  st timestamp(6) generated always as row start,
+  en timestamp(6) generated always as row end,
+  period for system_time (st, en)
+) with system versioning;
+create or replace table t3 select * from t1;
+show create table t3;
 
 drop table t1;
 drop table t2;

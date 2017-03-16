@@ -6551,6 +6551,14 @@ bool Vers_parse_info::is_trx_end(const char *name) const
   DBUG_ASSERT(name);
   return generated_as_row.end && !strcmp(generated_as_row.end->c_ptr(), name);
 }
+bool Vers_parse_info::is_trx_start(const Create_field &f) const
+{
+  return f.flags & VERS_SYS_START_FLAG;
+}
+bool Vers_parse_info::is_trx_end(const Create_field &f) const
+{
+  return f.flags & VERS_SYS_END_FLAG;
+}
 
 static bool create_string(MEM_ROOT *mem_root, String **s, const char *value)
 {
@@ -6667,8 +6675,24 @@ bool Vers_parse_info::check_and_fix_implicit(
   List_iterator<Create_field> it(alter_info->create_list);
   while (Create_field *f= it++)
   {
-    if (is_trx_start(f->field_name) || is_trx_end(f->field_name))
+    if (is_trx_start(*f))
+    {
+      if (!generated_as_row.start) // not inited in CREATE ... SELECT
+      {
+        generated_as_row.start= new (thd->mem_root) String(f->field_name, system_charset_info);
+        period_for_system_time.start= generated_as_row.start;
+      }
       continue;
+    }
+    if (is_trx_end(*f))
+    {
+      if (!generated_as_row.end)
+      {
+        generated_as_row.end= new (thd->mem_root) String(f->field_name, system_charset_info);
+        period_for_system_time.end= generated_as_row.end;
+      }
+      continue;
+    }
 
     if ((f->versioning == Column_definition::VERSIONING_NOT_SET &&
          !declared_with_system_versioning) ||
@@ -6686,7 +6710,7 @@ bool Vers_parse_info::check_and_fix_implicit(
   it.rewind();
   while (const Create_field *f= it++)
   {
-    if (is_trx_start(f->field_name) || is_trx_end(f->field_name))
+    if (is_trx_start(*f) || is_trx_end(*f))
       continue;
 
     if (f->versioning == Column_definition::VERSIONING_NOT_SET)
@@ -6904,7 +6928,7 @@ bool Vers_parse_info::check_generated_type(const char *table_name,
   List_iterator<Create_field> it(alter_info->create_list);
   while (Create_field *f= it++)
   {
-    if (is_trx_start(f->field_name) || is_trx_end(f->field_name))
+    if (is_trx_start(*f) || is_trx_end(*f))
     {
       if (integer_fields)
       {

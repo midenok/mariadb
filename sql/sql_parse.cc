@@ -3863,12 +3863,6 @@ mysql_execute_command(THD *thd)
         */
         lex->unlink_first_table(&link_to_local);
 
-        if (create_info.vers_info.check_and_fix_implicit(
-              thd, &alter_info, &create_info, create_table->table_name))
-        {
-          goto end_with_restore_list;
-        }
-
         /* Store reference to table in case of LOCK TABLES */
         create_info.table= create_table->table;
 

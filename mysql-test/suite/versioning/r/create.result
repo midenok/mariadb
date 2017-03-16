@@ -242,11 +242,26 @@ create or replace table t3 select * from t1, t2;
 show create table t3;
 Table	Create Table
 t3	CREATE TABLE `t3` (
-  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
-  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
   `a` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL,
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+create or replace table t1 (
+a int,
+st timestamp(6) generated always as row start,
+en timestamp(6) generated always as row end,
+period for system_time (st, en)
+) with system versioning;
+create or replace table t3 select * from t1;
+show create table t3;
+Table	Create Table
+t3	CREATE TABLE `t3` (
+  `a` int(11) DEFAULT NULL,
+  `st` timestamp(6) NOT NULL GENERATED ALWAYS AS ROW START,
+  `en` timestamp(6) NOT NULL GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`st`, `en`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 drop table t1;
 drop table t2;
