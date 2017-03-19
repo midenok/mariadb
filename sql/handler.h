@@ -1671,7 +1671,7 @@ private:
   bool is_trx_start(const Create_field &f) const;
   bool is_trx_end(const Create_field &f) const;
   bool fix_implicit(THD *thd, Alter_info *alter_info, bool integer_fields);
-  bool need_to_check() const
+  bool need_check() const
   {
     return
       has_versioned_fields ||

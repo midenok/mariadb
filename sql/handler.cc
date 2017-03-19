@@ -6655,7 +6655,7 @@ bool Vers_parse_info::check_and_fix_implicit(
     create_info->options|= HA_VERSIONED_TABLE;
   }
 
-  if (!need_to_check())
+  if (!need_check())
     return false;
 
   if (declared_without_system_versioning)
@@ -6679,6 +6679,7 @@ bool Vers_parse_info::check_and_fix_implicit(
     {
       if (!generated_as_row.start) // not inited in CREATE ... SELECT
       {
+        DBUG_ASSERT(vers_tables > 0);
         generated_as_row.start= new (thd->mem_root) String(f->field_name, system_charset_info);
         period_for_system_time.start= generated_as_row.start;
       }
@@ -6688,6 +6689,7 @@ bool Vers_parse_info::check_and_fix_implicit(
     {
       if (!generated_as_row.end)
       {
+        DBUG_ASSERT(vers_tables > 0);
         generated_as_row.end= new (thd->mem_root) String(f->field_name, system_charset_info);
         period_for_system_time.end= generated_as_row.end;
       }
@@ -6702,7 +6704,22 @@ bool Vers_parse_info::check_and_fix_implicit(
     }
   }
 
-  if (fix_implicit(thd, alter_info, integer_fields))
+  if (vers_tables > 0)
+  {
+    if (!generated_as_row.start && !generated_as_row.end)
+    {
+      declared_with_system_versioning= false;
+      create_info->options&= ~HA_VERSIONED_TABLE;
+      return false;
+    }
+    if (!generated_as_row.start || !generated_as_row.end)
+    {
+      my_error(ER_VERS_WRONG_PARAMS, MYF(0), table_name,
+        "both GENERATED AS ROW START, GENERATED AS ROW END columns required in SELECT resultset");
+      return true;
+    }
+  }
+  else if (fix_implicit(thd, alter_info, integer_fields))
     return true;
 
   int plain_cols= 0; // column doesn't have WITH or WITHOUT SYSTEM VERSIONING
@@ -6756,7 +6773,7 @@ bool Vers_parse_info::check_and_fix_alter(THD *thd, Alter_info *alter_info,
       create_info->db_type->flags & HTON_SUPPORTS_SYS_VERSIONING;
   const char *table_name= share->table_name.str;
 
-  if (!need_to_check() && !share->versioned)
+  if (!need_check() && !share->versioned)
     return false;
 
   if (declared_without_system_versioning)
