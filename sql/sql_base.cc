@@ -7512,20 +7512,25 @@ insert_fields(THD *thd, Name_resolution_context *context, const char *db_name,
         Item_field *f= static_cast<Item_field *>(item);
         DBUG_ASSERT(f->field);
         uint32 fl= f->field->flags;
+        bool sys_field= fl & (VERS_SYS_START_FLAG | VERS_SYS_END_FLAG);
         SELECT_LEX *slex= thd->lex->current_select;
-        DBUG_ASSERT(table->pos_in_table_list);
+        TABLE *table= f->field->table;
+        DBUG_ASSERT(table && table->pos_in_table_list);
         TABLE_LIST *tl= table->pos_in_table_list;
         vers_range_type_t vers_type=
           tl->vers_conditions.type == FOR_SYSTEM_TIME_UNSPECIFIED ?
             slex->vers_conditions.type : tl->vers_conditions.type;
 
-        if ((fl & HIDDEN_FLAG) && (
-            !(fl & (VERS_SYS_START_FLAG | VERS_SYS_END_FLAG)) ||
+        if ((sys_field && vers_hide == VERS_HIDE_FULL) ||
+          ((fl & HIDDEN_FLAG) && (
+            !sys_field ||
+            vers_hide == VERS_HIDE_IMPLICIT ||
+            (vers_hide == VERS_HIDE_AUTO && (
             vers_type == FOR_SYSTEM_TIME_UNSPECIFIED ||
-            vers_type == FOR_SYSTEM_TIME_AS_OF))
+            vers_type == FOR_SYSTEM_TIME_AS_OF)))))
           continue;
       }
-      if (item->type() == Item::REF_ITEM)
+      else if (item->type() == Item::REF_ITEM)
       {
         Item *i= item;
         while (i->type() == Item::REF_ITEM)
