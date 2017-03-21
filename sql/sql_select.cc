@@ -16042,6 +16042,7 @@ Field *create_tmp_field_from_field(THD *thd, Field *org_field,
       new_field->field_name= name;
     new_field->flags|= (org_field->flags & (
       NO_DEFAULT_VALUE_FLAG |
+      HIDDEN_FLAG |
       VERS_SYS_START_FLAG |
       VERS_SYS_END_FLAG |
       VERS_OPTIMIZED_UPDATE_FLAG));
