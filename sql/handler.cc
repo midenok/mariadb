@@ -6650,7 +6650,8 @@ bool Vers_parse_info::check_and_fix_implicit(
 
   // CREATE ... SELECT: if at least one table in SELECT is versioned,
   // then created table will be versioned.
-  if (vers_force || vers_tables > 0) {
+  if (vers_force || vers_tables > 0)
+  {
     declared_with_system_versioning= true;
     create_info->options|= HA_VERSIONED_TABLE;
   }
@@ -6672,6 +6673,7 @@ bool Vers_parse_info::check_and_fix_implicit(
     return true;
   }
 
+  TABLE *orig_table= NULL;
   List_iterator<Create_field> it(alter_info->create_list);
   while (Create_field *f= it++)
   {
@@ -6680,6 +6682,14 @@ bool Vers_parse_info::check_and_fix_implicit(
       if (!generated_as_row.start) // not inited in CREATE ... SELECT
       {
         DBUG_ASSERT(vers_tables > 0);
+        if (orig_table && orig_table != f->field->orig_table)
+        {
+          err_different_tables:
+          my_error(ER_VERS_WRONG_PARAMS, MYF(0), table_name,
+                  "system fields selected from different tables");
+          return true;
+        }
+        orig_table= f->field->orig_table;
         generated_as_row.start= new (thd->mem_root) String(f->field_name, system_charset_info);
         period_for_system_time.start= generated_as_row.start;
       }
@@ -6690,6 +6700,11 @@ bool Vers_parse_info::check_and_fix_implicit(
       if (!generated_as_row.end)
       {
         DBUG_ASSERT(vers_tables > 0);
+        if (orig_table && orig_table != f->field->orig_table)
+        {
+          goto err_different_tables;
+        }
+        orig_table= f->field->orig_table;
         generated_as_row.end= new (thd->mem_root) String(f->field_name, system_charset_info);
         period_for_system_time.end= generated_as_row.end;
       }
@@ -6715,7 +6730,7 @@ bool Vers_parse_info::check_and_fix_implicit(
     if (!generated_as_row.start || !generated_as_row.end)
     {
       my_error(ER_VERS_WRONG_PARAMS, MYF(0), table_name,
-        "both GENERATED AS ROW START, GENERATED AS ROW END columns required in SELECT resultset");
+        "both ROW START and ROW END system fields required in SELECT resultset");
       return true;
     }
   }

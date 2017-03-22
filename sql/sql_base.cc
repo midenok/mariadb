@@ -7521,7 +7521,8 @@ insert_fields(THD *thd, Name_resolution_context *context, const char *db_name,
           tl->vers_conditions.type == FOR_SYSTEM_TIME_UNSPECIFIED ?
             slex->vers_conditions.type : tl->vers_conditions.type;
 
-        if ((sys_field && vers_hide == VERS_HIDE_FULL) ||
+        if ((sys_field && vers_hide == VERS_HIDE_FULL &&
+            thd->lex->sql_command != SQLCOM_CREATE_TABLE) ||
           ((fl & HIDDEN_FLAG) && (
             !sys_field ||
             vers_hide == VERS_HIDE_IMPLICIT ||

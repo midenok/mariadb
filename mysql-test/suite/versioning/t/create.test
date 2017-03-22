@@ -216,7 +216,7 @@ drop table tt1;
 # CREATE TABLE ... SELECT
 create or replace table t1 (a int) with system versioning;
 create or replace table t2 (b int);
-create or replace table t3 select * from t1, t2;
+create or replace table t3 select * from t1 for system_time all, t2;
 show create table t3;
 
 create or replace table t1 (
