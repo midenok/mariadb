@@ -236,33 +236,43 @@ tt1	CREATE TABLE `tt1` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 drop table tt1;
-create or replace table t1 (a int) with system versioning;
-create or replace table t2 (b int);
-create or replace table t3 select * from t1, t2;
+create or replace table t1 (x int) with system versioning;
+create or replace table t2 (y int);
+create or replace table t3 select * from t1 for system_time all, t2;
 show create table t3;
 Table	Create Table
 t3	CREATE TABLE `t3` (
-  `a` int(11) DEFAULT NULL,
-  `b` int(11) DEFAULT NULL,
-  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
-  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
-  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-create or replace table t1 (
-a int,
+  `x` int(11) DEFAULT NULL,
+  `y` int(11) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+create or replace table t2 (
+y int,
 st timestamp(6) generated always as row start,
 en timestamp(6) generated always as row end,
 period for system_time (st, en)
 ) with system versioning;
-create or replace table t3 select * from t1;
+create or replace table t3 select * from t2;
 show create table t3;
 Table	Create Table
 t3	CREATE TABLE `t3` (
-  `a` int(11) DEFAULT NULL,
+  `y` int(11) DEFAULT NULL,
   `st` timestamp(6) NOT NULL GENERATED ALWAYS AS ROW START,
   `en` timestamp(6) NOT NULL GENERATED ALWAYS AS ROW END,
   PERIOD FOR SYSTEM_TIME (`st`, `en`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+create or replace table t3 select x, y, t1.sys_trx_start, t2.en from t1, t2;
+ERROR HY000: Wrong parameters for `t3`: system fields selected from different tables
+insert into t2 values (1), (2);
+delete from t2 where y = 2;
+create or replace table t3 select * from t2 for system_time all;
+select st, en from t2 where y = 1 into @st, @en;
+select y from t2 for system_time all where st = @st and en = @en;
+y
+1
+select st, en from t2 for system_time all where y = 2 into @st, @en;
+select y from t2 for system_time all where st = @st and en = @en;
+y
+2
 drop table t1;
 drop table t2;
 drop table t3;

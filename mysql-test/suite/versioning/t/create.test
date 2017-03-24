@@ -214,19 +214,31 @@ show create table tt1;
 drop table tt1;
 
 # CREATE TABLE ... SELECT
-create or replace table t1 (a int) with system versioning;
-create or replace table t2 (b int);
+create or replace table t1 (x int) with system versioning;
+create or replace table t2 (y int);
 create or replace table t3 select * from t1 for system_time all, t2;
 show create table t3;
 
-create or replace table t1 (
-  a int,
+create or replace table t2 (
+  y int,
   st timestamp(6) generated always as row start,
   en timestamp(6) generated always as row end,
   period for system_time (st, en)
 ) with system versioning;
-create or replace table t3 select * from t1;
+create or replace table t3 select * from t2;
 show create table t3;
+
+--error ER_VERS_WRONG_PARAMS
+create or replace table t3 select x, y, t1.sys_trx_start, t2.en from t1, t2;
+
+insert into t2 values (1), (2);
+delete from t2 where y = 2;
+
+create or replace table t3 select * from t2 for system_time all;
+select st, en from t2 where y = 1 into @st, @en;
+select y from t2 for system_time all where st = @st and en = @en;
+select st, en from t2 for system_time all where y = 2 into @st, @en;
+select y from t2 for system_time all where st = @st and en = @en;
 
 drop table t1;
 drop table t2;
