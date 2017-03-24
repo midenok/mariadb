@@ -786,7 +786,7 @@ char *opt_logname, *opt_slow_logname, *opt_bin_logname;
 /* System Versioning */
 char *temporal_current_timestamp;
 my_bool vers_force= false;
-vers_hide_enum vers_hide= VERS_HIDE_AUTO;
+ulong vers_hide= VERS_HIDE_AUTO;
 
 /* Static variables */
 
