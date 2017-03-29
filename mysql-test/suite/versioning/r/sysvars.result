@@ -1,27 +1,33 @@
 create table t (a int) with system versioning;
 insert into t values (1);
 update t set a= 2;
-select * from t;
-a
-2
-show variables where variable_name = "temporal_current_timestamp";
+show variables like 'vers_current_time';
 Variable_name	Value
-temporal_current_timestamp	now
-set global temporal_current_timestamp = '2031-1-1 0:0:0';
+vers_current_time	NOW
 select * from t;
 a
 2
-set global temporal_current_timestamp = '2011-1-1 0:0:0';
+set vers_current_time = '2031-1-1 0:0:0';
+show variables like 'vers_current_time';
+Variable_name	Value
+vers_current_time	2031-01-01 00:00:00.000000
 select * from t;
 a
-set global temporal_current_timestamp = 'all';
+2
+set vers_current_time = '2011-1-1 0:0:0';
+show variables like 'vers_current_time';
+Variable_name	Value
+vers_current_time	2011-01-01 00:00:00.000000
+select * from t;
+a
+set vers_current_time = 'all';
+show variables like 'vers_current_time';
+Variable_name	Value
+vers_current_time	ALL
 select * from t;
 a
 2
 1
-show variables where Variable_name like "temporal_current_timestamp%";
-Variable_name	Value
-temporal_current_timestamp	all
 create view vt as select * from t;
 select * from t;
 a
@@ -32,9 +38,7 @@ select * from (select * from t) as tt;
 a
 2
 1
-set session temporal_current_timestamp = 'now';
-ERROR HY000: Variable 'temporal_current_timestamp' is a GLOBAL variable and should be set with SET GLOBAL
-set global temporal_current_timestamp = 'now';
+set vers_current_time = 'now';
 show variables where variable_name = "vers_hide";
 Variable_name	Value
 vers_hide	IMPLICIT
@@ -42,7 +46,7 @@ select * from t for system_time all;
 a
 2
 1
-set global vers_hide= AUTO;
+set vers_hide= AUTO;
 select * from t;
 a
 2
@@ -61,11 +65,11 @@ select * from t for system_time timestamp between '0-0-0' and current_timestamp(
 a	sys_trx_start	sys_trx_end
 2	TIMESTAMP	TIMESTAMP
 1	TIMESTAMP	TIMESTAMP
-set global vers_hide= NEVER;
+set vers_hide= NEVER;
 select * from t;
 a	sys_trx_start	sys_trx_end
 2	TIMESTAMP	TIMESTAMP
-set global vers_hide= FULL;
+set vers_hide= FULL;
 create or replace table t (
 x int,
 st timestamp(6) generated always as row start,
@@ -85,4 +89,4 @@ select * from t for system_time all;
 x
 1
 drop table t;
-set global vers_hide= IMPLICIT;
+set vers_hide= IMPLICIT;
