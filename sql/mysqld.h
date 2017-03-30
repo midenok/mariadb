@@ -189,7 +189,7 @@ struct st_vers_current_time
 {
   char *str_value; // must be first
   vers_range_type_t type;
-  MYSQL_TIME t0;
+  MYSQL_TIME ltime;
   st_vers_current_time() :
     str_value(NULL),
     type(FOR_SYSTEM_TIME_UNSPECIFIED)

@@ -2557,19 +2557,18 @@ public:
     else
     {
       MYSQL_TIME_STATUS status;
-      out.type= FOR_SYSTEM_TIME_AS_OF;
-
       if (str_to_datetime(
             in.ptr(),
             in.length(),
-            &out.t0,
+            &out.ltime,
             flags,
             &status) ||
-          out.t0.time_type != MYSQL_TIMESTAMP_DATETIME ||
+          out.ltime.time_type != MYSQL_TIMESTAMP_DATETIME ||
           (status.warnings & ~MYSQL_TIME_NOTE_TRUNCATED) != 0)
       {
         return true;
       }
+      out.type= FOR_SYSTEM_TIME_AS_OF;
     }
     return false;
   }
@@ -2580,19 +2579,43 @@ public:
     switch (item->type())
     {
     case Item::DATE_ITEM:
-      out.type= FOR_SYSTEM_TIME_AS_OF;
-      return item->get_date(&out.t0, 0);
+      {
+        if (item->get_date(&out.ltime, 0))
+          break;
+        out.type= FOR_SYSTEM_TIME_AS_OF;
+        return false;
+      }
 
     case Item::STRING_ITEM:
       {
         String *str= item->val_str();
         DBUG_ASSERT(str);
-        return update(*str, out);
+        if (update(*str, out))
+          break;
+        return false;
       }
     case Item::INT_ITEM:
+      {
+        ulonglong sec;
+        ulong sec_part;
+        bool sign= item->get_seconds(&sec, &sec_part);
+
+        if (item->null_value || sign || sec > TIMESTAMP_MAX_VALUE)
+          break;
+
+        thd->variables.time_zone->gmt_sec_to_TIME(&out.ltime, (my_time_t)sec);
+
+        out.ltime.second_part= sec_part;
+        out.ltime.time_type= MYSQL_TIMESTAMP_TIME;
+        out.type= FOR_SYSTEM_TIME_AS_OF;
+        return false;
+      }
     default:
       break;
     }
+    String *str= item->val_str();
+    const char *cstr= str ? str->c_ptr_safe() : "NULL";
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, cstr);
     return true;
   }
   bool global_update(const char *in)
@@ -2600,7 +2623,7 @@ public:
     String s(in, &my_charset_utf8_general_ci);
     return update(s, global_var(st_vers_current_time));
   }
-  bool global_update()
+  bool option_updated()
   {
     return global_update(global_var(st_vers_current_time).str_value);
   }
@@ -2625,7 +2648,7 @@ public:
         uchar *buf= (uchar*) thd->alloc(MAX_DATE_STRING_REP_LENGTH);
         if (buf)
         {
-          if (!my_datetime_to_str(&val.t0, (char*) buf, 6))
+          if (!my_datetime_to_str(&val.ltime, (char*) buf, 6))
           {
             my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "vers_current_time", "NULL (wrong datetime)");
             return (uchar*) thd->strdup("Error: wrong datetime");

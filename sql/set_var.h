@@ -224,7 +224,7 @@ private:
   virtual bool global_update(THD *thd, set_var *var) = 0;
 
 public:
-  virtual bool global_update()
+  virtual bool option_updated()
   {
     DBUG_ASSERT(false);
     return true;

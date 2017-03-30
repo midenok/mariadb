@@ -675,7 +675,8 @@ bool vers_select_conds_t::init_from_sysvar(THD *thd)
   unit= UNIT_TIMESTAMP;
   if (type != FOR_SYSTEM_TIME_UNSPECIFIED && type != FOR_SYSTEM_TIME_ALL)
   {
-    start= new (thd->mem_root) Item_datetime_literal(thd, &in.t0, 6);
+    DBUG_ASSERT(type == FOR_SYSTEM_TIME_AS_OF);
+    start= new (thd->mem_root) Item_datetime_literal(thd, &in.ltime, 6);
     if (!start)
       return true;
   }

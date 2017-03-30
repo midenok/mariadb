@@ -9375,7 +9375,7 @@ mysqld_get_one_option(int optid, const struct my_option *opt, char *argument)
   case OPT_VERS_CURRENT_TIME:
     sys_var *var= static_cast<sys_var*>(opt->app_type);
     DBUG_ASSERT(var);
-    if (var->global_update())
+    if (var->option_updated())
     {
       sql_print_error("Can't start server: "
                       "cannot process --vers-current-time=%.*s",

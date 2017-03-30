@@ -23,6 +23,27 @@ drop view vt;
 
 select * from (select * from t) as tt;
 
+--error ER_WRONG_VALUE_FOR_VAR
+set vers_current_time = 'alley';
+--error ER_WRONG_VALUE_FOR_VAR
+set vers_current_time = null;
+--error ER_WRONG_TYPE_FOR_VAR
+set vers_current_time = 1;
+--error ER_WRONG_TYPE_FOR_VAR
+set vers_current_time = 1.1;
+
+set vers_current_time = '1911-11-11 11:11:11.1111119';
+show variables like 'vers_current_time';
+
+set vers_current_time = '1900-01-01 00:00:00';
+show variables like 'vers_current_time';
+
+set vers_current_time = timestamp'1911-11-11 11:11:11.1111119';
+show variables like 'vers_current_time';
+
+set vers_current_time = timestamp'1900-01-01 00:00:00';
+show variables like 'vers_current_time';
+
 set vers_current_time = 'now';
 
 show variables where variable_name = "vers_hide";
