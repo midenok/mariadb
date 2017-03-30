@@ -2499,8 +2499,8 @@ public:
     CMD_LINE getopt,
     enum charset_enum is_os_charset_arg,
     const char *def_val,
-    on_check_function on_check_func=0 /*on_check*/,
-    on_update_function on_update_func=0 /*on_update*/) :
+    on_check_function on_check_func=0,
+    on_update_function on_update_func=0) :
   sys_var(
     &all_sys_vars,
     name_arg,
@@ -2523,16 +2523,7 @@ public:
       DBUG_ASSERT(false);
     }
   }
-#if 0
-  static bool on_check(sys_var *self, THD *thd, set_var *var)
-  {
-    return false;
-  }
-  static bool on_update(sys_var *self, THD *thd, enum_var_type type)
-  {
-    return false;
-  }
-#endif
+
   bool do_check(THD *thd, set_var *var)
   { return false; }
 
@@ -2592,22 +2583,6 @@ public:
         DBUG_ASSERT(str);
         if (update(*str, out))
           break;
-        return false;
-      }
-    case Item::INT_ITEM:
-      {
-        ulonglong sec;
-        ulong sec_part;
-        bool sign= item->get_seconds(&sec, &sec_part);
-
-        if (item->null_value || sign || sec > TIMESTAMP_MAX_VALUE)
-          break;
-
-        thd->variables.time_zone->gmt_sec_to_TIME(&out.ltime, (my_time_t)sec);
-
-        out.ltime.second_part= sec_part;
-        out.ltime.time_type= MYSQL_TIMESTAMP_TIME;
-        out.type= FOR_SYSTEM_TIME_AS_OF;
         return false;
       }
     default:
