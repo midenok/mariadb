@@ -1306,8 +1306,8 @@ int MYSQLlex(YYSTYPE *yylval, THD *thd)
     const char *p= lip->get_ptr();
     while (my_isspace(cs, *p))
       ++p;
-    if (3 < lip->get_end_of_query() - p && 0 == strncasecmp(p, "for", 3) &&
-        my_isspace(cs, p[3]))
+    if (lip->get_end_of_query() - p > 3 && my_isspace(cs, p[3]) &&
+        0 == strncasecmp(p, "for", 3))
     {
       token= lex_one_token(yylval, thd);
       lip->add_digest_token(token, yylval);
