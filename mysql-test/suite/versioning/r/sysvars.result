@@ -1,6 +1,9 @@
 create table t (a int) with system versioning;
 insert into t values (1);
 update t set a= 2;
+show global variables like 'vers_current_time';
+Variable_name	Value
+vers_current_time	NOW
 show variables like 'vers_current_time';
 Variable_name	Value
 vers_current_time	NOW
@@ -38,33 +41,62 @@ select * from (select * from t) as tt;
 a
 2
 1
-set vers_current_time = 'alley';
+set global vers_current_time= 'alley';
 ERROR 42000: Variable 'vers_current_time' can't be set to the value of 'alley'
-set vers_current_time = null;
+set global vers_current_time= null;
 ERROR 42000: Variable 'vers_current_time' can't be set to the value of 'NULL'
-set vers_current_time = 1;
+set global vers_current_time= 1;
 ERROR 42000: Incorrect argument type to variable 'vers_current_time'
-set vers_current_time = 1.1;
+set global vers_current_time= 1.1;
 ERROR 42000: Incorrect argument type to variable 'vers_current_time'
-set vers_current_time = '1911-11-11 11:11:11.1111119';
+set vers_current_time= 'alley';
+ERROR 42000: Variable 'vers_current_time' can't be set to the value of 'alley'
+set vers_current_time= null;
+ERROR 42000: Variable 'vers_current_time' can't be set to the value of 'NULL'
+set vers_current_time= 1;
+ERROR 42000: Incorrect argument type to variable 'vers_current_time'
+set vers_current_time= 1.1;
+ERROR 42000: Incorrect argument type to variable 'vers_current_time'
+set global vers_current_time= '1911-11-11 11:11:11.1111119';
+show global variables like 'vers_current_time';
+Variable_name	Value
+vers_current_time	1911-11-11 11:11:11.111111
+set global vers_current_time= '1900-01-01 00:00:00';
+show global variables like 'vers_current_time';
+Variable_name	Value
+vers_current_time	1900-01-01 00:00:00.000000
+set global vers_current_time= timestamp'1911-11-11 11:11:11.1111119';
+Warnings:
+Note	1292	Truncated incorrect datetime value: '1911-11-11 11:11:11.1111119'
+show global variables like 'vers_current_time';
+Variable_name	Value
+vers_current_time	1911-11-11 11:11:11.111111
+set @ts= timestamp'1900-01-01 00:00:00';
+set global vers_current_time= @ts;
+show global variables like 'vers_current_time';
+Variable_name	Value
+vers_current_time	1900-01-01 00:00:00.000000
+set vers_current_time= '1911-11-11 11:11:11.1111119';
 show variables like 'vers_current_time';
 Variable_name	Value
 vers_current_time	1911-11-11 11:11:11.111111
-set vers_current_time = '1900-01-01 00:00:00';
+set vers_current_time= '1900-01-01 00:00:00';
 show variables like 'vers_current_time';
 Variable_name	Value
 vers_current_time	1900-01-01 00:00:00.000000
-set vers_current_time = timestamp'1911-11-11 11:11:11.1111119';
+set vers_current_time= timestamp'1911-11-11 11:11:11.1111119';
 Warnings:
 Note	1292	Truncated incorrect datetime value: '1911-11-11 11:11:11.1111119'
 show variables like 'vers_current_time';
 Variable_name	Value
 vers_current_time	1911-11-11 11:11:11.111111
-set vers_current_time = timestamp'1900-01-01 00:00:00';
+set @ts= timestamp'1900-01-01 00:00:00';
+set vers_current_time= @ts;
 show variables like 'vers_current_time';
 Variable_name	Value
 vers_current_time	1900-01-01 00:00:00.000000
-set vers_current_time = 'now';
+set global vers_current_time= 'now';
+set vers_current_time= 'now';
 show variables where variable_name = "vers_hide";
 Variable_name	Value
 vers_hide	IMPLICIT

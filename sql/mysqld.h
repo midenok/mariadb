@@ -186,7 +186,7 @@ enum vers_range_type_t
 };
 
 struct st_vers_current_time
-{
+{ // This struct must be POD, so no virtual-anything!
   char *str_value; // must be first
   vers_range_type_t type;
   MYSQL_TIME ltime;

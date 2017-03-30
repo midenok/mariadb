@@ -2,6 +2,7 @@ create table t (a int) with system versioning;
 insert into t values (1);
 update t set a= 2;
 
+show global variables like 'vers_current_time';
 show variables like 'vers_current_time';
 select * from t;
 
@@ -23,28 +24,56 @@ drop view vt;
 
 select * from (select * from t) as tt;
 
+# global
 --error ER_WRONG_VALUE_FOR_VAR
-set vers_current_time = 'alley';
+set global vers_current_time= 'alley';
 --error ER_WRONG_VALUE_FOR_VAR
-set vers_current_time = null;
+set global vers_current_time= null;
 --error ER_WRONG_TYPE_FOR_VAR
-set vers_current_time = 1;
+set global vers_current_time= 1;
 --error ER_WRONG_TYPE_FOR_VAR
-set vers_current_time = 1.1;
+set global vers_current_time= 1.1;
 
-set vers_current_time = '1911-11-11 11:11:11.1111119';
+# session
+--error ER_WRONG_VALUE_FOR_VAR
+set vers_current_time= 'alley';
+--error ER_WRONG_VALUE_FOR_VAR
+set vers_current_time= null;
+--error ER_WRONG_TYPE_FOR_VAR
+set vers_current_time= 1;
+--error ER_WRONG_TYPE_FOR_VAR
+set vers_current_time= 1.1;
+
+# global
+set global vers_current_time= '1911-11-11 11:11:11.1111119';
+show global variables like 'vers_current_time';
+
+set global vers_current_time= '1900-01-01 00:00:00';
+show global variables like 'vers_current_time';
+
+set global vers_current_time= timestamp'1911-11-11 11:11:11.1111119';
+show global variables like 'vers_current_time';
+
+set @ts= timestamp'1900-01-01 00:00:00';
+set global vers_current_time= @ts;
+show global variables like 'vers_current_time';
+
+# session
+set vers_current_time= '1911-11-11 11:11:11.1111119';
 show variables like 'vers_current_time';
 
-set vers_current_time = '1900-01-01 00:00:00';
+set vers_current_time= '1900-01-01 00:00:00';
 show variables like 'vers_current_time';
 
-set vers_current_time = timestamp'1911-11-11 11:11:11.1111119';
+set vers_current_time= timestamp'1911-11-11 11:11:11.1111119';
 show variables like 'vers_current_time';
 
-set vers_current_time = timestamp'1900-01-01 00:00:00';
+set @ts= timestamp'1900-01-01 00:00:00';
+set vers_current_time= @ts;
 show variables like 'vers_current_time';
 
-set vers_current_time = 'now';
+set global vers_current_time= 'now';
+set vers_current_time= 'now';
 
 show variables where variable_name = "vers_hide";
 select * from t for system_time all;

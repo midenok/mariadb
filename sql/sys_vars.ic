@@ -2567,9 +2567,9 @@ public:
   {
     Item *item= var->value;
 
-    switch (item->type())
+    switch (item->result_type())
     {
-    case Item::DATE_ITEM:
+    case TIME_RESULT:
       {
         if (item->get_date(&out.ltime, 0))
           break;
@@ -2577,11 +2577,10 @@ public:
         return false;
       }
 
-    case Item::STRING_ITEM:
+    case STRING_RESULT:
       {
         String *str= item->val_str();
-        DBUG_ASSERT(str);
-        if (update(*str, out))
+        if (!str || update(*str, out))
           break;
         return false;
       }
