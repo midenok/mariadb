@@ -1127,6 +1127,26 @@ private:
 		const uchar*	old_record,
 		uchar*		new_record)
 	{
+		int err;
+		if (table->versioned() && table->vers_end_field()->is_max()) {
+			trx_t* trx = thd_to_trx(ha_thd());
+			if (!trx->id)
+				trx_start_if_not_started_xa(trx, true);
+			ut_a(trx->id);
+			ut_a(table->record[0] == new_record);
+			ut_a(table->record[1] == old_record);
+			store_record(table, record[2]);
+			restore_record(table, record[1]);
+			table->vers_end_field()->store(trx->id, true);
+			err = Partition_helper::ph_write_row(const_cast<uchar*>(table->record[0]));
+			restore_record(table, record[2]);
+			if (err)
+				return err;
+			table->vers_start_field()->store(trx->id, true);
+		}
+		err = rnd_pos_by_record(const_cast<uchar *>(old_record));
+		if (err)
+			return err;
 		return(Partition_helper::ph_update_row(old_record, new_record));
 	}
 
