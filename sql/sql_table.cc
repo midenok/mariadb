@@ -5155,6 +5155,75 @@ static void make_unique_constraint_name(THD *thd, LEX_STRING *name,
 ** Alter a table definition
 ****************************************************************************/
 
+static void vers_table_name_date(THD *thd, const char *db,
+                                 const char *table_name, char *new_name,
+                                 size_t new_name_size)
+{
+  MYSQL_TIME now;
+  thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
+  my_snprintf(new_name, new_name_size, "%s_%s_%d_%d_%d_%d_%d_%d_%d", db,
+              table_name, now.month, now.day, now.year, now.hour, now.minute,
+              now.second, thd->query_start_sec_part());
+  thd->time_zone_used= 1;
+}
+
+// Set sys_trx_end = now(6) for all alive rows.
+static bool vers_make_alive_historical(THD *thd, TABLE *table)
+{
+  MYSQL_TIME now;
+  thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
+  now.second_part= thd->query_start_sec_part();
+  thd->time_zone_used= 1;
+
+  if (table->file->ha_external_lock(thd, F_WRLCK))
+    return true;
+
+  bitmap_set_bit(table->read_set, table->vers_end_field()->field_index);
+  bitmap_set_bit(table->write_set, table->vers_end_field()->field_index);
+
+  READ_RECORD info;
+  int error= 0;
+  bool will_batch= false;
+  uint dup_key_found = 0;
+  if (init_read_record(&info, thd, table, NULL, NULL, 0, 1, true))
+    goto err;
+
+  will_batch= !table->file->start_bulk_update();
+
+  while (!(error= info.read_record(&info)))
+  {
+    if (!table->vers_end_field()->is_max()) {
+      table->file->unlock_row();
+      continue;
+    }
+
+    store_record(table, record[1]);
+    table->vers_end_field()->store_time(&now);
+    if (will_batch)
+      error= table->file->ha_bulk_update_row(table->record[1], table->record[0],
+                                             &dup_key_found);
+    else
+      error= table->file->ha_update_row(table->record[1], table->record[0]);
+    if (error && table->file->is_fatal_error(error, HA_CHECK_ALL)) {
+      table->file->print_error(error, MYF(ME_FATALERROR));
+      goto err_read_record;
+    }
+  }
+
+  if (will_batch && (error= table->file->exec_bulk_update(&dup_key_found)))
+    table->file->print_error(error, MYF(ME_FATALERROR));
+  if (will_batch)
+    table->file->end_bulk_update();
+
+err_read_record:
+  end_read_record(&info);
+
+err:
+  if (table->file->ha_external_lock(thd, F_UNLCK))
+    return true;
+
+  return error ? true : false;
+}
 
 /**
   Rename a table.
@@ -9076,6 +9145,8 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   /* Remember that we have not created table in storage engine yet. */
   bool no_ha_table= true;
 
+  bool versioned= table->versioned();
+
   if (alter_info->requested_algorithm != Alter_info::ALTER_TABLE_ALGORITHM_COPY)
   {
     Alter_inplace_info ha_alter_info(create_info, alter_info,
@@ -9436,9 +9507,14 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     Rename the old table to temporary name to have a backup in case
     anything goes wrong while renaming the new table.
   */
-  char backup_name[32];
-  my_snprintf(backup_name, sizeof(backup_name), "%s2-%lx-%lx", tmp_file_prefix,
-              current_pid, thd->thread_id);
+  char backup_name[FN_LEN];
+  if (versioned)
+    vers_table_name_date(thd, alter_ctx.db, alter_ctx.table_name, backup_name,
+                         sizeof(backup_name));
+  else
+    my_snprintf(backup_name, sizeof(backup_name), "%s2-%lx-%lx",
+                tmp_file_prefix, current_pid, thd->thread_id);
+
   if (lower_case_table_names)
     my_casedn_str(files_charset_info, backup_name);
   if (mysql_rename_table(old_db_type, alter_ctx.db, alter_ctx.table_name,
@@ -9488,6 +9564,18 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     rename_table_in_stat_tables(thd, alter_ctx.db,alter_ctx.alias,
                                 alter_ctx.new_db, alter_ctx.new_alias);
   }
+
+  if (versioned) {
+    TABLE_LIST tmp_table_list;
+    tmp_table_list.init_one_table(table_list->db, strlen(table_list->db),
+                                  backup_name, strlen(backup_name), backup_name,
+                                  TL_WRITE);
+
+    Open_table_context ctx(thd, Open_table_context::OT_REOPEN_TABLES);
+    if (open_table(thd, &tmp_table_list, &ctx))
+      goto err_with_mdl_after_alter;
+    vers_make_alive_historical(thd, tmp_table_list.table);
+  } else
 
   // ALTER TABLE succeeded, delete the backup of the old table.
   if (quick_rm_table(thd, old_db_type, alter_ctx.db, backup_name, FN_IS_TMP))
@@ -9674,7 +9762,8 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   Field **dfield_ptr= to->default_field;
   bool make_versioned= !from->versioned() && to->versioned();
   bool make_unversioned= from->versioned() && !to->versioned();
-  Field *to_sys_trx_start= NULL, *from_sys_trx_end= NULL, *to_sys_trx_end= NULL;
+  bool keep_versioned= from->versioned() && to->versioned();
+  Field *to_sys_trx_start= NULL, *to_sys_trx_end= NULL, *from_sys_trx_end= NULL;
   MYSQL_TIME now;
   DBUG_ENTER("copy_data_between_tables");
 
@@ -9780,16 +9869,22 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
     now.second_part= thd->query_start_sec_part();
     thd->time_zone_used= 1;
-    to_sys_trx_start= to->field[to->s->row_start_field];
-    to_sys_trx_end= to->field[to->s->row_end_field];
+    to_sys_trx_start= to->vers_start_field();
+    to_sys_trx_end= to->vers_end_field();
   }
   else if (make_unversioned)
   {
-    from_sys_trx_end= from->field[from->s->row_end_field];
+    from_sys_trx_end= from->vers_end_field();
   }
-  else if (from->versioned() && to->versioned())
+  else if (keep_versioned)
   {
     to->file->vers_auto_decrement= 0xffffffffffffffff;
+    thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
+    now.second_part= thd->query_start_sec_part();
+    thd->time_zone_used= 1;
+
+    from_sys_trx_end= from->vers_end_field();
+    to_sys_trx_start= to->vers_start_field();
   }
 
   THD_STAGE_INFO(thd, stage_copy_to_tmp_table);
@@ -9862,6 +9957,12 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       // Drop history rows.
       if (!from_sys_trx_end->is_max())
         continue;
+    } else if (keep_versioned) {
+      // Drop history rows.
+      if (!from_sys_trx_end->is_max())
+        continue;
+
+      to_sys_trx_start->store_time(&now);
     }
 
     prev_insert_id= to->file->next_insert_id;
