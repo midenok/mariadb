@@ -23,7 +23,7 @@ x
 create or replace view vt1 as select * from t1;
 show create view vt1;
 View	Create View	character_set_client	collation_connection
-vt1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vt1` AS select `t1`.`x` AS `x`,`t1`.`sys_trx_start` AS `sys_trx_start`,`t1`.`sys_trx_end` AS `sys_trx_end` from `t1` FOR SYSTEM_TIME ALL where `t1`.`sys_trx_end` = 18446744073709551615	latin1	latin1_swedish_ci
+vt1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vt1` AS select `t1`.`x` AS `x`,`t1`.`sys_trx_start` AS `_t1_sys_trx_start`,`t1`.`sys_trx_end` AS `_t1_sys_trx_end` from `t1` FOR SYSTEM_TIME ALL where `t1`.`sys_trx_end` = 18446744073709551615	latin1	latin1_swedish_ci
 drop view vt1;
 drop view vt2;
 create view vt1 as select * from t1 for system_time all;
@@ -76,10 +76,6 @@ x
 select * from vt1 for system_time all;
 x
 3
-create view error_view as select *, sys_trx_start from t1;
-ERROR 42S21: Duplicate column name 'sys_trx_start'
-create view error_view as select *, sys_trx_end from t1;
-ERROR 42S21: Duplicate column name 'sys_trx_end'
 create or replace table t1 (x int) with system versioning;
 insert into t1 values (1), (2);
 set @t1=now(6);
@@ -91,23 +87,10 @@ set @tmp= concat("create or replace view vt1 as select * from t1 for system_time
 prepare stmt from @tmp;
 execute stmt;
 drop prepare stmt;
-set @tmp= concat("create or replace view vvt1 as select * from vt1 for system_time as of timestamp '", @t2, "'");
-prepare stmt from @tmp;
-execute stmt;
-drop prepare stmt;
-set @tmp= concat("create or replace view vvvt1 as select * from vvt1 for system_time as of timestamp '", @t3, "'");
-prepare stmt from @tmp;
-execute stmt;
-drop prepare stmt;
 select * from vt1 for system_time all;
 x
 1
 2
-select * from vvt1 for system_time all;
-x
-1
-select * from vvvt1 for system_time all;
-x
 create or replace table t1 (x int) with system versioning;
 create or replace view vt1(c) as select x from t1;
 create or replace table t1 (a int) with system versioning;
@@ -121,5 +104,20 @@ a	b
 create or replace view vt12 as select * from t1 for system_time as of timestamp '0-0-0' cross join t2;
 select * from vt12;
 a	b
-drop view vt1, vvt1, vvvt1, vt12;
+create or replace view vt1 as select a as xander, t2.b, t2.sys_trx_end from t1 as baba123012345678912, t2 query for system_time timestamp between '0-0-0' and '2020-1-1';
+Warnings:
+Warning	4086	Auto generated alias for `baba123012345678912.sys_trx_start` is too long; using `sys_trx_start`.
+show create view vt1;
+View	Create View	character_set_client	collation_connection
+vt1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vt1` AS select `baba123012345678912`.`a` AS `xander`,`t2`.`b` AS `b`,`t2`.`sys_trx_end` AS `sys_trx_end`,`baba123012345678912`.`sys_trx_start` AS `sys_trx_start`,`baba123012345678912`.`sys_trx_end` AS `_baba123012345678912_sys_trx_end`,`t2`.`sys_trx_start` AS `_t2_sys_trx_start` from (`t1` `baba123012345678912` FOR SYSTEM_TIME ALL join `t2` FOR SYSTEM_TIME ALL) where `baba123012345678912`.`sys_trx_end` >= '0-0-0' and `baba123012345678912`.`sys_trx_start` <= '2020-1-1' and `t2`.`sys_trx_end` >= '0-0-0' and `t2`.`sys_trx_start` <= '2020-1-1'	latin1	latin1_swedish_ci
+create or replace view vt1 as select a as xander, t2.b, t2.sys_trx_start as stato from t1 as baba1230123456789123, t2 for system_time as of timestamp '0-0-0' query for system_time timestamp between '0-0-0' and '2020-1-1';
+Warnings:
+Warning	4086	Auto generated alias for `baba1230123456789123.sys_trx_start` is too long; using `sys_trx_start`.
+Warning	4086	Auto generated alias for `baba1230123456789123.sys_trx_end` is too long; using `sys_trx_end`.
+show create view vt1;
+View	Create View	character_set_client	collation_connection
+vt1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vt1` AS select `baba1230123456789123`.`a` AS `xander`,`t2`.`b` AS `b`,`t2`.`sys_trx_start` AS `stato`,`baba1230123456789123`.`sys_trx_start` AS `sys_trx_start`,`baba1230123456789123`.`sys_trx_end` AS `sys_trx_end`,`t2`.`sys_trx_end` AS `_t2_sys_trx_end` from (`t1` `baba1230123456789123` FOR SYSTEM_TIME ALL join `t2` FOR SYSTEM_TIME ALL) where `baba1230123456789123`.`sys_trx_end` >= '0-0-0' and `baba1230123456789123`.`sys_trx_start` <= '2020-1-1' and `t2`.`sys_trx_end` > '0-0-0' and `t2`.`sys_trx_start` <= '0-0-0'	latin1	latin1_swedish_ci
+create or replace view vvt1 as select * from t1, t2, vt1;
+ERROR HY000: Creating VIEW from versioned VIEW `vt1` is prohibited!
+drop view vt1, vt12;
 drop table t1, t2;

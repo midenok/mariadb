@@ -7044,3 +7044,29 @@ bool LEX::sp_add_cfetch(THD *thd, const LEX_STRING &name)
     return true;
   return false;
 }
+
+
+bool SELECT_LEX::vers_push_field(THD *thd, TABLE_LIST *table, const char* field_name)
+{
+  char buf[MAX_FIELD_NAME];
+  Item_field *fld= new (thd->mem_root) Item_field(thd, &context,
+                                      table->db, table->alias, field_name);
+  if (!fld)
+    return true;
+
+  size_t len= system_charset_info->cset->snprintf(system_charset_info, buf, sizeof(buf), "_%s_%s", table->alias, field_name);
+  if (++len < sizeof(buf))
+  {
+    fld->name= (char *) memdup_root(thd->mem_root, buf, len);
+  }
+  else
+  {
+    push_warning_printf(thd,
+      Sql_condition::WARN_LEVEL_WARN,
+      WARN_VERS_ALIAS_TOO_LONG,
+      ER_THD(thd, WARN_VERS_ALIAS_TOO_LONG),
+      table->alias, field_name, field_name);
+  }
+  item_list.push_back(fld);
+  return false;
+}

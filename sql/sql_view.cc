@@ -453,38 +453,81 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
     goto err;
   }
 
-  /* Implicitly add versioning fields if needed */
+  /* System Versioning begin */
+  for (TABLE_LIST *table= tables; table; table= table->next_local)
   {
-    TABLE_LIST *tl = tables;
-    while (tl && tl->is_view())
-      tl = tl->view->select_lex.table_list.first;
-    if (tl && tl->table)
+    DBUG_ASSERT(!table->is_view() || table->view);
+    // Any versioned table in VIEW will add `FOR SYSTEM_TIME ALL` + WHERE:
+    // if there are at least one versioned table then VIEW will contain FOR_SYSTEM_TIME_ALL
+    // (because it is in fact LEX used to parse its SELECT).
+    if (table->is_view() && table->view->vers_conditions == FOR_SYSTEM_TIME_ALL)
     {
-      TABLE_SHARE *s= tl->table->s;
-      if (s->versioned)
+      my_error(ER_VERS_VIEW_PROHIBITED, MYF(0), table->table_name);
+      res= true;
+      goto err;
+    }
+
+    if (!table->table)
+      continue;
+
+    /* Implicitly add versioning fields if needed */
+    if (table->table->versioned())
+    {
+      Item *item;
+      List_iterator_fast<Item> it(select_lex->item_list);
+      bool add_start= true;
+      bool add_end= true;
+      const char *name_start= table->table->vers_start_field()->field_name;
+      const char *name_end= table->table->vers_end_field()->field_name;
+      DBUG_ASSERT(table->alias);
+      while ((item= it++))
       {
-        const char *start= s->vers_start_field()->field_name;
-        const char *end = s->vers_end_field()->field_name;
-
-        select_lex->item_list.push_back(new (thd->mem_root) Item_field(
-            thd, &select_lex->context, tables->db, tables->alias, start));
-        select_lex->item_list.push_back(new (thd->mem_root) Item_field(
-            thd, &select_lex->context, tables->db, tables->alias, end));
-
-        if (lex->view_list.elements)
+        if (item->real_item()->type() != Item::FIELD_ITEM)
+          continue;
+        Item_field *fld= (Item_field*) (item->real_item());
+        if (fld->table_name && 0 != my_strcasecmp(table_alias_charset, table->alias, fld->table_name))
+          continue;
+        DBUG_ASSERT(fld->field_name);
+        if (0 == my_strcasecmp(system_charset_info, name_start, fld->field_name))
         {
-          if (LEX_STRING *s= thd->make_lex_string(start, strlen(start)))
-            lex->view_list.push_back(s);
+          add_start= false;
+          if (!add_end)
+            break;
+        }
+        else if (0 == my_strcasecmp(system_charset_info, name_end, fld->field_name))
+        {
+          add_end= false;
+          if (!add_start)
+            break;
+        }
+      }
+
+      if (add_start && select_lex->vers_push_field(thd, table, name_start))
+        goto err;
+
+      if (add_end && select_lex->vers_push_field(thd, table, name_end))
+        goto err;
+
+      if (lex->view_list.elements)
+      {
+        if (add_start)
+        {
+          if (LEX_STRING *l= thd->make_lex_string(name_start, strlen(name_start)))
+            lex->view_list.push_back(l);
           else
             goto err;
-          if (LEX_STRING *s= thd->make_lex_string(end, strlen(end)))
-            lex->view_list.push_back(s);
+        }
+        if (add_end)
+        {
+          if (LEX_STRING *l= thd->make_lex_string(name_end, strlen(name_end)))
+            lex->view_list.push_back(l);
           else
             goto err;
         }
       }
     }
-  }
+  } // for (TABLE_LIST *table)
+  /* System Versioning end */
 
   view= lex->unlink_first_table(&link_to_local);
 
@@ -2071,8 +2114,8 @@ bool insert_view_fields(THD *thd, List<Item> *list, TABLE_LIST *view)
     {
       TABLE_SHARE *s= fld->context->table_list->table->s;
       if (s->versioned &&
-          (!strcmp(fld->name, s->vers_start_field()->field_name) ||
-           !strcmp(fld->name, s->vers_end_field()->field_name)))
+          (!strcmp(fld->field_name, s->vers_start_field()->field_name) ||
+           !strcmp(fld->field_name, s->vers_end_field()->field_name)))
         continue;
       list->push_back(fld, thd->mem_root);
     }
