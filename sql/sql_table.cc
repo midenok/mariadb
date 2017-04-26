@@ -5155,19 +5155,7 @@ static void make_unique_constraint_name(THD *thd, LEX_STRING *name,
 ** Alter a table definition
 ****************************************************************************/
 
-static void vers_table_name_date(THD *thd, const char *db,
-                                 const char *table_name, char *new_name,
-                                 size_t new_name_size)
-{
-  MYSQL_TIME now;
-  thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
-  my_snprintf(new_name, new_name_size, "%s_%s_%d_%d_%d_%d_%d_%d_%d", db,
-              table_name, now.month, now.day, now.year, now.hour, now.minute,
-              now.second, thd->query_start_sec_part());
-  thd->time_zone_used= 1;
-}
-
-MYSQL_TIME vers_thd_get_now(THD *thd) {
+static MYSQL_TIME vers_thd_get_now(THD *thd) {
   MYSQL_TIME now;
   thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
   now.second_part= thd->query_start_sec_part();
@@ -5175,59 +5163,14 @@ MYSQL_TIME vers_thd_get_now(THD *thd) {
   return now;
 }
 
-// Set sys_trx_end = now(6) for all alive rows.
-static bool vers_make_alive_historical(THD *thd, TABLE *table)
+static void vers_table_name_date(THD *thd, const char *db,
+                                 const char *table_name, char *new_name,
+                                 size_t new_name_size)
 {
   MYSQL_TIME now = vers_thd_get_now(thd);
-
-  if (table->file->ha_external_lock(thd, F_WRLCK))
-    return true;
-
-  bitmap_set_bit(table->read_set, table->vers_end_field()->field_index);
-  bitmap_set_bit(table->write_set, table->vers_end_field()->field_index);
-
-  READ_RECORD info;
-  int error= 0;
-  bool will_batch= false;
-  uint dup_key_found = 0;
-  if (init_read_record(&info, thd, table, NULL, NULL, 0, 1, true))
-    goto err;
-
-  will_batch= !table->file->start_bulk_update();
-
-  while (!(error= info.read_record(&info)))
-  {
-    if (!table->vers_end_field()->is_max()) {
-      table->file->unlock_row();
-      continue;
-    }
-
-    store_record(table, record[1]);
-    table->vers_end_field()->store_time(&now);
-    if (will_batch)
-      error= table->file->ha_bulk_update_row(table->record[1], table->record[0],
-                                             &dup_key_found);
-    else
-      error= table->file->ha_update_row(table->record[1], table->record[0]);
-    if (error && table->file->is_fatal_error(error, HA_CHECK_ALL)) {
-      table->file->print_error(error, MYF(ME_FATALERROR));
-      goto err_read_record;
-    }
-  }
-
-  if (will_batch && (error= table->file->exec_bulk_update(&dup_key_found)))
-    table->file->print_error(error, MYF(ME_FATALERROR));
-  if (will_batch)
-    table->file->end_bulk_update();
-
-err_read_record:
-  end_read_record(&info);
-
-err:
-  if (table->file->ha_external_lock(thd, F_UNLCK))
-    return true;
-
-  return error ? true : false;
+  my_snprintf(new_name, new_name_size, "%s_%s_%d_%d_%d_%d_%d_%d_%d", db,
+              table_name, now.month, now.day, now.year, now.hour, now.minute,
+              now.second, now.second_part);
 }
 
 bool operator==(const MYSQL_TIME &lhs, const MYSQL_TIME &rhs)
@@ -8728,11 +8671,12 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   uint tables_opened;
 
   thd->open_options|= HA_OPEN_FOR_ALTER;
-  if (0 == strcmp(table_list->alias, "t"))
-    table_list->lock_type= TL_WRITE;
   bool error= open_tables(thd, &table_list, &tables_opened, 0,
                           &alter_prelocking_strategy);
   thd->open_options&= ~HA_OPEN_FOR_ALTER;
+  bool versioned= table_list->table->versioned();
+  if (versioned)
+    table_list->set_lock_type(thd, TL_WRITE);
 
   DEBUG_SYNC(thd, "alter_opened_table");
 
@@ -8753,6 +8697,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   TABLE *table= table_list->table;
   table->use_all_columns();
   MDL_ticket *mdl_ticket= table->mdl_ticket;
+
 
   /*
     Prohibit changing of the UNION list of a non-temporary MERGE table
@@ -9207,8 +9152,6 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   /* Remember that we have not created table in storage engine yet. */
   bool no_ha_table= true;
 
-  bool versioned= table->versioned();
-
   if (alter_info->requested_algorithm != Alter_info::ALTER_TABLE_ALGORITHM_COPY)
   {
     Alter_inplace_info ha_alter_info(create_info, alter_info,
@@ -9375,7 +9318,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       goto err_new_table_cleanup;
     }
 
-    if (table->versioned())
+    if (versioned)
       alter_info->requested_lock= Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE;
 
     // If EXCLUSIVE lock is requested, upgrade already.
@@ -9477,7 +9420,14 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                                  order_num, order, &copied, &deleted,
                                  alter_info->keys_onoff,
                                  &alter_ctx))
+    {
+      if (versioned && new_table->versioned())
+      {
+        // Failure of this function means corruption of an original table.
+        vers_reset_alter_copy(thd, table);
+      }
       goto err_new_table_cleanup;
+    }
   }
   else
   {
@@ -9631,15 +9581,6 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   }
 
   if (versioned) {
-    // TABLE_LIST tmp_table_list;
-    // tmp_table_list.init_one_table(table_list->db, strlen(table_list->db),
-    //                               backup_name, strlen(backup_name), backup_name,
-    //                               TL_WRITE);
-
-    // Open_table_context ctx(thd, Open_table_context::OT_REOPEN_TABLES);
-    // if (open_table(thd, &tmp_table_list, &ctx))
-    //   goto err_with_mdl_after_alter;
-    // vers_make_alive_historical(thd, tmp_table_list.table);
   } else
 
   // ALTER TABLE succeeded, delete the backup of the old table.
