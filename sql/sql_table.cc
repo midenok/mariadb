@@ -5167,13 +5167,18 @@ static void vers_table_name_date(THD *thd, const char *db,
   thd->time_zone_used= 1;
 }
 
-// Set sys_trx_end = now(6) for all alive rows.
-static bool vers_make_alive_historical(THD *thd, TABLE *table)
-{
+MYSQL_TIME vers_thd_get_now(THD *thd) {
   MYSQL_TIME now;
   thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
   now.second_part= thd->query_start_sec_part();
   thd->time_zone_used= 1;
+  return now;
+}
+
+// Set sys_trx_end = now(6) for all alive rows.
+static bool vers_make_alive_historical(THD *thd, TABLE *table)
+{
+  MYSQL_TIME now = vers_thd_get_now(thd);
 
   if (table->file->ha_external_lock(thd, F_WRLCK))
     return true;
@@ -5199,6 +5204,61 @@ static bool vers_make_alive_historical(THD *thd, TABLE *table)
 
     store_record(table, record[1]);
     table->vers_end_field()->store_time(&now);
+    if (will_batch)
+      error= table->file->ha_bulk_update_row(table->record[1], table->record[0],
+                                             &dup_key_found);
+    else
+      error= table->file->ha_update_row(table->record[1], table->record[0]);
+    if (error && table->file->is_fatal_error(error, HA_CHECK_ALL)) {
+      table->file->print_error(error, MYF(ME_FATALERROR));
+      goto err_read_record;
+    }
+  }
+
+  if (will_batch && (error= table->file->exec_bulk_update(&dup_key_found)))
+    table->file->print_error(error, MYF(ME_FATALERROR));
+  if (will_batch)
+    table->file->end_bulk_update();
+
+err_read_record:
+  end_read_record(&info);
+
+err:
+  if (table->file->ha_external_lock(thd, F_UNLCK))
+    return true;
+
+  return error ? true : false;
+}
+
+bool operator==(const MYSQL_TIME &lhs, const MYSQL_TIME &rhs)
+{
+  return 0 == memcmp(&lhs, &rhs, sizeof(MYSQL_TIME));
+}
+
+static bool vers_reset_alter_copy(THD *thd, TABLE *table)
+{
+  MYSQL_TIME now = vers_thd_get_now(thd);
+
+  READ_RECORD info;
+  int error= 0;
+  bool will_batch= false;
+  uint dup_key_found = 0;
+  if (init_read_record(&info, thd, table, NULL, NULL, 0, 1, true))
+    goto err;
+
+  will_batch= !table->file->start_bulk_update();
+
+  while (!(error= info.read_record(&info)))
+  {
+    MYSQL_TIME current;
+    if (table->vers_end_field()->get_date(&current, 0))
+      goto err_read_record;
+    if (current == now) {
+      continue;
+    }
+
+    store_record(table, record[1]);
+    table->vers_end_field()->set_max();
     if (will_batch)
       error= table->file->ha_bulk_update_row(table->record[1], table->record[0],
                                              &dup_key_found);
@@ -8668,6 +8728,8 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   uint tables_opened;
 
   thd->open_options|= HA_OPEN_FOR_ALTER;
+  if (0 == strcmp(table_list->alias, "t"))
+    table_list->lock_type= TL_WRITE;
   bool error= open_tables(thd, &table_list, &tables_opened, 0,
                           &alter_prelocking_strategy);
   thd->open_options&= ~HA_OPEN_FOR_ALTER;
@@ -9313,6 +9375,9 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       goto err_new_table_cleanup;
     }
 
+    if (table->versioned())
+      alter_info->requested_lock= Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE;
+
     // If EXCLUSIVE lock is requested, upgrade already.
     if (alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE &&
         wait_while_table_is_used(thd, table, HA_EXTRA_FORCE_REOPEN))
@@ -9566,15 +9631,15 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   }
 
   if (versioned) {
-    TABLE_LIST tmp_table_list;
-    tmp_table_list.init_one_table(table_list->db, strlen(table_list->db),
-                                  backup_name, strlen(backup_name), backup_name,
-                                  TL_WRITE);
+    // TABLE_LIST tmp_table_list;
+    // tmp_table_list.init_one_table(table_list->db, strlen(table_list->db),
+    //                               backup_name, strlen(backup_name), backup_name,
+    //                               TL_WRITE);
 
-    Open_table_context ctx(thd, Open_table_context::OT_REOPEN_TABLES);
-    if (open_table(thd, &tmp_table_list, &ctx))
-      goto err_with_mdl_after_alter;
-    vers_make_alive_historical(thd, tmp_table_list.table);
+    // Open_table_context ctx(thd, Open_table_context::OT_REOPEN_TABLES);
+    // if (open_table(thd, &tmp_table_list, &ctx))
+    //   goto err_with_mdl_after_alter;
+    // vers_make_alive_historical(thd, tmp_table_list.table);
   } else
 
   // ALTER TABLE succeeded, delete the backup of the old table.
@@ -9958,10 +10023,13 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       if (!from_sys_trx_end->is_max())
         continue;
     } else if (keep_versioned) {
-      // Drop history rows.
+      // Do not copy history rows.
       if (!from_sys_trx_end->is_max())
         continue;
 
+      store_record(from, record[1]);
+      from->vers_end_field()->store_time(&now);
+      from->file->ha_update_row(from->record[1], from->record[0]);
       to_sys_trx_start->store_time(&now);
     }
 
