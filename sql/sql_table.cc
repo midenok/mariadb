@@ -8676,7 +8676,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   bool error= open_tables(thd, &table_list, &tables_opened, 0,
                           &alter_prelocking_strategy);
   thd->open_options&= ~HA_OPEN_FOR_ALTER;
-  bool versioned= table_list->table->versioned();
+  bool versioned= table_list->table && table_list->table->versioned();
   if (versioned) {
     table_list->set_lock_type(thd, TL_WRITE);
     if (thd->mdl_context.upgrade_shared_lock(table_list->table->mdl_ticket,
@@ -8999,10 +8999,10 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       Upgrade from MDL_SHARED_UPGRADABLE to MDL_SHARED_NO_WRITE.
       Afterwards it's safe to take the table level lock.
     */
-    if (!versioned &&
-            thd->mdl_context.upgrade_shared_lock(
-                mdl_ticket, MDL_SHARED_NO_WRITE,
-                thd->variables.lock_wait_timeout) ||
+    if ((!versioned &&
+         thd->mdl_context.upgrade_shared_lock(
+             mdl_ticket, MDL_SHARED_NO_WRITE,
+             thd->variables.lock_wait_timeout)) ||
         lock_tables(thd, table_list, alter_ctx.tables_opened, 0))
     {
       DBUG_RETURN(true);
