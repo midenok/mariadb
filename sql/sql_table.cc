@@ -5155,6 +5155,7 @@ static void make_unique_constraint_name(THD *thd, LEX_STRING *name,
 ** Alter a table definition
 ****************************************************************************/
 
+// Works as NOW(6)
 static MYSQL_TIME vers_thd_get_now(THD *thd) {
   MYSQL_TIME now;
   thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
@@ -5173,11 +5174,12 @@ static void vers_table_name_date(THD *thd, const char *db,
               now.second, now.second_part);
 }
 
-bool operator==(const MYSQL_TIME &lhs, const MYSQL_TIME &rhs)
+bool operator!=(const MYSQL_TIME &lhs, const MYSQL_TIME &rhs)
 {
-  return 0 == memcmp(&lhs, &rhs, sizeof(MYSQL_TIME));
+  return 0 != memcmp(&lhs, &rhs, sizeof(MYSQL_TIME));
 }
 
+// Sets sys_trx_end=MAX for rows with sys_trx_end=now(6)
 static bool vers_reset_alter_copy(THD *thd, TABLE *table)
 {
   MYSQL_TIME now = vers_thd_get_now(thd);
@@ -5196,7 +5198,7 @@ static bool vers_reset_alter_copy(THD *thd, TABLE *table)
     MYSQL_TIME current;
     if (table->vers_end_field()->get_date(&current, 0))
       goto err_read_record;
-    if (current == now) {
+    if (current != now) {
       continue;
     }
 
