@@ -7048,7 +7048,6 @@ bool LEX::sp_add_cfetch(THD *thd, const LEX_STRING &name)
 
 bool SELECT_LEX::vers_push_field(THD *thd, TABLE_LIST *table, const char* field_name)
 {
-  char buf[MAX_FIELD_NAME];
   Item_field *fld= new (thd->mem_root) Item_field(thd, &context,
                                       table->db, table->alias, field_name);
   if (!fld)
