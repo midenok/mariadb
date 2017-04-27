@@ -570,10 +570,14 @@ expli_table_err:
 
     if (expli_table)
       impli_table= expli_table;
-    if (!expli_start && select_lex->vers_push_field(thd, impli_table, impli_start))
-      goto err;
-    if (!expli_end && select_lex->vers_push_field(thd, impli_table, impli_end))
-      goto err;
+
+    if (impli_table)
+    {
+      if (!expli_start && select_lex->vers_push_field(thd, impli_table, impli_start))
+        goto err;
+      if (!expli_end && select_lex->vers_push_field(thd, impli_table, impli_end))
+        goto err;
+    }
 #pragma GCC diagnostic pop
   } /* System Versioning end */
 

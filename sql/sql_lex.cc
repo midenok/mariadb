@@ -2298,6 +2298,7 @@ void st_select_lex::init_select()
   join= 0;
   lock_type= TL_READ_DEFAULT;
   vers_conditions.empty();
+  vers_derived_conds.empty();
 }
 
 /*

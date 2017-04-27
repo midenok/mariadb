@@ -730,6 +730,9 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
       for (TABLE_LIST *table= sl->table_list.first; table; table= table->next_local)
       {
         // FIXME: how it will behave with table as VIEW?
+        if (!table->table || !table->table->versioned())
+          continue;
+
         const char *table_start= table->table->vers_start_field()->field_name;
         const char *table_end= table->table->vers_end_field()->field_name;
         if (!impli_table)
@@ -811,14 +814,25 @@ expli_table_err:
           }
         } // while ((item= it++))
       } // for (TABLE_LIST *table)
+
       if (expli_table)
         impli_table= expli_table;
 
-      Query_arena_stmt on_stmt_arena(thd);
-      if (!expli_start && (res= sl->vers_push_field(thd, impli_table, impli_start)))
-        goto exit;
-      if (!expli_end && (res= sl->vers_push_field(thd, impli_table, impli_end)))
-        goto exit;
+      if (impli_table)
+      {
+        Query_arena_stmt on_stmt_arena(thd);
+        if (!expli_start && (res= sl->vers_push_field(thd, impli_table, impli_start)))
+          goto exit;
+        if (!expli_end && (res= sl->vers_push_field(thd, impli_table, impli_end)))
+          goto exit;
+
+        if (impli_table->vers_conditions)
+          sl->vers_derived_conds= impli_table->vers_conditions;
+        else if (sl->vers_conditions)
+          sl->vers_derived_conds= sl->vers_conditions;
+        else
+          sl->vers_derived_conds.import_outer= true;
+      }
     } // if (sl->table_list.elements > 0)
 #pragma GCC diagnostic pop
     // System Versioning end

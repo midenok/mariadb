@@ -771,6 +771,28 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
     }
   }
 
+  SELECT_LEX *outer_slex= slex->next_select_in_list();
+  if (outer_slex && slex->linkage == DERIVED_TABLE_TYPE)
+  {
+    if (slex->vers_derived_conds)
+    {
+      // Propagate derived conditions to outer SELECT_LEX:
+      if (!outer_slex->vers_conditions)
+      {
+        (outer_slex->vers_conditions= slex->vers_derived_conds).
+          from_inner= true;
+      }
+    }
+    else if (slex->vers_conditions.import_outer)
+    {
+      // Propagate query conditions from nearest outer SELECT_LEX:
+      while (outer_slex && (!outer_slex->vers_conditions || outer_slex->vers_conditions.from_inner))
+        outer_slex= outer_slex->next_select_in_list();
+      if (outer_slex)
+        slex->vers_conditions= outer_slex->vers_conditions;
+    }
+  }
+
   for (table= tables; table; table= table->next_local)
   {
     if (table->table && table->table->versioned())
@@ -784,6 +806,15 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
         if (vers_conditions.init_from_sysvar(thd))
           DBUG_RETURN(-1);
       }
+
+      #if 0
+      if (table->is_derived() && slex->vers_conditions)
+      {
+        DBUG_ASSERT(table->derived);
+        SELECT_LEX *inner_slex= table->derived->first_select();
+        DBUG_ASSERT(inner_slex);
+      }
+      #endif
 
       if (vers_conditions)
       {
@@ -1059,7 +1090,7 @@ JOIN::prepare(TABLE_LIST *tables_init,
     remove_redundant_subquery_clauses(select_lex);
   }
 
-  /* Handle FOR SYSTEM_TIME clause. */
+  /* System Versioning: handle FOR SYSTEM_TIME clause. */
   if (vers_setup_select(thd, tables_list, &conds, select_lex) < 0)
     DBUG_RETURN(-1);
 
