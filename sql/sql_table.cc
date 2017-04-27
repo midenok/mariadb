@@ -5168,7 +5168,7 @@ static void vers_table_name_date(THD *thd, const char *db,
                                  const char *table_name, char *new_name,
                                  size_t new_name_size)
 {
-  MYSQL_TIME now = vers_thd_get_now(thd);
+  const MYSQL_TIME now = vers_thd_get_now(thd);
   my_snprintf(new_name, new_name_size, "%s_%s_%d_%d_%d_%d_%d_%d_%d", db,
               table_name, now.month, now.day, now.year, now.hour, now.minute,
               now.second, now.second_part);
@@ -5176,13 +5176,16 @@ static void vers_table_name_date(THD *thd, const char *db,
 
 bool operator!=(const MYSQL_TIME &lhs, const MYSQL_TIME &rhs)
 {
-  return 0 != memcmp(&lhs, &rhs, sizeof(MYSQL_TIME));
+  return lhs.year != rhs.year || lhs.month != rhs.month || lhs.day != rhs.day ||
+         lhs.hour != rhs.hour || lhs.minute != rhs.minute ||
+         lhs.second_part != rhs.second_part || lhs.neg != rhs.neg ||
+         lhs.time_type != rhs.time_type;
 }
 
 // Sets sys_trx_end=MAX for rows with sys_trx_end=now(6)
 static bool vers_reset_alter_copy(THD *thd, TABLE *table)
 {
-  MYSQL_TIME now = vers_thd_get_now(thd);
+  const MYSQL_TIME now = vers_thd_get_now(thd);
 
   READ_RECORD info;
   int error= 0;
@@ -8707,7 +8710,6 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   table->use_all_columns();
   MDL_ticket *mdl_ticket= table->mdl_ticket;
 
-
   /*
     Prohibit changing of the UNION list of a non-temporary MERGE table
     under LOCK tables. It would be quite difficult to reuse a shrinked
@@ -9880,9 +9882,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 
   if (make_versioned)
   {
-    thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
-    now.second_part= thd->query_start_sec_part();
-    thd->time_zone_used= 1;
+    now = vers_thd_get_now(thd);
     to_sys_trx_start= to->vers_start_field();
     to_sys_trx_end= to->vers_end_field();
   }
