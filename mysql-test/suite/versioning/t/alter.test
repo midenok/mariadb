@@ -1,3 +1,33 @@
+delimiter ~~;
+
+create procedure concat_exec2(a varchar(255), b varchar(255))
+begin
+  prepare stmt from concat(a, b);
+  execute stmt;
+  deallocate prepare stmt;
+end~~
+
+create procedure concat_exec3(a varchar(255), b varchar(255), c varchar(255))
+begin
+  prepare stmt from concat(a, b, c);
+  execute stmt;
+  deallocate prepare stmt;
+end~~
+
+create function get_historical_table_name(table_name_arg varchar(255))
+returns varchar(255)
+begin
+  return (select table_name from information_schema.tables
+           where table_schema='test' and table_name like concat(table_name_arg, '_%') limit 1);
+end~~
+
+create procedure drop_last_historical(table_name_arg varchar(255))
+begin
+  call concat_exec2('drop table ', get_historical_table_name(table_name_arg));
+end~~
+
+delimiter ;~~
+
 create table t(
   a int
 );
@@ -48,15 +78,19 @@ alter table t with system versioning;
 show create table t;
 
 alter table t add column b int;
+call drop_last_historical('t');
 show create table t;
 
 alter table t add column c int;
+call drop_last_historical('t');
 show create table t;
 
 alter table t add column d int first;
+call drop_last_historical('t');
 show create table t;
 
 alter table t add column e int after d;
+call drop_last_historical('t');
 show create table t;
 
 --error ER_VERS_WRONG_PARAMS
@@ -65,6 +99,7 @@ alter table t add column f int after sys_trx_start;
 alter table t add column f int after sys_trx_end;
 
 alter table t drop column a;
+call drop_last_historical('t');
 show create table t;
 
 --error ER_VERS_WRONG_PARAMS
@@ -87,10 +122,15 @@ select * from t;
 select * from t for system_time all;
 select sys_trx_start from t where a=3 into @tm;
 alter table t add column b int;
-select @tm=sys_trx_start from t where a=3;
+#select @tm=sys_trx_start from t where a=3;
+call concat_exec3('select @tm=sys_trx_start from ', get_historical_table_name('t'),
+		   ' for system_time all where a=3');
+select @tm<sys_trx_start from t where a=3;
 show create table t;
 select * from t;
 select * from t for system_time all;
+call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
+call drop_last_historical('t');
 
 alter table t without system versioning;
 select * from t;
@@ -143,10 +183,14 @@ select * from t for system_time all;
 alter table t add column b int, algorithm=copy;
 show create table t;
 select * from t;
+call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
+call drop_last_historical('t');
 
 alter table t drop column b, algorithm=copy;
 show create table t;
 select * from t for system_time all;
+call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
+call drop_last_historical('t');
 
 alter table t add column b int, algorithm=inplace;
 show create table t;
@@ -171,6 +215,7 @@ create or replace table t (a int) with system versioning;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b int auto_increment unique;
+call drop_last_historical('t');
 select * from t for system_time all;
 insert into t values (4, NULL);
 select * from t for system_time all;
@@ -187,6 +232,7 @@ create or replace table t (a int) with system versioning;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b tinyint auto_increment unique;
+call drop_last_historical('t');
 select * from t for system_time all;
 insert into t values (4, NULL);
 select * from t for system_time all;
@@ -204,5 +250,10 @@ select * from t;
 
 call verify_vtq;
 drop table t;
+
+drop procedure concat_exec2;
+drop procedure concat_exec3;
+drop function get_historical_table_name;
+drop procedure drop_last_historical;
 
 -- source suite/versioning/common_finish.inc

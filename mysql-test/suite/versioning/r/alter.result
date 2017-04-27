@@ -1,3 +1,25 @@
+create procedure concat_exec2(a varchar(255), b varchar(255))
+begin
+prepare stmt from concat(a, b);
+execute stmt;
+deallocate prepare stmt;
+end~~
+create procedure concat_exec3(a varchar(255), b varchar(255), c varchar(255))
+begin
+prepare stmt from concat(a, b, c);
+execute stmt;
+deallocate prepare stmt;
+end~~
+create function get_historical_table_name(table_name_arg varchar(255))
+returns varchar(255)
+begin
+return (select table_name from information_schema.tables
+where table_schema='test' and table_name like concat(table_name_arg, '_%') limit 1);
+end~~
+create procedure drop_last_historical(table_name_arg varchar(255))
+begin
+call concat_exec2('drop table ', get_historical_table_name(table_name_arg));
+end~~
 create table t(
 a int
 );
@@ -73,6 +95,7 @@ t	CREATE TABLE `t` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t add column b int;
+call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -83,6 +106,7 @@ t	CREATE TABLE `t` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t add column c int;
+call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -94,6 +118,7 @@ t	CREATE TABLE `t` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t add column d int first;
+call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -106,6 +131,7 @@ t	CREATE TABLE `t` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t add column e int after d;
+call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -123,6 +149,7 @@ ERROR HY000: Wrong parameters for `t`: Can not put new field after system versio
 alter table t add column f int after sys_trx_end;
 ERROR HY000: Wrong parameters for `t`: Can not put new field after system versioning field
 alter table t drop column a;
+call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -172,8 +199,12 @@ a
 1
 select sys_trx_start from t where a=3 into @tm;
 alter table t add column b int;
-select @tm=sys_trx_start from t where a=3;
+call concat_exec3('select @tm=sys_trx_start from ', get_historical_table_name('t'),
+' for system_time all where a=3');
 @tm=sys_trx_start
+1
+select @tm<sys_trx_start from t where a=3;
+@tm<sys_trx_start
 1
 show create table t;
 Table	Create Table
@@ -192,7 +223,12 @@ select * from t for system_time all;
 a	b
 3	NULL
 2	NULL
-1	NULL
+call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
+a
+3
+2
+1
+call drop_last_historical('t');
 alter table t without system versioning;
 select * from t;
 a	b
@@ -347,7 +383,11 @@ t	CREATE TABLE `t` (
 select * from t;
 a	b
 2	NULL
-1	NULL
+call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
+a
+2
+1
+call drop_last_historical('t');
 alter table t drop column b, algorithm=copy;
 show create table t;
 Table	Create Table
@@ -360,7 +400,10 @@ t	CREATE TABLE `t` (
 select * from t for system_time all;
 a
 2
-1
+call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
+a	b
+2	NULL
+call drop_last_historical('t');
 alter table t add column b int, algorithm=inplace;
 show create table t;
 Table	Create Table
@@ -374,7 +417,6 @@ t	CREATE TABLE `t` (
 select * from t;
 a	b
 2	NULL
-1	NULL
 alter table t drop column b, algorithm=inplace;
 show create table t;
 Table	Create Table
@@ -387,7 +429,6 @@ t	CREATE TABLE `t` (
 select * from t for system_time all;
 a
 2
-1
 alter table t without system versioning, algorithm=copy;
 show create table t;
 Table	Create Table
@@ -414,16 +455,13 @@ create or replace table t (a int) with system versioning;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b int auto_increment unique;
+call drop_last_historical('t');
 select * from t for system_time all;
 a	b
-1	-1
-2	-2
 3	1
 insert into t values (4, NULL);
 select * from t for system_time all;
 a	b
-1	-1
-2	-2
 3	1
 4	2
 create or replace table t (a int) with system versioning engine=innodb;
@@ -446,16 +484,13 @@ create or replace table t (a int) with system versioning;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b tinyint auto_increment unique;
+call drop_last_historical('t');
 select * from t for system_time all;
 a	b
-1	-1
-2	-2
 3	1
 insert into t values (4, NULL);
 select * from t for system_time all;
 a	b
-1	-1
-2	-2
 3	1
 4	2
 create or replace table t (a int) engine innodb;
@@ -492,6 +527,10 @@ No	A	B	C	D
 10	1	1	1	1
 11	1	1	1	1
 drop table t;
+drop procedure concat_exec2;
+drop procedure concat_exec3;
+drop function get_historical_table_name;
+drop procedure drop_last_historical;
 drop procedure verify_vtq;
 drop procedure innodb_verify_vtq;
 drop function default_engine;
