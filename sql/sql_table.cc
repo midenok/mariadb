@@ -8675,8 +8675,15 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                           &alter_prelocking_strategy);
   thd->open_options&= ~HA_OPEN_FOR_ALTER;
   bool versioned= table_list->table->versioned();
-  if (versioned)
+  if (versioned) {
     table_list->set_lock_type(thd, TL_WRITE);
+    if (thd->mdl_context.upgrade_shared_lock(table_list->table->mdl_ticket,
+                                             MDL_EXCLUSIVE,
+                                             thd->variables.lock_wait_timeout))
+    {
+      DBUG_RETURN(true);
+    }
+  }
 
   DEBUG_SYNC(thd, "alter_opened_table");
 
@@ -8990,9 +8997,11 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       Upgrade from MDL_SHARED_UPGRADABLE to MDL_SHARED_NO_WRITE.
       Afterwards it's safe to take the table level lock.
     */
-    if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_SHARED_NO_WRITE,
-                                             thd->variables.lock_wait_timeout)
-        || lock_tables(thd, table_list, alter_ctx.tables_opened, 0))
+    if (!versioned &&
+            thd->mdl_context.upgrade_shared_lock(
+                mdl_ticket, MDL_SHARED_NO_WRITE,
+                thd->variables.lock_wait_timeout) ||
+        lock_tables(thd, table_list, alter_ctx.tables_opened, 0))
     {
       DBUG_RETURN(true);
     }
@@ -9057,6 +9066,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   handlerton *new_db_type= create_info->db_type;
   handlerton *old_db_type= table->s->db_type();
   TABLE *new_table= NULL;
+  bool new_versioned= false;
   ha_rows copied=0,deleted=0;
 
   /*
@@ -9318,9 +9328,6 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       goto err_new_table_cleanup;
     }
 
-    if (versioned)
-      alter_info->requested_lock= Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE;
-
     // If EXCLUSIVE lock is requested, upgrade already.
     if (alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE &&
         wait_while_table_is_used(thd, table, HA_EXTRA_FORCE_REOPEN))
@@ -9394,6 +9401,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   }
   if (!new_table)
     goto err_new_table_cleanup;
+  new_versioned= new_table->versioned();
   /*
     Note: In case of MERGE table, we do not attach children. We do not
     copy data for MERGE tables. Only the children have data.
@@ -9421,7 +9429,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                                  alter_info->keys_onoff,
                                  &alter_ctx))
     {
-      if (versioned && new_table->versioned())
+      if (versioned && new_versioned)
       {
         // Failure of this function means corruption of an original table.
         vers_reset_alter_copy(thd, table);
@@ -9580,11 +9588,9 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                                 alter_ctx.new_db, alter_ctx.new_alias);
   }
 
-  if (versioned) {
-  } else
-
   // ALTER TABLE succeeded, delete the backup of the old table.
-  if (quick_rm_table(thd, old_db_type, alter_ctx.db, backup_name, FN_IS_TMP))
+  if (!(versioned && new_versioned) &&
+      quick_rm_table(thd, old_db_type, alter_ctx.db, backup_name, FN_IS_TMP))
   {
     /*
       The fact that deletion of the backup failed is not critical
