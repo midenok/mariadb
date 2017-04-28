@@ -570,7 +570,6 @@ expli_table_err:
 
     if (expli_table)
       impli_table= expli_table;
-<<<<<<< HEAD
 
     if (impli_table)
     {
@@ -580,12 +579,6 @@ expli_table_err:
         goto err;
     }
 #pragma GCC diagnostic pop
-=======
-    if (!expli_start && select_lex->vers_push_field(thd, impli_table, impli_start))
-      goto err;
-    if (!expli_end && select_lex->vers_push_field(thd, impli_table, impli_end))
-      goto err;
->>>>>>> remove garbage
   } /* System Versioning end */
 
   view= lex->unlink_first_table(&link_to_local);
