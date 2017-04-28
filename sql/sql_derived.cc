@@ -831,7 +831,7 @@ expli_table_err:
         else if (sl->vers_conditions)
           sl->vers_derived_conds= sl->vers_conditions;
         else
-          sl->vers_derived_conds.import_outer= true;
+          sl->vers_conditions.import_outer= true;
       }
     } // if (sl->table_list.elements > 0)
 #pragma GCC diagnostic pop
