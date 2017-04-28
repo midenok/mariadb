@@ -9899,7 +9899,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 
   if (make_versioned)
   {
-    now = vers_thd_get_now(thd);
+    now= vers_thd_get_now(thd);
     to_sys_trx_start= to->vers_start_field();
     to_sys_trx_end= to->vers_end_field();
   }
@@ -9988,7 +9988,9 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       // Drop history rows.
       if (!from_sys_trx_end->is_max())
         continue;
-    } else if (keep_versioned) {
+    }
+    else if (keep_versioned)
+    {
       // Do not copy history rows.
       if (!from_sys_trx_end->is_max())
         continue;
