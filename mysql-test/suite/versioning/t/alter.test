@@ -1,34 +1,6 @@
-delimiter ~~;
+-- source suite/versioning/t/ddl.inc
 
-create procedure concat_exec2(a varchar(255), b varchar(255))
-begin
-  prepare stmt from concat(a, b);
-  execute stmt;
-  deallocate prepare stmt;
-end~~
-
-create procedure concat_exec3(a varchar(255), b varchar(255), c varchar(255))
-begin
-  prepare stmt from concat(a, b, c);
-  execute stmt;
-  deallocate prepare stmt;
-end~~
-
-create function get_historical_table_name(table_name_arg varchar(255))
-returns varchar(255)
-begin
-  return (select table_name from information_schema.tables
-           where table_schema='test' and table_name like concat(table_name_arg, '_%') limit 1);
-end~~
-
-create procedure drop_last_historical(table_name_arg varchar(255))
-begin
-  call concat_exec2('drop table ', get_historical_table_name(table_name_arg));
-end~~
-
-delimiter ;~~
-
-create table t(
+create or replace table t(
   a int
 );
 show create table t;
@@ -122,14 +94,10 @@ select * from t;
 select * from t for system_time all;
 select sys_trx_start from t where a=3 into @tm;
 alter table t add column b int;
-#select @tm=sys_trx_start from t where a=3;
-call concat_exec3('select @tm=sys_trx_start from ', get_historical_table_name('t'),
-		   ' for system_time all where a=3');
 select @tm<sys_trx_start from t where a=3;
 show create table t;
 select * from t;
 select * from t for system_time all;
-call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
 call drop_last_historical('t');
 
 alter table t without system versioning;
@@ -151,7 +119,6 @@ show create table t;
 alter table t modify a int with system versioning;
 show create table t;
 
--- source suite/versioning/common.inc
 create or replace table t(
   a int
 ) engine=innodb;
@@ -183,13 +150,11 @@ select * from t for system_time all;
 alter table t add column b int, algorithm=copy;
 show create table t;
 select * from t;
-call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
 call drop_last_historical('t');
 
 alter table t drop column b, algorithm=copy;
 show create table t;
 select * from t for system_time all;
-call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
 call drop_last_historical('t');
 
 alter table t add column b int, algorithm=inplace;
@@ -207,6 +172,7 @@ create or replace table t (a int) with system versioning engine=innodb;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b int auto_increment unique;
+call drop_last_historical('t');
 select * from t for system_time all;
 insert into t values (4, NULL);
 select * from t for system_time all;
@@ -224,6 +190,7 @@ create or replace table t (a int) with system versioning engine=innodb;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b tinyint auto_increment unique;
+call drop_last_historical('t');
 select * from t for system_time all;
 insert into t values (4, NULL);
 select * from t for system_time all;
@@ -251,6 +218,7 @@ select * from t;
 call verify_vtq;
 drop table t;
 
+# from ddl.inc
 drop procedure concat_exec2;
 drop procedure concat_exec3;
 drop function get_historical_table_name;

@@ -5156,7 +5156,8 @@ static void make_unique_constraint_name(THD *thd, LEX_STRING *name,
 ****************************************************************************/
 
 // Works as NOW(6)
-static MYSQL_TIME vers_thd_get_now(THD *thd) {
+static MYSQL_TIME vers_thd_get_now(THD *thd)
+{
   MYSQL_TIME now;
   thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
   now.second_part= thd->query_start_sec_part();
@@ -5168,7 +5169,7 @@ static void vers_table_name_date(THD *thd, const char *db,
                                  const char *table_name, char *new_name,
                                  size_t new_name_size)
 {
-  const MYSQL_TIME now = vers_thd_get_now(thd);
+  const MYSQL_TIME now= vers_thd_get_now(thd);
   my_snprintf(new_name, new_name_size, "%s_%s_%d_%d_%d_%d_%d_%d_%d", db,
               table_name, now.month, now.day, now.year, now.hour, now.minute,
               now.second, now.second_part);
@@ -5185,12 +5186,12 @@ bool operator!=(const MYSQL_TIME &lhs, const MYSQL_TIME &rhs)
 // Sets sys_trx_end=MAX for rows with sys_trx_end=now(6)
 static bool vers_reset_alter_copy(THD *thd, TABLE *table)
 {
-  const MYSQL_TIME now = vers_thd_get_now(thd);
+  const MYSQL_TIME now= vers_thd_get_now(thd);
 
   READ_RECORD info;
   int error= 0;
   bool will_batch= false;
-  uint dup_key_found = 0;
+  uint dup_key_found= 0;
   if (init_read_record(&info, thd, table, NULL, NULL, 0, 1, true))
     goto err;
 
@@ -5201,7 +5202,8 @@ static bool vers_reset_alter_copy(THD *thd, TABLE *table)
     MYSQL_TIME current;
     if (table->vers_end_field()->get_date(&current, 0))
       goto err_read_record;
-    if (current != now) {
+    if (current != now)
+    {
       continue;
     }
 
@@ -5212,7 +5214,8 @@ static bool vers_reset_alter_copy(THD *thd, TABLE *table)
                                              &dup_key_found);
     else
       error= table->file->ha_update_row(table->record[1], table->record[0]);
-    if (error && table->file->is_fatal_error(error, HA_CHECK_ALL)) {
+    if (error && table->file->is_fatal_error(error, HA_CHECK_ALL))
+    {
       table->file->print_error(error, MYF(ME_FATALERROR));
       goto err_read_record;
     }
@@ -8680,13 +8683,23 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                           &alter_prelocking_strategy);
   thd->open_options&= ~HA_OPEN_FOR_ALTER;
   bool versioned= table_list->table && table_list->table->versioned();
-  if (versioned) {
+  if (versioned)
+  {
     table_list->set_lock_type(thd, TL_WRITE);
     if (thd->mdl_context.upgrade_shared_lock(table_list->table->mdl_ticket,
                                              MDL_EXCLUSIVE,
                                              thd->variables.lock_wait_timeout))
     {
       DBUG_RETURN(true);
+    }
+
+    if (table_list->table->versioned_by_engine() &&
+        alter_info->requested_algorithm ==
+            Alter_info::ALTER_TABLE_ALGORITHM_DEFAULT &&
+        !table_list->table->s->partition_info_str)
+    {
+      // Changle default ALGORITHM to COPY for INNODB
+      alter_info->requested_algorithm= Alter_info::ALTER_TABLE_ALGORITHM_COPY;
     }
   }
 
@@ -9437,8 +9450,8 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       {
         if (table->versioned_by_sql())
         {
-          // Failure of this function may result in corruption of an original
-          // table.
+          // Failure of this function may result in corruption of
+          // an original table.
           vers_reset_alter_copy(thd, table);
         }
       }
