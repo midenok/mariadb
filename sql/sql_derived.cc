@@ -718,18 +718,16 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat"
 #pragma GCC diagnostic ignored "-Wformat-extra-args"
-    if ((thd->stmt_arena->is_stmt_prepare() ||
-         !thd->stmt_arena->is_stmt_execute()) &&
-        !derived->is_view() && sl->table_list.elements > 0)
+    if ((thd->stmt_arena->is_stmt_prepare() || !thd->stmt_arena->is_stmt_execute())
+      && sl->table_list.elements > 0)
     {
-      // TODO: same logic as in mysql_create_view()
+      // Similar logic as in mysql_create_view()
       TABLE_LIST *impli_table= NULL, *expli_table= NULL;
       const char *impli_start, *impli_end;
       Item_field *expli_start= NULL, *expli_end= NULL;
 
       for (TABLE_LIST *table= sl->table_list.first; table; table= table->next_local)
       {
-        // FIXME: how it will behave with table as VIEW?
         if (!table->table || !table->table->versioned())
           continue;
 

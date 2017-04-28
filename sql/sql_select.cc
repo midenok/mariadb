@@ -772,7 +772,7 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
   }
 
   SELECT_LEX *outer_slex= slex->next_select_in_list();
-  if (outer_slex && slex->linkage == DERIVED_TABLE_TYPE)
+  if (outer_slex)
   {
     if (slex->vers_derived_conds)
     {
