@@ -96,6 +96,11 @@ insert into t1 values (2);
 delete from t1 where x = 1;
 insert into t2 values (10);
 
+--error ER_VERS_DERIVED_PROHIBITED
+select * from (select *, t1.sys_trx_end, t1.sys_trx_end as endo from t1) as s0;
+--error ER_VERS_DERIVED_PROHIBITED
+select * from (select *, t1.sys_trx_end, t2.sys_trx_start from t1, t2) as s0;
+
 # system_time propagation from inner to outer
 select * from (select * from t1 for system_time as of timestamp @t0, t2) as s0;
 # leading table selection

@@ -132,6 +132,10 @@ set @t0= now(6);
 insert into t1 values (2);
 delete from t1 where x = 1;
 insert into t2 values (10);
+select * from (select *, t1.sys_trx_end, t1.sys_trx_end as endo from t1) as s0;
+ERROR HY000: Derived table is prohibited: multiple end system fields `t1.sys_trx_end`, `t1.sys_trx_end` in query!
+select * from (select *, t1.sys_trx_end, t2.sys_trx_start from t1, t2) as s0;
+ERROR HY000: Derived table is prohibited: system fields from multiple tables `t1`, `t2` in query!
 select * from (select * from t1 for system_time as of timestamp @t0, t2) as s0;
 x	y
 1	10

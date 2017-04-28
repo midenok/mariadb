@@ -758,7 +758,7 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
             if (expli_start)
             {
               my_printf_error(
-                ER_VERS_VIEW_PROHIBITED,
+                ER_VERS_DERIVED_PROHIBITED,
                 "Derived table is prohibited: multiple start system fields `%s.%s`, `%s.%s` in query!", MYF(0),
                 expli_table->alias,
                 expli_start->field_name,
@@ -773,7 +773,7 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
               {
 expli_table_err:
                 my_printf_error(
-                  ER_VERS_VIEW_PROHIBITED,
+                  ER_VERS_DERIVED_PROHIBITED,
                   "Derived table is prohibited: system fields from multiple tables %`s, %`s in query!", MYF(0),
                   expli_table->alias,
                   table->alias);
@@ -791,7 +791,7 @@ expli_table_err:
             if (expli_end)
             {
               my_printf_error(
-                ER_VERS_VIEW_PROHIBITED,
+                ER_VERS_DERIVED_PROHIBITED,
                 "Derived table is prohibited: multiple end system fields `%s.%s`, `%s.%s` in query!", MYF(0),
                 expli_table->alias,
                 expli_end->field_name,

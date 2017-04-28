@@ -807,15 +807,6 @@ int vers_setup_select(THD *thd, TABLE_LIST *tables, COND **where_expr,
           DBUG_RETURN(-1);
       }
 
-      #if 0
-      if (table->is_derived() && slex->vers_conditions)
-      {
-        DBUG_ASSERT(table->derived);
-        SELECT_LEX *inner_slex= table->derived->first_select();
-        DBUG_ASSERT(inner_slex);
-      }
-      #endif
-
       if (vers_conditions)
       {
         switch (slex->lock_type)
