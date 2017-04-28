@@ -127,3 +127,19 @@ emp_id	name	mgr
 3	kate	1
 drop prepare stmt;
 drop table emp;
+create or replace table t1 (x int) with system versioning;
+create or replace table t2 (y int) with system versioning;
+insert into t1 values (1);
+set @t0= now(6);
+insert into t1 values (2);
+delete from t1 where x = 1;
+insert into t2 values (10);
+select * from (select * from t1 for system_time as of timestamp @t0, t2) as s0;
+x	y
+1	10
+select * from (select *, t1.sys_trx_end from t2, t1 for system_time as of timestamp @t0) as s0;
+y	x
+10	1
+select * from (select *, t1.sys_trx_start from t2 for system_time as of now, t1) as s0 query for system_time as of timestamp @t0;
+y	x
+10	1

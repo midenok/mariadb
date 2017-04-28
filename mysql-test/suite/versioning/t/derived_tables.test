@@ -89,3 +89,18 @@ select * from ancestors for system_time as of timestamp @ts;
 prepare stmt from @tmp; execute stmt; drop prepare stmt;
 
 drop table emp;
+
+create or replace table t1 (x int) with system versioning;
+create or replace table t2 (y int) with system versioning;
+insert into t1 values (1);
+set @t0= now(6);
+insert into t1 values (2);
+delete from t1 where x = 1;
+insert into t2 values (10);
+
+# system_time propagation from inner to outer
+select * from (select * from t1 for system_time as of timestamp @t0, t2) as s0;
+# leading table selection
+select * from (select *, t1.sys_trx_end from t2, t1 for system_time as of timestamp @t0) as s0;
+# system_time propagation from outer to inner
+select * from (select *, t1.sys_trx_start from t2 for system_time as of now, t1) as s0 query for system_time as of timestamp @t0;
