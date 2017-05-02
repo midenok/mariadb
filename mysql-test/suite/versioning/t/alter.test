@@ -1,6 +1,4 @@
--- source suite/versioning/t/ddl.inc
-
-create or replace table t(
+create table t(
   a int
 );
 show create table t;
@@ -50,19 +48,15 @@ alter table t with system versioning;
 show create table t;
 
 alter table t add column b int;
-call drop_last_historical('t');
 show create table t;
 
 alter table t add column c int;
-call drop_last_historical('t');
 show create table t;
 
 alter table t add column d int first;
-call drop_last_historical('t');
 show create table t;
 
 alter table t add column e int after d;
-call drop_last_historical('t');
 show create table t;
 
 --error ER_VERS_WRONG_PARAMS
@@ -71,7 +65,6 @@ alter table t add column f int after sys_trx_start;
 alter table t add column f int after sys_trx_end;
 
 alter table t drop column a;
-call drop_last_historical('t');
 show create table t;
 
 --error ER_VERS_WRONG_PARAMS
@@ -94,11 +87,10 @@ select * from t;
 select * from t for system_time all;
 select sys_trx_start from t where a=3 into @tm;
 alter table t add column b int;
-select @tm<sys_trx_start from t where a=3;
+select @tm=sys_trx_start from t where a=3;
 show create table t;
 select * from t;
 select * from t for system_time all;
-call drop_last_historical('t');
 
 alter table t without system versioning;
 select * from t;
@@ -119,6 +111,7 @@ show create table t;
 alter table t modify a int with system versioning;
 show create table t;
 
+-- source suite/versioning/common.inc
 create or replace table t(
   a int
 ) engine=innodb;
@@ -150,12 +143,10 @@ select * from t for system_time all;
 alter table t add column b int, algorithm=copy;
 show create table t;
 select * from t;
-call drop_last_historical('t');
 
 alter table t drop column b, algorithm=copy;
 show create table t;
 select * from t for system_time all;
-call drop_last_historical('t');
 
 alter table t add column b int, algorithm=inplace;
 show create table t;
@@ -172,7 +163,6 @@ create or replace table t (a int) with system versioning engine=innodb;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b int auto_increment unique;
-call drop_last_historical('t');
 select * from t for system_time all;
 insert into t values (4, NULL);
 select * from t for system_time all;
@@ -181,7 +171,6 @@ create or replace table t (a int) with system versioning;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b int auto_increment unique;
-call drop_last_historical('t');
 select * from t for system_time all;
 insert into t values (4, NULL);
 select * from t for system_time all;
@@ -190,7 +179,6 @@ create or replace table t (a int) with system versioning engine=innodb;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b tinyint auto_increment unique;
-call drop_last_historical('t');
 select * from t for system_time all;
 insert into t values (4, NULL);
 select * from t for system_time all;
@@ -199,7 +187,6 @@ create or replace table t (a int) with system versioning;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b tinyint auto_increment unique;
-call drop_last_historical('t');
 select * from t for system_time all;
 insert into t values (4, NULL);
 select * from t for system_time all;
@@ -217,11 +204,5 @@ select * from t;
 
 call verify_vtq;
 drop table t;
-
-# from ddl.inc
-drop procedure concat_exec2;
-drop procedure concat_exec3;
-drop function get_historical_table_name;
-drop procedure drop_last_historical;
 
 -- source suite/versioning/common_finish.inc

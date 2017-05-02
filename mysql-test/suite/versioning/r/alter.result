@@ -1,161 +1,4 @@
-set @@session.time_zone='+00:00';
-select ifnull(max(trx_id), 0) into @start_trx_id from information_schema.innodb_vtq;
-create procedure if not exists verify_vtq()
-begin
-set @i= 0;
-select
-@i:= @i + 1 as No,
-trx_id > 0 as A,
-commit_id > trx_id as B,
-begin_ts > '1-1-1 0:0:0' as C,
-commit_ts >= begin_ts as D
-from information_schema.innodb_vtq
-where trx_id > @start_trx_id;
-select ifnull(max(trx_id), 0)
-into @start_trx_id
-from information_schema.innodb_vtq;
-end~~
-create function if not exists default_engine()
-returns varchar(255)
-deterministic
-begin
-declare e varchar(255);
-select lower(engine) from information_schema.engines where support='DEFAULT' into e;
-return e;
-end~~
-create function if not exists sys_datatype()
-returns varchar(255)
-deterministic
-begin
-if default_engine() = 'innodb' then
-return 'bigint unsigned';
-elseif default_engine() = 'myisam' then
-return 'timestamp(6)';
-end if;
-return NULL;
-end~~
-create function if not exists sys_commit_ts(sys_field varchar(255))
-returns varchar(255)
-deterministic
-begin
-if default_engine() = 'innodb' then
-return concat('vtq_commit_ts(', sys_field, ')');
-elseif default_engine() = 'myisam' then
-return sys_field;
-end if;
-return NULL;
-end~~
-create procedure if not exists innodb_verify_vtq(recs int)
-begin
-declare i int default 1;
-if default_engine() = 'innodb' then
-call verify_vtq;
-elseif default_engine() = 'myisam' then
-create temporary table tmp (No int, A bool, B bool, C bool, D bool);
-while i <= recs do
-insert into tmp values (i, 1, 1, 1, 1);
-set i= i + 1;
-end while;
-select * from tmp;
-drop table tmp;
-end if;
-end~~
-create procedure concat_exec2(a varchar(255), b varchar(255))
-begin
-prepare stmt from concat(a, b);
-execute stmt;
-deallocate prepare stmt;
-end~~
-create procedure concat_exec3(a varchar(255), b varchar(255), c varchar(255))
-begin
-prepare stmt from concat(a, b, c);
-execute stmt;
-deallocate prepare stmt;
-end~~
-create function get_historical_table_name(table_name_arg varchar(255))
-returns varchar(255)
-begin
-return (select table_name from information_schema.tables
-where table_schema='test' and table_name like concat(table_name_arg, '_%') limit 1);
-end~~
-create procedure drop_last_historical(table_name_arg varchar(255))
-begin
-call concat_exec2('drop table ', get_historical_table_name(table_name_arg));
-end~~
-create or replace table t (a int) with system versioning;
-insert into t values (1);
-update t set a=2 where a=1;
-select sys_trx_start from t where a=2 into @tm;
-alter table t add column b int;
-select * from t;
-a	b
-2	NULL
-call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
-a
-2
-1
-call concat_exec3('select @tm=sys_trx_start from ', get_historical_table_name('t'), ' for system_time all where a=2');
-@tm=sys_trx_start
-1
-select @tm<sys_trx_start from t where a=2;
-@tm<sys_trx_start
-1
-select sys_trx_start from t where a=2 into @tm;
-call concat_exec3('select @tm=sys_trx_end from ', get_historical_table_name('t'), ' for system_time all where a=2');
-@tm=sys_trx_end
-1
-call drop_last_historical('t');
-create or replace table t (a int) with system versioning;
-insert into t values (1);
-update t set a=2 where a=1;
-select sys_trx_start from t where a=2 into @tm;
-alter table t add column b int;
-select * from t;
-a	b
-2	NULL
-call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
-a
-2
-1
-call concat_exec3('select @tm=sys_trx_start from ', get_historical_table_name('t'), ' for system_time all where a=2');
-@tm=sys_trx_start
-1
-select @tm<sys_trx_start from t where a=2;
-@tm<sys_trx_start
-1
-select sys_trx_start from t where a=2 into @tm;
-call concat_exec3('select @tm=sys_trx_end from ', get_historical_table_name('t'), ' for system_time all where a=2');
-@tm=sys_trx_end
-1
-call drop_last_historical('t');
-create or replace table t (a int) with system versioning engine innodb;
-insert into t values (1);
-update t set a=2 where a=1;
-select sys_trx_start from t where a=2 into @tm;
-alter table t add column b int;
-select * from t;
-a	b
-2	NULL
-call concat_exec3('select * from ', get_historical_table_name('t'), ' for system_time all');
-a
-2
-1
-call concat_exec3('select @tm=sys_trx_start from ', get_historical_table_name('t'), ' for system_time all where a=2');
-@tm=sys_trx_start
-1
-select @tm<sys_trx_start from t where a=2;
-@tm<sys_trx_start
-1
-select sys_trx_start from t where a=2 into @tm;
-call concat_exec3('select @tm=sys_trx_end from ', get_historical_table_name('t'), ' for system_time all where a=2');
-@tm=sys_trx_end
-1
-call drop_last_historical('t');
-create or replace table t (a int) with system versioning engine innodb;
-insert into t values (1);
-update t set a=2 where a=1;
-alter table t add column b int, algorithm=inplace;
-create or replace table t(
+create table t(
 a int
 );
 show create table t;
@@ -230,7 +73,6 @@ t	CREATE TABLE `t` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t add column b int;
-call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -241,7 +83,6 @@ t	CREATE TABLE `t` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t add column c int;
-call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -253,7 +94,6 @@ t	CREATE TABLE `t` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t add column d int first;
-call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -266,7 +106,6 @@ t	CREATE TABLE `t` (
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t add column e int after d;
-call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -284,7 +123,6 @@ ERROR HY000: Wrong parameters for `t`: Can not put new field after system versio
 alter table t add column f int after sys_trx_end;
 ERROR HY000: Wrong parameters for `t`: Can not put new field after system versioning field
 alter table t drop column a;
-call drop_last_historical('t');
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
@@ -334,8 +172,8 @@ a
 1
 select sys_trx_start from t where a=3 into @tm;
 alter table t add column b int;
-select @tm<sys_trx_start from t where a=3;
-@tm<sys_trx_start
+select @tm=sys_trx_start from t where a=3;
+@tm=sys_trx_start
 1
 show create table t;
 Table	Create Table
@@ -354,7 +192,7 @@ select * from t for system_time all;
 a	b
 3	NULL
 2	NULL
-call drop_last_historical('t');
+1	NULL
 alter table t without system versioning;
 select * from t;
 a	b
@@ -393,6 +231,68 @@ t	CREATE TABLE `t` (
   `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+set @@session.time_zone='+00:00';
+select ifnull(max(trx_id), 0) into @start_trx_id from information_schema.innodb_vtq;
+create procedure if not exists verify_vtq()
+begin
+set @i= 0;
+select
+@i:= @i + 1 as No,
+trx_id > 0 as A,
+commit_id > trx_id as B,
+begin_ts > '1-1-1 0:0:0' as C,
+commit_ts >= begin_ts as D
+from information_schema.innodb_vtq
+where trx_id > @start_trx_id;
+select ifnull(max(trx_id), 0)
+into @start_trx_id
+from information_schema.innodb_vtq;
+end~~
+create function if not exists default_engine()
+returns varchar(255)
+deterministic
+begin
+declare e varchar(255);
+select lower(engine) from information_schema.engines where support='DEFAULT' into e;
+return e;
+end~~
+create function if not exists sys_datatype()
+returns varchar(255)
+deterministic
+begin
+if default_engine() = 'innodb' then
+return 'bigint unsigned';
+elseif default_engine() = 'myisam' then
+return 'timestamp(6)';
+end if;
+return NULL;
+end~~
+create function if not exists sys_commit_ts(sys_field varchar(255))
+returns varchar(255)
+deterministic
+begin
+if default_engine() = 'innodb' then
+return concat('vtq_commit_ts(', sys_field, ')');
+elseif default_engine() = 'myisam' then
+return sys_field;
+end if;
+return NULL;
+end~~
+create procedure if not exists innodb_verify_vtq(recs int)
+begin
+declare i int default 1;
+if default_engine() = 'innodb' then
+call verify_vtq;
+elseif default_engine() = 'myisam' then
+create temporary table tmp (No int, A bool, B bool, C bool, D bool);
+while i <= recs do
+insert into tmp values (i, 1, 1, 1, 1);
+set i= i + 1;
+end while;
+select * from tmp;
+drop table tmp;
+end if;
+end~~
 create or replace table t(
 a int
 ) engine=innodb;
@@ -447,7 +347,7 @@ t	CREATE TABLE `t` (
 select * from t;
 a	b
 2	NULL
-call drop_last_historical('t');
+1	NULL
 alter table t drop column b, algorithm=copy;
 show create table t;
 Table	Create Table
@@ -460,7 +360,7 @@ t	CREATE TABLE `t` (
 select * from t for system_time all;
 a
 2
-call drop_last_historical('t');
+1
 alter table t add column b int, algorithm=inplace;
 show create table t;
 Table	Create Table
@@ -474,6 +374,7 @@ t	CREATE TABLE `t` (
 select * from t;
 a	b
 2	NULL
+1	NULL
 alter table t drop column b, algorithm=inplace;
 show create table t;
 Table	Create Table
@@ -486,6 +387,7 @@ t	CREATE TABLE `t` (
 select * from t for system_time all;
 a
 2
+1
 alter table t without system versioning, algorithm=copy;
 show create table t;
 Table	Create Table
@@ -496,52 +398,64 @@ create or replace table t (a int) with system versioning engine=innodb;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b int auto_increment unique;
-call drop_last_historical('t');
 select * from t for system_time all;
 a	b
+1	-1
+2	-2
 3	1
 insert into t values (4, NULL);
 select * from t for system_time all;
 a	b
+1	-1
+2	-2
 3	1
-4	4
+4	2
 create or replace table t (a int) with system versioning;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b int auto_increment unique;
-call drop_last_historical('t');
 select * from t for system_time all;
 a	b
+1	-1
+2	-2
 3	1
 insert into t values (4, NULL);
 select * from t for system_time all;
 a	b
+1	-1
+2	-2
 3	1
 4	2
 create or replace table t (a int) with system versioning engine=innodb;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b tinyint auto_increment unique;
-call drop_last_historical('t');
 select * from t for system_time all;
 a	b
+1	-1
+2	-2
 3	1
 insert into t values (4, NULL);
 select * from t for system_time all;
 a	b
+1	-1
+2	-2
 3	1
-4	4
+4	2
 create or replace table t (a int) with system versioning;
 insert into t values (1), (2), (3);
 delete from t where a<3;
 alter table t add b tinyint auto_increment unique;
-call drop_last_historical('t');
 select * from t for system_time all;
 a	b
+1	-1
+2	-2
 3	1
 insert into t values (4, NULL);
 select * from t for system_time all;
 a	b
+1	-1
+2	-2
 3	1
 4	2
 create or replace table t (a int) engine innodb;
@@ -577,18 +491,7 @@ No	A	B	C	D
 9	1	1	1	1
 10	1	1	1	1
 11	1	1	1	1
-12	1	1	1	1
-13	1	1	1	1
-14	1	1	1	1
-15	1	1	1	1
-16	1	1	1	1
-17	1	1	1	1
-18	1	1	1	1
 drop table t;
-drop procedure concat_exec2;
-drop procedure concat_exec3;
-drop function get_historical_table_name;
-drop procedure drop_last_historical;
 drop procedure verify_vtq;
 drop procedure innodb_verify_vtq;
 drop function default_engine;
