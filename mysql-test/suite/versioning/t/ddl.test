@@ -30,7 +30,7 @@ end~~
 
 delimiter ;~~
 
-set vers_ddl = 1;
+set versioning_ddl_survival = 1;
 
 create or replace table t (a int) with system versioning;
 insert into t values (1);
@@ -91,7 +91,7 @@ insert into t values (1);
 update t set a=2 where a=1;
 alter table t add column b int, algorithm=inplace;
 
-set vers_ddl = 0;
+set versioning_ddl_survival = 0;
 
 drop procedure concat_exec2;
 drop procedure concat_exec3;

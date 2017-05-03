@@ -82,7 +82,7 @@ create procedure drop_last_historical(table_name_arg varchar(255))
 begin
 call concat_exec2('drop table ', get_historical_table_name(table_name_arg));
 end~~
-set vers_ddl = 1;
+set versioning_ddl_survival = 1;
 create or replace table t (a int) with system versioning;
 insert into t values (1);
 update t set a=2 where a=1;
@@ -156,7 +156,7 @@ create or replace table t (a int) with system versioning engine innodb;
 insert into t values (1);
 update t set a=2 where a=1;
 alter table t add column b int, algorithm=inplace;
-set vers_ddl = 0;
+set versioning_ddl_survival = 0;
 drop procedure concat_exec2;
 drop procedure concat_exec3;
 drop function get_historical_table_name;

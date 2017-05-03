@@ -406,9 +406,9 @@ static Sys_var_mybool Sys_vers_innodb_algorithm_simple(
        SESSION_VAR(vers_innodb_algorithm_simple), CMD_LINE(OPT_ARG),
        DEFAULT(TRUE));
 
-static Sys_var_mybool Sys_vers_ddl(
-       "vers_ddl", "Use system versioning DDL survival feature",
-       SESSION_VAR(vers_ddl), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+static Sys_var_mybool Sys_vers_ddl_survival(
+       "versioning_ddl_survival", "Use system versioning DDL survival feature",
+       SESSION_VAR(vers_ddl_survival), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
 static Sys_var_ulonglong Sys_binlog_cache_size(
        "binlog_cache_size", "The size of the transactional cache for "

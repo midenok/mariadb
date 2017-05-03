@@ -5171,7 +5171,7 @@ static void vers_table_name_date(THD *thd, const char *db,
 {
   const MYSQL_TIME now= vers_thd_get_now(thd);
   my_snprintf(new_name, new_name_size, "%s_%s_%d_%d_%d_%d_%d_%d_%d", db,
-              table_name, now.month, now.day, now.year, now.hour, now.minute,
+              table_name, now.year, now.month, now.day, now.hour, now.minute,
               now.second, now.second_part);
 }
 
@@ -8683,7 +8683,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                           &alter_prelocking_strategy);
   thd->open_options&= ~HA_OPEN_FOR_ALTER;
   bool versioned= table_list->table && table_list->table->versioned();
-  if (versioned && thd->variables.vers_ddl)
+  if (versioned && thd->variables.vers_ddl_survival)
   {
     table_list->set_lock_type(thd, TL_WRITE);
     if (thd->mdl_context.upgrade_shared_lock(table_list->table->mdl_ticket,
@@ -9014,7 +9014,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       Upgrade from MDL_SHARED_UPGRADABLE to MDL_SHARED_NO_WRITE.
       Afterwards it's safe to take the table level lock.
     */
-    if ((!(versioned && thd->variables.vers_ddl) &&
+    if ((!(versioned && thd->variables.vers_ddl_survival) &&
          thd->mdl_context.upgrade_shared_lock(
              mdl_ticket, MDL_SHARED_NO_WRITE,
              thd->variables.lock_wait_timeout)) ||
@@ -9446,7 +9446,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                                  alter_info->keys_onoff,
                                  &alter_ctx))
     {
-      if (versioned && new_versioned && thd->variables.vers_ddl)
+      if (versioned && new_versioned && thd->variables.vers_ddl_survival)
       {
         if (table->versioned_by_sql())
         {
@@ -9552,7 +9552,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     anything goes wrong while renaming the new table.
   */
   char backup_name[FN_LEN];
-  if (versioned && thd->variables.vers_ddl)
+  if (versioned && thd->variables.vers_ddl_survival)
     vers_table_name_date(thd, alter_ctx.db, alter_ctx.table_name, backup_name,
                          sizeof(backup_name));
   else
@@ -9610,7 +9610,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   }
 
   // ALTER TABLE succeeded, delete the backup of the old table.
-  if (!(versioned && new_versioned && thd->variables.vers_ddl) &&
+  if (!(versioned && new_versioned && thd->variables.vers_ddl_survival) &&
       quick_rm_table(thd, old_db_type, alter_ctx.db, backup_name, FN_IS_TMP))
   {
     /*
@@ -9910,7 +9910,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   else if (keep_versioned)
   {
     to->file->vers_auto_decrement= 0xffffffffffffffff;
-    if (thd->variables.vers_ddl)
+    if (thd->variables.vers_ddl_survival)
     {
       thd->variables.time_zone->gmt_sec_to_TIME(&now, thd->query_start());
       now.second_part= thd->query_start_sec_part();
@@ -9992,7 +9992,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       if (!from_sys_trx_end->is_max())
         continue;
     }
-    else if (keep_versioned && thd->variables.vers_ddl)
+    else if (keep_versioned && thd->variables.vers_ddl_survival)
     {
       // Do not copy history rows.
       if (!from_sys_trx_end->is_max())
