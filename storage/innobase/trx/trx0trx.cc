@@ -1354,6 +1354,7 @@ trx_start_low(
 	ut_usectime((ulong *)&trx->start_time,
 		(ulong *)&trx->start_time_micro);
 
+#if 0 // disabled due to #189
 	if (trx->mysql_thd != NULL) {
 		time_t start_time = thd_start_time_in_secs(trx->mysql_thd);
 		ib_uint64_t start_utime = thd_query_start_micro(trx->mysql_thd);
@@ -1364,6 +1365,7 @@ trx_start_low(
 			trx->start_time_micro = start_utime;
 		}
 	}
+#endif
 
 	trx->vtq_notify_on_commit = false;
 	ut_a(trx->error_state == DB_SUCCESS);
