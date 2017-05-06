@@ -61,7 +61,8 @@ static const char* SYSTEM_TABLE_NAME[] = {
 	"SYS_TABLESPACES",
 	"SYS_DATAFILES",
 	"SYS_VIRTUAL",
-	"SYS_VTQ"
+	"SYS_VTQ",
+        "SYS_VTD"
 };
 
 /** Loads a table definition and also all its index definitions.

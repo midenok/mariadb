@@ -2002,6 +2002,93 @@ assign_and_exit:
 	return(err);
 }
 
+UNIV_INTERN
+dberr_t
+dict_create_or_check_vtd_table()
+{
+	trx_t*		trx;
+	my_bool		srv_file_per_table_backup;
+	dberr_t		err;
+
+	ut_a(srv_get_active_thread_type() == SRV_NONE);
+
+        /* Note: The master thread has not been started at this point. */
+	err = dict_check_if_system_table_exists(
+		"SYS_VTD", DICT_NUM_FIELDS__SYS_VTD + 1, 1);
+
+        if (err == DB_SUCCESS) {
+          mutex_enter(&dict_sys->mutex);
+          dict_sys->sys_vtd = dict_table_get_low("SYS_VTD");
+          mutex_exit(&dict_sys->mutex);
+          return(DB_SUCCESS);
+        }
+
+	if (srv_read_only_mode || srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO) {
+		return(DB_READ_ONLY);
+	}
+
+        trx = trx_allocate_for_mysql();
+        trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
+        trx->op_info = "creating sys_vtd table";
+        row_mysql_lock_data_dictionary(trx);
+
+        if (err == DB_CORRUPTION) {
+		ib::warn() << "Dropping incompletely created SYS_VTD_TABLE.";
+                row_drop_table_for_mysql("SYS_VTD", trx, false, TRUE);
+	}
+
+        ib::info() << "Creating sys_vtd system table.";
+
+	/* We always want SYSTEM tables to be created inside the system
+	 * tablespace. */
+	srv_file_per_table_backup = srv_file_per_table;
+	srv_file_per_table = 0;
+
+	err = que_eval_sql(NULL,
+		"PROCEDURE CREATE_SYS_VTD_TABLE_PROC () IS\n"
+		"BEGIN\n"
+		"CREATE TABLE SYS_VTD(\n"
+		"	TRX_ID_START BIGINT(20) UNSIGNED NOT NULL, "
+		"	TRX_ID_END BIGINT(20) UNSIGNED NOT NULL, "
+		"	OLD_NAME VARCHAR(64), "
+		"	NAME VARCHAR(64) NOT NULL, "
+		"	FRM_IMAGE BLOB, "
+		"	COL_RENAMES BLOB"
+		")\n"
+		"CREATE UNIQUE CLUSTERED INDEX TRX_ID_IND"
+		" ON SYS_VTD (TRX_ID);\n"
+		"END;\n",
+		FALSE, trx);
+
+        if (err != DB_SUCCESS) {
+		ib::error() << "Creation of SYS_VTD failed: " << ut_strerr(err)
+			    << ". Tablespace is full or too many transactions. "
+			       "Dropping incompletely created tables.";
+
+		ut_ad(err == DB_OUT_OF_FILE_SPACE ||
+			err == DB_TOO_MANY_CONCURRENT_TRXS);
+		row_drop_table_for_mysql("SYS_VTD", trx, false, TRUE);
+		if (err == DB_OUT_OF_FILE_SPACE)
+			err = DB_MUST_GET_MORE_FILE_SPACE;
+	}
+
+        trx_commit_for_mysql(trx);
+        row_mysql_unlock_data_dictionary(trx);
+        trx_free_for_mysql(trx);
+        srv_file_per_table = srv_file_per_table_backup;
+
+	if (err == DB_SUCCESS) {
+		ib::info() << "VTD system table created";
+	}
+
+        mutex_enter(&dict_sys->mutex);
+        dict_sys->sys_vtd = dict_table_get_low("SYS_VTD");
+        ut_ad(dict_sys->sys_vtd);
+        mutex_exit(&dict_sys->mutex);
+
+        return(err);
+}
+
 /****************************************************************//**
 Evaluate the given foreign key SQL statement.
 @return error code or DB_SUCCESS */

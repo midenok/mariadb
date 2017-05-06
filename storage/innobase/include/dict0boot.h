@@ -327,8 +327,7 @@ enum dict_fld_sys_datafiles_enum {
 };
 
 /* The columns in SYS_VTQ */
-enum dict_col_sys_vtq_enum
-{
+enum dict_col_sys_vtq_enum {
 	DICT_COL__SYS_VTQ__TRX_ID			= 0,
 	DICT_COL__SYS_VTQ__COMMIT_ID			= 1,
 	DICT_COL__SYS_VTQ__BEGIN_TS			= 2,
@@ -337,8 +336,7 @@ enum dict_col_sys_vtq_enum
 	DICT_NUM_COLS__SYS_VTQ				= 5
 };
 /* The field numbers in the SYS_VTQ clustered index */
-enum dict_fld_sys_vtq_enum
-{
+enum dict_fld_sys_vtq_enum {
 	DICT_FLD__SYS_VTQ__TRX_ID			= 0,
 	DICT_FLD__SYS_VTQ__DB_TRX_ID			= 1,
 	DICT_FLD__SYS_VTQ__DB_ROLL_PTR			= 2,
@@ -349,12 +347,36 @@ enum dict_fld_sys_vtq_enum
 	DICT_NUM_FIELDS__SYS_VTQ			= 7
 };
 
+/* The columns in SYS_VTD */
+enum dict_col_sys_vtd_enum {
+	DICT_COL__SYS_VTD__TRX_ID_START			= 0,
+	DICT_COL__SYS_VTD__TRX_ID_END			= 1,
+	DICT_COL__SYS_VTD__OLD_NAME			= 2,
+	DICT_COL__SYS_VTD__NAME				= 3,
+	DICT_COL__SYS_VTD__FRM_IMAGE			= 4,
+	DICT_COL__SYS_VTD__COL_RENAMES			= 5,
+        DICT_NUM_COLS__SYS_VTD				= 6
+};
+/* The field numbers in the SYS_VTD clusterd index */
+enum dict_fld_sys_vtd_enum {
+	DICT_FLD__SYS_VTD__TRX_ID			= 0,
+	DICT_FLD__SYS_VTD__DB_TRX_ID			= 1,
+	DICT_FLD__SYS_VTD__DB_ROLL_PTR			= 2,
+	DICT_FLD__SYS_VTD__TRX_ID_START			= 3,
+	DICT_FLD__SYS_VTD__TRX_ID_END			= 4,
+	DICT_FLD__SYS_VTD__OLD_NAME			= 5,
+	DICT_FLD__SYS_VTD__NAME				= 6,
+	DICT_FLD__SYS_VTD__FRM_IMAGE			= 7,
+	DICT_FLD__SYS_VTD__COL_RENAMES			= 8,
+        DICT_NUM_FIELDS__SYS_VTD			= 9
+};
+
 /* The columns in SYS_VIRTUAL */
 enum dict_col_sys_virtual_enum {
-	DICT_COL__SYS_VIRTUAL__TABLE_ID		= 0,
-	DICT_COL__SYS_VIRTUAL__POS		= 1,
-	DICT_COL__SYS_VIRTUAL__BASE_POS		= 2,
-	DICT_NUM_COLS__SYS_VIRTUAL		= 3
+	DICT_COL__SYS_VIRTUAL__TABLE_ID = 0,
+	DICT_COL__SYS_VIRTUAL__POS = 1,
+	DICT_COL__SYS_VIRTUAL__BASE_POS = 2,
+	DICT_NUM_COLS__SYS_VIRTUAL = 3
 };
 /* The field numbers in the SYS_VIRTUAL clustered index */
 enum dict_fld_sys_virtual_enum {

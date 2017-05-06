@@ -1739,6 +1739,7 @@ struct dict_sys_t{
 	dict_table_t*	sys_fields;	/*!< SYS_FIELDS table */
 	dict_table_t*	sys_vtq;	/*!< SYS_VTQ table */
 	dict_index_t*	vtq_commit_ts_ind;
+	dict_table_t*	sys_vtd;	/*!< SYS_VTD table */
 	dict_table_t*	sys_virtual;	/*!< SYS_VIRTUAL table */
 
 	/*=============================*/
