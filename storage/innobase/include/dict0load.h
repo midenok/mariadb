@@ -54,6 +54,7 @@ enum dict_system_id_t {
 	SYS_DATAFILES,
 	SYS_VIRTUAL,
 	SYS_VTQ,
+        SYS_VTD,
 
 	/* This must be last item. Defines the number of system tables. */
 	SYS_NUM_SYSTEM_TABLES

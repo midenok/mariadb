@@ -9977,13 +9977,35 @@ static ST_FIELD_INFO innodb_vtd_fields_info[] =
 };
 
 
+/**********************************************************************//**
+Function to fill INFORMATION_SCHEMA.INNODB_SYS_VTD with information
+collected by scanning SYS_VTD table.
+@return 0 on success */
+static
+int
+i_s_dict_fill_vtd(
+/*========================*/
+	THD*		thd,		/*!< in: thread */
+	const rec_t*	rec,		/*!< in: record */
+	TABLE*		table_to_fill)	/*!< in/out: fill this table */
+{
+	Field**		fields;
+
+	DBUG_ENTER("i_s_dict_fill_vtd");
+	fields = table_to_fill->field;
+
+
+	OK(schema_table_store_record(thd, table_to_fill));
+
+	DBUG_RETURN(0);
+}
+
+
 /*******************************************************************//**
 Function to populate INFORMATION_SCHEMA.INNODB_SYS_VTD table.
 Loop through each record in SYS_VTD, and extract the column
 information and fill the INFORMATION_SCHEMA.INNODB_SYS_VTD table.
 @return 0 on success */
-
-static const int I_S_SYS_VTD_LIMIT = 10000; // maximum number of records in I_S.INNODB_SYS_VTD
 
 static
 int
@@ -9993,8 +10015,26 @@ i_s_sys_vtd_fill_table(
 	TABLE_LIST*	tables,	/*!< in/out: tables to fill */
 	Item*		)	/*!< in: condition (not used) */
 {
+	mtr_t		mtr;
+	const rec_t*	rec = NULL;
+        btr_pcur_t	pcur;
+
 	DBUG_ENTER("i_s_sys_vtd_fill_table");
 	RETURN_IF_INNODB_NOT_STARTED(tables->schema_table_name);
+
+        // deny access to user without PROCESS_ACL privilege
+        if (check_global_access(thd, PROCESS_ACL)) {
+          DBUG_RETURN(0);
+        }
+
+        mutex_enter(&dict_sys->mutex);
+        mtr_start(&mtr);
+        rec = dict_startscan_system(&pcur, &mtr, SYS_VTD, false);
+
+        while (rec) {
+          //const char err_msg * = i_s_sy
+        }
+
 
 	DBUG_RETURN(0);
 }

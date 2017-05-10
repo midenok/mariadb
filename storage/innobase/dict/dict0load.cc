@@ -844,13 +844,12 @@ UNIV_INTERN
 const char*
 dict_process_sys_vtq(
 /*=======================*/
-mem_heap_t*	heap,		/*!< in/out: heap memory */
-const rec_t*	rec,		/*!< in: current rec */
-vtq_record_t&	out		/*!< out: field values */
-)
+	mem_heap_t*	heap,		/*!< in/out: heap memory */
+	const rec_t*	rec,		/*!< in: current rec */
+	vtq_record_t&	out)		/*!< out: field values */
 {
 	ulint		len, nfld;
-	const byte	*field;
+	const byte*	field;
 
 	if (rec_get_deleted_flag(rec, 0)) {
 		return("delete-marked record in SYS_VTQ");
@@ -904,6 +903,75 @@ vtq_record_t&	out		/*!< out: field values */
 
 	return(NULL);
 }
+
+/********************************************************************//**
+This function parses a SYS_VTD record, extracts necessary
+information from the record and returns it to the caller.
+@return error message, or NULL on success */
+UNIV_INTERN
+const char*
+dict_process_sys_vtd(
+/*=================*/
+	mem_heap_t*	heap,		/*!< in/out: heap memory */
+	const rec_t*	rec,		/*!< in: current rec */
+	ulonglong*	trx_id_start,	/*!< out: start transaction */
+	ulonglong*	trx_id_end,	/*!< out: end(ALTER) transaction */
+	const char**	old_name,	/*!< out: old table name*/
+	const char**	name,		/*!< out: new table name*/
+	const char**	frm_image,	/*!< out: .frm contents*/
+	const char**	col_renames,	/*!< out: column name mapping */
+	bool		with_blobs)	/*!< in: whether to return BLOBs */
+{
+	ulint		len;
+	const byte*	field;
+
+	if (rec_get_deleted_flag(rec, 0))
+		return("delete-marked record in SYS_VTD");
+        if (rec_get_n_fields_old(rec) != DICT_NUM_FIELDS__SYS_VTD)
+ 		return("wrong number of columns in SYS_VTD record");
+
+	field = rec_get_nth_field_old(
+		rec, DICT_FLD__SYS_VTD__TRX_ID_START, &len);
+	if (len != sizeof(trx_id_t))
+		return("incorrect column length in SYS_VTD");
+	*trx_id_start = mach_read_from_8(field);
+
+	field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__TRX_ID_END, &len);
+	if (len != sizeof(trx_id_t))
+		return("incorrect column length in SYS_VTD");
+        *trx_id_end = mach_read_from_8(field);
+
+	field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__OLD_NAME, &len);
+	*old_name = len == UNIV_SQL_NULL
+		? "NULL"
+		: mem_heap_strdupl(heap, (const char *)field, len);
+
+	field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__NAME, &len);
+	if (len == UNIV_SQL_NULL)
+		return("incorrect NULL value in in SYS_VTD");
+	*name = mem_heap_strdupl(heap, (const char *) field, len);
+
+        if (with_blobs) {
+		field = rec_get_nth_field_old(
+			rec, DICT_FLD__SYS_VTD__FRM_IMAGE, &len);
+		*frm_image = len == UNIV_SQL_NULL
+			? "NULL"
+			: mem_heap_strdupl(heap, (const char *)field, len);
+
+		field = rec_get_nth_field_old(
+			rec, DICT_FLD__SYS_VTD__COL_RENAMES, &len);
+		*col_renames = len == UNIV_SQL_NULL
+			? "NULL"
+			: mem_heap_strdupl(heap, (const char *)field, len);
+
+	} else {
+		*frm_image = "(blob)";
+		*col_renames = "(blob)";
+	}
+
+	return(NULL);
+}
+
 
 /** Get the first filepath from SYS_DATAFILES for a given space_id.
 @param[in]	space_id	Tablespace ID
