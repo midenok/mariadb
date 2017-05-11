@@ -9931,7 +9931,7 @@ static ST_FIELD_INFO innodb_vtd_fields_info[] =
 
 #define SYS_VTD_OLD_NAME 2
 {
-	STRUCT_FLD(field_name,		"trx_old_name"),
+	STRUCT_FLD(field_name,		"old_name"),
 	STRUCT_FLD(field_length,	1024),
 	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
 	STRUCT_FLD(value, 		0),
@@ -9942,7 +9942,7 @@ static ST_FIELD_INFO innodb_vtd_fields_info[] =
 
 #define SYS_VTD_NAME 3
 {
-	STRUCT_FLD(field_name,		"trx_name"),
+	STRUCT_FLD(field_name,		"name"),
 	STRUCT_FLD(field_length,	1024),
 	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
 	STRUCT_FLD(value, 		0),
@@ -10049,8 +10049,7 @@ i_s_sys_vtd_fill_table(THD *thd, TABLE_LIST *tables, Item *)
 }
 
 
-/*******************************************************************//**
-Bind the dynamic table INFORMATION_SCHEMA.innodb_vtd
+/* Bind the dynamic table INFORMATION_SCHEMA.innodb_vtd
 @return	0 on success */
 static
 int
