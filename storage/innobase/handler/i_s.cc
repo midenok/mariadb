@@ -9917,7 +9917,6 @@ static ST_FIELD_INFO innodb_vtd_fields_info[] =
 	STRUCT_FLD(open_method, 	SKIP_OPEN_TABLE)
 },
 
-
 #define SYS_VTD_TRX_ID_END 1
 {
 	STRUCT_FLD(field_name,		"trx_id_end"),
@@ -9932,7 +9931,7 @@ static ST_FIELD_INFO innodb_vtd_fields_info[] =
 #define SYS_VTD_OLD_NAME 2
 {
 	STRUCT_FLD(field_name,		"old_name"),
-	STRUCT_FLD(field_length,	1024),
+	STRUCT_FLD(field_length,	64),
 	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
 	STRUCT_FLD(value, 		0),
 	STRUCT_FLD(field_flags, 	MY_I_S_MAYBE_NULL),
@@ -9943,7 +9942,7 @@ static ST_FIELD_INFO innodb_vtd_fields_info[] =
 #define SYS_VTD_NAME 3
 {
 	STRUCT_FLD(field_name,		"name"),
-	STRUCT_FLD(field_length,	1024),
+	STRUCT_FLD(field_length,	64),
 	STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
 	STRUCT_FLD(value, 		0),
 	STRUCT_FLD(field_flags, 	0),
