@@ -1725,7 +1725,7 @@ sub command_line_setup {
   if ( $opt_valgrind )
   {
     # Make valgrind run in quiet mode so it only print errors
-    # push(@valgrind_args, "--quiet" );
+    push(@valgrind_args, "--quiet" );
 
     push(@valgrind_args, "--suppressions=${glob_mysql_test_dir}/valgrind.supp")
       if -f "$glob_mysql_test_dir/valgrind.supp";
