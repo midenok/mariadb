@@ -928,8 +928,7 @@ dict_process_sys_vtd(
         if (rec_get_n_fields_old(rec) != DICT_NUM_FIELDS__SYS_VTD)
  		return("wrong number of columns in SYS_VTD record");
 
-	field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__TRX_ID_START,
-				      &len);
+	field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__TRX_ID, &len);
 	if (len != sizeof(trx_id_t))
 		return("incorrect column length in SYS_VTD");
 	*trx_id_start = mach_read_from_8(field);

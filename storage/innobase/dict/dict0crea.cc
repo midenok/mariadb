@@ -2016,11 +2016,11 @@ dict_create_or_check_vtd_table()
 	err = dict_check_if_system_table_exists(
 		"SYS_VTD", DICT_NUM_FIELDS__SYS_VTD + 1, 1);
 
-        if (err == DB_SUCCESS) {
-          mutex_enter(&dict_sys->mutex);
-          dict_sys->sys_vtd = dict_table_get_low("SYS_VTD");
-          mutex_exit(&dict_sys->mutex);
-          return(DB_SUCCESS);
+	if (err == DB_SUCCESS) {
+		mutex_enter(&dict_sys->mutex);
+		dict_sys->sys_vtd = dict_table_get_low("SYS_VTD");
+		mutex_exit(&dict_sys->mutex);
+		return(DB_SUCCESS);
         }
 
 	if (srv_read_only_mode || srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO) {
@@ -2029,12 +2029,12 @@ dict_create_or_check_vtd_table()
 
         trx = trx_allocate_for_mysql();
         trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
-        trx->op_info = "creating sys_vtd table";
+        trx->op_info = "creating SYS_VTD table";
         row_mysql_lock_data_dictionary(trx);
 
         if (err == DB_CORRUPTION) {
-		ib::warn() << "Dropping incompletely created SYS_VTD_TABLE.";
-                row_drop_table_for_mysql("SYS_VTD", trx, false, TRUE);
+		ib::warn() << "Dropping incompletely created SYS_VTD table.";
+                row_drop_table_for_mysql("SYS_VTD", trx, false, true);
 	}
 
         ib::info() << "Creating sys_vtd system table.";
@@ -2044,30 +2044,28 @@ dict_create_or_check_vtd_table()
 	srv_file_per_table_backup = srv_file_per_table;
 	srv_file_per_table = 0;
 
-	err = que_eval_sql(NULL,
-		"PROCEDURE CREATE_SYS_VTD_TABLE_PROC () IS\n"
-		"BEGIN\n"
-		"CREATE TABLE SYS_VTD(\n"
-		"	TRX_ID_START BIGINT(20) UNSIGNED NOT NULL, "
-		"	TRX_ID_END BIGINT(20) UNSIGNED NOT NULL, "
-		"	OLD_NAME VARCHAR(64), "
-		"	NAME VARCHAR(64) NOT NULL, "
-		"	FRM_IMAGE BLOB, "
-		"	COL_RENAMES BLOB"
-		")\n"
-		"CREATE UNIQUE CLUSTERED INDEX TRX_ID_IND"
-		" ON SYS_VTD (TRX_ID);\n"
-		"END;\n",
-		FALSE, trx);
+	err = que_eval_sql(NULL, "PROCEDURE CREATE_VTD_SYS_TABLE_PROC() IS\n"
+				 "BEGIN\n"
+				 "CREATE TABLE SYS_VTD("
+				 "	TRX_ID_START BIGINT UNSIGNED,"
+				 "	TRX_ID_END BIGINT UNSIGNED,"
+				 "	OLD_NAME CHAR(64),"
+				 "	NAME CHAR(64),"
+				 "	FRM_IMAGE BLOB,"
+				 "	COL_RENAMES BLOB);\n"
+				 "CREATE UNIQUE CLUSTERED INDEX "
+				 "  TRX_ID_START_IDX ON SYS_VTD(TRX_ID_START);\n"
+				 "END;",
+			   false, trx);
 
-        if (err != DB_SUCCESS) {
+	if (err != DB_SUCCESS) {
 		ib::error() << "Creation of SYS_VTD failed: " << ut_strerr(err)
 			    << ". Tablespace is full or too many transactions. "
-			       "Dropping incompletely created tables.";
+			       "Dropping incompletely created table.";
 
 		ut_ad(err == DB_OUT_OF_FILE_SPACE ||
-			err == DB_TOO_MANY_CONCURRENT_TRXS);
-		row_drop_table_for_mysql("SYS_VTD", trx, false, TRUE);
+		      err == DB_TOO_MANY_CONCURRENT_TRXS);
+		row_drop_table_for_mysql("SYS_VTD", trx, false, true);
 		if (err == DB_OUT_OF_FILE_SPACE)
 			err = DB_MUST_GET_MORE_FILE_SPACE;
 	}
@@ -2081,7 +2079,12 @@ dict_create_or_check_vtd_table()
 		ib::info() << "VTD system table created";
 	}
 
-        mutex_enter(&dict_sys->mutex);
+	/* Confirm and move to the non-LRU part of the table LRU list. */
+	err = dict_check_if_system_table_exists(
+		"SYS_VTD", DICT_NUM_FIELDS__SYS_VTD + 1, 1);
+	ut_a(err == DB_SUCCESS);
+
+	mutex_enter(&dict_sys->mutex);
         dict_sys->sys_vtd = dict_table_get_low("SYS_VTD");
         ut_ad(dict_sys->sys_vtd);
         mutex_exit(&dict_sys->mutex);
