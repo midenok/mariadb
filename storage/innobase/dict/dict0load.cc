@@ -904,14 +904,12 @@ dict_process_sys_vtq(
 	return(NULL);
 }
 
-/********************************************************************//**
-This function parses a SYS_VTD record, extracts necessary
+/* This function parses a SYS_VTD record, extracts necessary
 information from the record and returns it to the caller.
 @return error message, or NULL on success */
 UNIV_INTERN
 const char*
 dict_process_sys_vtd(
-/*=================*/
 	mem_heap_t*	heap,		/*!< in/out: heap memory */
 	const rec_t*	rec,		/*!< in: current rec */
 	ulonglong*	trx_id_start,	/*!< out: start transaction */
@@ -930,8 +928,8 @@ dict_process_sys_vtd(
         if (rec_get_n_fields_old(rec) != DICT_NUM_FIELDS__SYS_VTD)
  		return("wrong number of columns in SYS_VTD record");
 
-	field = rec_get_nth_field_old(
-		rec, DICT_FLD__SYS_VTD__TRX_ID_START, &len);
+	field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__TRX_ID_START,
+				      &len);
 	if (len != sizeof(trx_id_t))
 		return("incorrect column length in SYS_VTD");
 	*trx_id_start = mach_read_from_8(field);
@@ -952,8 +950,8 @@ dict_process_sys_vtd(
 	*name = mem_heap_strdupl(heap, (const char *) field, len);
 
         if (with_blobs) {
-		field = rec_get_nth_field_old(
-			rec, DICT_FLD__SYS_VTD__FRM_IMAGE, &len);
+		field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__FRM_IMAGE,
+					      &len);
 		*frm_image = len == UNIV_SQL_NULL
 			? "NULL"
 			: mem_heap_strdupl(heap, (const char *)field, len);

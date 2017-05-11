@@ -9976,65 +9976,74 @@ static ST_FIELD_INFO innodb_vtd_fields_info[] =
 	END_OF_ST_FIELD_INFO
 };
 
-
-/**********************************************************************//**
-Function to fill INFORMATION_SCHEMA.INNODB_SYS_VTD with information
-collected by scanning SYS_VTD table.
-@return 0 on success */
-static
-int
-i_s_dict_fill_vtd(
-/*========================*/
-	THD*		thd,		/*!< in: thread */
-	const rec_t*	rec,		/*!< in: record */
-	TABLE*		table_to_fill)	/*!< in/out: fill this table */
-{
-	Field**		fields;
-
-	DBUG_ENTER("i_s_dict_fill_vtd");
-	fields = table_to_fill->field;
-
-
-	OK(schema_table_store_record(thd, table_to_fill));
-
-	DBUG_RETURN(0);
-}
-
-
-/*******************************************************************//**
-Function to populate INFORMATION_SCHEMA.INNODB_SYS_VTD table.
+/* Function to populate INFORMATION_SCHEMA.INNODB_SYS_VTD table.
 Loop through each record in SYS_VTD, and extract the column
 information and fill the INFORMATION_SCHEMA.INNODB_SYS_VTD table.
 @return 0 on success */
-
 static
 int
-i_s_sys_vtd_fill_table(
-/*=========================*/
-	THD*		thd,	/*!< in: thread */
-	TABLE_LIST*	tables,	/*!< in/out: tables to fill */
-	Item*		)	/*!< in: condition (not used) */
+i_s_sys_vtd_fill_table(THD *thd, TABLE_LIST *tables, Item *)
 {
 	mtr_t		mtr;
 	const rec_t*	rec = NULL;
         btr_pcur_t	pcur;
+	mem_heap_t*	heap = NULL;
+	Field**		fields = tables->table->field;
 
 	DBUG_ENTER("i_s_sys_vtd_fill_table");
 	RETURN_IF_INNODB_NOT_STARTED(tables->schema_table_name);
 
         // deny access to user without PROCESS_ACL privilege
-        if (check_global_access(thd, PROCESS_ACL)) {
-          DBUG_RETURN(0);
+	if (check_global_access(thd, PROCESS_ACL)) {
+		DBUG_RETURN(0);
         }
 
+	heap = mem_heap_create(1024);
         mutex_enter(&dict_sys->mutex);
         mtr_start(&mtr);
-        rec = dict_startscan_system(&pcur, &mtr, SYS_VTD, false);
+	rec = dict_startscan_system(&pcur, &mtr, SYS_VTD, false);
 
-        while (rec) {
-          //const char err_msg * = i_s_sy
-        }
+	while (rec) {
+		ulonglong	trx_id_start;
+		ulonglong	trx_id_end;
+		const char*	old_name;
+		const char*	name;
+		const char*	frm_image;
+		const char*	col_renames;
 
+		const char* err_msg = dict_process_sys_vtd(
+			heap, rec, &trx_id_start, &trx_id_end, &old_name, &name,
+			&frm_image, &col_renames, false);
+		mtr_commit(&mtr);
+		mutex_exit(&dict_sys->mutex);
+
+		if (err_msg) {
+			push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+					    ER_CANT_FIND_SYSTEM_REC, "%s",
+					    err_msg);
+			mem_heap_free(heap);
+			DBUG_RETURN(1);
+		}
+
+		OK(field_store_ullong(fields[SYS_VTD_TRX_ID_START],
+				      trx_id_start));
+		OK(field_store_ullong(fields[SYS_VTD_TRX_ID_END], trx_id_end));
+		OK(field_store_string(fields[SYS_VTD_OLD_NAME], old_name));
+		OK(field_store_string(fields[SYS_VTD_NAME], name));
+		OK(field_store_string(fields[SYS_VTD_FRM_IMAGE], frm_image));
+		OK(field_store_string(fields[SYS_VTD_COL_RENAMES],
+				      col_renames));
+
+		OK(schema_table_store_record(thd, tables->table));
+
+		mem_heap_empty(heap);
+		mtr_start(&mtr);
+		mutex_enter(&dict_sys->mutex);
+		rec = dict_getnext_system(&pcur, &mtr);
+	}
+
+	mutex_exit(&dict_sys->mutex);
+        mem_heap_free(heap);
 
 	DBUG_RETURN(0);
 }
@@ -10045,11 +10054,9 @@ Bind the dynamic table INFORMATION_SCHEMA.innodb_vtd
 @return	0 on success */
 static
 int
-innodb_vtd_init(
-/*=============*/
-	void*	p)	/*!< in/out: table schema object */
+innodb_vtd_init(void *p)
 {
-	ST_SCHEMA_TABLE*	schema;
+	ST_SCHEMA_TABLE *schema;
 
 	DBUG_ENTER("innodb_vtd_init");
 
@@ -10061,7 +10068,7 @@ innodb_vtd_init(
 	DBUG_RETURN(0);
 }
 
-UNIV_INTERN struct st_maria_plugin	i_s_innodb_vtd =
+UNIV_INTERN struct st_maria_plugin i_s_innodb_vtd =
 {
 	/* the plugin type (a MYSQL_XXX_PLUGIN value) */
 	/* int */

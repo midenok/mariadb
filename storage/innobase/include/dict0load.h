@@ -328,8 +328,21 @@ dict_process_sys_vtq(
 /*=======================*/
 mem_heap_t*	heap,		/*!< in/out: heap memory */
 const rec_t*	rec,		/*!< in: current rec */
-vtq_record_t&	fields		/*!< out: field values */
-);
+vtq_record_t&	fields);	/*!< out: field values */
+
+UNIV_INTERN
+const char*
+dict_process_sys_vtd(
+	mem_heap_t*	heap,		/*!< in/out: heap memory */
+	const rec_t*	rec,		/*!< in: current rec */
+	ulonglong*	trx_id_start,	/*!< out: start transaction */
+	ulonglong*	trx_id_end,	/*!< out: end(ALTER) transaction */
+	const char**	old_name,	/*!< out: old table name*/
+	const char**	name,		/*!< out: new table name*/
+	const char**	frm_image,	/*!< out: .frm contents*/
+	const char**	col_renames,	/*!< out: column name mapping */
+	bool		with_blobs);	/*!< in: whether to return BLOBs */
+
 
 /** Update the record for space_id in SYS_TABLESPACES to this filepath.
 @param[in]	space_id	Tablespace ID
@@ -353,10 +366,5 @@ dict_replace_tablespace_and_filepath(
 	const char*	name,
 	const char*	filepath,
 	ulint		fsp_flags);
-
-
-UNIV_INTERN
-dict_table_t*
-get_vtq_table();
 
 #endif
