@@ -330,18 +330,29 @@ mem_heap_t*	heap,		/*!< in/out: heap memory */
 const rec_t*	rec,		/*!< in: current rec */
 vtq_record_t&	fields);	/*!< out: field values */
 
+/** Parses VTD record
+@param[in,out]	heap		Heap memory
+@param[in]	rec		Record to parse
+@param[out]	trx_id_start	Transaction which started table
+@param[out]	trx_id_end	Transaction which ALTERed table
+@param[out]	old_name	Old table name if it was RENAME
+@param[out]	name		Current table name
+@param[out]	frm_image	Current .frm file content
+@param[out]	col_renames	Column name mapping for renamed columns
+@param[in]	with_blobs	Specifies whether to return BLOB fields
+@return error mesage, or NULL on succes */
 UNIV_INTERN
 const char*
 dict_process_sys_vtd(
-	mem_heap_t*	heap,		/*!< in/out: heap memory */
-	const rec_t*	rec,		/*!< in: current rec */
-	ulonglong*	trx_id_start,	/*!< out: start transaction */
-	ulonglong*	trx_id_end,	/*!< out: end(ALTER) transaction */
-	const char**	old_name,	/*!< out: old table name*/
-	const char**	name,		/*!< out: new table name*/
-	const char**	frm_image,	/*!< out: .frm contents*/
-	const char**	col_renames,	/*!< out: column name mapping */
-	bool		with_blobs);	/*!< in: whether to return BLOBs */
+	mem_heap_t*	heap,
+	const rec_t*	rec,
+	ulonglong*	trx_id_start,
+	ulonglong*	trx_id_end,
+	const char**	old_name,
+	const char**	name,
+	const char**	frm_image,
+	const char**	col_renames,
+	bool		with_blobs);
 
 
 /** Update the record for space_id in SYS_TABLESPACES to this filepath.

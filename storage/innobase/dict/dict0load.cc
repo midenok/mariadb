@@ -62,7 +62,7 @@ static const char* SYSTEM_TABLE_NAME[] = {
 	"SYS_DATAFILES",
 	"SYS_VIRTUAL",
 	"SYS_VTQ",
-        "SYS_VTD"
+	"SYS_VTD"
 };
 
 /** Loads a table definition and also all its index definitions.
@@ -904,29 +904,26 @@ dict_process_sys_vtq(
 	return(NULL);
 }
 
-/* This function parses a SYS_VTD record, extracts necessary
-information from the record and returns it to the caller.
-@return error message, or NULL on success */
 UNIV_INTERN
 const char*
 dict_process_sys_vtd(
-	mem_heap_t*	heap,		/*!< in/out: heap memory */
-	const rec_t*	rec,		/*!< in: current rec */
-	ulonglong*	trx_id_start,	/*!< out: start transaction */
-	ulonglong*	trx_id_end,	/*!< out: end(ALTER) transaction */
-	const char**	old_name,	/*!< out: old table name*/
-	const char**	name,		/*!< out: new table name*/
-	const char**	frm_image,	/*!< out: .frm contents*/
-	const char**	col_renames,	/*!< out: column name mapping */
-	bool		with_blobs)	/*!< in: whether to return BLOBs */
+	mem_heap_t*	heap,
+	const rec_t*	rec,
+	ulonglong*	trx_id_start,
+	ulonglong*	trx_id_end,
+	const char**	old_name,
+	const char**	name,
+	const char**	frm_image,
+	const char**	col_renames,
+	bool		with_blobs)
 {
 	ulint		len;
 	const byte*	field;
 
 	if (rec_get_deleted_flag(rec, 0))
 		return("delete-marked record in SYS_VTD");
-        if (rec_get_n_fields_old(rec) != DICT_NUM_FIELDS__SYS_VTD)
- 		return("wrong number of columns in SYS_VTD record");
+	if (rec_get_n_fields_old(rec) != DICT_NUM_FIELDS__SYS_VTD)
+		return("wrong number of columns in SYS_VTD record");
 
 	field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__TRX_ID, &len);
 	if (len != sizeof(trx_id_t))
@@ -936,7 +933,7 @@ dict_process_sys_vtd(
 	field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__TRX_ID_END, &len);
 	if (len != sizeof(trx_id_t))
 		return("incorrect column length in SYS_VTD");
-        *trx_id_end = mach_read_from_8(field);
+	*trx_id_end = mach_read_from_8(field);
 
 	field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__OLD_NAME, &len);
 	*old_name = len == UNIV_SQL_NULL
@@ -948,7 +945,7 @@ dict_process_sys_vtd(
 		return("incorrect NULL value in in SYS_VTD");
 	*name = mem_heap_strdupl(heap, (const char *) field, len);
 
-        if (with_blobs) {
+	if (with_blobs) {
 		field = rec_get_nth_field_old(rec, DICT_FLD__SYS_VTD__FRM_IMAGE,
 					      &len);
 		*frm_image = len == UNIV_SQL_NULL

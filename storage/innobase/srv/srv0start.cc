@@ -2537,7 +2537,7 @@ files_checked:
 			if (err == DB_SUCCESS) {
 				/* Create the SYS_VTQ system table */
 				err = dict_create_or_check_vtq_table();
-                                if (err == DB_SUCCESS) {
+				if (err == DB_SUCCESS) {
 					err = dict_create_or_check_vtd_table();
 				}
 			}

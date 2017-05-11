@@ -2012,7 +2012,7 @@ dict_create_or_check_vtd_table()
 
 	ut_a(srv_get_active_thread_type() == SRV_NONE);
 
-        /* Note: The master thread has not been started at this point. */
+	/* Note: The master thread has not been started at this point. */
 	err = dict_check_if_system_table_exists(
 		"SYS_VTD", DICT_NUM_FIELDS__SYS_VTD + 1, 1);
 
@@ -2021,23 +2021,23 @@ dict_create_or_check_vtd_table()
 		dict_sys->sys_vtd = dict_table_get_low("SYS_VTD");
 		mutex_exit(&dict_sys->mutex);
 		return(DB_SUCCESS);
-        }
+	}
 
 	if (srv_read_only_mode || srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO) {
 		return(DB_READ_ONLY);
 	}
 
-        trx = trx_allocate_for_mysql();
-        trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
-        trx->op_info = "creating SYS_VTD table";
-        row_mysql_lock_data_dictionary(trx);
+	trx = trx_allocate_for_mysql();
+	trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
+	trx->op_info = "creating SYS_VTD table";
+	row_mysql_lock_data_dictionary(trx);
 
-        if (err == DB_CORRUPTION) {
+	if (err == DB_CORRUPTION) {
 		ib::warn() << "Dropping incompletely created SYS_VTD table.";
-                row_drop_table_for_mysql("SYS_VTD", trx, false, true);
+		row_drop_table_for_mysql("SYS_VTD", trx, false, true);
 	}
 
-        ib::info() << "Creating sys_vtd system table.";
+	ib::info() << "Creating sys_vtd system table.";
 
 	/* We always want SYSTEM tables to be created inside the system
 	 * tablespace. */
@@ -2070,10 +2070,10 @@ dict_create_or_check_vtd_table()
 			err = DB_MUST_GET_MORE_FILE_SPACE;
 	}
 
-        trx_commit_for_mysql(trx);
-        row_mysql_unlock_data_dictionary(trx);
-        trx_free_for_mysql(trx);
-        srv_file_per_table = srv_file_per_table_backup;
+	trx_commit_for_mysql(trx);
+	row_mysql_unlock_data_dictionary(trx);
+	trx_free_for_mysql(trx);
+	srv_file_per_table = srv_file_per_table_backup;
 
 	if (err == DB_SUCCESS) {
 		ib::info() << "VTD system table created";
@@ -2085,11 +2085,11 @@ dict_create_or_check_vtd_table()
 	ut_a(err == DB_SUCCESS);
 
 	mutex_enter(&dict_sys->mutex);
-        dict_sys->sys_vtd = dict_table_get_low("SYS_VTD");
-        ut_ad(dict_sys->sys_vtd);
-        mutex_exit(&dict_sys->mutex);
+	dict_sys->sys_vtd = dict_table_get_low("SYS_VTD");
+	ut_ad(dict_sys->sys_vtd);
+	mutex_exit(&dict_sys->mutex);
 
-        return(err);
+	return(err);
 }
 
 /****************************************************************//**
