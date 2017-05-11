@@ -9992,14 +9992,14 @@ i_s_sys_vtd_fill_table(THD *thd, TABLE_LIST *tables, Item *)
 	DBUG_ENTER("i_s_sys_vtd_fill_table");
 	RETURN_IF_INNODB_NOT_STARTED(tables->schema_table_name);
 
-        // deny access to user without PROCESS_ACL privilege
+	// deny access to user without PROCESS_ACL privilege
 	if (check_global_access(thd, PROCESS_ACL)) {
 		DBUG_RETURN(0);
-        }
+	}
 
 	heap = mem_heap_create(1024);
-        mutex_enter(&dict_sys->mutex);
-        mtr_start(&mtr);
+	mutex_enter(&dict_sys->mutex);
+	mtr_start(&mtr);
 	rec = dict_startscan_system(&pcur, &mtr, SYS_VTD, false);
 
 	while (rec) {
@@ -10042,7 +10042,8 @@ i_s_sys_vtd_fill_table(THD *thd, TABLE_LIST *tables, Item *)
 	}
 
 	mutex_exit(&dict_sys->mutex);
-        mem_heap_free(heap);
+	mtr_commit(&mtr);
+	mem_heap_free(heap);
 
 	DBUG_RETURN(0);
 }
@@ -10086,7 +10087,7 @@ UNIV_INTERN struct st_maria_plugin i_s_innodb_vtd =
 
 	/* general descriptive text (for SHOW PLUGINS) */
 	/* const char* */
-	STRUCT_FLD(descr, "InnoDB Versioning Table DDL table"),
+	STRUCT_FLD(descr, "InnoDB Versioning Table DDL"),
 
 	/* the plugin license (PLUGIN_LICENSE_XXX) */
 	/* int */

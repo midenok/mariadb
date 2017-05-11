@@ -15,4 +15,5 @@
 --innodb-sys-tables
 --innodb-sys-virtual
 --innodb-vtq
+--innodb-vtd
 --versioning-hide=implicit
