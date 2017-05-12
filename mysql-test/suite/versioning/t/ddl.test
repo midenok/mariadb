@@ -98,6 +98,9 @@ drop procedure concat_exec3;
 drop function get_historical_table_name;
 drop procedure drop_last_historical;
 
+select * from mysql.innodb_vtd;
+show create table mysql.innodb_vtd;
+
 call verify_vtq;
 drop table t;
 
