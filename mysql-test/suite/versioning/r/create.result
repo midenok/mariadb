@@ -328,6 +328,13 @@ select st, en from t2 for system_time all where y = 2 into @st, @en;
 select y from t2 for system_time all where st = @st and en = @en;
 y
 2
+create or replace table t1 (
+a int,
+st SYS_TRX_TYPE generated always as row start,
+en SYS_TRX_TYPE generated always as row end,
+b int,
+period for system_time (st, en)
+) with system versioning;
 drop table t1;
 drop table t2;
 drop table t3;

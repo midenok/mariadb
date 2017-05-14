@@ -257,6 +257,16 @@ select y from t2 for system_time all where st = @st and en = @en;
 select st, en from t2 for system_time all where y = 2 into @st, @en;
 select y from t2 for system_time all where st = @st and en = @en;
 
+# system versioning fields can be between other fields
+--replace_result "bigint unsigned" SYS_TRX_TYPE timestamp(6) SYS_TRX_TYPE
+eval create or replace table t1 (
+  a int,
+  st $sys_datatype generated always as row start,
+  en $sys_datatype generated always as row end,
+  b int,
+  period for system_time (st, en)
+) with system versioning;
+
 drop table t1;
 drop table t2;
 drop table t3;

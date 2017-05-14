@@ -270,6 +270,25 @@ select @tmp2 = sys_trx_start as B2, salary from t2;
 drop table t1;
 drop table t2;
 end~~
+create procedure test_08(
+sys_type varchar(255),
+engine varchar(255))
+begin
+set @str= concat('
+  create table t1(
+    x int unsigned,
+    sys_start ', sys_type, ' generated always as row start,
+    sys_end ', sys_type, ' generated always as row end,
+    y int unsigned,
+    period for system_time (sys_start, sys_end))
+  with system versioning
+  engine ', engine);
+prepare stmt from @str; execute stmt; drop prepare stmt;
+insert into t1(x, y) values(3, 4);
+update t1 set x=33, y=44;
+select x, y from t1 for system_time all;
+drop table t1;
+end~~
 call test_01('timestamp(6)', 'myisam', 'sys_end');
 x	y
 1	1000
@@ -543,6 +562,14 @@ B1	salary
 1	2500
 B2	salary
 1	2500
+call test_08('timestamp(6)', 'myisam');
+x	y
+33	44
+3	4
+call test_08('bigint unsigned', 'innodb');
+x	y
+33	44
+3	4
 call verify_vtq;
 No	A	B	C	D
 1	1	1	1	1
@@ -565,6 +592,8 @@ No	A	B	C	D
 18	1	1	1	1
 19	1	1	1	1
 20	1	1	1	1
+21	1	1	1	1
+22	1	1	1	1
 drop procedure test_01;
 drop procedure test_02;
 drop procedure test_03;
@@ -572,6 +601,7 @@ drop procedure test_04;
 drop procedure test_05;
 drop procedure test_06;
 drop procedure test_07;
+drop procedure test_08;
 drop procedure verify_vtq;
 drop procedure innodb_verify_vtq;
 drop function default_engine;

@@ -231,6 +231,27 @@ begin
   drop table t1;
   drop table t2;
 end~~
+
+create procedure test_08(
+  sys_type varchar(255),
+  engine varchar(255))
+begin
+  set @str= concat('
+  create table t1(
+    x int unsigned,
+    sys_start ', sys_type, ' generated always as row start,
+    sys_end ', sys_type, ' generated always as row end,
+    y int unsigned,
+    period for system_time (sys_start, sys_end))
+  with system versioning
+  engine ', engine);
+  prepare stmt from @str; execute stmt; drop prepare stmt;
+  insert into t1(x, y) values(3, 4);
+  update t1 set x=33, y=44;
+  select x, y from t1 for system_time all;
+  drop table t1;
+end~~
+
 delimiter ;~~
 
 call test_01('timestamp(6)', 'myisam', 'sys_end');
@@ -254,6 +275,9 @@ call test_06('bigint unsigned', 'innodb', 'vtq_commit_ts(sys_end)');
 call test_07('timestamp(6)', 'myisam', 'sys_end');
 call test_07('bigint unsigned', 'innodb', 'vtq_commit_ts(sys_end)');
 
+call test_08('timestamp(6)', 'myisam');
+call test_08('bigint unsigned', 'innodb');
+
 call verify_vtq;
 
 drop procedure test_01;
@@ -263,5 +287,6 @@ drop procedure test_04;
 drop procedure test_05;
 drop procedure test_06;
 drop procedure test_07;
+drop procedure test_08;
 
 -- source suite/versioning/common_finish.inc
