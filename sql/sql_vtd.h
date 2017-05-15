@@ -1,4 +1,8 @@
+#ifndef SQL_VTD_INCLUDED
+#define SQL_VTD_INCLUDED
+
 #include "table.h"
+#include "unireg.h"
 #include <mysqld_error.h>
 
 class VTD_table
@@ -35,7 +39,7 @@ class VTD_table
   {
     /* We are relying on init_one_table zeroing out the TABLE_LIST structure. */
     tl.init_one_table(C_STRING_WITH_LEN("mysql"),
-                      C_STRING_WITH_LEN("user"),
+                      C_STRING_WITH_LEN("innodb_vtd"),
                       NULL, lock_type);
     tl.open_type= OT_BASE_ONLY;
     if (lock_type >= TL_WRITE_ALLOW_WRITE)
@@ -44,7 +48,30 @@ class VTD_table
       tl.open_strategy= TABLE_LIST::OPEN_IF_EXISTS;
   }
 
+  int write_row()
+  {
+    int error;
+    TABLE *table= tl.table;
+    DBUG_ASSERT(table);
+    table->use_all_columns();
+    restore_record(table, s->default_values);
+    if ((error= table->file->ha_write_row(table->record[0])))
+    {
+      DBUG_PRINT("info", ("error inserting row"));
+      goto table_error;
+    }
+
+    /* all ok */
+    return 0;
+
+  table_error:
+    DBUG_PRINT("info", ("table error"));
+    table->file->print_error(error, MYF(0));
+    return 1;
+  }
+
 private:
   TABLE_LIST tl;
 };
 
+#endif // SQL_VTD_INCLUDED

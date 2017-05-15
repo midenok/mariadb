@@ -152,7 +152,6 @@ SET (SQL_SOURCE
                ${GEN_SOURCES}
                ${GEN_DIGEST_SOURCES}
                ${MYSYS_LIBWRAP_SOURCE}
-               sql_vtd.cc
 			   )
   
 IF (CMAKE_SYSTEM_NAME MATCHES "Linux" OR
