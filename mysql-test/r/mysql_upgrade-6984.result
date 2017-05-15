@@ -20,6 +20,9 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
+mysql.innodb_vtd
+Error    : Unknown storage engine 'InnoDB'
+error    : Corrupt
 mysql.plugin                                       OK
 mysql.proc                                         OK
 mysql.procs_priv                                   OK
@@ -40,6 +43,9 @@ mysql.innodb_index_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 mysql.innodb_table_stats
+Error    : Unknown storage engine 'InnoDB'
+error    : Corrupt
+mysql.innodb_vtd
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
