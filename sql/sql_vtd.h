@@ -9,7 +9,15 @@ class THD;
 
 class VTD_table
 {
- public:
+public:
+  enum {
+    TRX_ID_START= 0,
+    TRX_ID_END,
+    OLD_NAME,
+    NAME,
+    FRM_IMAGE,
+    COL_RENAMES
+  };
   /* Check if the table exists after an attempt to open it was made.
      Some tables, such as the host table in MySQL 5.6.7+ are missing. */
   bool table_exists() const { return tl.table; };

@@ -47,6 +47,20 @@ bool VTD_table::write_as_log(THD *thd)
   /* Honor next number columns if present */
   table->next_number_field= table->found_next_number_field;
 
+  /* check that all columns exist */
+  if (table->s->fields < 6)
+    goto err;
+
+  table->field[TRX_ID_START]->store((longlong) 0, TRUE);
+  table->field[TRX_ID_START]->set_notnull();
+  table->field[TRX_ID_END]->store((longlong) 1, TRUE);
+  table->field[TRX_ID_END]->set_notnull();
+  table->field[OLD_NAME]->set_null();
+  table->field[NAME]->store(STRING_WITH_LEN("name"), system_charset_info);
+  table->field[NAME]->set_notnull();
+  table->field[FRM_IMAGE]->set_null();
+  table->field[COL_RENAMES]->set_null();
+
   if (table->file->ha_write_row(table->record[0]))
     goto err;
 
