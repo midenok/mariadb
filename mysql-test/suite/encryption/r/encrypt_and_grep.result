@@ -8,14 +8,15 @@ insert t3 values (repeat('dummy', 42));
 # Wait max 10 min for key encryption threads to encrypt all spaces
 SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION = 0;
 NAME
-test/t3
-SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
-NAME
 mysql/innodb_table_stats
 mysql/innodb_index_stats
+mysql/innodb_vtd
+test/t3
+innodb_system
+SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
+NAME
 test/t1
 test/t2
-innodb_system
 # t1 yes on expecting NOT FOUND
 NOT FOUND /foobar/ in t1.ibd
 # t2 ... on expecting NOT FOUND
@@ -32,12 +33,13 @@ SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_
 NAME
 mysql/innodb_table_stats
 mysql/innodb_index_stats
-test/t2
+mysql/innodb_vtd
 test/t3
 innodb_system
 SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
 NAME
 test/t1
+test/t2
 # t1 yes on expecting NOT FOUND
 NOT FOUND /foobar/ in t1.ibd
 # t2 ... on expecting FOUND
@@ -57,6 +59,7 @@ SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_
 NAME
 mysql/innodb_table_stats
 mysql/innodb_index_stats
+mysql/innodb_vtd
 test/t1
 test/t2
 innodb_system
