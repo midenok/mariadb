@@ -131,6 +131,12 @@ def	mysql	innodb_table_stats	last_update	3	current_timestamp()	NO	timestamp	NULL
 def	mysql	innodb_table_stats	n_rows	4	NULL	NO	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint(20) unsigned			select,insert,update,references		NEVER	NULL
 def	mysql	innodb_table_stats	sum_of_other_index_sizes	6	NULL	NO	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint(20) unsigned			select,insert,update,references		NEVER	NULL
 def	mysql	innodb_table_stats	table_name	2	NULL	NO	varchar	64	192	NULL	NULL	NULL	utf8	utf8_bin	varchar(64)	PRI		select,insert,update,references		NEVER	NULL
+def	mysql	innodb_vtd	col_renames	6	NULL	YES	blob	65535	65535	NULL	NULL	NULL	NULL	NULL	blob			select,insert,update,references		NEVER	NULL
+def	mysql	innodb_vtd	frm_image	5	NULL	YES	blob	65535	65535	NULL	NULL	NULL	NULL	NULL	blob			select,insert,update,references		NEVER	NULL
+def	mysql	innodb_vtd	name	4	NULL	NO	varchar	64	192	NULL	NULL	NULL	utf8	utf8_bin	varchar(64)	PRI		select,insert,update,references		NEVER	NULL
+def	mysql	innodb_vtd	old_name	3	NULL	YES	varchar	64	192	NULL	NULL	NULL	utf8	utf8_bin	varchar(64)			select,insert,update,references		NEVER	NULL
+def	mysql	innodb_vtd	trx_id_end	2	NULL	NO	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint(20) unsigned	PRI		select,insert,update,references		NEVER	NULL
+def	mysql	innodb_vtd	trx_id_start	1	NULL	NO	bigint	NULL	NULL	20	0	NULL	NULL	NULL	bigint(20) unsigned	PRI		select,insert,update,references		NEVER	NULL
 def	mysql	plugin	dl	2		NO	varchar	128	384	NULL	NULL	NULL	utf8	utf8_general_ci	varchar(128)			select,insert,update,references		NEVER	NULL
 def	mysql	plugin	name	1		NO	varchar	64	192	NULL	NULL	NULL	utf8	utf8_general_ci	varchar(64)	PRI		select,insert,update,references		NEVER	NULL
 def	mysql	proc	body	11	NULL	NO	longblob	4294967295	4294967295	NULL	NULL	NULL	NULL	NULL	longblob			select,insert,update,references		NEVER	NULL
@@ -466,6 +472,12 @@ NULL	mysql	innodb_table_stats	last_update	timestamp	NULL	NULL	NULL	NULL	timestam
 NULL	mysql	innodb_table_stats	n_rows	bigint	NULL	NULL	NULL	NULL	bigint(20) unsigned
 NULL	mysql	innodb_table_stats	clustered_index_size	bigint	NULL	NULL	NULL	NULL	bigint(20) unsigned
 NULL	mysql	innodb_table_stats	sum_of_other_index_sizes	bigint	NULL	NULL	NULL	NULL	bigint(20) unsigned
+NULL	mysql	innodb_vtd	trx_id_start	bigint	NULL	NULL	NULL	NULL	bigint(20) unsigned
+NULL	mysql	innodb_vtd	trx_id_end	bigint	NULL	NULL	NULL	NULL	bigint(20) unsigned
+3.0000	mysql	innodb_vtd	old_name	varchar	64	192	utf8	utf8_bin	varchar(64)
+3.0000	mysql	innodb_vtd	name	varchar	64	192	utf8	utf8_bin	varchar(64)
+1.0000	mysql	innodb_vtd	frm_image	blob	65535	65535	NULL	NULL	blob
+1.0000	mysql	innodb_vtd	col_renames	blob	65535	65535	NULL	NULL	blob
 3.0000	mysql	plugin	name	varchar	64	192	utf8	utf8_general_ci	varchar(64)
 3.0000	mysql	plugin	dl	varchar	128	384	utf8	utf8_general_ci	varchar(128)
 3.0000	mysql	proc	db	char	64	192	utf8	utf8_bin	char(64)

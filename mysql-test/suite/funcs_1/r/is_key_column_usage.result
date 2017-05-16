@@ -111,6 +111,9 @@ def	mysql	PRIMARY	def	mysql	innodb_index_stats	index_name
 def	mysql	PRIMARY	def	mysql	innodb_index_stats	stat_name
 def	mysql	PRIMARY	def	mysql	innodb_table_stats	database_name
 def	mysql	PRIMARY	def	mysql	innodb_table_stats	table_name
+def	mysql	PRIMARY	def	mysql	innodb_vtd	trx_id_start
+def	mysql	PRIMARY	def	mysql	innodb_vtd	trx_id_end
+def	mysql	PRIMARY	def	mysql	innodb_vtd	name
 def	mysql	PRIMARY	def	mysql	plugin	name
 def	mysql	PRIMARY	def	mysql	proc	db
 def	mysql	PRIMARY	def	mysql	proc	name
