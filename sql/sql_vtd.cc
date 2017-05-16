@@ -29,8 +29,8 @@ bool VTD_table::write_as_log(THD *thd)
   thd->variables.option_bits&= ~OPTION_BIN_LOG;
 
   table_list.init_one_table(MYSQL_SCHEMA_NAME.str, MYSQL_SCHEMA_NAME.length,
-                            GENERAL_LOG_NAME.str, GENERAL_LOG_NAME.length,
-                            GENERAL_LOG_NAME.str,
+                            VERS_VTD_NAME.str, VERS_VTD_NAME.length,
+                            VERS_VTD_NAME.str,
                             TL_WRITE_CONCURRENT_INSERT);
 
   if (!(table= open_log_table(thd, &table_list, &open_tables_backup)))

@@ -9607,6 +9607,13 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                                 alter_ctx.new_db, alter_ctx.new_alias);
   }
 
+  if (versioned && new_versioned && thd->variables.vers_ddl_survival)
+  {
+    VTD_table vtd;
+    if (vtd.write_as_log(thd))
+      goto err_with_mdl_after_alter;
+  }
+
   // ALTER TABLE succeeded, delete the backup of the old table.
   if (!(versioned && new_versioned && thd->variables.vers_ddl_survival) &&
       quick_rm_table(thd, old_db_type, alter_ctx.db, backup_name, FN_IS_TMP))

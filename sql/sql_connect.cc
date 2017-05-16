@@ -1276,9 +1276,6 @@ bool thd_prepare_connection(THD *thd)
 #ifdef WITH_WSREP
   thd->wsrep_client_thread= 1;
 #endif /* WITH_WSREP */
-  thd->get_stmt_da()->set_overwrite_status(true);
-  thd->vers_vtd.init(thd);
-  thd->get_stmt_da()->set_overwrite_status(false);
   return FALSE;
 }
 

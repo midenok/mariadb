@@ -3108,8 +3108,6 @@ mysql_execute_command(THD *thd)
       thd->get_stmt_da()->opt_clear_warning_info(thd->query_id);
   }
 
-  // lex->add_to_query_tables(&thd->vers_vtd.tl);
-
 #ifdef HAVE_REPLICATION
   if (unlikely(thd->slave_thread))
   {
