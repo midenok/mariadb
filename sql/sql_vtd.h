@@ -35,12 +35,10 @@ class VTD_table
     bzero(&tl, sizeof(tl));
   };
 
-  /* Initialization sequence. This should be called
-     after all table-specific initialization is performed. */
-  int init(THD *thd, enum thr_lock_type lock_type);
+  void init(THD *thd);
   int write_row();
+  bool write_as_log(THD *thd);
 
-private:
   TABLE_LIST tl;
 };
 
