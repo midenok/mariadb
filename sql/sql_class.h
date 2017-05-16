@@ -48,7 +48,6 @@
 #include <mysql_com_server.h>
 #include "session_tracker.h"
 
-#include "sql_vtd.h"        /* System Versioning */
 
 extern "C"
 void set_thd_stage_info(void *thd,
@@ -4451,9 +4450,6 @@ public:
     See also sp_head::merge_lex().
   */
   bool restore_from_local_lex_to_old_lex(LEX *oldlex);
-
-  /* System Versioning */
-  VTD_table vers_vtd;
 };
 
 inline void add_to_active_threads(THD *thd)

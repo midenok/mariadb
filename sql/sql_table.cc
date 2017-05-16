@@ -56,6 +56,7 @@
 #include "sql_audit.h"
 #include "sql_sequence.h"
 #include "tztime.h"
+#include "vtd.h"                  // System Versioning
 
 
 #ifdef __WIN__
@@ -9609,8 +9610,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
 
   if (versioned && new_versioned && thd->variables.vers_ddl_survival)
   {
-    VTD_table vtd;
-    if (vtd.write_as_log(thd))
+    if (VTD_table::write_row(thd))
       goto err_with_mdl_after_alter;
   }
 

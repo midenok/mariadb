@@ -1,20 +1,8 @@
-#include "sql_vtd.h"
+#include "vtd.h"
 #include "sql_base.h"
 #include "sql_class.h"
 
-void VTD_table::init(THD *thd)
-{
-  thr_lock_type lock_type= TL_WRITE;
-  /* We are relying on init_one_table zeroing out the TABLE_LIST structure. */
-  tl.init_one_table(MYSQL_SCHEMA_NAME.str, MYSQL_SCHEMA_NAME.length,
-                    C_STRING_WITH_LEN("user"),
-                    NULL, lock_type);
-  tl.open_type= OT_BASE_ONLY;
-  if (lock_type >= TL_WRITE_ALLOW_WRITE)
-    tl.updating= 1;
-}
-
-bool VTD_table::write_as_log(THD *thd)
+bool VTD_table::write_row(THD *thd)
 {
   TABLE_LIST table_list;
   TABLE *table;
@@ -78,26 +66,4 @@ err:
 
   thd->variables.option_bits= save_thd_options;
   return result;
-}
-
-int VTD_table::write_row()
-{
-  int error;
-  TABLE *table= tl.table;
-  DBUG_ASSERT(table);
-  table->use_all_columns();
-  restore_record(table, s->default_values);
-  if ((error= table->file->ha_write_row(table->record[0])))
-  {
-    DBUG_PRINT("info", ("error inserting row"));
-    goto table_error;
-  }
-
-  /* all ok */
-  return 0;
-
-table_error:
-  DBUG_PRINT("info", ("table error"));
-  table->file->print_error(error, MYF(0));
-  return 1;
 }
