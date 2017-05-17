@@ -19,7 +19,7 @@ public:
     COL_RENAMES
   };
 
-  static bool write_row(THD *thd);
+  static bool write_row(THD *thd, ulonglong alter_trx_id);
 };
 
 #endif // VTMD_INCLUDED

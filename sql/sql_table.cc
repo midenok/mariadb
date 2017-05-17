@@ -9084,6 +9084,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   handlerton *old_db_type= table->s->db_type();
   TABLE *new_table= NULL;
   bool new_versioned= false;
+  ulonglong vers_trx_id= 0;
   ha_rows copied=0,deleted=0;
 
   /*
@@ -9366,6 +9367,36 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   if (lock_tables(thd, table_list, alter_ctx.tables_opened, 0))
     goto err_new_table_cleanup;
 
+  if (versioned && thd->variables.vers_ddl_survival)
+  {
+    handlerton *hton= NULL;
+    bool versioned_hton= table->versioned_by_engine();
+    if (versioned_hton)
+    {
+      hton= old_db_type;
+    }
+    else if (innodb_plugin)
+    {
+      hton= plugin_hton(plugin_int_to_ref(innodb_plugin));
+      DBUG_ASSERT(hton);
+    }
+    if (!hton || !(hton->flags & HTON_SUPPORTS_SYS_VERSIONING))
+    {
+      my_error(ER_VERS_ENGINE_UNSUPPORTED, MYF(0), table->alias);
+      goto err_new_table_cleanup;
+    }
+    else
+    {
+      DBUG_ASSERT(hton->vers_get_trx_id);
+      vers_trx_id= hton->vers_get_trx_id(hton, thd, versioned_hton);
+      if (!vers_trx_id)
+      {
+        my_error(ER_VERS_GENERAL_ERROR, MYF(0), "failed to acquire TRX_ID");
+        goto err_new_table_cleanup;
+      }
+    }
+  }
+
   if (ha_create_table(thd, alter_ctx.get_tmp_path(),
                       alter_ctx.new_db, alter_ctx.tmp_name,
                       create_info, &frm))
@@ -9571,7 +9602,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
 
   if (versioned && new_versioned && thd->variables.vers_ddl_survival)
   {
-    if (VTMD_table::write_row(thd))
+    if (VTMD_table::write_row(thd, vers_trx_id))
       goto err_with_mdl;
   }
 

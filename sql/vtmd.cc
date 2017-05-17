@@ -2,7 +2,7 @@
 #include "sql_base.h"
 #include "sql_class.h"
 
-bool VTMD_table::write_row(THD *thd)
+bool VTMD_table::write_row(THD *thd, ulonglong alter_trx_id)
 {
   TABLE_LIST table_list;
   TABLE *table;
@@ -47,9 +47,9 @@ bool VTMD_table::write_row(THD *thd)
     goto err;
   }
 
-  table->field[TRX_ID_START]->store((longlong) 0, true);
+  table->field[TRX_ID_START]->store(alter_trx_id, true);
   table->field[TRX_ID_START]->set_notnull();
-  table->field[TRX_ID_END]->store((longlong) 1, true);
+  table->field[TRX_ID_END]->store((longlong) 0, true);
   table->field[TRX_ID_END]->set_notnull();
   table->field[OLD_NAME]->set_null();
   table->field[NAME]->store(STRING_WITH_LEN("name"), system_charset_info);

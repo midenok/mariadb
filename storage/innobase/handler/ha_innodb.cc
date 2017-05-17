@@ -1437,6 +1437,14 @@ innobase_start_trx_and_assign_read_view(
 group commit during flush stage, false in other cases.
 @return false */
 static
+ulonglong
+innobase_get_trx_id(
+/*====================================*/
+	handlerton*	hton,	/*!< in: InnoDB handlerton */
+	THD*		thd,	/*!< in: MySQL thread handle of the user for
+				whom the transaction should be committed */
+	bool		start);
+static
 bool
 innobase_flush_logs(
 	handlerton*	hton,
@@ -3887,6 +3895,7 @@ innobase_init(
 	innobase_hton->vers_query_commit_ts = vtq_query_commit_ts;
 	innobase_hton->vers_trx_sees = vtq_trx_sees;
 	innobase_hton->vers_upgrade_handler = innobase_upgrade_handler;
+	innobase_hton->vers_get_trx_id = innobase_get_trx_id;
 
 	innodb_remember_check_sysvar_funcs();
 
@@ -4648,6 +4657,39 @@ innobase_start_trx_and_assign_read_view(
 	innobase_register_trx(hton, current_thd, trx);
 
 	DBUG_RETURN(0);
+}
+
+static
+ulonglong
+innobase_get_trx_id(
+/*====================================*/
+	handlerton*	hton,	/*!< in: InnoDB handlerton */
+	THD*		thd,	/*!< in: MySQL thread handle of the user for
+				whom the transaction should be committed */
+	bool		start)
+{
+	DBUG_ENTER("innobase_start_trx");
+	DBUG_ASSERT(hton == innodb_hton_ptr);
+
+	if (start)
+	{
+		trx_t*	trx = check_trx_exists(thd);
+
+		TrxInInnoDB	trx_in_innodb(trx);
+
+		innobase_srv_conc_force_exit_innodb(trx);
+
+		trx_start_if_not_started_xa(trx, true);
+		/* Set the MySQL flag to mark that there is an active transaction */
+
+		innobase_register_trx(hton, current_thd, trx);
+		DBUG_RETURN(trx->id);
+	}
+
+	mutex_enter(&trx_sys->mutex);
+	trx_id_t trx_id = trx_sys_get_new_trx_id();
+	mutex_exit(&trx_sys->mutex);
+	DBUG_RETURN(trx_id);
 }
 
 static

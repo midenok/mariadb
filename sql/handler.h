@@ -1394,6 +1394,7 @@ struct handlerton
    bool (*vers_query_commit_ts)(THD* thd, void *out, const MYSQL_TIME &commit_ts, vtq_field_t field, bool backwards);
    bool (*vers_trx_sees)(THD *thd, bool &result, ulonglong trx_id1, ulonglong trx_id0, ulonglong commit_id1, uchar iso_level1, ulonglong commit_id0);
    handler *(*vers_upgrade_handler)(handler *hnd, MEM_ROOT *mem_root);
+   ulonglong (*vers_get_trx_id)(handlerton* hton, THD *thd, bool start);
 };
 
 
