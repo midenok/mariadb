@@ -15,7 +15,6 @@ host
 index_stats
 innodb_index_stats
 innodb_table_stats
-innodb_vtd
 plugin
 proc
 procs_priv
@@ -31,6 +30,7 @@ time_zone_name
 time_zone_transition
 time_zone_transition_type
 user
+vtmd
 show create table db;
 Table	Create Table
 db	CREATE TABLE `db` (

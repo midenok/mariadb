@@ -129,7 +129,7 @@ SET @create_innodb_index_stats="CREATE TABLE IF NOT EXISTS innodb_index_stats (
 	PRIMARY KEY (database_name, table_name, index_name, stat_name)
 ) ENGINE=INNODB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0";
 
-SET @create_innodb_vtd="CREATE TABLE IF NOT EXISTS innodb_vtd (
+SET @create_vtmd="CREATE TABLE IF NOT EXISTS vtmd (
 	trx_id_start			BIGINT UNSIGNED NOT NULL,
 	trx_id_end			BIGINT UNSIGNED NOT NULL,
 	old_name			VARCHAR(64),
@@ -149,7 +149,7 @@ PREPARE stmt FROM @str;
 EXECUTE stmt;
 DROP PREPARE stmt;
 
-SET @str=IF(@have_innodb <> 0, @create_innodb_vtd, "SET @dummy = 0");
+SET @str=IF(@have_innodb <> 0, @create_vtmd, "SET @dummy = 0");
 PREPARE stmt FROM @str;
 EXECUTE stmt;
 DROP PREPARE stmt;

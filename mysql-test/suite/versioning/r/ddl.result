@@ -161,11 +161,11 @@ drop procedure concat_exec2;
 drop procedure concat_exec3;
 drop function get_historical_table_name;
 drop procedure drop_last_historical;
-select * from mysql.innodb_vtd;
+select * from mysql.vtmd;
 trx_id_start	trx_id_end	old_name	name	frm_image	col_renames
-show create table mysql.innodb_vtd;
+show create table mysql.vtmd;
 Table	Create Table
-innodb_vtd	CREATE TABLE `innodb_vtd` (
+vtmd	CREATE TABLE `vtmd` (
   `trx_id_start` bigint(20) unsigned NOT NULL,
   `trx_id_end` bigint(20) unsigned NOT NULL,
   `old_name` varchar(64) COLLATE utf8_bin DEFAULT NULL,
