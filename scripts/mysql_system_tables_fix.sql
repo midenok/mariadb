@@ -699,20 +699,6 @@ PREPARE stmt FROM @str;
 EXECUTE stmt;
 DROP PREPARE stmt; 
 
-SET @create_vtmd="CREATE TABLE IF NOT EXISTS vtmd (
-	trx_id_start			BIGINT UNSIGNED NOT NULL,
-	trx_id_end			BIGINT UNSIGNED NOT NULL,
-	old_name			VARCHAR(64),
-	name				VARCHAR(64) NOT NULL,
-	frm_image			BLOB,
-	col_renames			BLOB,
-	PRIMARY KEY(trx_id_start, trx_id_end, name)
-) ENGINE=INNODB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0";
-SET @str=IF(@have_innodb <> 0, @create_vtmd, "SET @dummy = 0");
-PREPARE stmt FROM @str;
-EXECUTE stmt;
-DROP PREPARE stmt;
-
 # MDEV-4332 longer user names
 alter table user         modify User         char(80)  binary not null default '';
 alter table db           modify User         char(80)  binary not null default '';

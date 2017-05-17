@@ -130,13 +130,13 @@ SET @create_innodb_index_stats="CREATE TABLE IF NOT EXISTS innodb_index_stats (
 ) ENGINE=INNODB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0";
 
 SET @create_vtmd="CREATE TABLE IF NOT EXISTS vtmd (
-	trx_id_start			BIGINT UNSIGNED NOT NULL,
-	trx_id_end			BIGINT UNSIGNED NOT NULL,
-	old_name			VARCHAR(64),
-	name				VARCHAR(64) NOT NULL,
-	frm_image			BLOB,
-	col_renames			BLOB,
-	PRIMARY KEY(trx_id_start, trx_id_end, name)
+	trx_id_start			BIGINT UNSIGNED NOT NULL,	# transaction which created table
+	trx_id_end			BIGINT UNSIGNED NOT NULL,	# transaction which altered table
+	old_name			VARCHAR(64),			# old table name if it was renamed
+	name				VARCHAR(64) NOT NULL,		# current table name
+	frm_image			BLOB,				# .frm file contents
+	col_renames			BLOB,				# column rename mappings
+	PRIMARY KEY(trx_id_start, name)
 ) ENGINE=INNODB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0";
 
 SET @str=IF(@have_innodb <> 0, @create_innodb_table_stats, "SET @dummy = 0");
