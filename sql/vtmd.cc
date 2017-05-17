@@ -1,17 +1,20 @@
-#include "vtd.h"
+#include "vtmd.h"
 #include "sql_base.h"
 #include "sql_class.h"
 
-bool VTD_table::write_row(THD *thd)
+bool VTMD_table::write_row(THD *thd)
 {
   TABLE_LIST table_list;
   TABLE *table;
-  bool result= TRUE;
-  bool need_close= FALSE;
-  bool need_rnd_end= FALSE;
+  bool result= true;
+  bool need_close= false;
+  bool need_rnd_end= false;
+  int ret;
   Open_tables_backup open_tables_backup;
   ulonglong save_thd_options;
-
+  Diagnostics_area new_stmt_da(thd->query_id, false, true);
+  Diagnostics_area *save_stmt_da= thd->get_stmt_da();
+  thd->set_stmt_da(&new_stmt_da);
 
   save_thd_options= thd->variables.option_bits;
   thd->variables.option_bits&= ~OPTION_BIN_LOG;
@@ -24,24 +27,29 @@ bool VTD_table::write_row(THD *thd)
   if (!(table= open_log_table(thd, &table_list, &open_tables_backup)))
     goto err;
 
-  need_close= TRUE;
+  need_close= true;
 
-  if (table->file->extra(HA_EXTRA_MARK_AS_LOG_TABLE) ||
-      table->file->ha_rnd_init_with_error(0))
+  if ((ret= table->file->extra(HA_EXTRA_MARK_AS_LOG_TABLE)) ||
+      (ret= table->file->ha_rnd_init(0)))
+  {
+    table->file->print_error(ret, MYF(0));
     goto err;
+  }
 
-  need_rnd_end= TRUE;
+  need_rnd_end= true;
 
   /* Honor next number columns if present */
   table->next_number_field= table->found_next_number_field;
 
-  /* check that all columns exist */
-  if (table->s->fields < 6)
+  if (table->s->fields != 6)
+  {
+    my_printf_error(ER_VERS_VTMD_ERROR, "unexpected fields count: %d", MYF(0), table->s->fields);
     goto err;
+  }
 
-  table->field[TRX_ID_START]->store((longlong) 0, TRUE);
+  table->field[TRX_ID_START]->store((longlong) 0, true);
   table->field[TRX_ID_START]->set_notnull();
-  table->field[TRX_ID_END]->store((longlong) 1, TRUE);
+  table->field[TRX_ID_END]->store((longlong) 1, true);
   table->field[TRX_ID_END]->set_notnull();
   table->field[OLD_NAME]->set_null();
   table->field[NAME]->store(STRING_WITH_LEN("name"), system_charset_info);
@@ -49,12 +57,20 @@ bool VTD_table::write_row(THD *thd)
   table->field[FRM_IMAGE]->set_null();
   table->field[COL_RENAMES]->set_null();
 
-  if (table->file->ha_write_row(table->record[0]))
+  if ((ret= table->file->ha_write_row(table->record[0]))  )
+  {
+    table->file->print_error(ret, MYF(0));
     goto err;
+  }
 
-  result= FALSE;
+  result= false;
 
 err:
+  thd->set_stmt_da(save_stmt_da);
+
+  if (result)
+    my_error(ER_VERS_VTMD_ERROR, MYF(0), new_stmt_da.message());
+
   if (need_rnd_end)
   {
     table->file->ha_rnd_end();

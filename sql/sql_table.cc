@@ -56,7 +56,7 @@
 #include "sql_audit.h"
 #include "sql_sequence.h"
 #include "tztime.h"
-#include "vtd.h"                  // System Versioning
+#include "vtmd.h"                 // System Versioning
 
 
 #ifdef __WIN__
@@ -9569,6 +9569,12 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     goto err_with_mdl;
   }
 
+  if (versioned && new_versioned && thd->variables.vers_ddl_survival)
+  {
+    if (VTMD_table::write_row(thd))
+      goto err_with_mdl;
+  }
+
   // Rename the new table to the correct name.
   if (mysql_rename_table(new_db_type, alter_ctx.new_db, alter_ctx.tmp_name,
                          alter_ctx.new_db, alter_ctx.new_alias,
@@ -9606,12 +9612,6 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     }
     rename_table_in_stat_tables(thd, alter_ctx.db,alter_ctx.alias,
                                 alter_ctx.new_db, alter_ctx.new_alias);
-  }
-
-  if (versioned && new_versioned && thd->variables.vers_ddl_survival)
-  {
-    if (VTD_table::write_row(thd))
-      goto err_with_mdl_after_alter;
   }
 
   // ALTER TABLE succeeded, delete the backup of the old table.

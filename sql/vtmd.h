@@ -1,5 +1,5 @@
-#ifndef VTD_INCLUDED
-#define VTD_INCLUDED
+#ifndef VTMD_INCLUDED
+#define VTMD_INCLUDED
 
 #include "table.h"
 #include "unireg.h"
@@ -7,7 +7,7 @@
 
 class THD;
 
-class VTD_table
+class VTMD_table
 {
 public:
   enum {
@@ -22,4 +22,4 @@ public:
   static bool write_row(THD *thd);
 };
 
-#endif // VTD_INCLUDED
+#endif // VTMD_INCLUDED
