@@ -18,7 +18,6 @@ host
 index_stats
 innodb_index_stats
 innodb_table_stats
-innodb_vtd
 plugin
 proc
 procs_priv
@@ -34,6 +33,7 @@ time_zone_name
 time_zone_transition
 time_zone_transition_type
 user
+vtmd
 connect  con2,localhost,root,,test;
 show tables;
 Tables_in_test
@@ -66,7 +66,6 @@ host
 index_stats
 innodb_index_stats
 innodb_table_stats
-innodb_vtd
 plugin
 proc
 procs_priv
@@ -82,6 +81,7 @@ time_zone_name
 time_zone_transition
 time_zone_transition_type
 user
+vtmd
 connect  con4,localhost,test,gambling,test;
 show tables;
 Tables_in_test
@@ -126,7 +126,6 @@ host
 index_stats
 innodb_index_stats
 innodb_table_stats
-innodb_vtd
 plugin
 proc
 procs_priv
@@ -142,6 +141,7 @@ time_zone_name
 time_zone_transition
 time_zone_transition_type
 user
+vtmd
 connect  con6,localhost,test,gambling3,test;
 show tables;
 Tables_in_test

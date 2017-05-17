@@ -84,9 +84,6 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
-mysql.innodb_vtd
-Error    : Unknown storage engine 'InnoDB'
-error    : Corrupt
 mysql.plugin                                       OK
 mysql.proc                                         OK
 mysql.procs_priv                                   OK
@@ -101,6 +98,9 @@ mysql.time_zone_name                               OK
 mysql.time_zone_transition                         OK
 mysql.time_zone_transition_type                    OK
 mysql.user                                         OK
+mysql.vtmd
+Error    : Unknown storage engine 'InnoDB'
+error    : Corrupt
 
 Repairing tables
 mysql.innodb_index_stats
@@ -109,7 +109,7 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
-mysql.innodb_vtd
+mysql.vtmd
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
@@ -234,9 +234,6 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
-mysql.innodb_vtd
-Error    : Unknown storage engine 'InnoDB'
-error    : Corrupt
 mysql.plugin                                       OK
 mysql.proc                                         OK
 mysql.procs_priv                                   OK
@@ -251,6 +248,9 @@ mysql.time_zone_name                               OK
 mysql.time_zone_transition                         OK
 mysql.time_zone_transition_type                    OK
 mysql.user                                         OK
+mysql.vtmd
+Error    : Unknown storage engine 'InnoDB'
+error    : Corrupt
 
 Repairing tables
 mysql.innodb_index_stats
@@ -259,7 +259,7 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
-mysql.innodb_vtd
+mysql.vtmd
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
@@ -359,9 +359,6 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
-mysql.innodb_vtd
-Error    : Unknown storage engine 'InnoDB'
-error    : Corrupt
 mysql.plugin                                       OK
 mysql.proc                                         OK
 mysql.procs_priv                                   OK
@@ -376,6 +373,9 @@ mysql.time_zone_name                               OK
 mysql.time_zone_transition                         OK
 mysql.time_zone_transition_type                    OK
 mysql.user                                         OK
+mysql.vtmd
+Error    : Unknown storage engine 'InnoDB'
+error    : Corrupt
 
 Repairing tables
 mysql.innodb_index_stats
@@ -384,7 +384,7 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
-mysql.innodb_vtd
+mysql.vtmd
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped

@@ -74,7 +74,6 @@ def	mysql	PRIMARY	mysql	host
 def	mysql	PRIMARY	mysql	index_stats
 def	mysql	PRIMARY	mysql	innodb_index_stats
 def	mysql	PRIMARY	mysql	innodb_table_stats
-def	mysql	PRIMARY	mysql	innodb_vtd
 def	mysql	PRIMARY	mysql	plugin
 def	mysql	PRIMARY	mysql	proc
 def	mysql	PRIMARY	mysql	procs_priv
@@ -89,6 +88,7 @@ def	mysql	PRIMARY	mysql	time_zone_name
 def	mysql	PRIMARY	mysql	time_zone_transition
 def	mysql	PRIMARY	mysql	time_zone_transition_type
 def	mysql	PRIMARY	mysql	user
+def	mysql	PRIMARY	mysql	vtmd
 #########################################################################################
 # Testcase 3.2.7.2 + 3.2.7.3: INFORMATION_SCHEMA.TABLE_CONSTRAINTS accessible information
 #########################################################################################

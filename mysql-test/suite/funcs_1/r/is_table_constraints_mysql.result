@@ -24,7 +24,6 @@ def	mysql	PRIMARY	mysql	host	PRIMARY KEY
 def	mysql	PRIMARY	mysql	index_stats	PRIMARY KEY
 def	mysql	PRIMARY	mysql	innodb_index_stats	PRIMARY KEY
 def	mysql	PRIMARY	mysql	innodb_table_stats	PRIMARY KEY
-def	mysql	PRIMARY	mysql	innodb_vtd	PRIMARY KEY
 def	mysql	PRIMARY	mysql	plugin	PRIMARY KEY
 def	mysql	PRIMARY	mysql	proc	PRIMARY KEY
 def	mysql	PRIMARY	mysql	procs_priv	PRIMARY KEY
@@ -39,6 +38,7 @@ def	mysql	PRIMARY	mysql	time_zone_name	PRIMARY KEY
 def	mysql	PRIMARY	mysql	time_zone_transition	PRIMARY KEY
 def	mysql	PRIMARY	mysql	time_zone_transition_type	PRIMARY KEY
 def	mysql	PRIMARY	mysql	user	PRIMARY KEY
+def	mysql	PRIMARY	mysql	vtmd	PRIMARY KEY
 connect  testuser1,localhost,testuser1,,db_datadict;
 SELECT * FROM information_schema.table_constraints
 WHERE table_schema = 'mysql'

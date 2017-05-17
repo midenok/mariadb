@@ -244,7 +244,6 @@ mysql.host                                         OK
 mysql.index_stats                                  OK
 mysql.innodb_index_stats                           OK
 mysql.innodb_table_stats                           OK
-mysql.innodb_vtd                                   OK
 mysql.plugin                                       OK
 mysql.proc                                         OK
 mysql.procs_priv                                   OK
@@ -259,6 +258,7 @@ mysql.time_zone_name                               OK
 mysql.time_zone_transition                         OK
 mysql.time_zone_transition_type                    OK
 mysql.user                                         OK
+mysql.vtmd                                         OK
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views
 Phase 4/7: Running 'mysql_fix_privilege_tables'
@@ -303,7 +303,6 @@ mysql.host                                         OK
 mysql.index_stats                                  OK
 mysql.innodb_index_stats                           OK
 mysql.innodb_table_stats                           OK
-mysql.innodb_vtd                                   OK
 mysql.plugin                                       OK
 mysql.proc                                         OK
 mysql.procs_priv                                   OK
@@ -318,6 +317,7 @@ mysql.time_zone_name                               OK
 mysql.time_zone_transition                         OK
 mysql.time_zone_transition_type                    OK
 mysql.user                                         OK
+mysql.vtmd                                         OK
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views
 Phase 4/7: Running 'mysql_fix_privilege_tables'
