@@ -30,7 +30,7 @@ time_zone_name
 time_zone_transition
 time_zone_transition_type
 user
-vtmd
+vtmd_template
 show create table db;
 Table	Create Table
 db	CREATE TABLE `db` (

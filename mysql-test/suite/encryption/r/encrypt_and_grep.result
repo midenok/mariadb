@@ -13,7 +13,7 @@ SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_
 NAME
 mysql/innodb_table_stats
 mysql/innodb_index_stats
-mysql/vtmd
+mysql/vtmd_template
 test/t1
 test/t2
 innodb_system
@@ -33,7 +33,7 @@ SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_
 NAME
 mysql/innodb_table_stats
 mysql/innodb_index_stats
-mysql/vtmd
+mysql/vtmd_template
 test/t3
 innodb_system
 SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_VERSION <> 0;
@@ -59,7 +59,7 @@ SELECT NAME FROM INFORMATION_SCHEMA.INNODB_TABLESPACES_ENCRYPTION WHERE MIN_KEY_
 NAME
 mysql/innodb_table_stats
 mysql/innodb_index_stats
-mysql/vtmd
+mysql/vtmd_template
 test/t1
 test/t2
 innodb_system

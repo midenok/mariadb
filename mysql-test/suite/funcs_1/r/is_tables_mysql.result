@@ -702,7 +702,7 @@ user_comment	Users and global privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
 TABLE_SCHEMA	mysql
-TABLE_NAME	vtmd
+TABLE_NAME	vtmd_template
 TABLE_TYPE	BASE TABLE
 ENGINE	InnoDB
 VERSION	10

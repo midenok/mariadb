@@ -98,7 +98,7 @@ mysql.time_zone_name                               OK
 mysql.time_zone_transition                         OK
 mysql.time_zone_transition_type                    OK
 mysql.user                                         OK
-mysql.vtmd
+mysql.vtmd_template
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 
@@ -109,7 +109,7 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
-mysql.vtmd
+mysql.vtmd_template
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
@@ -248,7 +248,7 @@ mysql.time_zone_name                               OK
 mysql.time_zone_transition                         OK
 mysql.time_zone_transition_type                    OK
 mysql.user                                         OK
-mysql.vtmd
+mysql.vtmd_template
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 
@@ -259,7 +259,7 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
-mysql.vtmd
+mysql.vtmd_template
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
@@ -373,7 +373,7 @@ mysql.time_zone_name                               OK
 mysql.time_zone_transition                         OK
 mysql.time_zone_transition_type                    OK
 mysql.user                                         OK
-mysql.vtmd
+mysql.vtmd_template
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 
@@ -384,7 +384,7 @@ error    : Corrupt
 mysql.innodb_table_stats
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
-mysql.vtmd
+mysql.vtmd_template
 Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
