@@ -13337,6 +13337,12 @@ show_param:
             if (!lex->select_lex.add_table_to_list(thd, $3, NULL,0))
               MYSQL_YYABORT;
             lex->create_info.storage_media= HA_SM_DEFAULT;
+
+            if (lex->vers_conditions.type != FOR_SYSTEM_TIME_UNSPECIFIED &&
+                lex->vers_conditions.type != FOR_SYSTEM_TIME_AS_OF) {
+              my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0), "FOR SYSTEM_TIME",
+                                "only AS OF allowed here"));
+            }
           }
         | CREATE VIEW_SYM table_ident
           {

@@ -101,6 +101,16 @@ drop procedure drop_last_historical;
 select * from mysql.vtmd_template;
 show create table mysql.vtmd_template;
 
+create or replace table t (a int) with system versioning;
+show create table t for system_time as of timestamp @tm;
+show create table t for system_time as of now;
+--error ER_VERS_WRONG_PARAMS
+show create table t for system_time between timestamp @tm and timestamp @tm;
+--error ER_VERS_WRONG_PARAMS
+show create table t for system_time from timestamp @tm to timestamp @tm;
+--error ER_VERS_WRONG_PARAMS
+show create table t for system_time before timestamp @tm;
+
 call verify_vtq;
 drop table t;
 
