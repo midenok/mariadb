@@ -1890,7 +1890,7 @@ struct vers_select_conds_t
   {
     return type != b;
   }
-  operator bool()
+  operator bool() const
   {
     return type != FOR_SYSTEM_TIME_UNSPECIFIED;
   }

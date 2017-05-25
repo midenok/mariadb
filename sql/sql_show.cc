@@ -62,6 +62,7 @@
 #ifdef WITH_PARTITION_STORAGE_ENGINE
 #include "ha_partition.h"
 #endif
+#include "vtmd.h"
 
 enum enum_i_s_events_fields
 {
@@ -1266,6 +1267,14 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
     the statmement completes as it is an information statement.
   */
   MDL_savepoint mdl_savepoint= thd->mdl_context.mdl_savepoint();
+
+  if (const vers_select_conds_t &conds = thd->lex->select_lex.vers_conditions)
+  {
+    DBUG_ASSERT(conds == FOR_SYSTEM_TIME_AS_OF);
+    VTMD_table vtmd(*table_list);
+    String historical_name;
+    vtmd.find_historical_name(thd, historical_name);
+  }
 
 
   if (mysqld_show_create_get_fields(thd, table_list, &field_list, &buffer))

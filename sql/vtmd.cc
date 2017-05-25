@@ -3,6 +3,7 @@
 #include "sql_class.h"
 #include "sql_handler.h" // mysql_ha_rm_tables()
 #include "sql_table.h"
+#include "sql_select.h"
 #include "table_cache.h" // tdc_remove_table()
 #include "key.h"
 
@@ -509,4 +510,42 @@ void VTMD_table::archive_name(
   my_snprintf(new_name, new_name_size, "%s_%04d%02d%02d_%02d%02d%02d_%06d",
               table_name, now.year, now.month, now.day, now.hour, now.minute,
               now.second, now.second_part);
+
+bool VTMD_table::find_historical_name(THD *thd, String &out)
+{
+  String vtmd_name;
+  if (about.vers_vtmd_name(vtmd_name))
+    return true;
+
+  TABLE_LIST vtmd_tl;
+  vtmd_tl.init_one_table(about.db, about.db_length, vtmd_name.ptr(),
+                         vtmd_name.length(), vtmd_name.ptr(), TL_READ);
+  Open_tables_backup open_tables_backup;
+  if (!(vtmd= open_log_table(thd, &vtmd_tl, &open_tables_backup)))
+    return true;
+
+  READ_RECORD info;
+  int error= 0;
+  SQL_SELECT *select= NULL;
+  COND *conds= NULL;
+
+  if (vers_setup_select(thd, &vtmd_tl, &conds, &thd->lex->select_lex))
+    goto err;
+
+  select= make_select(vtmd_tl.table, 0, 0, conds, NULL, 0, &error);
+  if (error)
+    goto err;
+  if (init_read_record(&info, thd, vtmd_tl.table, select, NULL, 1, 1, false))
+    goto err;
+
+  while (!(error= info.read_record(&info) && !thd->is_error()))
+  {
+    1 + 1;
+  }
+
+  end_read_record(&info);
+err:
+  delete select;
+  close_log_table(thd, &open_tables_backup);
+  return false;
 }

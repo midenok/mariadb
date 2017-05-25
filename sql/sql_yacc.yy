@@ -13342,6 +13342,8 @@ show_param:
                 lex->vers_conditions.type != FOR_SYSTEM_TIME_AS_OF) {
               my_yyabort_error((ER_VERS_WRONG_PARAMS, MYF(0), "FOR SYSTEM_TIME",
                                 "only AS OF allowed here"));
+              if ($4)
+                Select->vers_conditions= Lex->vers_conditions;
             }
           }
         | CREATE VIEW_SYM table_ident
