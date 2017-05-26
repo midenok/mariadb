@@ -1268,12 +1268,37 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
   */
   MDL_savepoint mdl_savepoint= thd->mdl_context.mdl_savepoint();
 
-  if (const vers_select_conds_t &conds = thd->lex->select_lex.vers_conditions)
+  if (table_list->vers_conditions.type != FOR_SYSTEM_TIME_UNSPECIFIED)
   {
-    DBUG_ASSERT(conds == FOR_SYSTEM_TIME_AS_OF);
+    DBUG_ASSERT(table_list->vers_conditions.type == FOR_SYSTEM_TIME_AS_OF);
     VTMD_table vtmd(*table_list);
-    String historical_name;
-    vtmd.find_historical_name(thd, historical_name);
+    String archive_name;
+    if (!vtmd.find_archive_name(thd, archive_name))
+    {
+      TABLE_LIST tl;
+      tl.init_one_table(table_list->db, table_list->db_length,
+                        archive_name.ptr(), archive_name.length(),
+                        archive_name.ptr(), TL_READ);
+
+      if (mysqld_show_create_get_fields(thd, &tl, &field_list, &buffer))
+        goto exit;
+      if (protocol->send_result_set_metadata(
+              &field_list, Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
+        goto exit;
+      protocol->prepare_for_resend();
+      if (table_list->schema_table)
+        protocol->store(table_list->schema_table->table_name,
+                        system_charset_info);
+      else
+        protocol->store(table_list->table->alias.c_ptr(), system_charset_info);
+      protocol->store(buffer.ptr(), buffer.length(), buffer.charset());
+      if (protocol->write())
+        goto exit;
+      error= false;
+      my_eof(thd);
+
+      goto exit;
+    }
   }
 
 

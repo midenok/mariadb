@@ -86,7 +86,7 @@ public:
     archive_name(thd, about.table_name, new_name, new_name_size);
   }
 
-  bool find_historical_name(THD *thd, String &out);
+  bool find_archive_name(THD *thd, String &out);
 };
 
 class VTMD_exists : public VTMD_table

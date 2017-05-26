@@ -510,8 +510,9 @@ void VTMD_table::archive_name(
   my_snprintf(new_name, new_name_size, "%s_%04d%02d%02d_%02d%02d%02d_%06d",
               table_name, now.year, now.month, now.day, now.hour, now.minute,
               now.second, now.second_part);
+}
 
-bool VTMD_table::find_historical_name(THD *thd, String &out)
+bool VTMD_table::find_archive_name(THD *thd, String &out)
 {
   String vtmd_name;
   if (about.vers_vtmd_name(vtmd_name))
@@ -529,6 +530,7 @@ bool VTMD_table::find_historical_name(THD *thd, String &out)
   SQL_SELECT *select= NULL;
   COND *conds= NULL;
 
+  vtmd_tl.vers_conditions= about.vers_conditions;
   if (vers_setup_select(thd, &vtmd_tl, &conds, &thd->lex->select_lex))
     goto err;
 
@@ -538,9 +540,13 @@ bool VTMD_table::find_historical_name(THD *thd, String &out)
   if (init_read_record(&info, thd, vtmd_tl.table, select, NULL, 1, 1, false))
     goto err;
 
-  while (!(error= info.read_record(&info) && !thd->is_error()))
+  error= info.read_record(&info);
+  if (!error)
   {
-    1 + 1;
+    vtmd_tl.table->field[FLD_ARCHIVE_NAME]->val_str(&out);
+  } else
+  {
+    // No record found or error.
   }
 
   end_read_record(&info);
