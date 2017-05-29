@@ -63,6 +63,7 @@
 #include "ha_partition.h"
 #endif
 #include "vtmd.h"
+#include "transaction.h"
 
 enum enum_i_s_events_fields
 {
@@ -1282,25 +1283,30 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
 
       if (mysqld_show_create_get_fields(thd, &tl, &field_list, &buffer))
         goto exit;
+
+      char *table_name= strstr(buffer.ptr(), archive_name.ptr());
+      buffer.replace(table_name - buffer.ptr(), archive_name.length(),
+                     table_list->table_name, table_list->table_name_length);
+
       if (protocol->send_result_set_metadata(
               &field_list, Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
         goto exit;
       protocol->prepare_for_resend();
-      if (table_list->schema_table)
-        protocol->store(table_list->schema_table->table_name,
-                        system_charset_info);
-      else
-        protocol->store(table_list->table->alias.c_ptr(), system_charset_info);
+      protocol->store(table_list->table_name, system_charset_info);
       protocol->store(buffer.ptr(), buffer.length(), buffer.charset());
       if (protocol->write())
         goto exit;
       error= false;
       my_eof(thd);
 
+      /* If commit fails, we should be able to reset the OK status. */
+      thd->get_stmt_da()->set_overwrite_status(true);
+      trans_commit_stmt(thd);
+      thd->get_stmt_da()->set_overwrite_status(false);
+
       goto exit;
     }
   }
-
 
   if (mysqld_show_create_get_fields(thd, table_list, &field_list, &buffer))
     goto exit;
