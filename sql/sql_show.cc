@@ -1268,54 +1268,36 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
     the statmement completes as it is an information statement.
   */
   MDL_savepoint mdl_savepoint= thd->mdl_context.mdl_savepoint();
+  String archive_name;
 
   if (table_list->vers_conditions.type != FOR_SYSTEM_TIME_UNSPECIFIED)
   {
     DBUG_ASSERT(table_list->vers_conditions.type == FOR_SYSTEM_TIME_AS_OF);
     VTMD_table vtmd(*table_list);
-    String archive_name;
-    if (vtmd.find_archive_name(thd, archive_name))
+    if (vtmd.find_archive_name(thd, table_list, archive_name))
       goto exit;
-
-    if (archive_name.length() == 0)
-    {
-      my_error(ER_VERS_VTMD_ERROR, MYF(0), "failed to find archive name");
-    }
-    else
-    {
-      TABLE_LIST tl;
-      tl.init_one_table(table_list->db, table_list->db_length,
-                        archive_name.ptr(), archive_name.length(),
-                        archive_name.ptr(), TL_READ);
-
-      if (mysqld_show_create_get_fields(thd, &tl, &field_list, &buffer))
-        goto exit;
-
-      char *table_name= strstr(buffer.ptr(), archive_name.ptr());
-      buffer.replace(table_name - buffer.ptr(), archive_name.length(),
-                     table_list->table_name, table_list->table_name_length);
-
-      if (protocol->send_result_set_metadata(
-              &field_list, Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
-        goto exit;
-      protocol->prepare_for_resend();
-      protocol->store(table_list->table_name, system_charset_info);
-      protocol->store(buffer.ptr(), buffer.length(), buffer.charset());
-      if (protocol->write())
-        goto exit;
-      error= false;
-      my_eof(thd);
-    }
 
     /* If commit fails, we should be able to reset the OK status. */
     thd->get_stmt_da()->set_overwrite_status(true);
     trans_commit_stmt(thd);
     thd->get_stmt_da()->set_overwrite_status(false);
-    goto exit;
+
+    if (archive_name.length() == 0)
+    {
+      my_error(ER_VERS_VTMD_ERROR, MYF(0), "failed to find archive name");
+      goto exit;
+    }
   }
 
   if (mysqld_show_create_get_fields(thd, table_list, &field_list, &buffer))
     goto exit;
+
+  if (archive_name.length() != 0)
+  {
+    char *table_name= strstr(buffer.ptr(), archive_name.ptr());
+    buffer.replace(table_name - buffer.ptr(), archive_name.length(),
+                   table_list->table_name, table_list->table_name_length);
+  }
 
   if (protocol->send_result_set_metadata(&field_list,
                                          Protocol::SEND_NUM_ROWS |
