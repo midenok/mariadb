@@ -1274,7 +1274,14 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
     DBUG_ASSERT(table_list->vers_conditions.type == FOR_SYSTEM_TIME_AS_OF);
     VTMD_table vtmd(*table_list);
     String archive_name;
-    if (!vtmd.find_archive_name(thd, archive_name))
+    if (vtmd.find_archive_name(thd, archive_name))
+      goto exit;
+
+    if (archive_name.length() == 0)
+    {
+      my_error(ER_VERS_VTMD_ERROR, MYF(0), "failed to find archive name");
+    }
+    else
     {
       TABLE_LIST tl;
       tl.init_one_table(table_list->db, table_list->db_length,
@@ -1298,14 +1305,13 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
         goto exit;
       error= false;
       my_eof(thd);
-
-      /* If commit fails, we should be able to reset the OK status. */
-      thd->get_stmt_da()->set_overwrite_status(true);
-      trans_commit_stmt(thd);
-      thd->get_stmt_da()->set_overwrite_status(false);
-
-      goto exit;
     }
+
+    /* If commit fails, we should be able to reset the OK status. */
+    thd->get_stmt_da()->set_overwrite_status(true);
+    trans_commit_stmt(thd);
+    thd->get_stmt_da()->set_overwrite_status(false);
+    goto exit;
   }
 
   if (mysqld_show_create_get_fields(thd, table_list, &field_list, &buffer))

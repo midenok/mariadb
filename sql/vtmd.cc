@@ -514,6 +514,8 @@ void VTMD_table::archive_name(
 
 bool VTMD_table::find_archive_name(THD *thd, String &out)
 {
+  out.length(0);
+
   String vtmd_name;
   if (about.vers_vtmd_name(vtmd_name))
     return true;
@@ -529,29 +531,36 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
   int error= 0;
   SQL_SELECT *select= NULL;
   COND *conds= NULL;
+  List<TABLE_LIST> dummy;
+  TABLE_LIST *a;
+  TABLE_LIST *b;
 
   vtmd_tl.vers_conditions= about.vers_conditions;
   if (vers_setup_select(thd, &vtmd_tl, &conds, &thd->lex->select_lex))
     goto err;
 
+  if ((error= setup_conds(thd, &vtmd_tl, dummy, &conds)))
+    goto err;
+
   select= make_select(vtmd_tl.table, 0, 0, conds, NULL, 0, &error);
   if (error)
     goto err;
-  if (init_read_record(&info, thd, vtmd_tl.table, select, NULL, 1, 1, false))
+  if ((error= init_read_record(&info, thd, vtmd_tl.table, select, NULL, 1, 1,
+                               false)))
     goto err;
 
-  error= info.read_record(&info);
-  if (!error)
+  while (!(error= info.read_record(&info)) && !thd->killed && !thd->is_error())
   {
-    vtmd_tl.table->field[FLD_ARCHIVE_NAME]->val_str(&out);
-  } else
-  {
-    // No record found or error.
+    if (select->skip_record(thd) > 0)
+    {
+      vtmd_tl.table->field[FLD_ARCHIVE_NAME]->val_str(&out);
+      break;
+    }
   }
 
   end_read_record(&info);
 err:
   delete select;
   close_log_table(thd, &open_tables_backup);
-  return false;
+  return static_cast<bool>(error);
 }
