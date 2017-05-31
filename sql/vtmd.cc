@@ -533,22 +533,16 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
   if (!(vtmd= open_log_table(thd, &tl, &open_tables_backup)))
     return true;
 
-  {
-    TABLE_LIST *table_list= select_lex.context.table_list;
-    TABLE_LIST *first_name_resolution_table=
-        select_lex.context.first_name_resolution_table;
-    select_lex.context.table_list= &tl;
-    select_lex.context.first_name_resolution_table= &tl;
+  Name_resolution_context &ctx= thd->lex->select_lex.context;
+  TABLE_LIST *table_list= ctx.table_list;
+  TABLE_LIST *first_name_resolution_table= ctx.first_name_resolution_table;
+  ctx.table_list= &tl;
+  ctx.first_name_resolution_table= &tl;
 
-    tl.vers_conditions= about.vers_conditions;
-    if (vers_setup_select(thd, &tl, &conds, &select_lex))
-      goto err;
-    if ((error= setup_conds(thd, &tl, dummy, &conds)))
-      goto err;
-
-    select_lex.context.table_list= table_list;
-    select_lex.context.first_name_resolution_table= first_name_resolution_table;
-  }
+  tl.vers_conditions= about.vers_conditions;
+  if ((error= vers_setup_select(thd, &tl, &conds, &select_lex)) ||
+      (error= setup_conds(thd, &tl, dummy, &conds)))
+    goto err;
 
   select= make_select(tl.table, 0, 0, conds, NULL, 0, &error);
   if (error)
@@ -569,6 +563,8 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
   end_read_record(&info);
 err:
   delete select;
+  ctx.table_list= table_list;
+  ctx.first_name_resolution_table= first_name_resolution_table;
   close_log_table(thd, &open_tables_backup);
   return error > 0 || out.length() == 0 ? true : false;
 }
