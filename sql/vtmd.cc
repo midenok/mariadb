@@ -512,10 +512,8 @@ void VTMD_table::archive_name(
               now.second, now.second_part);
 }
 
-bool VTMD_table::find_archive_name(THD *thd, TABLE_LIST *tl, String &out)
+bool VTMD_table::find_archive_name(THD *thd, String &out)
 {
-  out.length(0);
-
   String vtmd_name;
   if (about.vers_vtmd_name(vtmd_name))
     return true;
@@ -525,37 +523,45 @@ bool VTMD_table::find_archive_name(THD *thd, TABLE_LIST *tl, String &out)
   SQL_SELECT *select= NULL;
   COND *conds= NULL;
   List<TABLE_LIST> dummy;
+  SELECT_LEX &select_lex= thd->lex->select_lex;
 
-  char *table_name= tl->table_name;
-  int table_name_length= tl->table_name_length;
-  char *alias= tl->alias;
-  tl->table_name= vtmd_name.c_ptr();
-  tl->table_name_length= vtmd_name.length();
-  tl->alias= vtmd_name.c_ptr();
+  TABLE_LIST tl;
+  tl.init_one_table(about.db, about.db_length, vtmd_name.ptr(),
+                    vtmd_name.length(), vtmd_name.ptr(), TL_READ);
 
   Open_tables_backup open_tables_backup;
-  if (!(vtmd= open_log_table(thd, tl, &open_tables_backup)))
-    goto name_err;
+  if (!(vtmd= open_log_table(thd, &tl, &open_tables_backup)))
+    return true;
 
-  tl->vers_conditions= about.vers_conditions;
-  if (vers_setup_select(thd, tl, &conds, &thd->lex->select_lex))
-    goto err;
+  {
+    TABLE_LIST *table_list= select_lex.context.table_list;
+    TABLE_LIST *first_name_resolution_table=
+        select_lex.context.first_name_resolution_table;
+    select_lex.context.table_list= &tl;
+    select_lex.context.first_name_resolution_table= &tl;
 
-  if ((error= setup_conds(thd, tl, dummy, &conds)))
-    goto err;
+    tl.vers_conditions= about.vers_conditions;
+    if (vers_setup_select(thd, &tl, &conds, &select_lex))
+      goto err;
+    if ((error= setup_conds(thd, &tl, dummy, &conds)))
+      goto err;
 
-  select= make_select(tl->table, 0, 0, conds, NULL, 0, &error);
+    select_lex.context.table_list= table_list;
+    select_lex.context.first_name_resolution_table= first_name_resolution_table;
+  }
+
+  select= make_select(tl.table, 0, 0, conds, NULL, 0, &error);
   if (error)
     goto err;
   if ((error=
-           init_read_record(&info, thd, tl->table, select, NULL, 1, 1, false)))
+           init_read_record(&info, thd, tl.table, select, NULL, 1, 1, false)))
     goto err;
 
   while (!(error= info.read_record(&info)) && !thd->killed && !thd->is_error())
   {
     if (select->skip_record(thd) > 0)
     {
-      tl->table->field[FLD_ARCHIVE_NAME]->val_str(&out);
+      tl.table->field[FLD_ARCHIVE_NAME]->val_str(&out);
       break;
     }
   }
@@ -564,9 +570,5 @@ bool VTMD_table::find_archive_name(THD *thd, TABLE_LIST *tl, String &out)
 err:
   delete select;
   close_log_table(thd, &open_tables_backup);
-name_err:
-  tl->table_name= table_name;
-  tl->table_name_length= table_name_length;
-  tl->alias= alias;
-  return static_cast<bool>(error);
+  return error > 0 || out.length() == 0 ? true : false;
 }
