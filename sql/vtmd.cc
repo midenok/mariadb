@@ -556,6 +556,11 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
     if (select->skip_record(thd) > 0)
     {
       tl.table->field[FLD_ARCHIVE_NAME]->val_str(&out);
+      if (out.length() == 0)
+      {
+        // Handle AS OF NOW or similar
+        tl.table->field[FLD_NAME]->val_str(&out);
+      }
       break;
     }
   }
