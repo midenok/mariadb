@@ -531,7 +531,10 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
 
   Open_tables_backup open_tables_backup;
   if (!(vtmd= open_log_table(thd, &tl, &open_tables_backup)))
+  {
+    my_error(ER_VERS_VTMD_ERROR, MYF(0), "failed to open VTMD table");
     return true;
+  }
 
   Name_resolution_context &ctx= thd->lex->select_lex.context;
   TABLE_LIST *table_list= ctx.table_list;
@@ -542,14 +545,18 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
   tl.vers_conditions= about.vers_conditions;
   if ((error= vers_setup_select(thd, &tl, &conds, &select_lex)) ||
       (error= setup_conds(thd, &tl, dummy, &conds)))
+  {
+    my_error(ER_VERS_VTMD_ERROR, MYF(0),
+             "failed to setup conditions for querying VTMD table");
     goto err;
+  }
 
   select= make_select(tl.table, 0, 0, conds, NULL, 0, &error);
   if (error)
-    goto err;
+    goto loc_err;
   if ((error=
            init_read_record(&info, thd, tl.table, select, NULL, 1, 1, false)))
-    goto err;
+    goto loc_err;
 
   while (!(error= info.read_record(&info)) && !thd->killed && !thd->is_error())
   {
@@ -565,11 +572,15 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
     }
   }
 
+loc_err:
+  if (error)
+    my_error(ER_VERS_VTMD_ERROR, MYF(0), "failed to query VTMD table");
+
   end_read_record(&info);
 err:
   delete select;
   ctx.table_list= table_list;
   ctx.first_name_resolution_table= first_name_resolution_table;
   close_log_table(thd, &open_tables_backup);
-  return error > 0 || out.length() == 0 ? true : false;
+  return error ? true : false;
 }

@@ -1277,10 +1277,7 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
     DBUG_ASSERT(table_list->vers_conditions.type == FOR_SYSTEM_TIME_AS_OF);
     VTMD_table vtmd(*table_list);
     if (vtmd.find_archive_name(thd, archive_name))
-    {
-      my_error(ER_VERS_VTMD_ERROR, MYF(0), "failed to find archive name");
       goto loc_err;
-    }
 
     tl.init_one_table(table_list->db, table_list->db_length, archive_name.ptr(),
                       archive_name.length(), archive_name.ptr(), TL_READ);
