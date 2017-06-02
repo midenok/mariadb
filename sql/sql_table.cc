@@ -2472,11 +2472,27 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables, bool if_exists,
                                                  table->table_name,
                                                  MDL_EXCLUSIVE));
 
-      // Remove extension for delete
-      *(end= path + path_length - reg_ext_length)= '\0';
+      VTMD_drop vtmd(*table);
+      if (thd->variables.vers_ddl_survival &&
+        table_type && table_type != view_pseudo_hton)
+      {
+        error= vtmd.check_exists(thd);
+        if (error)
+          goto non_tmp_err;
+        if (!vtmd.exists)
+          goto drop_table;
+        error= mysql_rename_table(table_type, table->db, table->table_name,
+                                   table->db, "FIXME", NO_FK_CHECKS);
+      }
+      else
+      {
+      drop_table:
+        // Remove extension for delete
+        *(end= path + path_length - reg_ext_length)= '\0';
 
-      error= ha_delete_table(thd, table_type, path, db, table->table_name,
-                             !dont_log_query);
+        error= ha_delete_table(thd, table_type, path, db, table->table_name,
+                              !dont_log_query);
+      }
 
       if (!error)
       {
@@ -2511,6 +2527,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables, bool if_exists,
         else if (frm_delete_error && if_exists)
           thd->clear_error();
       }
+    non_tmp_err:
       non_tmp_error|= MY_TEST(error);
     }
 
@@ -2521,8 +2538,8 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables, bool if_exists,
       !drop_view &&
       !drop_sequence)
     {
-      VTMD_table vtmd(*table);
-      //error= vtmd.write_row(thd);
+      VTMD_drop vtmd(*table);
+      error= vtmd.try_update(thd);
     }
 
     if (error)
@@ -5065,7 +5082,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   if (create_info->versioned() && thd->variables.vers_ddl_survival)
   {
     VTMD_table vtmd(*create_table);
-    if (vtmd.write_row(thd))
+    if (vtmd.update(thd))
     {
       result= 1;
       goto err;
@@ -9624,7 +9641,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   {
     DBUG_ASSERT(table_list);
     VTMD_table vtmd(*table_list);
-    if (vtmd.write_row(thd, backup_name))
+    if (vtmd.update(thd, backup_name))
       goto err_with_mdl_after_alter;
   }
 
