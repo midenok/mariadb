@@ -752,6 +752,7 @@ struct TABLE_SHARE
 
   bool versioned;
   bool vtmd;
+  bool vers_archived;
   uint16 row_start_field;
   uint16 row_end_field;
   uint32 hist_part_id;

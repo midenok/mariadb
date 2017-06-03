@@ -1203,6 +1203,8 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
   const uchar *system_period= 0;
   bool vtmd_used= false;
   share->vtmd= false;
+  bool vers_archived_used= false;
+  share->vers_archived= false;
   const uchar *extra2_field_flags= 0;
   size_t extra2_field_flags_length= 0;
 
@@ -1317,6 +1319,12 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
         if (share->vtmd)
           share->table_category= TABLE_CATEGORY_LOG;
         vtmd_used= true;
+        break;
+      case EXTRA2_VERS_ARCHIVED:
+        if (vers_archived_used)
+          goto err;
+        share->vers_archived= true;
+        vers_archived_used= true;
         break;
       default:
         /* abort frm parsing if it's an unknown but important extra2 value */

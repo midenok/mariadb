@@ -273,6 +273,11 @@ LEX_CUSTRING build_frm_image(THD *thd, const char *table,
     extra2_size+= 1 + 1 + 1;
   }
 
+  if (create_info->vers_archived())
+  {
+    extra2_size+= 1 + 1 + 1;
+  }
+
   bool has_extra2_field_flags_= has_extra2_field_flags(create_fields);
   if (has_extra2_field_flags_)
   {
@@ -348,6 +353,13 @@ LEX_CUSTRING build_frm_image(THD *thd, const char *table,
   if (create_info->vtmd())
   {
     *pos++= EXTRA2_VTMD;
+    *pos++= 1;
+    *pos++= 1;
+  }
+
+  if (create_info->vers_archived())
+  {
+    *pos++= EXTRA2_VERS_ARCHIVED;
     *pos++= 1;
     *pos++= 1;
   }

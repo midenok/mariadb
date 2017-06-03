@@ -404,6 +404,7 @@ enum enum_alter_inplace_result {
 #define HA_LEX_CREATE_SEQUENCE  16U
 #define HA_VERSIONED_TABLE      32U
 #define HA_VTMD                 64U
+#define HA_VERS_ARCHIVED        128U
 
 #define HA_MAX_REC_LENGTH	65535
 
@@ -1845,6 +1846,11 @@ struct Table_scope_and_contents_source_st
   bool vtmd() const
   {
     return options & HA_VTMD;
+  }
+
+  bool vers_archived() const
+  {
+    return options & HA_VERS_ARCHIVED;
   }
 };
 
