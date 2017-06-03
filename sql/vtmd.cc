@@ -563,10 +563,18 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
     if (select->skip_record(thd) > 0)
     {
       tl.table->field[FLD_ARCHIVE_NAME]->val_str(&out);
+
       if (out.length() == 0)
       {
-        // Handle AS OF NOW or similar
-        tl.table->field[FLD_NAME]->val_str(&out);
+        if (tl.table->field[FLD_END]->is_max())
+        {
+          // Handle AS OF NOW or similar case
+          tl.table->field[FLD_NAME]->val_str(&out);
+        }
+        else
+        {
+          // Handle RENAME TABLE case
+        }
       }
       break;
     }
