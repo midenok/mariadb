@@ -48,23 +48,33 @@ show create table t for system_time as of timestamp '01-01-1990';
 --error ER_VERS_VTMD_ERROR
 show create table t for system_time as of timestamp '01-01-2020';
 drop table t;
+call drop_archives('t_vtmd');
+drop table t_vtmd;
 
 create table t (a int) with system versioning;
 
-set @tm1 = now(6);
-alter table t add column b int;
+#set @tm1 = now(6);
+#alter table t add column b int;
 
-set @tm2 = now(6);
-alter table t add column c int;
+#set @tm2 = now(6);
+#alter table t add column c int;
 
-show create table t for system_time as of timestamp @tm1;
-show create table t for system_time as of timestamp @tm2;
-show create table t for system_time as of now;
-show create table t for system_time as of timestamp now(6);
-show create table t;
+#show create table t for system_time as of timestamp @tm1;
+#show create table t for system_time as of timestamp @tm2;
+#show create table t for system_time as of now;
+#show create table t for system_time as of timestamp now(6);
+#show create table t;
 
-drop table t;
-call drop_archives('t_vtmd');
-drop table t_vtmd;
+#set @tm3 = now(6);
+select * from t_vtmd for system_time all;
+rename table t to tt;
+select * from tt_vtmd for system_time all;
+rename table tt to ttt;
+select * from ttt_vtmd for system_time all;
+
+
+drop table ttt;
+call drop_archives('ttt_vtmd');
+drop table ttt_vtmd;
 
 drop procedure drop_archives;
