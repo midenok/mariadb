@@ -40,6 +40,8 @@ ERROR HY000: VTMD error: failed to query VTMD table
 show create table t for system_time as of timestamp '01-01-2020';
 ERROR HY000: VTMD error: failed to query VTMD table
 drop table t;
+call drop_archives('t_vtmd');
+drop table t_vtmd;
 create table t (a int) with system versioning;
 set @tm1 = now(6);
 alter table t add column b int;
@@ -92,7 +94,52 @@ t	CREATE TABLE `t` (
   `c` int(11) DEFAULT NULL,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-drop table t;
-call drop_archives('t_vtmd');
-drop table t_vtmd;
+set @tm3 = now(6);
+rename table t to tt;
+show create table tt for system_time as of timestamp @tm3;
+Table	Create Table
+tt	CREATE TABLE `tt` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+set @tm4 = now(6);
+alter table tt add column d int;
+show create table tt for system_time as of timestamp @tm3;
+Table	Create Table
+tt	CREATE TABLE `tt` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+show create table tt for system_time as of timestamp @tm4;
+Table	Create Table
+tt	CREATE TABLE `tt` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+show create table tt;
+Table	Create Table
+tt	CREATE TABLE `tt` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  `d` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+drop table tt;
+call drop_archives('tt_vtmd');
+drop table tt_vtmd;
 drop procedure drop_archives;

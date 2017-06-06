@@ -174,7 +174,6 @@ vtmd_template	CREATE TABLE `vtmd_template` (
   PRIMARY KEY (`end`),
   PERIOD FOR SYSTEM_TIME (`start`, `end`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0 WITH SYSTEM VERSIONING
-
 call verify_vtq;
 No	A	B	C	D
 1	1	1	1	1
