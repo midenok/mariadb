@@ -174,29 +174,7 @@ vtmd_template	CREATE TABLE `vtmd_template` (
   PRIMARY KEY (`end`),
   PERIOD FOR SYSTEM_TIME (`start`, `end`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0 WITH SYSTEM VERSIONING
-create or replace table t (a int) with system versioning;
-show create table t for system_time as of timestamp @tm;
-Table	Create Table
-t	CREATE TABLE `t` (
-  `a` int(11) DEFAULT NULL,
-  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
-  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
-  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-show create table t for system_time as of now;
-Table	Create Table
-t	CREATE TABLE `t` (
-  `a` int(11) DEFAULT NULL,
-  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
-  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
-  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-show create table t for system_time between timestamp @tm and timestamp @tm;
-ERROR HY000: Wrong parameters for `FOR SYSTEM_TIME`: only AS OF allowed here
-show create table t for system_time from timestamp @tm to timestamp @tm;
-ERROR HY000: Wrong parameters for `FOR SYSTEM_TIME`: only AS OF allowed here
-show create table t for system_time before timestamp @tm;
-ERROR HY000: Wrong parameters for `FOR SYSTEM_TIME`: only AS OF allowed here
+
 call verify_vtq;
 No	A	B	C	D
 1	1	1	1	1
