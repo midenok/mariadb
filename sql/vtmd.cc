@@ -539,8 +539,10 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
   Name_resolution_context &ctx= thd->lex->select_lex.context;
   TABLE_LIST *table_list= ctx.table_list;
   TABLE_LIST *first_name_resolution_table= ctx.first_name_resolution_table;
+  table_map map = tl.table->map;
   ctx.table_list= &tl;
   ctx.first_name_resolution_table= &tl;
+  tl.table->map= 1;
 
   tl.vers_conditions= about.vers_conditions;
   if ((error= vers_setup_select(thd, &tl, &conds, &select_lex)) ||
@@ -582,6 +584,7 @@ err:
   delete select;
   ctx.table_list= table_list;
   ctx.first_name_resolution_table= first_name_resolution_table;
+  tl.table->map= map;
   close_log_table(thd, &open_tables_backup);
   return error ? true : false;
 }
