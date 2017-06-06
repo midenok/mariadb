@@ -568,8 +568,9 @@ bool VTMD_table::find_archive_name(THD *thd, String &out)
 
       if (out.length() == 0)
       {
-          // Handle AS OF NOW or similar case
-          tl.table->field[FLD_NAME]->val_str(&out);
+          // Handle AS OF NOW or just RENAMEd case
+          out.set(about.table_name, about.table_name_length,
+                  system_charset_info);
       }
       break;
     }
