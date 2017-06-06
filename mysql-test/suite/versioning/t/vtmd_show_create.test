@@ -3,30 +3,31 @@
 set versioning_ddl_survival=1;
 
 create table t (a int) with system versioning;
---error ER_VERS_VTMD_ERROR
-show create table t for system_time as of timestamp @tm1;
+select * from t_vtmd;
+show create table t for system_time as of now;
+
+
 
 set @tm1 = now(6);
 alter table t add column b int;
 
-set @tm2 = now(6);
-alter table t add column c int;
+--error ER_VERS_WRONG_PARAMS
+show create table t for system_time between timestamp @tm1 and timestamp @tm1;
+--error ER_VERS_WRONG_PARAMS
+show create table t for system_time from timestamp @tm1 to timestamp @tm1;
+--error ER_VERS_WRONG_PARAMS
+show create table t for system_time before timestamp @tm1;
 
-select * from t_vtmd for system_time all;
-
-show create table t for system_time as of timestamp @tm1;
-show create table t for system_time as of timestamp @tm2;
---error ER_VERS_VTMD_ERROR
-show create table t for system_time as of timestamp '01-01-1990';
---error ER_VERS_VTMD_ERROR
-show create table t for system_time as of timestamp '01-01-2020';
+#show create table t for system_time as of timestamp @tm1;
+#--error ER_VERS_VTMD_ERROR
+#show create table t for system_time as of timestamp '01-01-1990';
+#--error ER_VERS_VTMD_ERROR
+#show create table t for system_time as of timestamp '01-01-2020';
+#select * from t_vtmd for system_time all;
 show create table t for system_time as of now;
+show create table t for system_time as of timestamp now(6);
 show create table t;
 
-set @tm3 = now(6);
-rename table t to tt;
-select * from tt_vtmd for system_time all;
-show create table tt for system_time as of timestamp @tm3;
 
 drop table if exists t, tt;
 
