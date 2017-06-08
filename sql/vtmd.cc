@@ -120,9 +120,9 @@ VTMD_table::find_record(THD *thd, ulonglong sys_trx_end, bool &found)
   DBUG_ASSERT(sys_trx_end);
   vtmd->vers_end_field()->set_notnull();
   vtmd->vers_end_field()->store(sys_trx_end, true);
-  key_copy((uchar*)key.get(), vtmd->record[0], vtmd->key_info + IDX_END, 0);
+  key_copy((uchar*)key.get(), vtmd->record[0], vtmd->key_info + IDX_TRX_END, 0);
 
-  error= vtmd->file->ha_index_read_idx_map(vtmd->record[1], IDX_END,
+  error= vtmd->file->ha_index_read_idx_map(vtmd->record[1], IDX_TRX_END,
                                             (const uchar*)key.get(),
                                             HA_WHOLE_KEY,
                                             HA_READ_KEY_EXACT);
@@ -337,6 +337,75 @@ VTMD_rename::try_rename(THD *thd, LEX_STRING &new_db, LEX_STRING &new_alias)
 
   if (new_table.vers_vtmd_name(vtmd_new_name))
     return true;
+
+  if (*new_alias.str == 'x')
+  {
+    Open_tables_backup open_tables_backup;
+    TABLE_LIST vtmd_tl;
+    vtmd_tl.init_one_table(
+      about.db, about.db_length,
+      vtmd_name.ptr(), vtmd_name.length(),
+      vtmd_name.ptr(),
+      TL_READ);
+    vtmd= open_log_table(thd, &vtmd_tl, &open_tables_backup);
+    if (vtmd)
+    {
+      vtmd->key_info[IDX_ARCHIVE_NAME].flags= HA_READ_AFTER_KEY;
+      vtmd->file->ha_start_keyread(IDX_ARCHIVE_NAME);
+      if (!vtmd->file->ha_index_init(IDX_ARCHIVE_NAME, true))
+      {
+        auto_afree_ptr<char> key(NULL);
+        if (key.get() == NULL)
+        {
+          key.assign(static_cast<char*>(my_alloca(vtmd->key_info[IDX_ARCHIVE_NAME].key_length)));
+          if (key.get() == NULL)
+          {
+            my_message(ER_VERS_VTMD_ERROR, "failed to allocate key buffer", MYF(0));
+            return true;
+          }
+        }
+        int rc= vtmd->file->ha_index_first(vtmd->record[0]);
+        String archive;
+        ulonglong start;
+        while (!rc)
+        {
+          start= (ulonglong) vtmd->vers_start_field()->val_int();
+          if (!vtmd->field[FLD_ARCHIVE_NAME]->is_null())
+          {
+            vtmd->field[FLD_ARCHIVE_NAME]->val_str(&archive);
+            key_copy((uchar*)key.get(),
+                     vtmd->record[0],
+                     &vtmd->key_info[IDX_ARCHIVE_NAME],
+                     vtmd->key_info[IDX_ARCHIVE_NAME].key_length,
+                     false);
+            rc= vtmd->file->ha_index_read_map(
+              vtmd->record[0],
+              (uchar *)key.get(),
+              vtmd->key_info[IDX_ARCHIVE_NAME].ext_key_part_map,
+              HA_READ_PREFIX_LAST);
+            if (!rc)
+              rc= vtmd->file->ha_index_next(vtmd->record[0]);
+          }
+          else
+          {
+            archive.length(0);
+            rc= vtmd->file->ha_index_next(vtmd->record[0]);
+          }
+        }
+        if (rc && rc != HA_ERR_END_OF_FILE)
+        {
+          vtmd->file->print_error(rc, MYF(0));
+        }
+        vtmd->file->ha_index_end();
+      }
+      vtmd->file->ha_end_keyread();
+      close_log_table(thd, &open_tables_backup);
+    }
+    if (!local_da.is_error())
+      my_printf_error(ER_VERS_VTMD_ERROR, "`%s.%s` table already exists!", MYF(0),
+                          new_db.str, vtmd_new_name.ptr());
+    return true;
+  }
 
   if (ha_table_exists(thd, new_db.str, vtmd_new_name.ptr()))
   {

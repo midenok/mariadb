@@ -28,7 +28,8 @@ public:
   };
 
   enum {
-    IDX_END= 0
+    IDX_TRX_END= 0,
+    IDX_ARCHIVE_NAME
   };
 
   VTMD_table(TABLE_LIST &_about) :
