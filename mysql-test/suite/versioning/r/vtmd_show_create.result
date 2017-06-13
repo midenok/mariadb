@@ -24,6 +24,31 @@ prepare stmt from @tmp; execute stmt; drop prepare stmt;
 end loop;
 drop table cur_tmp;
 end~~
+create procedure test_01(in engine varchar(64))
+begin
+set @tmp = concat('create table t (a int) with system versioning engine ', engine);
+prepare stmt from @tmp; execute stmt; drop prepare stmt;
+set @tm1 = now(6);
+alter table t add column b int;
+set @tm2 = now(6);
+alter table t add column c int;
+show create table t for system_time as of timestamp @tm1;
+show create table t for system_time as of timestamp @tm2;
+show create table t for system_time as of now;
+show create table t for system_time as of timestamp now(6);
+show create table t;
+set @tm3 = now(6);
+rename table t to tt;
+show create table tt for system_time as of timestamp @tm3;
+set @tm4 = now(6);
+alter table tt add column d int;
+show create table tt for system_time as of timestamp @tm3;
+show create table tt for system_time as of timestamp @tm4;
+show create table tt;
+drop table tt;
+call drop_archives('tt_vtmd');
+drop table tt_vtmd;
+end~~
 create table t (a int) with system versioning;
 show create table t for system_time as of now;
 ERROR 42S02: Table 'test.t_vtmd' doesn't exist
@@ -42,12 +67,7 @@ ERROR HY000: VTMD error: failed to query VTMD table
 drop table t;
 call drop_archives('t_vtmd');
 drop table t_vtmd;
-create table t (a int) with system versioning;
-set @tm1 = now(6);
-alter table t add column b int;
-set @tm2 = now(6);
-alter table t add column c int;
-show create table t for system_time as of timestamp @tm1;
+call test_01('myisam');
 Table	Create Table
 t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
@@ -55,7 +75,6 @@ t	CREATE TABLE `t` (
   `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-show create table t for system_time as of timestamp @tm2;
 Table	Create Table
 t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
@@ -64,7 +83,6 @@ t	CREATE TABLE `t` (
   `b` int(11) DEFAULT NULL,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-show create table t for system_time as of now;
 Table	Create Table
 t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
@@ -74,7 +92,6 @@ t	CREATE TABLE `t` (
   `c` int(11) DEFAULT NULL,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-show create table t for system_time as of timestamp now(6);
 Table	Create Table
 t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
@@ -84,7 +101,6 @@ t	CREATE TABLE `t` (
   `c` int(11) DEFAULT NULL,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
@@ -94,9 +110,6 @@ t	CREATE TABLE `t` (
   `c` int(11) DEFAULT NULL,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-set @tm3 = now(6);
-rename table t to tt;
-show create table tt for system_time as of timestamp @tm3;
 Table	Create Table
 tt	CREATE TABLE `tt` (
   `a` int(11) DEFAULT NULL,
@@ -106,9 +119,6 @@ tt	CREATE TABLE `tt` (
   `c` int(11) DEFAULT NULL,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-set @tm4 = now(6);
-alter table tt add column d int;
-show create table tt for system_time as of timestamp @tm3;
 Table	Create Table
 tt	CREATE TABLE `tt` (
   `a` int(11) DEFAULT NULL,
@@ -118,7 +128,6 @@ tt	CREATE TABLE `tt` (
   `c` int(11) DEFAULT NULL,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-show create table tt for system_time as of timestamp @tm4;
 Table	Create Table
 tt	CREATE TABLE `tt` (
   `a` int(11) DEFAULT NULL,
@@ -128,7 +137,6 @@ tt	CREATE TABLE `tt` (
   `c` int(11) DEFAULT NULL,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-show create table tt;
 Table	Create Table
 tt	CREATE TABLE `tt` (
   `a` int(11) DEFAULT NULL,
@@ -139,7 +147,85 @@ tt	CREATE TABLE `tt` (
   `d` int(11) DEFAULT NULL,
   PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
-drop table tt;
-call drop_archives('tt_vtmd');
-drop table tt_vtmd;
+call test_01('innodb');
+Table	Create Table
+t	CREATE TABLE `t` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+Table	Create Table
+t	CREATE TABLE `t` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+Table	Create Table
+t	CREATE TABLE `t` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+Table	Create Table
+t	CREATE TABLE `t` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+Table	Create Table
+t	CREATE TABLE `t` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+Table	Create Table
+tt	CREATE TABLE `tt` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+Table	Create Table
+tt	CREATE TABLE `tt` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+Table	Create Table
+tt	CREATE TABLE `tt` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+Table	Create Table
+tt	CREATE TABLE `tt` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT NULL,
+  `d` int(11) DEFAULT NULL,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+drop procedure test_01;
 drop procedure drop_archives;
