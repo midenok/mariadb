@@ -35,7 +35,14 @@ VTMD_table::create(THD *thd)
   if (mdl_lock.acquire_error())
     return true;
 
-  return mysql_create_like_table(thd, &table, &src_table, &create_info);
+  Reprepare_observer *reprepare_observer= thd->m_reprepare_observer;
+  partition_info *work_part_info= thd->work_part_info;
+  thd->m_reprepare_observer= NULL;
+  thd->work_part_info= NULL;
+  bool rc= mysql_create_like_table(thd, &table, &src_table, &create_info);
+  thd->m_reprepare_observer= reprepare_observer;
+  thd->work_part_info= work_part_info;
+  return rc;
 }
 
 bool
