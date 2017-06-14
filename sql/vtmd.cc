@@ -380,7 +380,7 @@ VTMD_rename::move_table(THD *thd, SString_fs &table_name, LString &new_db)
 }
 
 bool
-VTMD_rename::try_rename(THD *thd, LString new_db, LString new_alias)
+VTMD_rename::try_rename(THD *thd, LString new_db, LString new_alias, const char *archive_name)
 {
   Local_da local_da(thd, ER_VERS_VTMD_ERROR);
   TABLE_LIST new_table;
@@ -442,11 +442,11 @@ VTMD_rename::try_rename(THD *thd, LString new_db, LString new_alias)
     if (!rc)
     {
       query_cache_invalidate3(thd, &vtmd_tl, 0);
-      if (same_db || new_alias != LString(TABLE_NAME_WITH_LEN(about)))
+      if (same_db || archive_name || new_alias != LString(TABLE_NAME_WITH_LEN(about)))
       {
         local_da.finish();
         VTMD_table new_vtmd(new_table);
-        rc= new_vtmd.update(thd);
+        rc= new_vtmd.update(thd, archive_name);
       }
     }
     return rc;

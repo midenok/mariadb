@@ -98,6 +98,10 @@ public:
     Storage(src.str, src.length, Compare::charset())
   {
   }
+  XString(char *_str) :
+    Storage(_str, strlen(_str), Compare::charset())
+  {
+  }
   bool operator== (const XString& b) const
   {
     return Storage::length() == b.length() && 0 == Compare()(this->lex_string(), b.lex_string());

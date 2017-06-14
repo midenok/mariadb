@@ -115,7 +115,7 @@ public:
     VTMD_exists(_about)
   {}
 
-  bool try_rename(THD *thd, LString new_db, LString new_alias);
+  bool try_rename(THD *thd, LString new_db, LString new_alias, const char* archive_name= NULL);
   bool revert_rename(THD *thd, LString new_db);
 
 private:

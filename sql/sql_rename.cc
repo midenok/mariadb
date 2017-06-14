@@ -300,22 +300,22 @@ do_rename(THD *thd, TABLE_LIST *ren_table, char *new_db, char *new_table_name,
         (void) rename_table_in_stat_tables(thd, &db_name, &table_name,
                                            &new_db_name, &new_table);
         VTMD_rename vtmd(*ren_table);
-        rc= vtmd.try_rename(thd, new_db_name, new_table);
-
-        if (!rc)
+        if (thd->variables.vers_ddl_survival)
         {
-          rc= Table_triggers_list::change_table_name(thd, ren_table->db,
-                                                        old_alias,
-                                                        ren_table->table_name,
-                                                        new_db,
-                                                        new_alias);
+          rc= vtmd.try_rename(thd, new_db_name, new_table);
           if (rc)
-          {
-            vtmd.revert_rename(thd, new_db_name);
-          }
+            goto revert_table_name;
         }
+        rc= Table_triggers_list::change_table_name(thd, ren_table->db,
+                                                      old_alias,
+                                                      ren_table->table_name,
+                                                      new_db,
+                                                      new_alias);
         if (rc)
         {
+          if (thd->variables.vers_ddl_survival)
+            vtmd.revert_rename(thd, new_db_name);
+revert_table_name:
           /*
             We've succeeded in renaming table's .frm and in updating
             corresponding handler data, but have failed to update table's
