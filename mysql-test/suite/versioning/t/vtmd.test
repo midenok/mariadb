@@ -144,11 +144,18 @@ use db1;
 show tables;
 call test.check_vtmd('db1.other_name_vtmd');
 
+# alter rename
+alter table other_name rename to t1;
+call test.check_vtmd('db1.t1_vtmd');
+
+# alter rename and modify to different schema
+alter table t1 rename to test.t2, add column (y int);
 use test;
+--replace_regex /\d{8}_\d{6}_\d{6}/TIMESTAMP_SUFFIX/
+show tables;
+call check_vtmd('t2_vtmd');
+
 drop database db0;
 drop database db1;
-
-set versioning_ddl_survival= off;
 drop database test;
 create database test;
-

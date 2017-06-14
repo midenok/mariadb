@@ -219,9 +219,51 @@ A_start	B_end	name	C_archive_name
 1	0	t0	t0_
 1	0	t0	NULL
 1	1	other_name	NULL
+alter table other_name rename to t1;
+call test.check_vtmd('db1.t1_vtmd');
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	0	x0	t0_
+1	0	d0	t0_
+1	0	duck	t0_
+1	0	bay	t0_
+1	0	sheer	t0_
+1	0	t0	t0_
+1	0	t0	t0_
+1	0	t0	t0_
+1	0	t0	t0_
+1	0	t0	NULL
+1	0	other_name	NULL
+1	1	t1	NULL
+alter table t1 rename to test.t2, add column (y int);
 use test;
+show tables;
+Tables_in_test
+t0_TIMESTAMP_SUFFIX
+t0_TIMESTAMP_SUFFIX
+t0_TIMESTAMP_SUFFIX
+t0_TIMESTAMP_SUFFIX
+t2
+t2_vtmd
+call check_vtmd('t2_vtmd');
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	0	x0	t0_
+1	0	d0	t0_
+1	0	duck	t0_
+1	0	bay	t0_
+1	0	sheer	t0_
+1	0	t0	t0_
+1	0	t0	t0_
+1	0	t0	t0_
+1	0	t0	t0_
+1	0	t0	t1_
+1	0	other_name	t1_
+1	0	t1	t1_
+1	1	t2	NULL
 drop database db0;
 drop database db1;
-set versioning_ddl_survival= off;
 drop database test;
 create database test;
