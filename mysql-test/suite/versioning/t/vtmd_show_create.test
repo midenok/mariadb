@@ -36,31 +36,31 @@ begin
   set @tmp = concat('create table t (a int) with system versioning engine ', engine);
   prepare stmt from @tmp; execute stmt; drop prepare stmt;
 
-set @tm1 = now(6);
-alter table t add column b int;
+  set @tm1 = now(6);
+  alter table t add column b int;
 
-set @tm2 = now(6);
-alter table t add column c int;
+  set @tm2 = now(6);
+  alter table t add column c int;
 
-show create table t for system_time as of timestamp @tm1;
-show create table t for system_time as of timestamp @tm2;
-show create table t for system_time as of now;
-show create table t for system_time as of timestamp now(6);
-show create table t;
+  show create table t for system_time as of timestamp @tm1;
+  show create table t for system_time as of timestamp @tm2;
+  show create table t for system_time as of now;
+  show create table t for system_time as of timestamp now(6);
+  show create table t;
 
-set @tm3 = now(6);
-rename table t to tt;
-show create table tt for system_time as of timestamp @tm3;
+  set @tm3 = now(6);
+  rename table t to tt;
+  show create table tt for system_time as of timestamp @tm3;
 
-set @tm4 = now(6);
-alter table tt add column d int;
-show create table tt for system_time as of timestamp @tm3;
-show create table tt for system_time as of timestamp @tm4;
-show create table tt;
+  set @tm4 = now(6);
+  alter table tt add column d int;
+  show create table tt for system_time as of timestamp @tm3;
+  show create table tt for system_time as of timestamp @tm4;
+  show create table tt;
 
-drop table tt;
-call drop_archives('tt_vtmd');
-drop table tt_vtmd;
+  drop table tt;
+  call drop_archives('tt_vtmd');
+  drop table tt_vtmd;
 end~~
 delimiter ;~~
 
