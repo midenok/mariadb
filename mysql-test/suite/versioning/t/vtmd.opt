@@ -1,1 +1,3 @@
---innodb --default-storage-engine=innodb
+--innodb
+--default-storage-engine=innodb
+--partition

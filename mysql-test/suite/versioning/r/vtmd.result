@@ -44,6 +44,24 @@ substr(archive_name, 1, instr(archive_name, '_')) as C_archive_name
 from tmp_vtmd for system_time all;
 drop table tmp_vtmd;
 end~~
+create procedure test_01(in engine varchar(64))
+begin
+set @tmp = concat('create table t (a int) with system versioning engine ', engine);
+prepare stmt from @tmp; execute stmt; drop prepare stmt;
+call check_vtmd('t_vtmd');
+alter table t change a a bigint;
+show create table t;
+call check_vtmd('t_vtmd');
+alter table t modify a int;
+show create table t;
+call check_vtmd('t_vtmd');
+alter table t modify a int after sys_trx_start;
+show create table t;
+call check_vtmd('t_vtmd');
+drop table t;
+call drop_archives('t_vtmd');
+drop table t_vtmd;
+end~~
 set versioning_ddl_survival= off;
 create or replace table t0 (x int) with system versioning;
 show tables;
@@ -265,6 +283,94 @@ A_start	B_end	name	C_archive_name
 1	0	other_name	t1_
 1	0	t1	t1_
 1	1	t2	NULL
+call test_01('myisam');
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	1	t	NULL
+Table	Create Table
+t	CREATE TABLE `t` (
+  `a` bigint(20) DEFAULT NULL,
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	0	t	t_
+1	1	t	NULL
+Table	Create Table
+t	CREATE TABLE `t` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	0	t	t_
+1	0	t	t_
+1	1	t	NULL
+Table	Create Table
+t	CREATE TABLE `t` (
+  `sys_trx_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	0	t	t_
+1	0	t	t_
+1	0	t	t_
+1	1	t	NULL
+call test_01('innodb');
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	1	t	NULL
+Table	Create Table
+t	CREATE TABLE `t` (
+  `a` bigint(20) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	0	t	t_
+1	1	t	NULL
+Table	Create Table
+t	CREATE TABLE `t` (
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	0	t	t_
+1	0	t	t_
+1	1	t	NULL
+Table	Create Table
+t	CREATE TABLE `t` (
+  `sys_trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START,
+  `a` int(11) DEFAULT NULL,
+  `sys_trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`sys_trx_start`, `sys_trx_end`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	0	t	t_
+1	0	t	t_
+1	0	t	t_
+1	1	t	NULL
 drop database db0;
 drop database db1;
 drop database test;
