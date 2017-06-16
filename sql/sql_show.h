@@ -78,7 +78,8 @@ typedef struct system_status_var STATUS_VAR;
 typedef enum { WITHOUT_DB_NAME, WITH_DB_NAME } enum_with_db_name;
 int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
                       Table_specification_st *create_info_arg,
-                      enum_with_db_name with_db_name);
+                      enum_with_db_name with_db_name,
+                      const char *orig_name= NULL);
 
 int copy_event_to_schema_table(THD *thd, TABLE *sch_table, TABLE *event_table);
 
@@ -87,7 +88,8 @@ bool append_identifier(THD *thd, String *packet, const char *name,
 void mysqld_list_fields(THD *thd,TABLE_LIST *table, const char *wild);
 int mysqld_dump_create_info(THD *thd, TABLE_LIST *table_list, int fd);
 bool mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
-                                   List<Item> *field_list, String *buffer);
+                                   List<Item> *field_list, String *buffer,
+                                   const char *orig_name=NULL);
 bool mysqld_show_create(THD *thd, TABLE_LIST *table_list);
 void mysqld_show_create_db_get_fields(THD *thd, List<Item> *field_list);
 bool mysqld_show_create_db(THD *thd, LEX_STRING *db_name,

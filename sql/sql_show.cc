@@ -1141,9 +1141,9 @@ public:
 
 */
 
-bool
-mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
-                              List<Item> *field_list, String *buffer)
+bool mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
+                                   List<Item> *field_list, String *buffer,
+                                   const char *orig_name)
 {
   bool error= TRUE;
   MEM_ROOT *mem_root= thd->mem_root;
@@ -1193,11 +1193,11 @@ mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
   if (table_list->view)
     buffer->set_charset(table_list->view_creation_ctx->get_client_cs());
 
-  if ((table_list->view ?
-       show_create_view(thd, table_list, buffer) :
-       thd->lex->table_type == TABLE_TYPE_SEQUENCE ?
-       show_create_sequence(thd, table_list, buffer) :
-       show_create_table(thd, table_list, buffer, NULL, WITHOUT_DB_NAME)))
+  if ((table_list->view ? show_create_view(thd, table_list, buffer)
+                        : thd->lex->table_type == TABLE_TYPE_SEQUENCE
+                              ? show_create_sequence(thd, table_list, buffer)
+                              : show_create_table(thd, table_list, buffer, NULL,
+                                                  WITHOUT_DB_NAME, orig_name)))
     goto exit;
 
   if (table_list->view)
@@ -1269,44 +1269,27 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
   */
   MDL_savepoint mdl_savepoint= thd->mdl_context.mdl_savepoint();
 
-  if (table_list->vers_conditions.type != FOR_SYSTEM_TIME_UNSPECIFIED)
+  const char *orig_name= NULL;
+  TABLE_LIST tl;
+  bool versioned_query=
+      table_list->vers_conditions.type != FOR_SYSTEM_TIME_UNSPECIFIED;
+  String archive_name;
+  if (versioned_query)
   {
-    String archive_name;
-    char *table_name= NULL;
-    TABLE_LIST tl;
     DBUG_ASSERT(table_list->vers_conditions.type == FOR_SYSTEM_TIME_AS_OF);
     VTMD_table vtmd(*table_list);
     if (vtmd.find_archive_name(thd, archive_name))
-      goto loc_err;
+      goto exit;
 
     tl.init_one_table(table_list->db, table_list->db_length, archive_name.ptr(),
                       archive_name.length(), archive_name.ptr(), TL_READ);
 
-    if (mysqld_show_create_get_fields(thd, &tl, &field_list, &buffer))
-      goto loc_err;
-    table_name= strstr(buffer.ptr(), archive_name.ptr());
-    buffer.replace(table_name - buffer.ptr(), archive_name.length(),
-                   table_list->table_name, table_list->table_name_length);
-    if (protocol->send_result_set_metadata(
-            &field_list, Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
-      goto loc_err;
-    protocol->prepare_for_resend();
-    protocol->store(table_list->table_name, system_charset_info);
-    protocol->store(buffer.ptr(), buffer.length(), buffer.charset());
-    if (protocol->write())
-      goto loc_err;
-
-    error= false;
-    my_eof(thd);
-loc_err:
-    /* If commit fails, we should be able to reset the OK status. */
-    thd->get_stmt_da()->set_overwrite_status(true);
-    trans_commit_stmt(thd);
-    thd->get_stmt_da()->set_overwrite_status(false);
-    goto exit;
+    orig_name= table_list->table_name;
+    table_list= &tl;
   }
 
-  if (mysqld_show_create_get_fields(thd, table_list, &field_list, &buffer))
+  if (mysqld_show_create_get_fields(thd, table_list, &field_list, &buffer,
+                                    orig_name))
     goto exit;
 
   if (protocol->send_result_set_metadata(&field_list,
@@ -1317,7 +1300,10 @@ loc_err:
   protocol->prepare_for_resend();
   if (table_list->view)
     protocol->store(table_list->view_name.str, system_charset_info);
-  else
+  else if (orig_name)
+  {
+    protocol->store(orig_name, system_charset_info);
+  } else
   {
     if (table_list->schema_table)
       protocol->store(table_list->schema_table->table_name,
@@ -1347,6 +1333,13 @@ loc_err:
   my_eof(thd);
 
 exit:
+  if (versioned_query)
+  {
+    /* If commit fails, we should be able to reset the OK status. */
+    thd->get_stmt_da()->set_overwrite_status(true);
+    trans_commit_stmt(thd);
+    thd->get_stmt_da()->set_overwrite_status(false);
+  }
   close_thread_tables(thd);
   /* Release any metadata locks taken during SHOW CREATE. */
   thd->mdl_context.rollback_to_savepoint(mdl_savepoint);
@@ -2000,6 +1993,7 @@ end_options:
                       NULL, in which case only SQL_MODE is considered
                       when building the statement.
     with_db_name     Add database name to table name
+    orig_name         Show this instead of archive name.
 
   NOTE
     Currently always return 0, but might return error code in the
@@ -2011,7 +2005,7 @@ end_options:
 
 int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
                       Table_specification_st *create_info_arg,
-                      enum_with_db_name with_db_name)
+                      enum_with_db_name with_db_name, const char *orig_name)
 {
   List<Item> field_list;
   char tmp[MAX_FIELD_WIDTH], *for_str, def_value_buf[MAX_FIELD_WIDTH];
@@ -2060,7 +2054,9 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
   packet->append(STRING_WITH_LEN("TABLE "));
   if (create_info_arg && create_info_arg->if_not_exists())
     packet->append(STRING_WITH_LEN("IF NOT EXISTS "));
-  if (table_list->schema_table)
+  if (orig_name)
+    alias= orig_name;
+  else if (table_list->schema_table)
     alias= table_list->schema_table->table_name;
   else
   {
