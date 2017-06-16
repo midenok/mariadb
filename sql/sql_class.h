@@ -48,7 +48,6 @@
 #include <mysql_com_server.h>
 #include "session_tracker.h"
 
-
 extern "C"
 void set_thd_stage_info(void *thd,
                         const PSI_stage_info *new_stage,
@@ -4451,6 +4450,7 @@ public:
     See also sp_head::merge_lex().
   */
   bool restore_from_local_lex_to_old_lex(LEX *oldlex);
+
 };
 
 inline void add_to_active_threads(THD *thd)

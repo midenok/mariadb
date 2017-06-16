@@ -64,7 +64,7 @@ set versioning_ddl_survival= on;
 create or replace table t0 (x int) with system versioning;
 show tables;
 show create table t0_vtmd;
-select * from t0_vtmd for system_time all;
+call check_vtmd('t0_vtmd');
 
 set versioning_ddl_survival= off;
 drop table t0;

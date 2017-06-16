@@ -67,9 +67,11 @@ t0_vtmd	CREATE TABLE `t0_vtmd` (
   KEY `archive_name` (`archive_name`),
   PERIOD FOR SYSTEM_TIME (`start`, `end`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0 WITH SYSTEM VERSIONING
-select * from t0_vtmd for system_time all;
-start	end	name	archive_name	col_renames
-1292	18446744073709551615	t0	NULL	NULL
+call check_vtmd('t0_vtmd');
+@start > 0 and @start < @inf
+1
+A_start	B_end	name	C_archive_name
+1	1	t0	NULL
 set versioning_ddl_survival= off;
 drop table t0;
 set versioning_ddl_survival= on;

@@ -290,7 +290,10 @@ VTMD_rename::move_archives(THD *thd, LString &new_db)
     return true;
 
   if (key.allocate(vtmd->key_info[IDX_ARCHIVE_NAME].key_length))
+  {
+    close_log_table(thd, &open_tables_backup);
     return true;
+  }
 
   if ((error= vtmd->file->ha_start_keyread(IDX_ARCHIVE_NAME)))
     goto err;
