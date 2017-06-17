@@ -1141,9 +1141,9 @@ public:
 
 */
 
-bool mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
-                                   List<Item> *field_list, String *buffer,
-                                   const char *orig_name)
+bool
+mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
+                              List<Item> *field_list, String *buffer)
 {
   bool error= TRUE;
   MEM_ROOT *mem_root= thd->mem_root;
@@ -1193,11 +1193,11 @@ bool mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
   if (table_list->view)
     buffer->set_charset(table_list->view_creation_ctx->get_client_cs());
 
-  if ((table_list->view ? show_create_view(thd, table_list, buffer)
-                        : thd->lex->table_type == TABLE_TYPE_SEQUENCE
-                              ? show_create_sequence(thd, table_list, buffer)
-                              : show_create_table(thd, table_list, buffer, NULL,
-                                                  WITHOUT_DB_NAME, orig_name)))
+  if ((table_list->view ?
+       show_create_view(thd, table_list, buffer) :
+       thd->lex->table_type == TABLE_TYPE_SEQUENCE ?
+       show_create_sequence(thd, table_list, buffer) :
+       show_create_table(thd, table_list, buffer, NULL, WITHOUT_DB_NAME)))
     goto exit;
 
   if (table_list->view)
@@ -1269,10 +1269,10 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
   */
   MDL_savepoint mdl_savepoint= thd->mdl_context.mdl_savepoint();
 
-  const char *orig_name= NULL;
   TABLE_LIST tl;
   bool versioned_query=
       table_list->vers_conditions.type != FOR_SYSTEM_TIME_UNSPECIFIED;
+  const char *orig_name= NULL;
   String archive_name;
   if (versioned_query)
   {
@@ -1284,12 +1284,13 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
     tl.init_one_table(table_list->db, table_list->db_length, archive_name.ptr(),
                       archive_name.length(), archive_name.ptr(), TL_READ);
 
+    tl.alias= table_list->table_name;
+    tl.vers_force_alias= true;
     orig_name= table_list->table_name;
     table_list= &tl;
   }
 
-  if (mysqld_show_create_get_fields(thd, table_list, &field_list, &buffer,
-                                    orig_name))
+  if (mysqld_show_create_get_fields(thd, table_list, &field_list, &buffer))
     goto exit;
 
   if (protocol->send_result_set_metadata(&field_list,
@@ -2005,7 +2006,7 @@ end_options:
 
 int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
                       Table_specification_st *create_info_arg,
-                      enum_with_db_name with_db_name, const char *orig_name)
+                      enum_with_db_name with_db_name)
 {
   List<Item> field_list;
   char tmp[MAX_FIELD_WIDTH], *for_str, def_value_buf[MAX_FIELD_WIDTH];
@@ -2054,13 +2055,11 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
   packet->append(STRING_WITH_LEN("TABLE "));
   if (create_info_arg && create_info_arg->if_not_exists())
     packet->append(STRING_WITH_LEN("IF NOT EXISTS "));
-  if (orig_name)
-    alias= orig_name;
-  else if (table_list->schema_table)
+  if (table_list->schema_table)
     alias= table_list->schema_table->table_name;
   else
   {
-    if (lower_case_table_names == 2)
+    if (lower_case_table_names == 2 || table_list->vers_force_alias)
       alias= table->alias.c_ptr();
     else
     {
