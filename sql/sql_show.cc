@@ -1994,7 +1994,6 @@ end_options:
                       NULL, in which case only SQL_MODE is considered
                       when building the statement.
     with_db_name     Add database name to table name
-    orig_name         Show this instead of archive name.
 
   NOTE
     Currently always return 0, but might return error code in the
