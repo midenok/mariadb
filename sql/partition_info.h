@@ -465,7 +465,7 @@ public:
     }
     return NULL;
   }
-  bool vers_limit_exceed(partition_element *part= NULL)
+  bool vers_limit_exceed(THD *thd, partition_element *part= NULL)
   {
     DBUG_ASSERT(vers_info);
     if (!vers_info->limit)
@@ -476,7 +476,13 @@ public:
       part= vers_hist_part();
     }
     // TODO: cache thread-shared part_recs and increment on INSERT
-    return table->file->part_recs_slow(part) >= vers_info->limit;
+    bool read_lock_needed= table->file->get_lock_type() == F_UNLCK;
+    if (read_lock_needed)
+      table->file->ha_external_lock(thd, F_RDLCK);
+    bool result= table->file->part_recs_slow(part) >= vers_info->limit;
+    if (read_lock_needed)
+      table->file->ha_external_lock(thd, F_UNLCK);
+    return result;
   }
   Vers_field_stats& vers_stat_trx(stat_trx_field fld, uint32 part_element_id)
   {
