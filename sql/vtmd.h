@@ -154,4 +154,22 @@ public:
 };
 
 
+inline
+bool
+VTMD_exists::check_exists(THD *thd)
+{
+  if (about.vers_vtmd_name(vtmd_name))
+    return true;
+
+  exists= ha_table_exists(thd, about.db, vtmd_name, &hton);
+
+  if (exists && !hton)
+  {
+    my_printf_error(ER_VERS_VTMD_ERROR, "`%s.%s` handlerton empty!", MYF(0),
+                        about.db, vtmd_name.ptr());
+    return true;
+  }
+  return false;
+}
+
 #endif // VTMD_INCLUDED

@@ -250,23 +250,6 @@ quit:
   return result;
 }
 
-inline
-bool
-VTMD_exists::check_exists(THD *thd)
-{
-  if (about.vers_vtmd_name(vtmd_name))
-    return true;
-
-  exists= ha_table_exists(thd, about.db, vtmd_name, &hton);
-
-  if (exists && !hton)
-  {
-    my_printf_error(ER_VERS_VTMD_ERROR, "`%s.%s` handlerton empty!", MYF(0),
-                        about.db, vtmd_name.ptr());
-    return true;
-  }
-  return false;
-}
 
 bool
 VTMD_rename::move_archives(THD *thd, LString &new_db)
