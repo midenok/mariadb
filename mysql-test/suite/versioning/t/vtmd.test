@@ -81,29 +81,6 @@ begin
 end~~
 delimiter ;~~
 
-delimiter ~~;
-create procedure test_02(in engine varchar(64))
-begin
-  set @tmp = concat('create or replace table t (a int)
-                       with system versioning engine ', engine, '
-                       partition by system_time
-                       (partition p0 versioning,
-                        partition pn as of now)');
-  prepare stmt from @tmp; execute stmt; drop prepare stmt;
-  show create table t;
-  call check_vtmd('t_vtmd');
-
---error ER_VERS_WRONG_PARAMS
-  alter table t drop partition pn;
---error ER_VERS_WRONG_PARAMS
-  alter table t drop partition p0;
-
-  drop table t;
-  call drop_archives('t_vtmd');
-  drop table t_vtmd;
-end~~
-delimiter ;~~
-
 # create
 set versioning_ddl_survival= off;
 create or replace table t0 (x int) with system versioning;
@@ -205,8 +182,6 @@ call check_vtmd('t2_vtmd');
 
 call test_01('myisam');
 call test_01('innodb');
-call test_02('myisam');
-call test_02('innodb');
 
 drop database db0;
 drop database db1;
