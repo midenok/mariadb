@@ -3063,8 +3063,10 @@ ha_innopart::part_recs_slow(void *_part_elem)
 		if (read_lock_needed)
 			ha_external_lock(ha_thd(), F_RDLCK);
 		ha_rows n = ha_innobase::records_new();
-		if (read_lock_needed)
+		if (read_lock_needed) {
 			ha_external_lock(ha_thd(), F_UNLCK);
+			ha_commit_one_phase(ha_thd(), false);
+		}
 		update_partition(part_id);
 		if (n == HA_POS_ERROR) {
 			return HA_POS_ERROR;
