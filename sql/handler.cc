@@ -6679,18 +6679,7 @@ bool Vers_parse_info::check_and_fix_implicit(
     // one used in source table.
     if (!(create_info->used_fields & HA_CREATE_USED_ENGINE))
     {
-      List_iterator_fast<Create_field> it(alter_info->create_list);
-      while (Create_field *f= it++)
-      {
-        if (is_trx_start(*f) || is_trx_end(*f))
-        {
-          create_info->db_type= ha_resolve_by_legacy_type(
-              thd,
-              f->sql_type == MYSQL_TYPE_LONGLONG ? DB_TYPE_INNODB
-                                                 : DB_TYPE_MYISAM);
-          break;
-        }
-      }
+      create_info->db_type= slex.table_list.first->table->file->ht;
     }
   }
 
