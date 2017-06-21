@@ -328,6 +328,16 @@ select st, en from t2 for system_time all where y = 2 into @st, @en;
 select y from t2 for system_time all where st = @st and en = @en;
 y
 2
+set default_storage_engine = myisam;
+create or replace table t1 (a int) with system versioning engine innodb;
+create or replace table t2 as select a, sys_trx_start, sys_trx_end from t1 for system_time all;
+create or replace table t2 engine myisam as select a, sys_trx_start, sys_trx_end from t1 for system_time all;
+ERROR HY000: `sys_trx_start` must be of type `TIMESTAMP(6)` for versioned table `t2`
+set default_storage_engine = innodb;
+create or replace table t1 (a int) with system versioning engine myisam;
+create or replace table t2 as select *, sys_trx_start, sys_trx_end from t1 for system_time all;
+create or replace table t2 engine innodb as select *, sys_trx_start, sys_trx_end from t1 for system_time all;
+ERROR HY000: `sys_trx_start` must be of type `BIGINT(20) UNSIGNED` for versioned table `t2`
 drop table t1;
 drop table t2;
 drop table t3;
