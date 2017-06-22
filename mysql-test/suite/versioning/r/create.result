@@ -333,6 +333,10 @@ create or replace table t1 (a int) with system versioning engine innodb;
 create or replace table t2 as select a, sys_trx_start, sys_trx_end from t1 for system_time all;
 create or replace table t2 engine myisam as select a, sys_trx_start, sys_trx_end from t1 for system_time all;
 ERROR HY000: `sys_trx_start` must be of type `TIMESTAMP(6)` for versioned table `t2`
+create or replace table t1 (a int, id int) with system versioning engine innodb;
+create or replace table t2 (b int, id int);
+create or replace table t3 as
+select t2.b, t1.a, t1.sys_trx_start, t1.sys_trx_end from t2 inner join t1 on t2.id=t1.id;
 set default_storage_engine = innodb;
 create or replace table t1 (a int) with system versioning engine myisam;
 create or replace table t2 as select *, sys_trx_start, sys_trx_end from t1 for system_time all;
