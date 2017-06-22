@@ -128,6 +128,7 @@ with system versioning
 partition by system_time (
 partition p0 versioning,
 partition pn as of now);
+# XXX this looks fine, although a bit unconventional. but see below
 alter table t1 add partition (
 partition p1 as of now);
 ERROR HY000: Wrong parameters for `BY SYSTEM_TIME`: AS OF NOW partition can not be added
