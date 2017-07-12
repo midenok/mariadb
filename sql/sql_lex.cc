@@ -1368,23 +1368,6 @@ int MYSQLlex(YYSTYPE *yylval, THD *thd)
       return FOR_SYM;
     }
     break;
-  case QUERY_SYM:
-  {
-    static const char* system_time= "system_time";
-    static int len= (int) strlen(system_time);
-    CHARSET_INFO *cs= thd->charset();
-    const char *p= lip->get_ptr();
-    while (my_isspace(cs, *p))
-      ++p;
-    if (lip->get_end_of_query() - p > len && my_isspace(cs, p[len]) &&
-        0 == strncasecmp(p, system_time, len))
-    {
-      token= lex_one_token(yylval, thd);
-      lip->add_digest_token(token, yylval);
-      return QUERY_SYSTEM_TIME_SYM;
-    }
-    return QUERY_SYM;
-  }
   default:
     break;
   }

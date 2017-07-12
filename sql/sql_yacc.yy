@@ -1355,7 +1355,6 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  PURGE
 %token  QUARTER_SYM
 %token  QUERY_SYM
-%token  QUERY_SYSTEM_TIME_SYM         /* INTERNAL */
 %token  QUICK
 %token  RAISE_SYM                     /* Oracle-PLSQL-R */
 %token  RANGE_SYM                     /* SQL-2003-R */
@@ -8804,7 +8803,7 @@ table_expression:
           opt_group_clause
           opt_having_clause
           opt_window_clause
-          opt_query_system_time_clause
+          opt_system_time_clause
         ;
 
 opt_table_expression:
@@ -8850,10 +8849,10 @@ trans_or_timestamp:
           }
         ;
 
-opt_query_system_time_clause:
+opt_system_time_clause:
           /* empty */
           {}
-        | QUERY_SYSTEM_TIME_SYM system_time_expr
+        | SYSTEM_TIME_SYM system_time_expr
           {
             DBUG_ASSERT(Select);
             Select->vers_conditions= Lex->vers_conditions;
