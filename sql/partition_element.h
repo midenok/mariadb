@@ -170,15 +170,6 @@ public:
   uint32 id;
   bool empty;
 
-  enum elem_type
-  {
-    CONVENTIONAL= 0,
-    AS_OF_NOW,
-    VERSIONING
-  };
-
-  elem_type type;
-
   partition_element()
   : part_max_rows(0), part_min_rows(0), range_value(0),
     partition_name(NULL), tablespace_name(NULL),
@@ -188,8 +179,7 @@ public:
     nodegroup_id(UNDEF_NODEGROUP), has_null_value(FALSE),
     signed_flag(FALSE), max_value(FALSE),
     id(UINT32_MAX),
-    empty(true),
-    type(CONVENTIONAL)
+    empty(true)
   {}
   partition_element(partition_element *part_elem)
   : part_max_rows(part_elem->part_max_rows),
@@ -205,14 +195,12 @@ public:
     nodegroup_id(part_elem->nodegroup_id),
     has_null_value(FALSE),
     id(part_elem->id),
-    empty(part_elem->empty),
-    type(part_elem->type)
+    empty(part_elem->empty)
   {}
   ~partition_element() {}
 
   part_column_list_val& get_col_val(uint idx)
   {
-    DBUG_ASSERT(type != CONVENTIONAL);
     DBUG_ASSERT(list_val_list.elements == 1);
     part_elem_value *ev= list_val_list.head();
     DBUG_ASSERT(ev && ev->col_val_array);
