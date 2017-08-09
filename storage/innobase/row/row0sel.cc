@@ -3346,6 +3346,7 @@ row_sel_get_clust_rec_for_mysql(
 				it, NULL if the old version did not exist
 				in the read view, i.e., it was a fresh
 				inserted version */
+	rec_t**		saved_rec,
 	ulint**		offsets,/*!< in: offsets returned by
 				rec_get_offsets(rec, sec_index);
 				out: offsets returned by
@@ -3529,16 +3530,21 @@ row_sel_get_clust_rec_for_mysql(
 			    clust_rec, clust_index, *offsets,
 			    trx_get_read_view(trx))) {
 
-			/* The following call returns 'offsets' associated with
-			'old_vers' */
-			err = row_sel_build_prev_vers_for_mysql(
-				trx->read_view, clust_index, prebuilt,
-				clust_rec, offsets, offset_heap, &old_vers,
-				vrow, mtr);
+			if (!*saved_rec) {
+				/* The following call returns 'offsets' associated with
+				'old_vers' */
+				err = row_sel_build_prev_vers_for_mysql(
+					trx->read_view, clust_index, prebuilt,
+					clust_rec, offsets, offset_heap, &old_vers,
+					vrow, mtr);
 
-			if (err != DB_SUCCESS || old_vers == NULL) {
+				if (err != DB_SUCCESS || old_vers == NULL) {
 
-				goto err_exit;
+					goto err_exit;
+				}
+				*saved_rec = old_vers;
+			} else {
+				old_vers = *saved_rec;
 			}
 
 			clust_rec = old_vers;
@@ -4143,6 +4149,7 @@ row_search_mvcc(
 	const dtuple_t*	vrow = NULL;
 	const rec_t*	result_rec = NULL;
 	const rec_t*	clust_rec;
+	rec_t*		saved_rec = NULL;
 	dberr_t		err				= DB_SUCCESS;
 	ibool		unique_search			= FALSE;
 	ibool		mtr_has_extra_clust_latch	= FALSE;
@@ -5293,6 +5300,7 @@ requires_clust_rec:
 
 		err = row_sel_get_clust_rec_for_mysql(prebuilt, index, rec,
 						      thr, &clust_rec,
+						      &saved_rec,
 						      &offsets, &heap,
 						      need_vrow ? &vrow : NULL,
 						      &mtr);
