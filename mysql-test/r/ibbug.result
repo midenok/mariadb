@@ -29,9 +29,9 @@ set @rr1= bprrs();
 select * from t1 force index (b);
 a	b	c
 set @rr2= bprrs();
-select @rr2 - @rr1;
-@rr2 - @rr1
-10201
+select @rr2 - @rr1 < 1000;
+@rr2 - @rr1 < 1000
+1
 disconnect con2;
 drop database test;
 create database test;

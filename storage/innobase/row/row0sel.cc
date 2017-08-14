@@ -3326,14 +3326,35 @@ row_sel_build_prev_vers_for_mysql(
 	return(err);
 }
 
+class
+Row_sel_get_clust_rec_for_mysql
+{
+	const rec_t*	cached_clust_rec;
+	rec_t*		cached_old_vers;
+public:
+	Row_sel_get_clust_rec_for_mysql() :
+		cached_clust_rec(NULL),
+		cached_old_vers(NULL) {}
+	dberr_t operator()(
+		row_prebuilt_t*,
+		dict_index_t*,
+		const rec_t*,
+		que_thr_t*,
+		const rec_t**,
+		ulint**,
+		mem_heap_t**,
+		const dtuple_t**,
+		mtr_t*);
+};
+
 /*********************************************************************//**
 Retrieves the clustered index record corresponding to a record in a
 non-clustered index. Does the necessary locking. Used in the MySQL
 interface.
 @return DB_SUCCESS, DB_SUCCESS_LOCKED_REC, or error code */
-static MY_ATTRIBUTE((warn_unused_result))
+MY_ATTRIBUTE((warn_unused_result))
 dberr_t
-row_sel_get_clust_rec_for_mysql(
+Row_sel_get_clust_rec_for_mysql::operator()(
 /*============================*/
 	row_prebuilt_t*	prebuilt,/*!< in: prebuilt struct in the handle */
 	dict_index_t*	sec_index,/*!< in: secondary index where rec resides */
@@ -3346,8 +3367,6 @@ row_sel_get_clust_rec_for_mysql(
 				it, NULL if the old version did not exist
 				in the read view, i.e., it was a fresh
 				inserted version */
-	rec_t**		saved_rec,
-	bool&		saved_set,
 	ulint**		offsets,/*!< in: offsets returned by
 				rec_get_offsets(rec, sec_index);
 				out: offsets returned by
@@ -3531,7 +3550,7 @@ row_sel_get_clust_rec_for_mysql(
 			    clust_rec, clust_index, *offsets,
 			    trx_get_read_view(trx))) {
 
-			if (!saved_set) {
+			if (clust_rec != cached_clust_rec) {
 				/* The following call returns 'offsets' associated with
 				'old_vers' */
 				err = row_sel_build_prev_vers_for_mysql(
@@ -3542,11 +3561,11 @@ row_sel_get_clust_rec_for_mysql(
 				if (err != DB_SUCCESS) {
 					goto err_exit;
 				}
-				*saved_rec = old_vers;
-				saved_set = true;
+				cached_clust_rec = clust_rec;
+				cached_old_vers = old_vers;
 			} else {
 				err = DB_SUCCESS;
-				old_vers = *saved_rec;
+				old_vers = cached_old_vers;
 			}
 
 			if (old_vers == NULL) {
@@ -4155,8 +4174,7 @@ row_search_mvcc(
 	const dtuple_t*	vrow = NULL;
 	const rec_t*	result_rec = NULL;
 	const rec_t*	clust_rec;
-	rec_t*		saved_rec = NULL;
-	bool		saved_set = false;
+	Row_sel_get_clust_rec_for_mysql row_sel_get_clust_rec_for_mysql;
 	dberr_t		err				= DB_SUCCESS;
 	ibool		unique_search			= FALSE;
 	ibool		mtr_has_extra_clust_latch	= FALSE;
@@ -5307,8 +5325,6 @@ requires_clust_rec:
 
 		err = row_sel_get_clust_rec_for_mysql(prebuilt, index, rec,
 						      thr, &clust_rec,
-						      &saved_rec,
-						      saved_set,
 						      &offsets, &heap,
 						      need_vrow ? &vrow : NULL,
 						      &mtr);
