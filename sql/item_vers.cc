@@ -55,7 +55,8 @@ Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
   THD *thd= current_thd; // can it differ from constructor's?
   DBUG_ASSERT(thd);
   DBUG_ASSERT(args[0]);
-  if (args[0]->result_type() != INT_RESULT)
+  if (args[0]->result_type() != INT_RESULT &&
+      args[0]->result_type() != STRING_RESULT)
   {
     my_error(ER_ILLEGAL_PARAMETER_DATA_TYPE_FOR_OPERATION, MYF(0),
       args[0]->type_handler()->name().ptr(),
@@ -67,6 +68,7 @@ Item_func_vtq_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
   {
     null_value= false;
     thd->variables.time_zone->gmt_sec_to_TIME(res, TIMESTAMP_MAX_VALUE);
+    res->second_part= TIME_MAX_SECOND_PART;
     return false;
   }
 
