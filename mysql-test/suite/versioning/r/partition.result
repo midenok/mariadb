@@ -61,6 +61,9 @@ partition by system_time (
 partition pn as of now,
 partition p0 versioning);
 ERROR HY000: Wrong partitions consistency for `t1`: must have at least one 'VERSIONING' and exactly one last 'AS OF NOW'
+drop database test;
+create database test;
+use test;
 create or replace table t1 (x int)
 with system versioning
 partition by system_time (
@@ -95,6 +98,9 @@ select x from t1;
 x
 1
 2
+drop database test;
+create database test;
+use test;
 set @@session.time_zone='+00:00';
 select ifnull(max(transaction_id), 0) into @start_trx_id from information_schema.innodb_vtq;
 create procedure if not exists verify_vtq()
@@ -249,6 +255,9 @@ partition p0 versioning,
 partition p1 versioning,
 partition pn as of now);
 ERROR HY000: Wrong parameters for partitioned `t1`: wrong value for 'LIMIT'
+drop database test;
+create database test;
+use test;
 create or replace table t1 (x int)
 with system versioning
 partition by system_time limit 1 (
@@ -298,6 +307,9 @@ partition p0 versioning,
 partition p1 versioning,
 partition pn as of now);
 ERROR HY000: Wrong parameters for partitioned `t1`: wrong value for 'INTERVAL'
+drop database test;
+create database test;
+use test;
 create or replace table t1 (x int)
 with system versioning
 partition by system_time interval 1 second (
@@ -323,6 +335,9 @@ Note	4079	Switching from partition `p0` to `p1`
 select * from t1 partition (p1) for system_time all;
 x
 4
+drop database test;
+create database test;
+use test;
 create or replace table t1 (x int)
 with system versioning
 partition by system_time limit 1
@@ -354,4 +369,6 @@ x
 select * from t1 partition (p1sp1) for system_time all;
 x
 2
-drop table t1;
+drop database test;
+create database test;
+use test;

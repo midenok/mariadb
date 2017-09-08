@@ -1,7 +1,19 @@
 [innodb]
 partition
 default-storage-engine=innodb
+versioning-alter-history=keep
 
 [myisam]
 partition
 default-storage-engine=myisam
+versioning-alter-history=keep
+
+[innodb-survival]
+partition
+default-storage-engine=innodb
+versioning-alter-history=survive
+
+[myisam-survival]
+partition
+default-storage-engine=myisam
+versioning-alter-history=survive
