@@ -282,7 +282,35 @@ use test;
 #show create table t1;
 #select * from t1 for system_time all;
 
+#drop database test;
+#create database test;
+#use test;
 
-drop database test;
-create database test;
-use test;
+#create table t0 (x int)
+#  with system versioning;
+
+#insert into t0 values (11);
+#update t0 set x = 22;
+
+#create table t1 (x int)
+#  with system versioning
+#  partition by system_time limit 1 (
+#    partition p0 versioning,
+#    partition p1 versioning,
+#    partition pn as of now);
+
+#insert into t1 values (1);
+#update t1 set x = 2;
+#update t1 set x = 3;
+
+#select * from t1 for system_time all;
+
+#alter table t1 exchange partition pn with table t0;
+#show create table t1;
+
+#select * from t1 for system_time all;
+#select * from t2 for system_time all;
+
+#drop database test;
+#create database test;
+#use test;
