@@ -332,3 +332,16 @@ use test;
 #drop database test;
 #create database test;
 #use test;
+
+create table t1 (x int)
+  with system versioning
+  partition by system_time limit 1 (
+    partition p0 versioning,
+    partition pn as of now);
+
+--error ER_REORG_NO_PARAM_ERROR
+alter table t1 reorganize partition;
+
+drop database test;
+create database test;
+use test;

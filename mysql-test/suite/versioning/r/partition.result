@@ -372,3 +372,13 @@ x
 drop database test;
 create database test;
 use test;
+create table t1 (x int)
+with system versioning
+partition by system_time limit 1 (
+partition p0 versioning,
+partition pn as of now);
+alter table t1 reorganize partition;
+ERROR HY000: REORGANIZE PARTITION without parameters can only be used on auto-partitioned tables using HASH PARTITIONs
+drop database test;
+create database test;
+use test;
