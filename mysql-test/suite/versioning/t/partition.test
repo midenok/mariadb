@@ -345,3 +345,28 @@ alter table t1 reorganize partition;
 drop database test;
 create database test;
 use test;
+
+#create table t1 (x int)
+#  with system versioning
+#  partition by system_time limit 1 (
+#    partition p0 versioning,
+#    partition pn as of now);
+
+#alter table t1 reorganize partition p0 into (partition p00 versioning);
+
+#drop database test;
+#create database test;
+#use test;
+
+create table t1 (x int)
+  with system versioning
+  partition by system_time limit 1 (
+    partition p0 versioning,
+    partition pn as of now);
+
+--error ER_COALESCE_ONLY_ON_HASH_PARTITION
+alter table t1 coalesce partition 0;
+
+drop database test;
+create database test;
+use test;
