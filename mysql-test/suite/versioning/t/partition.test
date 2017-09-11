@@ -252,3 +252,34 @@ select * from t1 partition (p1sp1) for system_time all;
 drop database test;
 create database test;
 use test;
+
+#create table t1 (x int)
+#  with system versioning
+#  partition by system_time limit 1 (
+#    partition p0 versioning,
+#    partition pn as of now);
+
+#alter table t1 change x big int;
+#show create table t1;
+
+#drop database test;
+#create database test;
+#use test;
+
+create table t1 (x int)
+  with system versioning;
+#  partition by system_time limit 2 (
+ #   partition p0 versioning,
+  #  partition pn as of now);
+
+
+insert into t1 values (1);
+update t1 set x = 2;
+
+select * from t1 for system_time all;
+truncate table t1;
+select * from t1 for system_time all;
+
+drop database test;
+create database test;
+use test;
