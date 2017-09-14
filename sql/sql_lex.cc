@@ -7052,7 +7052,6 @@ bool SELECT_LEX::vers_push_field(THD *thd, TABLE_LIST *table, const char* field_
   if (!fld)
     return true;
 
-  fld->vers_implicit= true;
   item_list.push_back(fld);
 
   if (thd->lex->view_list.elements)
