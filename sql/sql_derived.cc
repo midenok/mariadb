@@ -718,7 +718,8 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat"
 #pragma GCC diagnostic ignored "-Wformat-extra-args"
-    if ((thd->stmt_arena->is_stmt_prepare() || !thd->stmt_arena->is_stmt_execute())
+    if (sl == first_select &&
+      (thd->stmt_arena->is_stmt_prepare() || !thd->stmt_arena->is_stmt_execute())
       && sl->table_list.elements > 0)
     {
       // Similar logic as in mysql_create_view()

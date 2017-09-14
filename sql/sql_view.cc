@@ -457,6 +457,7 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat"
 #pragma GCC diagnostic ignored "-Wformat-extra-args"
+    // Similar logic as in mysql_derived_prepare()
     // Leading versioning table detected implicitly (first one selected)
     TABLE_LIST *impli_table= NULL;
     // Leading versioning table specified explicitly

@@ -823,6 +823,12 @@ bool st_select_lex_unit::prepare(THD *thd_arg, select_result *sel_result,
       Item *item_tmp;
       while ((item_tmp= it++))
       {
+        if (item_tmp->type() == Item::FIELD_ITEM)
+        {
+          Item_field *fld= static_cast<Item_field *>(item_tmp);
+          if (fld->vers_implicit)
+            continue;
+        }
 	/* Error's in 'new' will be detected after loop */
 	types.push_back(new (thd_arg->mem_root)
                         Item_type_holder(thd_arg, item_tmp));

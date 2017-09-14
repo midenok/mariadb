@@ -2599,7 +2599,7 @@ void Item_ident_for_show::make_field(THD *thd, Send_field *tmp_field)
 Item_field::Item_field(THD *thd, Field *f)
   :Item_ident(thd, 0, NullS, *f->table_name, f->field_name),
    item_equal(0),
-   have_privileges(0), any_privileges(0)
+   have_privileges(0), any_privileges(0), vers_implicit(0)
 {
   set_field(f);
   /*
@@ -2622,7 +2622,7 @@ Item_field::Item_field(THD *thd, Name_resolution_context *context_arg,
                        Field *f)
   :Item_ident(thd, context_arg, f->table->s->db.str, *f->table_name, f->field_name),
    item_equal(0),
-   have_privileges(0), any_privileges(0)
+   have_privileges(0), any_privileges(0), vers_implicit(0)
 {
   /*
     We always need to provide Item_field with a fully qualified field
@@ -2665,7 +2665,7 @@ Item_field::Item_field(THD *thd, Name_resolution_context *context_arg,
                        const char *field_name_arg)
   :Item_ident(thd, context_arg, db_arg, table_name_arg, field_name_arg),
    field(0), item_equal(0),
-   have_privileges(0), any_privileges(0)
+   have_privileges(0), any_privileges(0), vers_implicit(0)
 {
   SELECT_LEX *select= thd->lex->current_select;
   collation.set(DERIVATION_IMPLICIT);
@@ -2683,7 +2683,8 @@ Item_field::Item_field(THD *thd, Item_field *item)
    field(item->field),
    item_equal(item->item_equal),
    have_privileges(item->have_privileges),
-   any_privileges(item->any_privileges)
+   any_privileges(item->any_privileges),
+   vers_implicit(item->vers_implicit)
 {
   collation.set(DERIVATION_IMPLICIT);
   with_field= 1;
