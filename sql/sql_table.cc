@@ -76,7 +76,8 @@ static int copy_data_between_tables(THD *thd, TABLE *from,TABLE *to,
 				    uint order_num, ORDER *order,
 				    ha_rows *copied,ha_rows *deleted,
                                     Alter_info::enum_enable_or_disable keys_onoff,
-                                    Alter_table_ctx *alter_ctx);
+                                    Alter_table_ctx *alter_ctx,
+                                    bool &vers_save_archive);
 
 static int mysql_prepare_create_table(THD *, HA_CREATE_INFO *, Alter_info *,
                                       uint *, handler *, KEY **, uint *, int);
@@ -8728,11 +8729,12 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                           &alter_prelocking_strategy);
   thd->open_options&= ~HA_OPEN_FOR_ALTER;
   bool versioned= table_list->table && table_list->table->versioned();
-  bool vers_data_mod= versioned &&
+  bool vers_save_archive= versioned &&
     thd->variables.vers_alter_history == VERS_ALTER_HISTORY_SURVIVE &&
     alter_info->vers_data_modifying();
+  bool vers_update_vtmd= vers_save_archive;
 
-  if (vers_data_mod)
+  if (vers_save_archive)
   {
     table_list->set_lock_type(thd, TL_WRITE);
     if (thd->mdl_context.upgrade_shared_lock(table_list->table->mdl_ticket,
@@ -9063,7 +9065,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       Upgrade from MDL_SHARED_UPGRADABLE to MDL_SHARED_NO_WRITE.
       Afterwards it's safe to take the table level lock.
     */
-    if ((!vers_data_mod &&
+    if ((!vers_save_archive &&
          thd->mdl_context.upgrade_shared_lock(
              mdl_ticket, MDL_SHARED_NO_WRITE,
              thd->variables.lock_wait_timeout)) ||
@@ -9493,9 +9495,9 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                                  alter_info->create_list, ignore,
                                  order_num, order, &copied, &deleted,
                                  alter_info->keys_onoff,
-                                 &alter_ctx))
+                                 &alter_ctx, vers_save_archive))
     {
-      if (vers_data_mod && new_versioned && table->versioned_by_sql())
+      if (vers_save_archive && new_versioned && table->versioned_by_sql())
       {
         // Failure of this function may result in corruption of an original table.
         vers_reset_alter_copy(thd, table);
@@ -9597,7 +9599,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     anything goes wrong while renaming the new table.
   */
   char backup_name[FN_LEN];
-  if (vers_data_mod)
+  if (vers_save_archive)
     VTMD_table::archive_name(thd, alter_ctx.table_name, backup_name,
                          sizeof(backup_name));
   else
@@ -9631,7 +9633,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     goto err_with_mdl;
   }
 
-  if (vers_data_mod && new_versioned)
+  if (vers_update_vtmd)
   {
     DBUG_ASSERT(alter_info && table_list);
     VTMD_rename vtmd(*table_list);
@@ -9667,7 +9669,7 @@ err_after_rename:
   }
 
   // ALTER TABLE succeeded, delete the backup of the old table.
-  if (!(vers_data_mod && new_versioned) &&
+  if (!(vers_save_archive && new_versioned) &&
       quick_rm_table(thd, old_db_type, alter_ctx.db, backup_name, FN_IS_TMP))
   {
     /*
@@ -9835,7 +9837,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 			 uint order_num, ORDER *order,
 			 ha_rows *copied, ha_rows *deleted,
                          Alter_info::enum_enable_or_disable keys_onoff,
-                         Alter_table_ctx *alter_ctx)
+                         Alter_table_ctx *alter_ctx, bool &vers_save_archive)
 {
   int error= 1;
   Copy_field *copy= NULL, *copy_end;
