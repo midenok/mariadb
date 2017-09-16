@@ -9885,6 +9885,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   Create_field *def;
   copy_end=copy;
   to->s->default_fields= 0;
+  bool skip_archive= vers_save_archive;
   for (Field **ptr=to->field ; *ptr ; ptr++)
   {
     def=it++;
@@ -9902,7 +9903,18 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
         if (def->field == from->found_next_number_field)
           thd->variables.sql_mode|= MODE_NO_AUTO_VALUE_ON_ZERO;
       }
-      (copy_end++)->set(*ptr,def->field,0);
+      copy_end->set(*ptr,def->field,0);
+      if (skip_archive)
+      {
+        register Copy_field *cf= copy_end;
+        register Field *from= cf->from_field;
+        register Field *to= cf->to_field;
+        if (from->type() != to->type() || cf->from_length > cf->to_length)
+        {
+          skip_archive= false;
+        }
+      }
+      copy_end++;
     }
     else
     {
@@ -9921,6 +9933,9 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   }
   if (dfield_ptr)
     *dfield_ptr= NULL;
+
+  if (skip_archive)
+    vers_save_archive= false;
 
   if (order)
   {
