@@ -9889,7 +9889,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   Create_field *def;
   copy_end=copy;
   to->s->default_fields= 0;
-  bool skip_archive= vers_save_archive;
+  bool skip_archive= from->s->fields == to->s->fields ? vers_save_archive : false;
   for (Field **ptr=to->field ; *ptr ; ptr++)
   {
     def=it++;
