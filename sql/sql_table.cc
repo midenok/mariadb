@@ -8733,6 +8733,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     thd->variables.vers_alter_history == VERS_ALTER_HISTORY_SURVIVE &&
     alter_info->vers_data_modifying();
   bool vers_update_vtmd= vers_save_archive;
+  char *vers_archive_name= NULL;
 
   if (vers_save_archive)
   {
@@ -9600,8 +9601,11 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   */
   char backup_name[FN_LEN];
   if (vers_save_archive)
+  {
     VTMD_table::archive_name(thd, alter_ctx.table_name, backup_name,
                          sizeof(backup_name));
+    vers_archive_name= backup_name;
+  }
   else
     my_snprintf(backup_name, sizeof(backup_name), "%s2-%lx-%lx",
                 tmp_file_prefix, current_pid, thd->thread_id);
@@ -9638,8 +9642,8 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     DBUG_ASSERT(alter_info && table_list);
     VTMD_rename vtmd(*table_list);
     bool rc= alter_info->flags & Alter_info::ALTER_RENAME ?
-      vtmd.try_rename(thd, alter_ctx.new_db, alter_ctx.new_alias, backup_name) :
-      vtmd.update(thd, backup_name);
+      vtmd.try_rename(thd, alter_ctx.new_db, alter_ctx.new_alias, vers_archive_name) :
+      vtmd.update(thd, vers_archive_name);
     if (rc)
       goto err_after_rename;
   }
@@ -9906,9 +9910,9 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       copy_end->set(*ptr,def->field,0);
       if (skip_archive)
       {
-        register Copy_field *cf= copy_end;
-        register Field *from= cf->from_field;
-        register Field *to= cf->to_field;
+        Copy_field *cf= copy_end;
+        Field *from= cf->from_field;
+        Field *to= cf->to_field;
         if (from->type() != to->type() || cf->from_length > cf->to_length)
         {
           skip_archive= false;
