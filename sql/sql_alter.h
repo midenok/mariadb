@@ -126,20 +126,24 @@ public:
 
   enum enum_enable_or_disable { LEAVE_AS_IS, ENABLE, DISABLE };
 
-  bool vers_data_modifying() const
+  bool vers_save_archive() const
   {
     return flags & (
       ALTER_ADD_COLUMN |
       ALTER_DROP_COLUMN |
-      ALTER_CHANGE_COLUMN |
       ALTER_DROP_PARTITION |
       ALTER_COALESCE_PARTITION |
       ALTER_REORGANIZE_PARTITION |
       ALTER_TABLE_REORG |
       ALTER_REMOVE_PARTITIONING |
       ALTER_EXCHANGE_PARTITION |
-      ALTER_TRUNCATE_PARTITION |
-      ALTER_COLUMN_ORDER);
+      ALTER_TRUNCATE_PARTITION);
+  }
+
+  bool vers_update_vtmd() const
+  {
+    return vers_save_archive() ||
+      (flags & (ALTER_CHANGE_COLUMN | ALTER_COLUMN_ORDER));
   }
 
   /**

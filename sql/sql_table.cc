@@ -7244,7 +7244,9 @@ static bool mysql_inplace_alter_table(THD *thd,
                                       Alter_inplace_info *ha_alter_info,
                                       enum_alter_inplace_result inplace_supported,
                                       MDL_request *target_mdl_request,
-                                      Alter_table_ctx *alter_ctx)
+                                      Alter_table_ctx *alter_ctx,
+                                      bool vers_update_vtmd,
+                                      const char* vers_archive_name)
 {
   Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN | MYSQL_OPEN_IGNORE_KILLED);
   handlerton *db_type= table->s->db_type();
@@ -7412,6 +7414,16 @@ static bool mysql_inplace_alter_table(THD *thd,
 
   DEBUG_SYNC(thd, "alter_table_inplace_before_commit");
   THD_STAGE_INFO(thd, stage_alter_inplace_commit);
+
+  if (vers_update_vtmd)
+  {
+    DBUG_ASSERT(alter_info && table_list);
+    DBUG_ASSERT(!(alter_info->flags & Alter_info::ALTER_RENAME));
+    VTMD_table vtmd(*table_list);
+    bool rc= vtmd.update(thd, vers_archive_name);
+    if (rc)
+      goto rollback;
+  }
 
   if (table->file->ha_commit_inplace_alter_table(altered_table,
                                                  ha_alter_info,
@@ -8729,10 +8741,15 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                           &alter_prelocking_strategy);
   thd->open_options&= ~HA_OPEN_FOR_ALTER;
   bool versioned= table_list->table && table_list->table->versioned();
-  bool vers_save_archive= versioned &&
-    thd->variables.vers_alter_history == VERS_ALTER_HISTORY_SURVIVE &&
-    alter_info->vers_data_modifying();
-  bool vers_update_vtmd= vers_save_archive;
+  bool vers_save_archive= false;
+  bool vers_update_vtmd= false;
+
+  if (versioned && thd->variables.vers_alter_history == VERS_ALTER_HISTORY_SURVIVE)
+  {
+    vers_save_archive= alter_info->vers_save_archive();
+    vers_update_vtmd= alter_info->vers_update_vtmd();
+  }
+
   char *vers_archive_name= NULL;
 
   if (vers_save_archive)
@@ -9365,7 +9382,8 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       table->s->frm_image= &frm;
       int res= mysql_inplace_alter_table(thd, table_list, table, altered_table,
                                          &ha_alter_info, inplace_supported,
-                                         &target_mdl_request, &alter_ctx);
+                                         &target_mdl_request, &alter_ctx,
+                                         vers_update_vtmd, vers_archive_name);
       my_free(const_cast<uchar*>(frm.str));
 
       if (res)
@@ -9889,7 +9907,6 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   Create_field *def;
   copy_end=copy;
   to->s->default_fields= 0;
-  bool skip_archive= from->s->fields == to->s->fields ? vers_save_archive : false;
   for (Field **ptr=to->field ; *ptr ; ptr++)
   {
     def=it++;
@@ -9908,14 +9925,14 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
           thd->variables.sql_mode|= MODE_NO_AUTO_VALUE_ON_ZERO;
       }
       copy_end->set(*ptr,def->field,0);
-      if (skip_archive)
+      if (!vers_save_archive)
       {
         Copy_field *cf= copy_end;
         Field *from= cf->from_field;
         Field *to= cf->to_field;
         if (from->type() != to->type() || cf->from_length > cf->to_length)
         {
-          skip_archive= false;
+          vers_save_archive= true;
         }
       }
       copy_end++;
@@ -9937,9 +9954,6 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   }
   if (dfield_ptr)
     *dfield_ptr= NULL;
-
-  if (skip_archive)
-    vers_save_archive= false;
 
   if (order)
   {
