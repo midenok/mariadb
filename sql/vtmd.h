@@ -64,7 +64,7 @@ public:
     FLD_END,
     FLD_NAME,
     FLD_ARCHIVE_NAME,
-    FLD_COL_RENAMES,
+    FLD_COL_MAP,
     FIELD_COUNT
   };
 
@@ -82,7 +82,7 @@ public:
   bool create(THD *thd);
   bool find_record(ulonglong sys_trx_end, bool &found);
   bool open(THD *thd, Local_da &local_da, bool *created= NULL);
-  bool update(THD *thd, const char* archive_name= NULL);
+  bool update(THD *thd, const char* archive_name= NULL, bool col_map= false);
   bool setup_select(THD *thd);
 
   static void archive_name(THD *thd, const char *table_name, char *new_name, size_t new_name_size);

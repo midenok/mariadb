@@ -122,7 +122,7 @@ VTMD_table::open(THD *thd, Local_da &local_da, bool *created)
 }
 
 bool
-VTMD_table::update(THD *thd, const char* archive_name)
+VTMD_table::update(THD *thd, const char* archive_name, bool col_map)
 {
   bool result= true;
   bool found= false;
@@ -174,7 +174,9 @@ VTMD_table::update(THD *thd, const char* archive_name)
     {
       vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
     }
-    vtmd.table->field[FLD_COL_RENAMES]->set_null();
+
+    vtmd.table->field[FLD_COL_MAP]->store(col_map, true);
+    vtmd.table->field[FLD_COL_MAP]->set_notnull();
 
     if (found)
     {
