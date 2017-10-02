@@ -136,11 +136,18 @@ SET @create_vtmd_template="CREATE OR REPLACE TABLE vtmd_template (
 	end		BIGINT UNSIGNED GENERATED ALWAYS AS ROW END	COMMENT 'TRX_ID of table lifetime end',
 	name		VARCHAR(64) NOT NULL				COMMENT 'Table name during period [start, end)',
 	archive_name	VARCHAR(64) NULL				COMMENT 'Name of archive table',
-	col_renames	BLOB						COMMENT 'Column name mappings from previous lifetime',
+	col_map		BOOL NOT NULL					COMMENT 'Existence of column mappings in CMMD',
 	PERIOD FOR SYSTEM_TIME(start, end),
 	PRIMARY KEY (end),
 	INDEX (archive_name)
 ) ENGINE=INNODB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0 WITH SYSTEM VERSIONING";
+
+SET @create_cmmd_template="CREATE OR REPLACE TABLE cmmd_template (
+	start		BIGINT UNSIGNED NOT NULL			COMMENT 'TRX_ID of column mapping start',
+	from_col	INT UNSIGNED NOT NULL				COMMENT 'Column ID in previous archive',
+	to_col		INT UNSIGNED NOT NULL				COMMENT 'Column ID in current archive',
+	PRIMARY KEY (start, from_col)
+) ENGINE=INNODB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0";
 
 SET @str=IF(@have_innodb <> 0, @create_innodb_table_stats, "SET @dummy = 0");
 PREPARE stmt FROM @str;
@@ -153,6 +160,11 @@ EXECUTE stmt;
 DROP PREPARE stmt;
 
 SET @str=IF(@have_innodb <> 0, @create_vtmd_template, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @str=IF(@have_innodb <> 0, @create_cmmd_template, "SET @dummy = 0");
 PREPARE stmt FROM @str;
 EXECUTE stmt;
 DROP PREPARE stmt;
