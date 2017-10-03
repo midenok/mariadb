@@ -5955,6 +5955,7 @@ int handler::ha_reset()
 {
   DBUG_ENTER("ha_reset");
   /* Check that we have called all proper deallocation functions */
+  DBUG_ASSERT(table);
   DBUG_ASSERT((uchar*) table->def_read_set.bitmap +
               table->s->column_bitmap_size ==
               (uchar*) table->def_write_set.bitmap);

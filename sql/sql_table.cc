@@ -7420,7 +7420,11 @@ static bool mysql_inplace_alter_table(THD *thd,
     DBUG_ASSERT(alter_info && table_list);
     DBUG_ASSERT(!(alter_info->flags & Alter_info::ALTER_RENAME));
     VTMD_table vtmd(*table_list);
+    DBUG_ASSERT(!altered_table->open_by_handler);
+    // protect from mark_tmp_table_as_free_for_reuse() caused by mysql_create_like_table()
+    altered_table->open_by_handler= true;
     bool rc= vtmd.update(thd, vers_archive_name);
+    altered_table->open_by_handler= false;
     if (rc)
       goto rollback;
   }
