@@ -118,6 +118,12 @@ VTMD_table::open(THD *thd, Local_da &local_da, bool *created)
     else
       break;
   }
+  if (local_da.is_error() && local_da.sql_errno() == ER_NOT_LOG_TABLE)
+  {
+    local_da.reset_diagnostics_area();
+    my_printf_error(ER_VERS_VTMD_ERROR, "Table `%s.%s` is not a VTMD table",
+      MYF(0), vtmd.db, vtmd.table_name);
+  }
   return true;
 }
 
