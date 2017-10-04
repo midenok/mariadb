@@ -43,6 +43,7 @@ Created 3/26/1996 Heikki Tuuri
 #include "srv0mon.h"
 #include "srv0srv.h"
 #include "fsp0sysspace.h"
+#include "row0ins.h"
 #include "row0mysql.h"
 #include "srv0start.h"
 #include "trx0purge.h"
@@ -2246,6 +2247,11 @@ trx_commit_for_mysql(
 
 		if (trx->id != 0) {
 			trx_update_mod_tables_timestamp(trx);
+			/* Notify VTQ on System Versioned tables update */
+			if (trx->vtq_notify_on_commit) {
+				vers_notify_vtq(trx);
+				trx->vtq_notify_on_commit = false;
+			}
 		}
 
 		trx_commit(trx);
