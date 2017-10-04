@@ -9896,7 +9896,10 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 
   /* We need external lock before we can disable/enable keys */
   if (to->file->ha_external_lock(thd, F_WRLCK))
+  {
+    delete [] copy;
     DBUG_RETURN(-1);
+  }
 
   alter_table_manage_keys(to, from->file->indexes_are_disabled(), keys_onoff);
 
@@ -9929,7 +9932,8 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
           thd->variables.sql_mode|= MODE_NO_AUTO_VALUE_ON_ZERO;
       }
       copy_end->set(*ptr,def->field,0);
-      if (!vers_save_archive)
+      if (!vers_save_archive && from->versioned() &&
+        thd->variables.vers_alter_history == VERS_ALTER_HISTORY_SURVIVE)
       {
         Copy_field *cf= copy_end;
         Field *from= cf->from_field;
