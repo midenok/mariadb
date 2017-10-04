@@ -33,8 +33,9 @@ VTMD_table::create(THD *thd)
     VERS_VTMD_TEMPLATE,
     TL_READ);
 
-  Query_tables_backup backup(thd);
-  thd->lex->sql_command= backup.get().sql_command;
+  Open_tables_auto_backup open_tables(thd);
+  Query_tables_auto_backup query_tables(thd);
+  thd->lex->sql_command= query_tables.get().sql_command;
   thd->lex->add_to_query_tables(&src_table);
 
   MDL_auto_lock mdl_lock(thd, table);
@@ -46,6 +47,12 @@ VTMD_table::create(THD *thd)
   thd->m_reprepare_observer= NULL;
   thd->work_part_info= NULL;
   bool rc= mysql_create_like_table(thd, &table, &src_table, &create_info);
+  if (!rc)
+  {
+    DBUG_ASSERT(src_table.table);
+    tc_release_table(src_table.table);
+    thd->reset_open_tables_state(thd);
+  }
   thd->m_reprepare_observer= reprepare_observer;
   thd->work_part_info= work_part_info;
   return rc;

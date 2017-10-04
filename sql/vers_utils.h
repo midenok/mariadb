@@ -32,6 +32,24 @@ public:
 };
 
 
+class Open_tables_auto_backup
+{
+  THD *thd;
+  Open_tables_backup backup;
+
+public:
+  Open_tables_auto_backup(THD *_thd) :
+    thd(_thd)
+  {
+    thd->reset_n_backup_open_tables_state(&backup);
+  }
+  ~Open_tables_auto_backup()
+  {
+    thd->restore_backup_open_tables_state(&backup);
+  }
+};
+
+
 class Local_da : public Diagnostics_area
 {
   THD *thd;

@@ -7014,14 +7014,14 @@ int set_statement_var_if_exists(THD *thd, const char *var_name,
 }
 
 
-Query_tables_backup::Query_tables_backup(THD* _thd) :
+Query_tables_auto_backup::Query_tables_auto_backup(THD* _thd) :
   thd(_thd)
 {
   thd->lex->reset_n_backup_query_tables_list(&backup);
 }
 
 
-Query_tables_backup::~Query_tables_backup()
+Query_tables_auto_backup::~Query_tables_auto_backup()
 {
   thd->lex->restore_backup_query_tables_list(&backup);
 }

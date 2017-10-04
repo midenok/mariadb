@@ -1915,14 +1915,14 @@ private:
 };
 
 
-class Query_tables_backup
+class Query_tables_auto_backup
 {
   THD *thd;
   Query_tables_list backup;
 
 public:
-  Query_tables_backup(THD *_thd);
-  ~Query_tables_backup();
+  Query_tables_auto_backup(THD *_thd);
+  ~Query_tables_auto_backup();
   const Query_tables_list& get() const { return backup; }
 };
 
