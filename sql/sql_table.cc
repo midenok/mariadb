@@ -9249,6 +9249,29 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     DBUG_RETURN(true);
   }
 
+  struct Pair
+  {
+    int a;
+    int b;
+    Pair(int _a, int _b) : a(_a), b(_b) {}
+  };
+  Dynamic_array<Pair> mapping;
+  if (vers_update_vtmd)
+  {
+    int cf_idx= 0;
+    List_iterator_fast<Create_field> cf_it(alter_info->create_list);
+    while (Create_field* cf = cf_it++)
+    {
+      Field *f= cf->field;
+      if (f && !f->vers_sys_field() && (
+        (f->flags & FIELD_IS_RENAMED) || f->field_index != cf_idx))
+      {
+        mapping.append_val(Pair(f->field_index, cf_idx));
+      }
+      cf_idx++;
+    }
+  }
+
   /* Remember that we have not created table in storage engine yet. */
   bool no_ha_table= true;
 
@@ -9379,27 +9402,6 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     default:
       thd->drop_temporary_table(altered_table, NULL, false);
       goto err_new_table_cleanup;
-    }
-
-    {
-      int cf_idx= 0;
-      List_iterator_fast<Create_field> cf_it(alter_info->create_list);
-      struct Pair
-      {
-        int a;
-        int b;
-        Pair(int _a, int _b) : a(_a), b(_b) {}
-      };
-      Dynamic_array<Pair> mapping;
-      while (Create_field* cf = cf_it++)
-      {
-        Field *f= cf->field;
-        if ((f->flags & FIELD_IS_RENAMED) || f->field_index != cf_idx)
-        {
-          mapping.append_val(Pair(f->field_index, cf_idx));
-        }
-        cf_idx++;
-      }
     }
 
     if (use_inplace)
