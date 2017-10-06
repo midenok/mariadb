@@ -8,43 +8,22 @@
 
 #include "vers_utils.h"
 
-class key_buf_t
+class THD;
+
+typedef Dynamic_array<IntPair> CMMD_map;
+
+struct VTMD_update_args
 {
-  uchar* buf;
-
-  key_buf_t(const key_buf_t&); // disabled
-  key_buf_t& operator= (const key_buf_t&); // disabled
-
-public:
-  key_buf_t() : buf(NULL)
-  {}
-
-  ~key_buf_t()
+  const char* archive_name;
+  CMMD_map* colmap;
+  VTMD_update_args(const char* _archive_name= NULL, CMMD_map* _colmap= NULL) :
+    archive_name(_archive_name),
+    colmap(_colmap) {}
+  bool has_colmap()
   {
-    if (buf)
-      my_free(buf);
-  }
-
-  bool allocate(size_t alloc_size)
-  {
-    DBUG_ASSERT(!buf);
-    buf= static_cast<uchar *>(my_malloc(alloc_size, MYF(0)));
-    if (!buf)
-    {
-      my_message(ER_VERS_VTMD_ERROR, "failed to allocate key buffer", MYF(0));
-      return true;
-    }
-    return false;
-  }
-
-  operator uchar* ()
-  {
-    DBUG_ASSERT(buf);
-    return reinterpret_cast<uchar *>(buf);
+    return colmap ? colmap->elements() > 0 : false;
   }
 };
-
-class THD;
 
 class VTMD_table
 {
@@ -82,7 +61,7 @@ public:
   bool create(THD *thd);
   bool find_record(ulonglong sys_trx_end, bool &found);
   bool open(THD *thd, Local_da &local_da, bool *created= NULL);
-  bool update(THD *thd, const char* archive_name= NULL, bool col_map= false);
+  bool update(THD *thd, VTMD_update_args args= VTMD_update_args());
   bool setup_select(THD *thd);
 
   static void archive_name(THD *thd, const char *table_name, char *new_name, size_t new_name_size);
@@ -123,7 +102,8 @@ public:
     VTMD_exists(_about)
   {}
 
-  bool try_rename(THD *thd, LString new_db, LString new_alias, const char* archive_name= NULL);
+  bool try_rename(THD *thd, LString new_db, LString new_alias,
+                  VTMD_update_args args= VTMD_update_args());
   bool revert_rename(THD *thd, LString new_db);
 
 private:

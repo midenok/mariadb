@@ -135,7 +135,7 @@ VTMD_table::open(THD *thd, Local_da &local_da, bool *created)
 }
 
 bool
-VTMD_table::update(THD *thd, const char* archive_name, bool col_map)
+VTMD_table::update(THD *thd, VTMD_update_args args)
 {
   bool result= true;
   bool found= false;
@@ -177,10 +177,10 @@ VTMD_table::update(THD *thd, const char* archive_name, bool col_map)
       goto quit;
     }
 
-    if (archive_name)
+    if (args.archive_name)
     {
-      an_len= strlen(archive_name);
-      vtmd.table->field[FLD_ARCHIVE_NAME]->store(archive_name, an_len, table_alias_charset);
+      an_len= strlen(args.archive_name);
+      vtmd.table->field[FLD_ARCHIVE_NAME]->store(args.archive_name, an_len, table_alias_charset);
       vtmd.table->field[FLD_ARCHIVE_NAME]->set_notnull();
     }
     else
@@ -188,7 +188,7 @@ VTMD_table::update(THD *thd, const char* archive_name, bool col_map)
       vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
     }
 
-    vtmd.table->field[FLD_COL_MAP]->store(col_map, true);
+    vtmd.table->field[FLD_COL_MAP]->store(args.has_colmap(), true);
     vtmd.table->field[FLD_COL_MAP]->set_notnull();
 
     if (found)
@@ -200,7 +200,7 @@ VTMD_table::update(THD *thd, const char* archive_name, bool col_map)
         goto quit;
       }
       vtmd.table->mark_columns_needed_for_update(); // not needed?
-      if (archive_name)
+      if (args.archive_name)
       {
         vtmd.table->s->versioned= false;
         error= vtmd.table->file->ha_update_row(vtmd.table->record[1], vtmd.table->record[0]);
@@ -234,7 +234,7 @@ VTMD_table::update(THD *thd, const char* archive_name, bool col_map)
                 break;
 
               store_record(vtmd.table, record[1]);
-              vtmd.table->field[FLD_ARCHIVE_NAME]->store(archive_name, an_len, table_alias_charset);
+              vtmd.table->field[FLD_ARCHIVE_NAME]->store(args.archive_name, an_len, table_alias_charset);
               vtmd.table->field[FLD_ARCHIVE_NAME]->set_notnull();
               vtmd.table->s->versioned= false;
               error= vtmd.table->file->ha_update_row(vtmd.table->record[1], vtmd.table->record[0]);
@@ -405,7 +405,7 @@ VTMD_rename::move_table(THD *thd, SString_fs &table_name, LString &new_db)
 }
 
 bool
-VTMD_rename::try_rename(THD *thd, LString new_db, LString new_alias, const char *archive_name)
+VTMD_rename::try_rename(THD *thd, LString new_db, LString new_alias, VTMD_update_args args)
 {
   Local_da local_da(thd, ER_VERS_VTMD_ERROR);
   TABLE_LIST new_table;
@@ -470,11 +470,11 @@ VTMD_rename::try_rename(THD *thd, LString new_db, LString new_alias, const char 
   if (!rc)
   {
     query_cache_invalidate3(thd, &vtmd_tl, 0);
-    if (same_db || archive_name || new_alias != LString(TABLE_NAME_WITH_LEN(about)))
+    if (same_db || args.archive_name || new_alias != LString(TABLE_NAME_WITH_LEN(about)))
     {
       local_da.finish();
       VTMD_table new_vtmd(new_table);
-      rc= new_vtmd.update(thd, archive_name);
+      rc= new_vtmd.update(thd, args);
     }
   }
   return rc;

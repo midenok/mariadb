@@ -82,5 +82,50 @@ public:
   }
 };
 
+class key_buf_t
+{
+  uchar* buf;
+
+  key_buf_t(const key_buf_t&); // disabled
+  key_buf_t& operator= (const key_buf_t&); // disabled
+
+public:
+  key_buf_t() : buf(NULL)
+  {}
+
+  ~key_buf_t()
+  {
+    if (buf)
+      my_free(buf);
+  }
+
+  bool allocate(size_t alloc_size)
+  {
+    DBUG_ASSERT(!buf);
+    buf= static_cast<uchar *>(my_malloc(alloc_size, MYF(0)));
+    if (!buf)
+    {
+      my_message(ER_VERS_VTMD_ERROR, "failed to allocate key buffer", MYF(0));
+      return true;
+    }
+    return false;
+  }
+
+  operator uchar* ()
+  {
+    DBUG_ASSERT(buf);
+    return reinterpret_cast<uchar *>(buf);
+  }
+};
+
+template <typename T>
+struct Pair
+{
+  T first;
+  T second;
+  Pair(T a, T b) : first(a), second(b) {}
+};
+
+typedef Pair<int> IntPair;
 
 #endif // VERS_UTILS_INCLUDED

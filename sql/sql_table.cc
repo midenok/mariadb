@@ -7246,7 +7246,7 @@ static bool mysql_inplace_alter_table(THD *thd,
                                       MDL_request *target_mdl_request,
                                       Alter_table_ctx *alter_ctx,
                                       bool vers_update_vtmd,
-                                      const char* vers_archive_name)
+                                      VTMD_update_args vers_vtmd_args)
 {
   Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN | MYSQL_OPEN_IGNORE_KILLED);
   handlerton *db_type= table->s->db_type();
@@ -7423,7 +7423,7 @@ static bool mysql_inplace_alter_table(THD *thd,
     DBUG_ASSERT(!altered_table->open_by_handler);
     // protect from mark_tmp_table_as_free_for_reuse() caused by mysql_create_like_table()
     altered_table->open_by_handler= true;
-    bool rc= vtmd.update(thd, vers_archive_name);
+    bool rc= vtmd.update(thd, vers_vtmd_args);
     altered_table->open_by_handler= false;
     if (rc)
       goto rollback;
@@ -8747,6 +8747,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   bool versioned= table_list->table && table_list->table->versioned();
   bool vers_save_archive= false;
   bool vers_update_vtmd= false;
+  CMMD_map vers_cmmd_map;
 
   if (versioned && thd->variables.vers_alter_history == VERS_ALTER_HISTORY_SURVIVE)
   {
@@ -9249,13 +9250,6 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     DBUG_RETURN(true);
   }
 
-  struct Pair
-  {
-    int a;
-    int b;
-    Pair(int _a, int _b) : a(_a), b(_b) {}
-  };
-  Dynamic_array<Pair> mapping;
   if (vers_update_vtmd)
   {
     int cf_idx= 0;
@@ -9266,7 +9260,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       if (f && !f->vers_sys_field() && (
         (f->flags & FIELD_IS_RENAMED) || f->field_index != cf_idx))
       {
-        mapping.append_val(Pair(f->field_index, cf_idx));
+        vers_cmmd_map.append_val(IntPair(f->field_index, cf_idx));
       }
       cf_idx++;
     }
@@ -9410,7 +9404,8 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       int res= mysql_inplace_alter_table(thd, table_list, table, altered_table,
                                          &ha_alter_info, inplace_supported,
                                          &target_mdl_request, &alter_ctx,
-                                         vers_update_vtmd, vers_archive_name);
+                                         vers_update_vtmd,
+                                         VTMD_update_args(vers_archive_name, &vers_cmmd_map));
       my_free(const_cast<uchar*>(frm.str));
 
       if (res)
@@ -9686,9 +9681,10 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
   {
     DBUG_ASSERT(alter_info && table_list);
     VTMD_rename vtmd(*table_list);
+    VTMD_update_args vtmd_args(vers_archive_name, &vers_cmmd_map);
     bool rc= alter_info->flags & Alter_info::ALTER_RENAME ?
-      vtmd.try_rename(thd, alter_ctx.new_db, alter_ctx.new_alias, vers_archive_name) :
-      vtmd.update(thd, vers_archive_name);
+      vtmd.try_rename(thd, alter_ctx.new_db, alter_ctx.new_alias, vtmd_args) :
+      vtmd.update(thd, vtmd_args);
     if (rc)
       goto err_after_rename;
   }
