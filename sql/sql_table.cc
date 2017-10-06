@@ -9381,6 +9381,27 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       goto err_new_table_cleanup;
     }
 
+    {
+      int cf_idx= 0;
+      List_iterator_fast<Create_field> cf_it(alter_info->create_list);
+      struct Pair
+      {
+        int a;
+        int b;
+        Pair(int _a, int _b) : a(_a), b(_b) {}
+      };
+      Dynamic_array<Pair> mapping;
+      while (Create_field* cf = cf_it++)
+      {
+        Field *f= cf->field;
+        if ((f->flags & FIELD_IS_RENAMED) || f->field_index != cf_idx)
+        {
+          mapping.append_val(Pair(f->field_index, cf_idx));
+        }
+        cf_idx++;
+      }
+    }
+
     if (use_inplace)
     {
       table->s->frm_image= &frm;
