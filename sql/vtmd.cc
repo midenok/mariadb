@@ -220,6 +220,9 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
             vtmd.table->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about), system_charset_info);
             vtmd.table->field[FLD_NAME]->set_notnull();
             vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
+            vtmd.table->field[FLD_COL_MAP]->store(false, true);
+            vtmd.table->field[FLD_COL_MAP]->set_notnull();
+
             error= vtmd.table->file->ha_update_row(vtmd.table->record[1], vtmd.table->record[0]);
             if (error)
               goto err;
