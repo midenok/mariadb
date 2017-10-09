@@ -177,22 +177,21 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
       goto quit;
     }
 
-    if (args.archive_name)
-    {
-      an_len= strlen(args.archive_name);
-      vtmd.table->field[FLD_ARCHIVE_NAME]->store(args.archive_name, an_len, table_alias_charset);
-      vtmd.table->field[FLD_ARCHIVE_NAME]->set_notnull();
-    }
-    else
-    {
-      vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
-    }
-
-    vtmd.table->field[FLD_COL_MAP]->store(args.has_colmap(), true);
-    vtmd.table->field[FLD_COL_MAP]->set_notnull();
-
     if (found)
     {
+      if (args.archive_name)
+      {
+        an_len= strlen(args.archive_name);
+        vtmd.table->field[FLD_ARCHIVE_NAME]->store(args.archive_name, an_len, table_alias_charset);
+        vtmd.table->field[FLD_ARCHIVE_NAME]->set_notnull();
+      }
+      else
+      {
+        vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
+      }
+      vtmd.table->field[FLD_CMMD]->store(args.has_cmmd(), true);
+      vtmd.table->field[FLD_CMMD]->set_notnull();
+
       if (thd->lex->sql_command == SQLCOM_CREATE_TABLE)
       {
         my_printf_error(ER_VERS_VTMD_ERROR, "`%s.%s` exists and not empty!", MYF(0),
@@ -220,8 +219,7 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
             vtmd.table->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about), system_charset_info);
             vtmd.table->field[FLD_NAME]->set_notnull();
             vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
-            vtmd.table->field[FLD_COL_MAP]->store(false, true);
-            vtmd.table->field[FLD_COL_MAP]->set_notnull();
+            vtmd.table->field[FLD_CMMD]->set_null();
 
             error= vtmd.table->file->ha_update_row(vtmd.table->record[1], vtmd.table->record[0]);
             if (error)
@@ -258,8 +256,12 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
     } // if (found)
     else
     {
+      DBUG_ASSERT(!args.archive_name);
+      DBUG_ASSERT(!args.has_cmmd());
       vtmd.table->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about), system_charset_info);
       vtmd.table->field[FLD_NAME]->set_notnull();
+      vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
+      vtmd.table->field[FLD_CMMD]->set_null();
       vtmd.table->mark_columns_needed_for_insert(); // not needed?
       error= vtmd.table->file->ha_write_row(vtmd.table->record[0]);
     }

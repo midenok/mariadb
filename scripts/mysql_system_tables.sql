@@ -136,7 +136,7 @@ SET @create_vtmd_template="CREATE OR REPLACE TABLE vtmd_template (
 	end		BIGINT UNSIGNED GENERATED ALWAYS AS ROW END	COMMENT 'TRX_ID of table lifetime end',
 	name		VARCHAR(64) NOT NULL				COMMENT 'Table name during period [start, end)',
 	archive_name	VARCHAR(64) NULL				COMMENT 'Name of archive table',
-	col_map		BOOL NOT NULL					COMMENT 'Existence of column mappings in CMMD',
+	cmmd		BOOL NULL					COMMENT 'CMMD records exist',
 	PERIOD FOR SYSTEM_TIME(start, end),
 	PRIMARY KEY (end),
 	INDEX (archive_name)
@@ -144,9 +144,9 @@ SET @create_vtmd_template="CREATE OR REPLACE TABLE vtmd_template (
 
 SET @create_cmmd_template="CREATE OR REPLACE TABLE cmmd_template (
 	start		BIGINT UNSIGNED NOT NULL			COMMENT 'TRX_ID of column mapping start',
-	from_col	INT UNSIGNED NOT NULL				COMMENT 'Column ID in previous archive',
-	to_col		INT UNSIGNED NOT NULL				COMMENT 'Column ID in current archive',
-	PRIMARY KEY (start, from_col)
+	current		INT UNSIGNED NOT NULL				COMMENT 'Column ID in current archive',
+	later		INT UNSIGNED NOT NULL				COMMENT 'Column ID in later archive',
+	PRIMARY KEY (start, later)
 ) ENGINE=INNODB DEFAULT CHARSET=utf8 COLLATE=utf8_bin STATS_PERSISTENT=0";
 
 SET @str=IF(@have_innodb <> 0, @create_innodb_table_stats, "SET @dummy = 0");

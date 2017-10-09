@@ -19,7 +19,7 @@ struct VTMD_update_args
   VTMD_update_args(const char* _archive_name= NULL, CMMD_map* _colmap= NULL) :
     archive_name(_archive_name),
     colmap(_colmap) {}
-  bool has_colmap()
+  bool has_cmmd()
   {
     return colmap ? colmap->elements() > 0 : false;
   }
@@ -43,7 +43,7 @@ public:
     FLD_END,
     FLD_NAME,
     FLD_ARCHIVE_NAME,
-    FLD_COL_MAP,
+    FLD_CMMD,
     FIELD_COUNT
   };
 
