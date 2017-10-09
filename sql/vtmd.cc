@@ -12,25 +12,27 @@
 #include "sp_head.h"
 #include "sp_rcontext.h"
 
-LString VERS_VTMD_TEMPLATE(C_STRING_WITH_LEN("vtmd_template"));
+const LString VERS_VTMD_TEMPLATE(C_STRING_WITH_LEN("vtmd_template"));
+const LString VERS_CMMD_TEMPLATE(C_STRING_WITH_LEN("cmmd_template"));
 
+template <const LString &md_template>
 bool
-VTMD_table::create(THD *thd)
+MD_table<md_template>::create(THD *thd)
 {
   Table_specification_st create_info;
   TABLE_LIST src_table, table;
   create_info.init(DDL_options_st::OPT_LIKE);
   create_info.options|= HA_VTMD;
-  create_info.alias= vtmd_name;
+  create_info.alias= md_table_name_;
   table.init_one_table(
-    DB_WITH_LEN(about),
-    XSTRING_WITH_LEN(vtmd_name),
-    vtmd_name,
+    DB_WITH_LEN(about_tl_),
+    XSTRING_WITH_LEN(md_table_name_),
+    md_table_name_,
     TL_READ);
   src_table.init_one_table(
     LEX_STRING_WITH_LEN(MYSQL_SCHEMA_NAME),
-    XSTRING_WITH_LEN(VERS_VTMD_TEMPLATE),
-    VERS_VTMD_TEMPLATE,
+    XSTRING_WITH_LEN(md_template),
+    md_template,
     TL_READ);
 
   Open_tables_auto_backup open_tables(thd);
@@ -58,60 +60,25 @@ VTMD_table::create(THD *thd)
   return rc;
 }
 
+template <const LString &md_template>
 bool
-VTMD_table::find_record(ulonglong sys_trx_end, bool &found)
-{
-  int error;
-  key_buf_t key;
-  found= false;
-
-  DBUG_ASSERT(vtmd.table);
-
-  if (key.allocate(vtmd.table->s->max_unique_length))
-    return true;
-
-  DBUG_ASSERT(sys_trx_end);
-  vtmd.table->vers_end_field()->set_notnull();
-  vtmd.table->vers_end_field()->store(sys_trx_end, true);
-  key_copy(key, vtmd.table->record[0], vtmd.table->key_info + IDX_TRX_END, 0);
-
-  error= vtmd.table->file->ha_index_read_idx_map(vtmd.table->record[1], IDX_TRX_END,
-                                            key,
-                                            HA_WHOLE_KEY,
-                                            HA_READ_KEY_EXACT);
-  if (error)
-  {
-    if (error == HA_ERR_RECORD_DELETED || error == HA_ERR_KEY_NOT_FOUND)
-      return false;
-    vtmd.table->file->print_error(error, MYF(0));
-    return true;
-  }
-
-  restore_record(vtmd.table, record[1]);
-
-  found= true;
-  return false;
-}
-
-
-bool
-VTMD_table::open(THD *thd, Local_da &local_da, bool *created)
+MD_table<md_template>::open(THD *thd, Local_da &local_da, bool *created)
 {
   if (created)
     *created= false;
 
-  if (0 == vtmd_name.length() && about.vers_vtmd_name(vtmd_name))
+  if (0 == md_table_name_.length() && about_tl_.vers_vtmd_name(md_table_name_))
     return true;
 
   while (true) // max 2 iterations
   {
-    vtmd.init_one_table(
-      DB_WITH_LEN(about),
-      XSTRING_WITH_LEN(vtmd_name),
-      vtmd_name,
+    md_tl_.init_one_table(
+      DB_WITH_LEN(about_tl_),
+      XSTRING_WITH_LEN(md_table_name_),
+      md_table_name_,
       TL_WRITE_CONCURRENT_INSERT);
 
-    TABLE *res= open_log_table(thd, &vtmd, &open_tables_backup);
+    TABLE *res= open_log_table(thd, &md_tl_, &ot_backup_);
     if (res)
       return false;
 
@@ -129,9 +96,43 @@ VTMD_table::open(THD *thd, Local_da &local_da, bool *created)
   {
     local_da.reset_diagnostics_area();
     my_printf_error(ER_VERS_VTMD_ERROR, "Table `%s.%s` is not a VTMD table",
-      MYF(0), vtmd.db, vtmd.table_name);
+      MYF(0), md_tl_.db, md_tl_.table_name);
   }
   return true;
+}
+
+
+bool
+VTMD_table::find_record(ulonglong sys_trx_end, bool &found)
+{
+  int error;
+  key_buf_t key;
+  found= false;
+  TABLE *vtmd= md_tl_.table;
+  DBUG_ASSERT(vtmd);
+
+  if (key.allocate(vtmd->s->max_unique_length))
+    return true;
+
+  DBUG_ASSERT(sys_trx_end);
+  vtmd->vers_end_field()->set_notnull();
+  vtmd->vers_end_field()->store(sys_trx_end, true);
+  key_copy(key, vtmd->record[0], vtmd->key_info + IDX_TRX_END, 0);
+
+  error= vtmd->file->ha_index_read_idx_map(vtmd->record[1], IDX_TRX_END, key,
+                                           HA_WHOLE_KEY, HA_READ_KEY_EXACT);
+  if (error)
+  {
+    if (error == HA_ERR_RECORD_DELETED || error == HA_ERR_KEY_NOT_FOUND)
+      return false;
+    vtmd->file->print_error(error, MYF(0));
+    return true;
+  }
+
+  restore_record(vtmd, record[1]);
+
+  found= true;
+  return false;
 }
 
 bool
@@ -152,7 +153,9 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
     if (open(thd, local_da, &created))
       goto open_error;
 
-    if (!vtmd.table->versioned())
+    TABLE *vtmd= md_tl_.table;
+    DBUG_ASSERT(vtmd);
+    if (!vtmd->versioned())
     {
       my_message(ER_VERS_VTMD_ERROR, "VTMD is not versioned", MYF(0));
       goto quit;
@@ -161,19 +164,19 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
     if (!created && find_record(ULONGLONG_MAX, found))
       goto quit;
 
-    if ((error= vtmd.table->file->extra(HA_EXTRA_MARK_AS_LOG_TABLE)))
+    if ((error= vtmd->file->extra(HA_EXTRA_MARK_AS_LOG_TABLE)))
     {
-      vtmd.table->file->print_error(error, MYF(0));
+      vtmd->file->print_error(error, MYF(0));
       goto quit;
     }
 
     /* Honor next number columns if present */
-    vtmd.table->next_number_field= vtmd.table->found_next_number_field;
+    vtmd->next_number_field= vtmd->found_next_number_field;
 
-    if (vtmd.table->s->fields != FIELD_COUNT)
+    if (vtmd->s->fields != FIELD_COUNT)
     {
       my_printf_error(ER_VERS_VTMD_ERROR, "`%s.%s` unexpected fields count: %d", MYF(0),
-                      vtmd.table->s->db.str, vtmd.table->s->table_name.str, vtmd.table->s->fields);
+                      vtmd->s->db.str, vtmd->s->table_name.str, vtmd->s->fields);
       goto quit;
     }
 
@@ -182,46 +185,46 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
       if (args.archive_name)
       {
         an_len= strlen(args.archive_name);
-        vtmd.table->field[FLD_ARCHIVE_NAME]->store(args.archive_name, an_len, table_alias_charset);
-        vtmd.table->field[FLD_ARCHIVE_NAME]->set_notnull();
+        vtmd->field[FLD_ARCHIVE_NAME]->store(args.archive_name, an_len, table_alias_charset);
+        vtmd->field[FLD_ARCHIVE_NAME]->set_notnull();
       }
       else
       {
-        vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
+        vtmd->field[FLD_ARCHIVE_NAME]->set_null();
       }
-      vtmd.table->field[FLD_CMMD]->store(args.has_cmmd(), true);
-      vtmd.table->field[FLD_CMMD]->set_notnull();
+      vtmd->field[FLD_CMMD]->store(args.has_cmmd(), true);
+      vtmd->field[FLD_CMMD]->set_notnull();
 
       if (thd->lex->sql_command == SQLCOM_CREATE_TABLE)
       {
         my_printf_error(ER_VERS_VTMD_ERROR, "`%s.%s` exists and not empty!", MYF(0),
-                        vtmd.table->s->db.str, vtmd.table->s->table_name.str);
+                        vtmd->s->db.str, vtmd->s->table_name.str);
         goto quit;
       }
-      vtmd.table->mark_columns_needed_for_update(); // not needed?
+      vtmd->mark_columns_needed_for_update(); // not needed?
       if (args.archive_name)
       {
-        vtmd.table->s->versioned= false;
-        error= vtmd.table->file->ha_update_row(vtmd.table->record[1], vtmd.table->record[0]);
-        vtmd.table->s->versioned= true;
+        vtmd->s->versioned= false;
+        error= vtmd->file->ha_update_row(vtmd->record[1], vtmd->record[0]);
+        vtmd->s->versioned= true;
 
         if (!error)
         {
           if (thd->lex->sql_command == SQLCOM_DROP_TABLE)
           {
-            error= vtmd.table->file->ha_delete_row(vtmd.table->record[0]);
+            error= vtmd->file->ha_delete_row(vtmd->record[0]);
           }
           else
           {
             DBUG_ASSERT(thd->lex->sql_command == SQLCOM_ALTER_TABLE);
-            ulonglong sys_trx_end= (ulonglong) vtmd.table->vers_start_field()->val_int();
-            store_record(vtmd.table, record[1]);
-            vtmd.table->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about), system_charset_info);
-            vtmd.table->field[FLD_NAME]->set_notnull();
-            vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
-            vtmd.table->field[FLD_CMMD]->set_null();
+            ulonglong sys_trx_end= (ulonglong) vtmd->vers_start_field()->val_int();
+            store_record(vtmd, record[1]);
+            vtmd->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about_tl_), system_charset_info);
+            vtmd->field[FLD_NAME]->set_notnull();
+            vtmd->field[FLD_ARCHIVE_NAME]->set_null();
+            vtmd->field[FLD_CMMD]->set_null();
 
-            error= vtmd.table->file->ha_update_row(vtmd.table->record[1], vtmd.table->record[0]);
+            error= vtmd->file->ha_update_row(vtmd->record[1], vtmd->record[0]);
             if (error)
               goto err;
 
@@ -231,52 +234,57 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
               bool found;
               if (find_record(sys_trx_end, found))
                 goto quit;
-              if (!found || !vtmd.table->field[FLD_ARCHIVE_NAME]->is_null())
+              if (!found || !vtmd->field[FLD_ARCHIVE_NAME]->is_null())
                 break;
 
-              store_record(vtmd.table, record[1]);
-              vtmd.table->field[FLD_ARCHIVE_NAME]->store(args.archive_name, an_len, table_alias_charset);
-              vtmd.table->field[FLD_ARCHIVE_NAME]->set_notnull();
-              vtmd.table->s->versioned= false;
-              error= vtmd.table->file->ha_update_row(vtmd.table->record[1], vtmd.table->record[0]);
-              vtmd.table->s->versioned= true;
+              store_record(vtmd, record[1]);
+              vtmd->field[FLD_ARCHIVE_NAME]->store(args.archive_name, an_len, table_alias_charset);
+              vtmd->field[FLD_ARCHIVE_NAME]->set_notnull();
+              vtmd->s->versioned= false;
+              error= vtmd->file->ha_update_row(vtmd->record[1], vtmd->record[0]);
+              vtmd->s->versioned= true;
               if (error)
                 goto err;
-              sys_trx_end= (ulonglong) vtmd.table->vers_start_field()->val_int();
+              sys_trx_end= (ulonglong) vtmd->vers_start_field()->val_int();
             } // while (true)
           } // else (thd->lex->sql_command != SQLCOM_DROP_TABLE)
         } // if (!error)
       } // if (archive_name)
       else
       {
-        vtmd.table->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about), system_charset_info);
-        vtmd.table->field[FLD_NAME]->set_notnull();
-        error= vtmd.table->file->ha_update_row(vtmd.table->record[1], vtmd.table->record[0]);
+        vtmd->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about_tl_), system_charset_info);
+        vtmd->field[FLD_NAME]->set_notnull();
+        error= vtmd->file->ha_update_row(vtmd->record[1], vtmd->record[0]);
+      }
+      if (args.has_cmmd())
+      {
+        CMMD_table cmmd(about_tl_);
+        cmmd.update(thd, *args.cmmd);
       }
     } // if (found)
     else
     {
       DBUG_ASSERT(!args.archive_name);
       DBUG_ASSERT(!args.has_cmmd());
-      vtmd.table->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about), system_charset_info);
-      vtmd.table->field[FLD_NAME]->set_notnull();
-      vtmd.table->field[FLD_ARCHIVE_NAME]->set_null();
-      vtmd.table->field[FLD_CMMD]->set_null();
-      vtmd.table->mark_columns_needed_for_insert(); // not needed?
-      error= vtmd.table->file->ha_write_row(vtmd.table->record[0]);
+      vtmd->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about_tl_), system_charset_info);
+      vtmd->field[FLD_NAME]->set_notnull();
+      vtmd->field[FLD_ARCHIVE_NAME]->set_null();
+      vtmd->field[FLD_CMMD]->set_null();
+      vtmd->mark_columns_needed_for_insert(); // not needed?
+      error= vtmd->file->ha_write_row(vtmd->record[0]);
     }
 
     if (error)
     {
 err:
-      vtmd.table->file->print_error(error, MYF(0));
+      vtmd->file->print_error(error, MYF(0));
     }
     else
       result= local_da.is_error();
   }
 
 quit:
-  close_log_table(thd, &open_tables_backup);
+  close_log_table(thd, &ot_backup_);
 
 open_error:
   thd->variables.option_bits= save_thd_options;
@@ -286,10 +294,10 @@ open_error:
 bool
 VTMD_rename::move_archives(THD *thd, LString &new_db)
 {
-  vtmd.init_one_table(
-    DB_WITH_LEN(about),
-    XSTRING_WITH_LEN(vtmd_name),
-    vtmd_name,
+  md_tl_.init_one_table(
+    DB_WITH_LEN(about_tl_),
+    XSTRING_WITH_LEN(md_table_name_),
+    md_table_name_,
     TL_READ);
   int error;
   bool rc= false;
@@ -299,66 +307,60 @@ VTMD_rename::move_archives(THD *thd, LString &new_db)
   Open_tables_backup open_tables_backup;
   key_buf_t key;
 
-  TABLE *res= open_log_table(thd, &vtmd, &open_tables_backup);
-  if (!res)
+  TABLE *vtmd= open_log_table(thd, &md_tl_, &open_tables_backup);
+  if (!vtmd)
     return true;
 
-  if (key.allocate(vtmd.table->key_info[IDX_ARCHIVE_NAME].key_length))
+  if (key.allocate(vtmd->key_info[IDX_ARCHIVE_NAME].key_length))
   {
     close_log_table(thd, &open_tables_backup);
     return true;
   }
 
-  if ((error= vtmd.table->file->ha_start_keyread(IDX_ARCHIVE_NAME)))
+  if ((error= vtmd->file->ha_start_keyread(IDX_ARCHIVE_NAME)))
     goto err;
   end_keyread= true;
 
-  if ((error= vtmd.table->file->ha_index_init(IDX_ARCHIVE_NAME, true)))
+  if ((error= vtmd->file->ha_index_init(IDX_ARCHIVE_NAME, true)))
     goto err;
   index_end= true;
 
-  error= vtmd.table->file->ha_index_first(vtmd.table->record[0]);
+  error= vtmd->file->ha_index_first(vtmd->record[0]);
   while (!error)
   {
-    if (!vtmd.table->field[FLD_ARCHIVE_NAME]->is_null())
+    if (!vtmd->field[FLD_ARCHIVE_NAME]->is_null())
     {
-      vtmd.table->field[FLD_ARCHIVE_NAME]->val_str(&archive);
-      key_copy(key,
-                vtmd.table->record[0],
-                &vtmd.table->key_info[IDX_ARCHIVE_NAME],
-                vtmd.table->key_info[IDX_ARCHIVE_NAME].key_length,
-                false);
-      error= vtmd.table->file->ha_index_read_map(
-        vtmd.table->record[0],
-        key,
-        vtmd.table->key_info[IDX_ARCHIVE_NAME].ext_key_part_map,
-        HA_READ_PREFIX_LAST);
+      vtmd->field[FLD_ARCHIVE_NAME]->val_str(&archive);
+      key_copy(key, vtmd->record[0], &vtmd->key_info[IDX_ARCHIVE_NAME],
+                vtmd->key_info[IDX_ARCHIVE_NAME].key_length, false);
+      error= vtmd->file->ha_index_read_map(vtmd->record[0], key,
+        vtmd->key_info[IDX_ARCHIVE_NAME].ext_key_part_map, HA_READ_PREFIX_LAST);
       if (!error)
       {
         if ((rc= move_table(thd, archive, new_db)))
           break;
 
-        error= vtmd.table->file->ha_index_next(vtmd.table->record[0]);
+        error= vtmd->file->ha_index_next(vtmd->record[0]);
       }
     }
     else
     {
       archive.length(0);
-      error= vtmd.table->file->ha_index_next(vtmd.table->record[0]);
+      error= vtmd->file->ha_index_next(vtmd->record[0]);
     }
   }
 
   if (error && error != HA_ERR_END_OF_FILE)
   {
 err:
-    vtmd.table->file->print_error(error, MYF(0));
+    vtmd->file->print_error(error, MYF(0));
     rc= true;
   }
 
   if (index_end)
-    vtmd.table->file->ha_index_end();
+    vtmd->file->ha_index_end();
   if (end_keyread)
-    vtmd.table->file->ha_end_keyread();
+    vtmd->file->ha_end_keyread();
 
   close_log_table(thd, &open_tables_backup);
   return rc;
@@ -368,26 +370,26 @@ bool
 VTMD_rename::move_table(THD *thd, SString_fs &table_name, LString &new_db)
 {
   handlerton *table_hton= NULL;
-  if (!ha_table_exists(thd, about.db, table_name, &table_hton) || !table_hton)
+  if (!ha_table_exists(thd, about_tl_.db, table_name, &table_hton) || !table_hton)
   {
     push_warning_printf(
         thd, Sql_condition::WARN_LEVEL_WARN,
         ER_VERS_VTMD_ERROR,
         "`%s.%s` archive doesn't exist",
-        about.db, table_name.ptr());
+        about_tl_.db, table_name.ptr());
     return false;
   }
 
   if (ha_table_exists(thd, new_db, table_name))
   {
     my_printf_error(ER_VERS_VTMD_ERROR, "`%s.%s` archive already exists!", MYF(0),
-                        new_db.ptr(), table_name.ptr());
+                    new_db.ptr(), table_name.ptr());
     return true;
   }
 
   TABLE_LIST tl;
   tl.init_one_table(
-    DB_WITH_LEN(about),
+    DB_WITH_LEN(about_tl_),
     XSTRING_WITH_LEN(table_name),
     table_name,
     TL_WRITE_ONLY);
@@ -396,11 +398,11 @@ VTMD_rename::move_table(THD *thd, SString_fs &table_name, LString &new_db)
   mysql_ha_rm_tables(thd, &tl);
   if (lock_table_names(thd, &tl, 0, thd->variables.lock_wait_timeout, 0))
     return true;
-  tdc_remove_table(thd, TDC_RT_REMOVE_ALL, about.db, table_name, false);
+  tdc_remove_table(thd, TDC_RT_REMOVE_ALL, about_tl_.db, table_name, false);
 
   bool rc= mysql_rename_table(
     table_hton,
-    about.db, table_name,
+    about_tl_.db, table_name,
     new_db, table_name,
     NO_FK_CHECKS);
   if (!rc)
@@ -446,7 +448,7 @@ VTMD_rename::try_rename(THD *thd, LString new_db, LString new_alias, VTMD_update
     return false;
 
   bool same_db= true;
-  if (LString_fs(DB_WITH_LEN(about)) != LString_fs(new_db))
+  if (LString_fs(DB_WITH_LEN(about_tl_)) != LString_fs(new_db))
   {
     // Move archives before VTMD so if the operation is interrupted, it could be continued.
     if (move_archives(thd, new_db))
@@ -456,26 +458,24 @@ VTMD_rename::try_rename(THD *thd, LString new_db, LString new_alias, VTMD_update
 
   TABLE_LIST vtmd_tl;
   vtmd_tl.init_one_table(
-    DB_WITH_LEN(about),
-    XSTRING_WITH_LEN(vtmd_name),
-    vtmd_name,
+    DB_WITH_LEN(about_tl_),
+    XSTRING_WITH_LEN(md_table_name_),
+    md_table_name_,
     TL_WRITE_ONLY);
   vtmd_tl.mdl_request.set_type(MDL_EXCLUSIVE);
 
   mysql_ha_rm_tables(thd, &vtmd_tl);
   if (lock_table_names(thd, &vtmd_tl, 0, thd->variables.lock_wait_timeout, 0))
     return true;
-  tdc_remove_table(thd, TDC_RT_REMOVE_ALL, about.db, vtmd_name, false);
+  tdc_remove_table(thd, TDC_RT_REMOVE_ALL, about_tl_.db, md_table_name_, false);
   if (local_da.is_error()) // just safety check
     return true;
-  bool rc= mysql_rename_table(hton,
-    about.db, vtmd_name,
-    new_db, vtmd_new_name,
-    NO_FK_CHECKS);
+  bool rc= mysql_rename_table(hton, about_tl_.db, md_table_name_, new_db,
+                              vtmd_new_name, NO_FK_CHECKS);
   if (!rc)
   {
     query_cache_invalidate3(thd, &vtmd_tl, 0);
-    if (same_db || args.archive_name || new_alias != LString(TABLE_NAME_WITH_LEN(about)))
+    if (same_db || args.archive_name || new_alias != LString(TABLE_NAME_WITH_LEN(about_tl_)))
     {
       local_da.finish();
       VTMD_table new_vtmd(new_table);
@@ -493,7 +493,7 @@ VTMD_rename::revert_rename(THD *thd, LString new_db)
 
   TABLE_LIST vtmd_tl;
   vtmd_tl.init_one_table(
-    DB_WITH_LEN(about),
+    DB_WITH_LEN(about_tl_),
     XSTRING_WITH_LEN(vtmd_new_name),
     vtmd_new_name,
     TL_WRITE_ONLY);
@@ -506,7 +506,7 @@ VTMD_rename::revert_rename(THD *thd, LString new_db)
   bool rc= mysql_rename_table(
     hton,
     new_db, vtmd_new_name,
-    new_db, vtmd_name,
+    new_db, md_table_name_,
     NO_FK_CHECKS);
 
   if (!rc)
@@ -542,24 +542,26 @@ VTMD_table::find_archive_name(THD *thd, String &out)
   if (open(thd, local_da))
     return true;
 
+  TABLE *vtmd= md_tl_.table;
+  DBUG_ASSERT(vtmd);
   Name_resolution_context &ctx= thd->lex->select_lex.context;
   TABLE_LIST *table_list= ctx.table_list;
   TABLE_LIST *first_name_resolution_table= ctx.first_name_resolution_table;
-  table_map map = vtmd.table->map;
-  ctx.table_list= &vtmd;
-  ctx.first_name_resolution_table= &vtmd;
-  vtmd.table->map= 1;
+  table_map map = vtmd->map;
+  ctx.table_list= &md_tl_;
+  ctx.first_name_resolution_table= &md_tl_;
+    vtmd->map= 1;
 
-  vtmd.vers_conditions= about.vers_conditions;
-  if ((error= vers_setup_select(thd, &vtmd, &conds, &select_lex)) ||
-      (error= setup_conds(thd, &vtmd, dummy, &conds)))
+    md_tl_.vers_conditions= about_tl_.vers_conditions;
+  if ((error= vers_setup_select(thd, &md_tl_, &conds, &select_lex)) ||
+      (error= setup_conds(thd, &md_tl_, dummy, &conds)))
     goto err;
 
-  select= make_select(vtmd.table, 0, 0, conds, NULL, 0, &error);
+  select= make_select(vtmd, 0, 0, conds, NULL, 0, &error);
   if (error)
     goto loc_err;
 
-  error= init_read_record(&info, thd, vtmd.table, select, NULL,
+  error= init_read_record(&info, thd, vtmd, select, NULL,
                           1 /* use_record_cache */, true /* print_error */,
                           false /* disable_rr_cache */);
   if (error)
@@ -569,13 +571,13 @@ VTMD_table::find_archive_name(THD *thd, String &out)
   {
     if (!select || select->skip_record(thd) > 0)
     {
-      vtmd.table->field[FLD_ARCHIVE_NAME]->val_str(&out);
+      vtmd->field[FLD_ARCHIVE_NAME]->val_str(&out);
       break;
     }
   }
 
   if (error < 0)
-    my_error(ER_NO_SUCH_TABLE, MYF(0), about.db, about.alias);
+    my_error(ER_NO_SUCH_TABLE, MYF(0), about_tl_.db, about_tl_.alias);
 
 loc_err:
   end_read_record(&info);
@@ -583,8 +585,8 @@ err:
   delete select;
   ctx.table_list= table_list;
   ctx.first_name_resolution_table= first_name_resolution_table;
-  vtmd.table->map= map;
-  close_log_table(thd, &open_tables_backup);
+    vtmd->map= map;
+  close_log_table(thd, &ot_backup_);
   DBUG_ASSERT(!error || local_da.is_error());
   return error;
 }
@@ -595,13 +597,12 @@ get_vtmd_tables(THD *thd, const char *db,
                 size_t db_length, Dynamic_array<LEX_STRING *> &table_names)
 {
   LOOKUP_FIELD_VALUES lookup_field_values= {
-      *thd->make_lex_string(db, db_length),
-      *thd->make_lex_string(C_STRING_WITH_LEN("%_vtmd")), false, true};
+    *thd->make_lex_string(db, db_length),
+    *thd->make_lex_string(C_STRING_WITH_LEN("%_vtmd")), false, true
+  };
 
-  int res=
-      make_table_name_list(thd, &table_names, thd->lex, &lookup_field_values,
+  int res= make_table_name_list(thd, &table_names, thd->lex, &lookup_field_values,
                            &lookup_field_values.db_value);
-
   return res;
 }
 
@@ -684,7 +685,8 @@ VTMD_table::get_archive_tables(THD *thd, const char *db, size_t db_length,
   return false;
 }
 
-bool VTMD_table::setup_select(THD* thd)
+bool
+VTMD_table::setup_select(THD* thd)
 {
   SString archive_name;
   if (find_archive_name(thd, archive_name))
@@ -693,12 +695,12 @@ bool VTMD_table::setup_select(THD* thd)
   if (archive_name.length() == 0)
     return false;
 
-  about.table_name= (char *) thd->memdup(archive_name.c_ptr_safe(), archive_name.length() + 1);
-  about.table_name_length= archive_name.length();
-  DBUG_ASSERT(!about.mdl_request.ticket);
-  about.mdl_request.init(MDL_key::TABLE, about.db, about.table_name,
-                         about.mdl_request.type, about.mdl_request.duration);
-  about.vers_force_alias= true;
+  about_tl_.table_name= (char *) thd->memdup(archive_name.c_ptr_safe(), archive_name.length() + 1);
+  about_tl_.table_name_length= archive_name.length();
+  DBUG_ASSERT(!about_tl_.mdl_request.ticket);
+  about_tl_.mdl_request.init(MDL_key::TABLE, about_tl_.db, about_tl_.table_name,
+                          about_tl_.mdl_request.type, about_tl_.mdl_request.duration);
+  about_tl_.vers_force_alias= true;
   // Since we modified SELECT_LEX::table_list, we need to invalidate current SP
   if (thd->spcont)
   {
@@ -706,4 +708,10 @@ bool VTMD_table::setup_select(THD* thd)
     thd->spcont->sp->set_sp_cache_version(ULONG_MAX);
   }
   return false;
+}
+
+
+bool
+CMMD_table::update(THD* thd, CMMD_map& cmmd)
+{
 }

@@ -12,31 +12,47 @@ class THD;
 
 typedef Dynamic_array<IntPair> CMMD_map;
 
+template <const LString &md_template>
+class MD_table
+{
+protected:
+  Open_tables_backup ot_backup_;
+  TABLE_LIST md_tl_;
+  TABLE_LIST &about_tl_;
+  SString_t md_table_name_;
+
+private:
+  MD_table(const MD_table&); // prohibit copying references
+
+public:
+  MD_table(TABLE_LIST &about) :
+    about_tl_(about)
+  {
+    md_tl_.table= NULL;
+  }
+
+  bool create(THD *thd);
+  bool open(THD *thd, Local_da &local_da, bool *created= NULL);
+};
+
 struct VTMD_update_args
 {
   const char* archive_name;
-  CMMD_map* colmap;
+  CMMD_map* cmmd;
   VTMD_update_args(const char* _archive_name= NULL, CMMD_map* _colmap= NULL) :
     archive_name(_archive_name),
-    colmap(_colmap) {}
+    cmmd(_colmap) {}
   bool has_cmmd()
   {
-    return colmap ? colmap->elements() > 0 : false;
+    return cmmd ? cmmd->elements() > 0 : false;
   }
 };
 
-class VTMD_table
+extern const LString VERS_VTMD_TEMPLATE;
+extern const LString VERS_CMMD_TEMPLATE;
+
+class VTMD_table : public MD_table<VERS_VTMD_TEMPLATE>
 {
-  Open_tables_backup open_tables_backup;
-
-protected:
-  TABLE_LIST vtmd;
-  TABLE_LIST &about;
-  SString_t vtmd_name;
-
-private:
-  VTMD_table(const VTMD_table&); // prohibit copying references
-
 public:
   enum {
     FLD_START= 0,
@@ -52,22 +68,18 @@ public:
     IDX_ARCHIVE_NAME
   };
 
-  VTMD_table(TABLE_LIST &_about) :
-    about(_about)
-  {
-    vtmd.table= NULL;
-  }
+  VTMD_table(TABLE_LIST &about) :
+    MD_table(about)
+  {}
 
-  bool create(THD *thd);
   bool find_record(ulonglong sys_trx_end, bool &found);
-  bool open(THD *thd, Local_da &local_da, bool *created= NULL);
   bool update(THD *thd, VTMD_update_args args= VTMD_update_args());
   bool setup_select(THD *thd);
 
   static void archive_name(THD *thd, const char *table_name, char *new_name, size_t new_name_size);
   void archive_name(THD *thd, char *new_name, size_t new_name_size)
   {
-    archive_name(thd, about.table_name, new_name, new_name_size);
+    archive_name(thd, about_tl_.table_name, new_name, new_name_size);
   }
 
   bool find_archive_name(THD *thd, String &out);
@@ -142,19 +154,37 @@ public:
 };
 
 
+class CMMD_table : public MD_table<VERS_CMMD_TEMPLATE>
+{
+public:
+  enum {
+    FLD_START= 0,
+    FLD_CURRENT,
+    FLD_LATER,
+    FIELD_COUNT
+  };
+
+  CMMD_table(TABLE_LIST &about) :
+    MD_table(about)
+  {}
+
+  bool update(THD *thd, CMMD_map &cmmd);
+};
+
+
 inline
 bool
 VTMD_exists::check_exists(THD *thd)
 {
-  if (about.vers_vtmd_name(vtmd_name))
+  if (about_tl_.vers_vtmd_name(md_table_name_))
     return true;
 
-  exists= ha_table_exists(thd, about.db, vtmd_name, &hton);
+  exists= ha_table_exists(thd, about_tl_.db, md_table_name_, &hton);
 
   if (exists && !hton)
   {
     my_printf_error(ER_VERS_VTMD_ERROR, "`%s.%s` handlerton empty!", MYF(0),
-                        about.db, vtmd_name.ptr());
+                        about_tl_.db, md_table_name_.ptr());
     return true;
   }
   return false;
