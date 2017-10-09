@@ -12,12 +12,12 @@
 #include "sp_head.h"
 #include "sp_rcontext.h"
 
-const LString VERS_VTMD_TEMPLATE(C_STRING_WITH_LEN("vtmd_template"));
-const LString VERS_CMMD_TEMPLATE(C_STRING_WITH_LEN("cmmd_template"));
+const MD_naming VERS_VTMD_NAMING("vtmd_template", "_vtmd");
+const MD_naming VERS_CMMD_NAMING("cmmd_template", "_cmmd");
 
-template <const LString &md_template>
+template <const MD_naming &names>
 bool
-MD_table<md_template>::create(THD *thd)
+MD_table<names>::create(THD *thd)
 {
   Table_specification_st create_info;
   TABLE_LIST src_table, table;
@@ -31,8 +31,8 @@ MD_table<md_template>::create(THD *thd)
     TL_READ);
   src_table.init_one_table(
     LEX_STRING_WITH_LEN(MYSQL_SCHEMA_NAME),
-    XSTRING_WITH_LEN(md_template),
-    md_template,
+    XSTRING_WITH_LEN(names.templ),
+    names.templ,
     TL_READ);
 
   Open_tables_auto_backup open_tables(thd);
@@ -60,14 +60,16 @@ MD_table<md_template>::create(THD *thd)
   return rc;
 }
 
-template <const LString &md_template>
+template <const MD_naming &names>
 bool
-MD_table<md_template>::open(THD *thd, Local_da &local_da, bool *created)
+MD_table<names>::open(Local_da &local_da, bool *created)
 {
+  THD *thd= local_da.thd;
+
   if (created)
     *created= false;
 
-  if (0 == md_table_name_.length() && about_tl_.vers_vtmd_name(md_table_name_))
+  if (0 == md_table_name_.length() && update_table_name())
     return true;
 
   while (true) // max 2 iterations
@@ -150,7 +152,7 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
     save_thd_options= thd->variables.option_bits;
     thd->variables.option_bits&= ~OPTION_BIN_LOG;
 
-    if (open(thd, local_da, &created))
+    if (open(local_da, &created))
       goto open_error;
 
     TABLE *vtmd= md_tl_.table;
@@ -256,16 +258,14 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
         vtmd->field[FLD_NAME]->set_notnull();
         error= vtmd->file->ha_update_row(vtmd->record[1], vtmd->record[0]);
       }
-      if (args.has_cmmd())
+      if (!error && args.has_cmmd())
       {
         CMMD_table cmmd(about_tl_);
-        cmmd.update(thd, *args.cmmd);
+        error= cmmd.update(local_da, *args.cmmd);
       }
     } // if (found)
     else
     {
-      DBUG_ASSERT(!args.archive_name);
-      DBUG_ASSERT(!args.has_cmmd());
       vtmd->field[FLD_NAME]->store(TABLE_NAME_WITH_LEN(about_tl_), system_charset_info);
       vtmd->field[FLD_NAME]->set_notnull();
       vtmd->field[FLD_ARCHIVE_NAME]->set_null();
@@ -425,7 +425,7 @@ VTMD_rename::try_rename(THD *thd, LString new_db, LString new_alias, VTMD_update
     XSTRING_WITH_LEN(new_alias),
     new_alias, TL_READ);
 
-  if (new_table.vers_vtmd_name(vtmd_new_name))
+  if (add_suffix(new_table, vtmd_new_name))
     return true;
 
   if (ha_table_exists(thd, new_db, vtmd_new_name))
@@ -539,7 +539,7 @@ VTMD_table::find_archive_name(THD *thd, String &out)
   SELECT_LEX &select_lex= thd->lex->select_lex;
 
   Local_da local_da(thd, ER_VERS_VTMD_ERROR);
-  if (open(thd, local_da))
+  if (open(local_da))
     return true;
 
   TABLE *vtmd= md_tl_.table;
@@ -712,6 +712,25 @@ VTMD_table::setup_select(THD* thd)
 
 
 bool
-CMMD_table::update(THD* thd, CMMD_map& cmmd)
+CMMD_table::update(Local_da &local_da, CMMD_map& cmmd)
 {
+  THD* thd= local_da.thd;
+  bool result= true;
+  ulonglong save_thd_options;
+  bool created;
+
+  save_thd_options= thd->variables.option_bits;
+  thd->variables.option_bits&= ~OPTION_BIN_LOG;
+
+  if (open(local_da, &created))
+    goto open_error;
+
+result= false;
+
+quit:
+  close_log_table(thd, &ot_backup_);
+
+open_error:
+  thd->variables.option_bits= save_thd_options;
+  return result;
 }

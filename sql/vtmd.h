@@ -12,7 +12,16 @@ class THD;
 
 typedef Dynamic_array<IntPair> CMMD_map;
 
-template <const LString &md_template>
+struct MD_naming
+{
+  LString templ;
+  LString suffix;
+  MD_naming(LString _templ, LString _suffix) :
+    templ(_templ),
+    suffix(_suffix) {}
+};
+
+template <const MD_naming &names>
 class MD_table
 {
 protected:
@@ -32,7 +41,15 @@ public:
   }
 
   bool create(THD *thd);
-  bool open(THD *thd, Local_da &local_da, bool *created= NULL);
+  bool open(Local_da &local_da, bool *created= NULL);
+  bool add_suffix(TABLE_LIST &arg, SString_t &result)
+  {
+    return arg.vers_add_suffix(names.suffix, result);
+  }
+  bool update_table_name()
+  {
+    return add_suffix(about_tl_, md_table_name_);
+  }
 };
 
 struct VTMD_update_args
@@ -48,10 +65,10 @@ struct VTMD_update_args
   }
 };
 
-extern const LString VERS_VTMD_TEMPLATE;
-extern const LString VERS_CMMD_TEMPLATE;
+extern const MD_naming VERS_VTMD_NAMING;
+extern const MD_naming VERS_CMMD_NAMING;
 
-class VTMD_table : public MD_table<VERS_VTMD_TEMPLATE>
+class VTMD_table : public MD_table<VERS_VTMD_NAMING>
 {
 public:
   enum {
@@ -154,7 +171,7 @@ public:
 };
 
 
-class CMMD_table : public MD_table<VERS_CMMD_TEMPLATE>
+class CMMD_table : public MD_table<VERS_CMMD_NAMING>
 {
 public:
   enum {
@@ -168,7 +185,7 @@ public:
     MD_table(about)
   {}
 
-  bool update(THD *thd, CMMD_map &cmmd);
+  bool update(Local_da &local_da, CMMD_map &cmmd);
 };
 
 
@@ -176,7 +193,7 @@ inline
 bool
 VTMD_exists::check_exists(THD *thd)
 {
-  if (about_tl_.vers_vtmd_name(md_table_name_))
+  if (update_table_name())
     return true;
 
   exists= ha_table_exists(thd, about_tl_.db, md_table_name_, &hton);

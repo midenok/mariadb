@@ -52,16 +52,17 @@ public:
 
 class Local_da : public Diagnostics_area
 {
-  THD *thd;
   uint sql_error;
   Diagnostics_area *saved_da;
 
 public:
+  THD *thd;
+
   Local_da(THD *_thd, uint _sql_error= 0) :
     Diagnostics_area(_thd->query_id, false, true),
-    thd(_thd),
     sql_error(_sql_error),
-    saved_da(_thd->get_stmt_da())
+    saved_da(_thd->get_stmt_da()),
+    thd(_thd)
   {
     thd->set_stmt_da(this);
   }
