@@ -153,7 +153,7 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
     thd->variables.option_bits&= ~OPTION_BIN_LOG;
 
     if (open(local_da, &created))
-      goto open_error;
+      goto no_close;
 
     TABLE *vtmd= md_tl_.table;
     DBUG_ASSERT(vtmd);
@@ -260,8 +260,11 @@ VTMD_table::update(THD *thd, VTMD_update_args args)
       }
       if (!error && args.has_cmmd())
       {
+        ulonglong sys_trx_start= (ulonglong) vtmd->vers_start_field()->val_int();
+        close_log_table(thd, &ot_backup_);
         CMMD_table cmmd(about_tl_);
-        error= cmmd.update(local_da, *args.cmmd);
+        result= cmmd.update(local_da, sys_trx_start, *args.cmmd);
+        goto no_close;
       }
     } // if (found)
     else
@@ -286,7 +289,7 @@ err:
 quit:
   close_log_table(thd, &ot_backup_);
 
-open_error:
+no_close:
   thd->variables.option_bits= save_thd_options;
   return result;
 }
@@ -617,7 +620,7 @@ VTMD_table::get_archive_tables(THD *thd, const char *db, size_t db_length,
   Local_da local_da(thd, ER_VERS_VTMD_ERROR);
   for (uint i= 0; i < vtmd_tables.elements(); i++)
   {
-    LEX_STRING table_name= *vtmd_tables.at(i);
+    const LEX_STRING &table_name= *vtmd_tables.at(i);
 
     Open_tables_backup open_tables_backup;
     TABLE_LIST table_list;
@@ -712,25 +715,43 @@ VTMD_table::setup_select(THD* thd)
 
 
 bool
-CMMD_table::update(Local_da &local_da, CMMD_map& cmmd)
+CMMD_table::update(Local_da &local_da, ulonglong sys_trx_start, CMMD_map& cmmd_map)
 {
   THD* thd= local_da.thd;
   bool result= true;
-  ulonglong save_thd_options;
   bool created;
-
-  save_thd_options= thd->variables.option_bits;
-  thd->variables.option_bits&= ~OPTION_BIN_LOG;
 
   if (open(local_da, &created))
     goto open_error;
 
-result= false;
+  {
+    TABLE *cmmd= md_tl_.table;
+    DBUG_ASSERT(cmmd);
+
+    for (uint i= 0; i < cmmd_map.elements(); i++)
+    {
+      const IntPair &map= cmmd_map.at(i);
+      cmmd->field[FLD_START]->store(sys_trx_start, true);
+      cmmd->field[FLD_START]->set_notnull();
+      cmmd->field[FLD_CURRENT]->store(map.first, true);
+      cmmd->field[FLD_CURRENT]->set_notnull();
+      cmmd->field[FLD_LATER]->store(map.second, true);
+      cmmd->field[FLD_LATER]->set_notnull();
+      cmmd->mark_columns_needed_for_insert(); // not needed?
+      int error= cmmd->file->ha_write_row(cmmd->record[0]);
+      if (error)
+      {
+        cmmd->file->print_error(error, MYF(0));
+        goto quit;
+      }
+    }
+
+    result= local_da.is_error();
+  }
 
 quit:
   close_log_table(thd, &ot_backup_);
 
 open_error:
-  thd->variables.option_bits= save_thd_options;
   return result;
 }

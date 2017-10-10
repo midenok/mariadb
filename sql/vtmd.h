@@ -94,7 +94,7 @@ public:
   bool setup_select(THD *thd);
 
   static void archive_name(THD *thd, const char *table_name, char *new_name, size_t new_name_size);
-  void archive_name(THD *thd, char *new_name, size_t new_name_size)
+  void archive_name(THD *thd, char *new_name, size_t new_name_size) const
   {
     archive_name(thd, about_tl_.table_name, new_name, new_name_size);
   }
@@ -185,7 +185,7 @@ public:
     MD_table(about)
   {}
 
-  bool update(Local_da &local_da, CMMD_map &cmmd);
+  bool update(Local_da &local_da, ulonglong sys_trx_start, CMMD_map &cmmd);
 };
 
 
