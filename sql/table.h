@@ -2366,6 +2366,7 @@ struct TABLE_LIST
   vers_select_conds_t vers_conditions;
   bool vers_vtmd_name(String &out) const;
   bool vers_force_alias;
+  TABLE_LIST *vers_archive_table;
 
   /**
      @brief

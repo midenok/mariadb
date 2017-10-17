@@ -702,6 +702,21 @@ bool VTMD_table::setup_select(THD* thd)
   if (archive_name.length() == 0)
     return false;
 
+  if (thd->variables.vers_ident_mode == VERS_IDENT_MODE_CURRENT)
+  {
+    TABLE_LIST *archive= (TABLE_LIST*) thd->alloc(sizeof(TABLE_LIST));
+    if (!archive)
+    {
+      my_message(ER_VERS_VTMD_ERROR, "failed to allocate archive TABLE_LIST", MYF(0));
+      return true;
+    }
+    archive->init_one_table(about.db, about.db_length, archive_name.ptr(),
+                      archive_name.length(), archive_name.ptr(), TL_READ);
+    thd->lex->add_to_query_tables(archive);
+    about.vers_archive_table= archive;
+    return false;
+  }
+
   about.table_name= (char *) thd->memdup(archive_name.c_ptr_safe(), archive_name.length() + 1);
   about.table_name_length= archive_name.length();
   DBUG_ASSERT(!about.mdl_request.ticket);

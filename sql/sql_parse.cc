@@ -6369,6 +6369,7 @@ struct String_pair
   const char *second;
 };
 
+#if 0
 static bool get_table_fields(THD *thd, LEX_STRING db, LEX_STRING table_name,
                              Dynamic_array<const char *> &fields)
 {
@@ -6428,6 +6429,7 @@ static void map_field(Item_field *item, const Dynamic_array<String_pair> &map)
       item->vers_rename((char *)map.at(i).second);
   }
 }
+#endif
 
 static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
 {
@@ -6457,6 +6459,7 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
         if (vtmd.exists && vtmd.setup_select(thd))
           return 1;
 
+#if 0
         if (thd->variables.vers_ident_mode == VERS_IDENT_MODE_CURRENT &&
             table->vers_conditions == FOR_SYSTEM_TIME_AS_OF)
         {
@@ -6475,6 +6478,7 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
             }
           }
         }
+#endif
       }
     }
   }
