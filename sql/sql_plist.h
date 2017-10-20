@@ -16,6 +16,8 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 
+#include <cstddef>
+
 template <typename T, typename L>
 class I_P_List_iterator;
 class I_P_List_null_counter;
