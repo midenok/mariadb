@@ -9442,6 +9442,7 @@ mysqld_get_one_option(int optid, const struct my_option *opt, char *argument)
               WSREP_SYNC_WAIT_BEFORE_READ);
     break;
 #endif /* WITH_WSREP */
+#if 0
   case OPT_VERS_ASOF_TIMESTAMP:
     int type= find_type(argument, opt->typelib, FIND_TYPE_BASIC);
     st_vers_asof_timestamp &out= global_system_variables.vers_asof_timestamp;
@@ -9465,6 +9466,7 @@ mysqld_get_one_option(int optid, const struct my_option *opt, char *argument)
       }
     }
     break;
+#endif
   }
   return 0;
 }

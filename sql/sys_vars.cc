@@ -382,11 +382,22 @@ static Sys_var_charptr Sys_basedir(
        READ_ONLY GLOBAL_VAR(mysql_home_ptr), CMD_LINE(REQUIRED_ARG, 'b'),
        IN_FS_CHARSET, DEFAULT(0));
 
-const char *Sys_var_vers_asof::asof_keywords[]= {"CURRENT", "ALL", NULL};
-static Sys_var_vers_asof Sys_vers_asof_timestamp(
+static bool vers_asof_check(sys_var *self, THD *thd, set_var *var)
+{
+  st_vers_asof_timestamp& asof= self->scope() == sys_var::GLOBAL ?
+    global_system_variables.vers_asof_timestamp :
+    thd->variables.vers_asof_timestamp;
+  bool res= var->value->get_date(&asof.ltime, 0);
+  if (!res)
+    asof.type= FOR_SYSTEM_TIME_AS_OF;
+  return res;
+}
+
+static Sys_var_charptr Sys_vers_asof_timestamp(
        "versioning_asof_timestamp", "Default AS OF value for versioned queries",
        SESSION_VAR(vers_asof_timestamp.getopt_value), CMD_LINE(REQUIRED_ARG, OPT_VERS_ASOF_TIMESTAMP),
-       Sys_var_vers_asof::asof_keywords, DEFAULT(FOR_SYSTEM_TIME_UNSPECIFIED));
+       IN_SYSTEM_CHARSET, DEFAULT(0), 0, NOT_IN_BINLOG,
+       ON_CHECK(vers_asof_check));
 
 static Sys_var_mybool Sys_vers_force(
        "versioning_force", "Force system versioning for all created tables",
