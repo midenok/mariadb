@@ -5142,6 +5142,13 @@ public:
                                    bool keep_row_order,
                                    uint hidden);
   TMP_TABLE_PARAM *get_tmp_table_param() { return &tmp_table_param; }
+  void start_select()
+  {
+    curr_step= prev_step= 0;
+    curr_sel= UINT_MAX;
+    step= UNION_TYPE;
+    records= 0;
+  }
   void change_select();
 };
 
