@@ -1,0 +1,4 @@
+--innodb-sys-tablestats
+--innodb-page-size=16k
+--versioning-force
+--versioning-hide=full
