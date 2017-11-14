@@ -8,6 +8,7 @@
 --source include/have_binlog_format_row.inc
 --source include/master-slave.inc
 --source include/have_innodb.inc
+--source include/have_wsrep_enabled.inc
 
 connection master;
 create database s_db;
