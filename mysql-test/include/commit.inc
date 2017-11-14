@@ -418,14 +418,14 @@ call p_verify_status_increment(1, 0, 1, 0);
 insert into t1 (a) values (1);
 call p_verify_status_increment(2, 2, 2, 2);
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 
 --echo # 3. Read-write statement: UPDATE, update 1 row. 
 --echo #
 update t1 set a=2;
 call p_verify_status_increment(2, 2, 2, 2);
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 
 --echo # 4. Read-write statement: UPDATE, update 0 rows, 1 row matches WHERE 
 --echo #
@@ -460,7 +460,7 @@ call p_verify_status_increment(2, 0, 1, 0);
 delete from t1 where a=2;
 call p_verify_status_increment(2, 2, 2, 2);
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 
 --echo # 8. Read-write statement: unqualified DELETE
 --echo #
@@ -474,21 +474,21 @@ call p_verify_status_increment(2, 2, 2, 2);
 delete from t1;
 call p_verify_status_increment(2, 2, 1, 0);
 commit;
-call p_verify_status_increment(2, 2, 1, 0);
+call p_verify_status_increment(3, 2, 2, 0);
 
 --echo # 9. Read-write statement: REPLACE, change 1 row. 
 --echo #
 replace t1 set a=1;
 call p_verify_status_increment(2, 2, 2, 2);
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 
 --echo # 10. Read-write statement: REPLACE, change 0 rows. 
 --echo #
 replace t1 set a=1;
 call p_verify_status_increment(2, 2, 1, 0);
 commit;
-call p_verify_status_increment(2, 2, 1, 0);
+call p_verify_status_increment(3, 2, 2, 0);
 
 --echo # 11. Read-write statement: IODKU, change 1 row. 
 --echo #
@@ -497,28 +497,28 @@ call p_verify_status_increment(2, 2, 2, 2);
 select * from t1;
 call p_verify_status_increment(1, 0, 1, 0);
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 
 --echo # 12. Read-write statement: IODKU, change 0 rows. 
 --echo #
 insert t1 set a=2 on duplicate key update a=2;
 call p_verify_status_increment(2, 2, 1, 0);
 commit;
-call p_verify_status_increment(2, 2, 1, 0);
+call p_verify_status_increment(3, 2, 2, 0);
 
 --echo # 13. Read-write statement: INSERT IGNORE, change 0 rows. 
 --echo #
 insert ignore t1 set a=2;
 call p_verify_status_increment(2, 2, 1, 0);
 commit;
-call p_verify_status_increment(2, 2, 1, 0);
+call p_verify_status_increment(3, 2, 2, 0);
 
 --echo # 14. Read-write statement: INSERT IGNORE, change 1 row. 
 --echo #
 insert ignore t1 set a=1;
 call p_verify_status_increment(2, 2, 2, 2);
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 --echo # 15. Read-write statement: UPDATE IGNORE, change 0 rows. 
 --echo #
 --disable_warnings
@@ -675,7 +675,7 @@ call p_verify_status_increment(1, 0, 1, 0);
 insert t1 set a=3;
 call p_verify_status_increment(2, 2, 2, 2);
 set autocommit=1;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 rollback;
 select a from t1 where a=3;
 call p_verify_status_increment(1, 0, 1, 0);
@@ -717,13 +717,13 @@ call p_verify_status_increment(0, 0, 0, 0);
 do (select f1() from t1 where a=2);
 call p_verify_status_increment(2, 2, 2, 2);
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 
 --echo # 29. Read-write statement: MULTI-DELETE
 --echo # 
 delete t1, t2 from t1 join t2 on (t1.a=t2.a) where t1.a=2;
 commit;
-call p_verify_status_increment(4, 4, 4, 4);
+call p_verify_status_increment(5, 4, 5, 4);
 
 --echo # 30. Read-write statement: INSERT-SELECT, MULTI-UPDATE, REPLACE-SELECT
 --echo # 
@@ -733,7 +733,7 @@ commit;
 replace into t2 select a from t1;
 --enable_warnings
 commit;
-call p_verify_status_increment(8, 8, 8, 8);
+call p_verify_status_increment(10, 8, 10, 8);
 #
 # Multi-update is one of the few remaining statements that still
 # locks the tables at prepare step (and hence starts the transaction.
@@ -744,7 +744,7 @@ call p_verify_status_increment(8, 8, 8, 8);
 update t1, t2 set t1.a=4, t2.a=8 where t1.a=t2.a and t1.a=1;
 --enable_ps_protocol
 commit;
-call p_verify_status_increment(4, 4, 4, 4);
+call p_verify_status_increment(5, 4, 5, 4);
 
 --echo # 31. DDL: various DDL with transactional tables
 --echo #
@@ -755,7 +755,7 @@ call p_verify_status_increment(0, 0, 0, 0);
 create table t3 select a from t2;
 call p_verify_status_increment(2, 0, 4, 4);
 alter table t3 add column (b int);
-call p_verify_status_increment(2, 0, 2, 0);
+call p_verify_status_increment(3, 0, 3, 0);
 alter table t3 rename t4;
 call p_verify_status_increment(0, 0, 0, 0);
 rename table t4 to t3;

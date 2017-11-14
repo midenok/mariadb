@@ -404,7 +404,7 @@ call p_verify_status_increment(2, 2, 2, 2);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 SUCCESS
 
 # 3. Read-write statement: UPDATE, update 1 row. 
@@ -414,7 +414,7 @@ call p_verify_status_increment(2, 2, 2, 2);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 SUCCESS
 
 # 4. Read-write statement: UPDATE, update 0 rows, 1 row matches WHERE 
@@ -461,7 +461,7 @@ call p_verify_status_increment(2, 2, 2, 2);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 SUCCESS
 
 # 8. Read-write statement: unqualified DELETE
@@ -478,7 +478,7 @@ call p_verify_status_increment(2, 2, 1, 0);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 1, 0);
+call p_verify_status_increment(3, 2, 2, 0);
 SUCCESS
 
 # 9. Read-write statement: REPLACE, change 1 row. 
@@ -488,7 +488,7 @@ call p_verify_status_increment(2, 2, 2, 2);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 SUCCESS
 
 # 10. Read-write statement: REPLACE, change 0 rows. 
@@ -498,7 +498,7 @@ call p_verify_status_increment(2, 2, 1, 0);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 1, 0);
+call p_verify_status_increment(3, 2, 2, 0);
 SUCCESS
 
 # 11. Read-write statement: IODKU, change 1 row. 
@@ -514,7 +514,7 @@ call p_verify_status_increment(1, 0, 1, 0);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 SUCCESS
 
 # 12. Read-write statement: IODKU, change 0 rows. 
@@ -524,7 +524,7 @@ call p_verify_status_increment(2, 2, 1, 0);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 1, 0);
+call p_verify_status_increment(3, 2, 2, 0);
 SUCCESS
 
 # 13. Read-write statement: INSERT IGNORE, change 0 rows. 
@@ -536,7 +536,7 @@ call p_verify_status_increment(2, 2, 1, 0);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 1, 0);
+call p_verify_status_increment(3, 2, 2, 0);
 SUCCESS
 
 # 14. Read-write statement: INSERT IGNORE, change 1 row. 
@@ -546,7 +546,7 @@ call p_verify_status_increment(2, 2, 2, 2);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 SUCCESS
 
 # 15. Read-write statement: UPDATE IGNORE, change 0 rows. 
@@ -724,7 +724,7 @@ call p_verify_status_increment(2, 2, 2, 2);
 SUCCESS
 
 set autocommit=1;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 SUCCESS
 
 rollback;
@@ -800,14 +800,14 @@ call p_verify_status_increment(2, 2, 2, 2);
 SUCCESS
 
 commit;
-call p_verify_status_increment(2, 2, 2, 2);
+call p_verify_status_increment(3, 2, 3, 2);
 SUCCESS
 
 # 29. Read-write statement: MULTI-DELETE
 # 
 delete t1, t2 from t1 join t2 on (t1.a=t2.a) where t1.a=2;
 commit;
-call p_verify_status_increment(4, 4, 4, 4);
+call p_verify_status_increment(5, 4, 5, 4);
 SUCCESS
 
 # 30. Read-write statement: INSERT-SELECT, MULTI-UPDATE, REPLACE-SELECT
@@ -816,12 +816,12 @@ insert into t2 select a from t1;
 commit;
 replace into t2 select a from t1;
 commit;
-call p_verify_status_increment(8, 8, 8, 8);
+call p_verify_status_increment(10, 8, 10, 8);
 SUCCESS
 
 update t1, t2 set t1.a=4, t2.a=8 where t1.a=t2.a and t1.a=1;
 commit;
-call p_verify_status_increment(4, 4, 4, 4);
+call p_verify_status_increment(5, 4, 5, 4);
 SUCCESS
 
 # 31. DDL: various DDL with transactional tables
@@ -839,7 +839,7 @@ call p_verify_status_increment(2, 0, 4, 4);
 SUCCESS
 
 alter table t3 add column (b int);
-call p_verify_status_increment(2, 0, 2, 0);
+call p_verify_status_increment(3, 0, 3, 0);
 SUCCESS
 
 alter table t3 rename t4;
