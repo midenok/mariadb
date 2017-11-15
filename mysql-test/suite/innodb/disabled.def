@@ -11,3 +11,5 @@
 ##############################################################################
 
 create-index-debug : MDEV-13680 InnoDB may crash when btr_page_alloc() fails
+log-file : fails in 10.3
+log_corruption : fails in 10.3
