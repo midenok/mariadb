@@ -1,4 +1,8 @@
--- source suite/versioning/common.inc
+# Windows timing is broken: sequential DML ops go to same time moment
+--source include/not_windows.inc
+
+--source suite/versioning/common.inc
+
 
 delimiter ~~;
 create function get_archive_table_name()
