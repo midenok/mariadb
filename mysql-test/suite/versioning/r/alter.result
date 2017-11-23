@@ -468,7 +468,6 @@ t	CREATE TABLE `t` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
 call verify_vtq;
 No	A	B	C	D
-1	1	1	1	1
 create or replace table t (a int) with system versioning engine=innodb;
 insert into t values (1), (2), (3);
 delete from t where a<3;
@@ -479,7 +478,6 @@ No	A	B	C	D
 alter table t add b int auto_increment unique;
 call verify_vtq;
 No	A	B	C	D
-1	1	1	1	1
 select * from t for system_time all;
 a	b
 1	-1
@@ -521,7 +519,6 @@ No	A	B	C	D
 alter table t add b tinyint auto_increment unique;
 call verify_vtq;
 No	A	B	C	D
-1	1	1	1	1
 select * from t for system_time all;
 a	b
 1	-1
