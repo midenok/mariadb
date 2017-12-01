@@ -268,7 +268,8 @@ rw_lock_free_func(
 	rw_lock_t*	lock)	/*!< in/out: rw-lock */
 {
 	ut_ad(rw_lock_validate(lock));
-	ut_a(lock->lock_word == X_LOCK_DECR);
+	ut_a(my_atomic_load32_explicit(&lock->lock_word,
+				       MY_MEMORY_ORDER_RELAXED) == X_LOCK_DECR);
 
 	mutex_enter(&rw_lock_list_mutex);
 
@@ -438,12 +439,10 @@ rw_lock_x_lock_wait_func(
 	sync_array_t*	sync_arr;
 	uint64_t	count_os_wait = 0;
 
-	ut_ad(lock->lock_word <= threshold);
+	ut_ad(my_atomic_load32_explicit(&lock->lock_word, MY_MEMORY_ORDER_RELAXED) <= threshold);
 
-	while (lock->lock_word < threshold) {
-
-
-		HMT_low();
+	HMT_low();
+	while (my_atomic_load32_explicit(&lock->lock_word, MY_MEMORY_ORDER_RELAXED) < threshold) {
 		if (srv_spin_wait_delay) {
 			ut_delay(ut_rnd_interval(0, srv_spin_wait_delay));
 		}
@@ -452,7 +451,6 @@ rw_lock_x_lock_wait_func(
 			i++;
 			continue;
 		}
-		HMT_medium();
 
 		/* If there is still a reader, then go to sleep.*/
 		++n_spins;
@@ -465,7 +463,7 @@ rw_lock_x_lock_wait_func(
 		i = 0;
 
 		/* Check lock_word to ensure wake-up isn't missed.*/
-		if (lock->lock_word < threshold) {
+		if (my_atomic_load32_explicit(&lock->lock_word, MY_MEMORY_ORDER_RELAXED) < threshold) {
 
 			++count_os_wait;
 
@@ -488,7 +486,6 @@ rw_lock_x_lock_wait_func(
 			sync_array_free_cell(sync_arr, cell);
 			break;
 		}
-		HMT_low();
 	}
 	HMT_medium();
 	rw_lock_stats.rw_x_spin_round_count.add(n_spins);
@@ -564,14 +561,18 @@ rw_lock_x_lock_low(
 					file_name, line);
 
 			} else {
+				int32_t lock_word = my_atomic_load32_explicit(&lock->lock_word,
+									      MY_MEMORY_ORDER_RELAXED);
 				/* At least one X lock by this thread already
 				exists. Add another. */
-				if (lock->lock_word == 0
-				    || lock->lock_word == -X_LOCK_HALF_DECR) {
-					lock->lock_word -= X_LOCK_DECR;
+				if (lock_word == 0
+				    || lock_word == -X_LOCK_HALF_DECR) {
+					my_atomic_add32_explicit(&lock->lock_word, -X_LOCK_DECR,
+								 MY_MEMORY_ORDER_RELAXED);
 				} else {
-					ut_ad(lock->lock_word <= -X_LOCK_DECR);
-					--lock->lock_word;
+					ut_ad(lock_word <= -X_LOCK_DECR);
+					my_atomic_add32_explicit(&lock->lock_word, -1,
+								 MY_MEMORY_ORDER_RELAXED);
 				}
 			}
 
@@ -623,6 +624,8 @@ rw_lock_sx_lock_low(
 		if (!pass && os_thread_eq(lock->writer_thread, thread_id)) {
 			/* This thread owns an X or SX lock */
 			if (lock->sx_recursive++ == 0) {
+				int32_t lock_word = my_atomic_load32_explicit(&lock->lock_word,
+									      MY_MEMORY_ORDER_RELAXED);
 				/* This thread is making first SX-lock request
 				and it must be holding at least one X-lock here
 				because:
@@ -642,12 +645,13 @@ rw_lock_sx_lock_low(
 				  thread working on this lock and it is safe to
 				  read and write to the lock_word. */
 
-				ut_ad((lock->lock_word == 0)
-				      || ((lock->lock_word <= -X_LOCK_DECR)
-					  && (lock->lock_word
+				ut_ad((lock_word == 0)
+				      || ((lock_word <= -X_LOCK_DECR)
+					  && (lock_word
 					      > -(X_LOCK_DECR
 						  + X_LOCK_HALF_DECR))));
-				lock->lock_word -= X_LOCK_HALF_DECR;
+				my_atomic_add32_explicit(&lock->lock_word, -X_LOCK_HALF_DECR,
+							 MY_MEMORY_ORDER_RELAXED);
 			}
 		} else {
 			/* Another thread locked before us */
@@ -709,7 +713,7 @@ lock_loop:
 		/* Spin waiting for the lock_word to become free */
 		HMT_low();
 		while (i < srv_n_spin_wait_rounds
-		       && lock->lock_word <= X_LOCK_HALF_DECR) {
+		       && my_atomic_load32_explicit(&lock->lock_word, MY_MEMORY_ORDER_RELAXED) <= X_LOCK_HALF_DECR) {
 
 			if (srv_spin_wait_delay) {
 				ut_delay(ut_rnd_interval(
@@ -815,7 +819,7 @@ lock_loop:
 
 		/* Spin waiting for the lock_word to become free */
 		while (i < srv_n_spin_wait_rounds
-		       && lock->lock_word <= X_LOCK_HALF_DECR) {
+		       && my_atomic_load32_explicit(&lock->lock_word, MY_MEMORY_ORDER_RELAXED) <= X_LOCK_HALF_DECR) {
 
 			if (srv_spin_wait_delay) {
 				ut_delay(ut_rnd_interval(
@@ -955,15 +959,17 @@ rw_lock_add_debug_info(
 	rw_lock_debug_mutex_exit();
 
 	if (pass == 0 && lock_type != RW_LOCK_X_WAIT) {
+		int32_t lock_word = my_atomic_load32_explicit(&lock->lock_word,
+							      MY_MEMORY_ORDER_RELAXED);
 
 		/* Recursive x while holding SX
 		(lock_type == RW_LOCK_X && lock_word == -X_LOCK_HALF_DECR)
 		is treated as not-relock (new lock). */
 
 		if ((lock_type == RW_LOCK_X
-		     && lock->lock_word <  -X_LOCK_HALF_DECR)
+		     && lock_word <  -X_LOCK_HALF_DECR)
 		    || (lock_type == RW_LOCK_SX
-		       && (lock->lock_word < 0 || lock->sx_recursive == 1))) {
+		       && (lock_word < 0 || lock->sx_recursive == 1))) {
 
 			sync_check_lock_validate(lock);
 			sync_check_lock_granted(lock);
@@ -1154,7 +1160,7 @@ rw_lock_list_print_info(
 
 		count++;
 
-		if (lock->lock_word != X_LOCK_DECR) {
+		if (my_atomic_load32_explicit(&lock->lock_word, MY_MEMORY_ORDER_RELAXED) != X_LOCK_DECR) {
 
 			fprintf(file, "RW-LOCK: %p ", (void*) lock);
 
