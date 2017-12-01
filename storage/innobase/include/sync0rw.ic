@@ -474,7 +474,7 @@ rw_lock_sx_unlock_func(
 		/* Last caller in a possible recursive chain. */
 		if (lock_word > 0) {
 			lock->writer_thread = 0;
-			ut_ad(lock_word <= INT32_MAX - X_LOCK_HALF_DECR);
+			ut_ad(lock_word <= INT_MAX32 - X_LOCK_HALF_DECR);
 
 			/* Last SX-lock owned by this thread, doesn't own X-lock.
 			ACQ_REL due to...
