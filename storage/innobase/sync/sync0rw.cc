@@ -891,7 +891,7 @@ rw_lock_validate(
 
 	ut_ad(lock);
 
-	lock_word = my_atomic_load32_explicit(&lock->lock_word,
+	lock_word = my_atomic_load32_explicit((int32*) &lock->lock_word,
 					      MY_MEMORY_ORDER_RELAXED);
 
 	ut_ad(lock->magic_n == RW_LOCK_MAGIC_N);
@@ -1160,7 +1160,7 @@ rw_lock_list_print_info(
 
 		count++;
 
-		if (my_atomic_load32_explicit(&lock->lock_word, MY_MEMORY_ORDER_RELAXED) != X_LOCK_DECR) {
+		if (my_atomic_load32_explicit((int32*) &lock->lock_word, MY_MEMORY_ORDER_RELAXED) != X_LOCK_DECR) {
 
 			fprintf(file, "RW-LOCK: %p ", (void*) lock);
 

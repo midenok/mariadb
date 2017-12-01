@@ -77,7 +77,7 @@ rw_lock_get_writer(
 /*===============*/
 	const rw_lock_t*	lock)	/*!< in: rw-lock */
 {
-	int32_t lock_word = my_atomic_load32_explicit(&lock->lock_word,
+	int32_t lock_word = my_atomic_load32_explicit((int32*) &lock->lock_word,
 						      MY_MEMORY_ORDER_RELAXED);
 
 	ut_ad(lock_word <= X_LOCK_DECR);
@@ -110,7 +110,7 @@ rw_lock_get_reader_count(
 /*=====================*/
 	const rw_lock_t*	lock)	/*!< in: rw-lock */
 {
-	int32_t lock_word = my_atomic_load32_explicit(&lock->lock_word,
+	int32_t lock_word = my_atomic_load32_explicit((int32*) &lock->lock_word,
 						      MY_MEMORY_ORDER_RELAXED);
 	ut_ad(lock_word <= X_LOCK_DECR);
 
@@ -147,7 +147,7 @@ rw_lock_get_x_lock_count(
 /*=====================*/
 	const rw_lock_t*	lock)	/*!< in: rw-lock */
 {
-	int32_t lock_copy = my_atomic_load32_explicit(&lock->lock_word,
+	int32_t lock_copy = my_atomic_load32_explicit((int32*) &lock->lock_word,
 						      MY_MEMORY_ORDER_RELAXED);
 	ut_ad(lock_copy <= X_LOCK_DECR);
 
@@ -181,7 +181,7 @@ rw_lock_get_sx_lock_count(
 	const rw_lock_t*	lock)	/*!< in: rw-lock */
 {
 #ifdef UNIV_DEBUG
-	int32_t lock_copy = my_atomic_load32_explicit(&lock->lock_word,
+	int32_t lock_copy = my_atomic_load32_explicit((int32*) &lock->lock_word,
 						      MY_MEMORY_ORDER_RELAXED);
 
 	ut_ad(lock_copy <= X_LOCK_DECR);
