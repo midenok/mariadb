@@ -1164,7 +1164,7 @@ rw_lock_list_print_info(
 
 			fprintf(file, "RW-LOCK: %p ", (void*) lock);
 
-			if (lock->waiters) {
+			if (my_atomic_load32_explicit((int32*) &lock->waiters, MY_MEMORY_ORDER_RELAXED)) {
 				fputs(" Waiters for the lock exist\n", file);
 			} else {
 				putc('\n', file);
