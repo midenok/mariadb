@@ -5499,27 +5499,25 @@ Remove statistics for dropped indexes, add statistics for created indexes
 and rename statistics for renamed indexes.
 @param ha_alter_info	Data used during in-place alter
 @param ctx		In-place ALTER TABLE context
-@param altered_table	MySQL table that is being altered
 @param table_name	Table name in MySQL
-@param thd		MySQL connection
-*/
+@param trx		transaction
+@return error code */
 static
-void
+dberr_t
 alter_stats_norebuild(
-/*==================*/
 	Alter_inplace_info*		ha_alter_info,
 	ha_innobase_inplace_ctx*	ctx,
-	TABLE*				altered_table,
 	const char*			table_name,
-	THD*				thd)
+	trx_t*				trx)
 {
+	dberr_t	err = DB_SUCCESS;
 	ulint	i;
 
 	DBUG_ENTER("alter_stats_norebuild");
 	DBUG_ASSERT(!ctx->need_rebuild());
 
 	if (!dict_stats_is_persistent_enabled(ctx->new_table)) {
-		DBUG_VOID_RETURN;
+		DBUG_RETURN(err);
 	}
 
 	/* TODO: This will not drop the (unused) statistics for
@@ -5536,10 +5534,13 @@ alter_stats_norebuild(
 
 		char	errstr[1024];
 
-		if (dict_stats_drop_index(
-			    ctx->new_table->name, key->name,
-			    errstr, sizeof errstr) != DB_SUCCESS) {
-			push_warning(thd,
+		dberr_t err2 = dict_stats_drop_index(
+			ctx->new_table->name, key->name,
+			errstr, sizeof errstr, trx);
+
+		if (err2 != DB_SUCCESS) {
+			err = err2;
+			push_warning(trx->mysql_thd,
 				     Sql_condition::WARN_LEVEL_WARN,
 				     ER_LOCK_WAIT_TIMEOUT, errstr);
 		}
@@ -5550,12 +5551,15 @@ alter_stats_norebuild(
 		DBUG_ASSERT(index->table == ctx->new_table);
 
 		if (!(index->type & DICT_FTS)) {
-			dict_stats_init(ctx->new_table);
-			dict_stats_update_for_index(index);
+			dict_stats_init(ctx->new_table, trx);
+			dberr_t err2 = dict_stats_update_for_index(index, trx);
+			if (err2 != DB_SUCCESS) {
+				err = err2;
+			}
 		}
 	}
 
-	DBUG_VOID_RETURN;
+	DBUG_RETURN(err);
 }
 
 /** Adjust the persistent statistics after rebuilding ALTER TABLE.
@@ -5563,30 +5567,44 @@ Remove statistics for dropped indexes, add statistics for created indexes
 and rename statistics for renamed indexes.
 @param table		InnoDB table that was rebuilt by ALTER TABLE
 @param table_name	Table name in MySQL
-@param thd		MySQL connection
-*/
+@param trx		transaction
+@return error code */
 static
-void
+dberr_t
 alter_stats_rebuild(
-/*================*/
 	dict_table_t*	table,
 	const char*	table_name,
-	THD*		thd)
+	trx_t*		trx)
 {
 	DBUG_ENTER("alter_stats_rebuild");
 
 	if (dict_table_is_discarded(table)
 	    || !dict_stats_is_persistent_enabled(table)) {
-		DBUG_VOID_RETURN;
+		DBUG_RETURN(DB_SUCCESS);
 	}
 
-	dberr_t	ret;
+	char	errstr[1024];
+	mutex_enter(&dict_sys->mutex);
+	dberr_t	ret = dict_stats_drop_table(table->name,
+					    errstr, sizeof errstr, trx);
+	mutex_exit(&dict_sys->mutex);
+	if (ret != DB_SUCCESS) {
+		push_warning_printf(
+			trx->mysql_thd,
+			Sql_condition::WARN_LEVEL_WARN,
+			ER_ALTER_INFO,
+			"Deleting persistent statistics"
+			" for rebuilt table '%s' in"
+			" InnoDB failed: %s",
+			table_name, errstr);
+		DBUG_RETURN(ret);
+	}
 
-	ret = dict_stats_update(table, DICT_STATS_RECALC_PERSISTENT);
+	ret = dict_stats_update(table, DICT_STATS_RECALC_PERSISTENT, trx);
 
 	if (ret != DB_SUCCESS) {
 		push_warning_printf(
-			thd,
+			trx->mysql_thd,
 			Sql_condition::WARN_LEVEL_WARN,
 			ER_ALTER_INFO,
 			"Error updating stats for table '%s' "
@@ -5594,7 +5612,7 @@ alter_stats_rebuild(
 			table_name, ut_strerr(ret));
 	}
 
-	DBUG_VOID_RETURN;
+	DBUG_RETURN(ret);
 }
 
 #ifndef DBUG_OFF
@@ -6104,31 +6122,6 @@ foreign_fail:
 		ut_a(fts_check_cached_index(ctx->new_table));
 
 		if (new_clustered) {
-			/* Since the table has been rebuilt, we remove
-			all persistent statistics corresponding to the
-			old copy of the table (which was renamed to
-			ctx->tmp_name). */
-
-			char	errstr[1024];
-
-			DBUG_ASSERT(0 == strcmp(ctx->old_table->name,
-						ctx->tmp_name));
-
-			if (dict_stats_drop_table(
-				    ctx->new_table->name,
-				    errstr, sizeof(errstr))
-			    != DB_SUCCESS) {
-				push_warning_printf(
-					user_thd,
-					Sql_condition::WARN_LEVEL_WARN,
-					ER_ALTER_INFO,
-					"Deleting persistent statistics"
-					" for rebuilt table '%s' in"
-					" InnoDB failed: %s",
-					table->s->table_name.str,
-					errstr);
-			}
-
 			DBUG_EXECUTE_IF("ib_ddl_crash_before_commit",
 					DBUG_SUICIDE(););
 
@@ -6157,7 +6150,6 @@ foreign_fail:
 	}
 
 	row_mysql_unlock_data_dictionary(trx);
-	trx_free_for_mysql(trx);
 
 	/* Rebuild index translation table now for temporary tables if we are
 	restoring secondary keys, as ha_innobase::open will not be called for
@@ -6170,13 +6162,17 @@ foreign_fail:
 						      ctx0->new_table,
 						      share)) {
 			MONITOR_ATOMIC_DEC(MONITOR_PENDING_ALTER_TABLE);
+			trx_free_for_mysql(trx);
 			DBUG_RETURN(true);
 		}
 	}
 
+	++trx->will_lock;
 	/* TODO: The following code could be executed
 	while allowing concurrent access to the table
 	(MDL downgrade). */
+	trx->mysql_thd = user_thd;
+	dberr_t stats_err = DB_SUCCESS;
 
 	if (new_clustered) {
 		for (inplace_alter_handler_ctx** pctx = ctx_array;
@@ -6185,10 +6181,11 @@ foreign_fail:
 				= static_cast<ha_innobase_inplace_ctx*>
 				(*pctx);
 			DBUG_ASSERT(ctx->need_rebuild());
-
-			alter_stats_rebuild(
-				ctx->new_table, table->s->table_name.str,
-				user_thd);
+			stats_err = alter_stats_rebuild(
+				ctx->new_table, table->s->table_name.str, trx);
+			if (stats_err != DB_SUCCESS) {
+				break;
+			}
 			DBUG_INJECT_CRASH("ib_commit_inplace_crash",
 					  crash_inject_count++);
 		}
@@ -6200,13 +6197,24 @@ foreign_fail:
 				(*pctx);
 			DBUG_ASSERT(!ctx->need_rebuild());
 
-			alter_stats_norebuild(
-				ha_alter_info, ctx, altered_table,
-				table->s->table_name.str, user_thd);
+			stats_err = alter_stats_norebuild(
+				ha_alter_info, ctx,
+				table->s->table_name.str, trx);
+			if (stats_err != DB_SUCCESS) {
+				break;
+			}
 			DBUG_INJECT_CRASH("ib_commit_inplace_crash",
 					  crash_inject_count++);
 		}
 	}
+
+	if (stats_err != DB_SUCCESS) {
+		trx_rollback_to_savepoint(trx, NULL);
+	} else {
+		trx_commit_for_mysql(trx);
+	}
+
+	trx_free_for_mysql(trx);
 
 	/* TODO: Also perform DROP TABLE and DROP INDEX after
 	the MDL downgrade. */

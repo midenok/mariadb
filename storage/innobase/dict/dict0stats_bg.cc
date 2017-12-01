@@ -276,8 +276,7 @@ Get the first table that has been added for auto recalc and eventually
 update its stats. */
 static
 void
-dict_stats_process_entry_from_recalc_pool()
-/*=======================================*/
+dict_stats_process_entry_from_recalc_pool(trx_t* trx)
 {
 	table_id_t	table_id;
 
@@ -330,8 +329,10 @@ dict_stats_process_entry_from_recalc_pool()
 		dict_stats_recalc_pool_add(table);
 
 	} else {
-
-		dict_stats_update(table, DICT_STATS_RECALC_PERSISTENT);
+		dict_stats_update(table, DICT_STATS_RECALC_PERSISTENT, trx);
+		if (trx->state != TRX_STATE_NOT_STARTED) {
+			trx_commit_for_mysql(trx);
+		}
 	}
 
 	mutex_enter(&dict_sys->mutex);
@@ -358,6 +359,8 @@ DECLARE_THREAD(dict_stats_thread)(
 	my_thread_init();
 	ut_a(!srv_read_only_mode);
 
+	trx_t* trx = trx_allocate_for_background();
+
 	while (!dict_stats_start_shutdown) {
 
 		/* Wake up periodically even if not signaled. This is
@@ -372,11 +375,12 @@ DECLARE_THREAD(dict_stats_thread)(
 			break;
 		}
 
-		dict_stats_process_entry_from_recalc_pool();
+		dict_stats_process_entry_from_recalc_pool(trx);
 
 		os_event_reset(dict_stats_event);
 	}
 
+	trx_free_for_background(trx);
 	srv_dict_stats_thread_active = false;
 
 	os_event_set(dict_stats_shutdown_event);

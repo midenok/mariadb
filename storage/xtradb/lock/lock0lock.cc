@@ -1,7 +1,7 @@
 /*****************************************************************************
 
 Copyright (c) 1996, 2016, Oracle and/or its affiliates. All Rights Reserved.
-Copyright (c) 2014, 2015, MariaDB Corporation
+Copyright (c) 2014, 2017, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -2001,6 +2001,16 @@ lock_rec_enqueue_waiting(
 		break;
 	case TRX_DICT_OP_TABLE:
 	case TRX_DICT_OP_INDEX:
+		if (trx->dict_operation_lock_mode != RW_X_LATCH) {
+		} else if (!strcmp(index->table->name,
+				   "mysql/innodb_table_stats")
+			   || !strcmp(index->table->name,
+				      "mysql/innodb_index_stats")) {
+			/* Statistics can be updated as part of a DDL
+			transaction, but only as the very last operation. */
+			return(DB_QUE_THR_SUSPENDED);
+		}
+
 		ut_print_timestamp(stderr);
 		fputs("  InnoDB: Error: a record lock wait happens"
 		      " in a dictionary operation!\n"
@@ -4468,6 +4478,15 @@ lock_table_enqueue_waiting(
 		break;
 	case TRX_DICT_OP_TABLE:
 	case TRX_DICT_OP_INDEX:
+		if (trx->dict_operation_lock_mode != RW_X_LATCH) {
+		} else if (!strcmp(table->name, "mysql/innodb_table_stats")
+			   || !strcmp(table->name,
+				      "mysql/innodb_index_stats")) {
+			/* Statistics can be updated as part of a DDL
+			transaction, but only as the very last operation. */
+			return(DB_QUE_THR_SUSPENDED);
+		}
+
 		ut_print_timestamp(stderr);
 		fputs("  InnoDB: Error: a table lock wait happens"
 		      " in a dictionary operation!\n"

@@ -1142,7 +1142,7 @@ row_update_statistics_if_needed(
 
 		ut_ad(!mutex_own(&dict_sys->mutex));
 		/* this will reset table->stat_modified_counter to 0 */
-		dict_stats_update(table, DICT_STATS_RECALC_TRANSIENT);
+		dict_stats_update(table, DICT_STATS_RECALC_TRANSIENT, NULL);
 	}
 }
 
@@ -3253,31 +3253,9 @@ run_again:
 		que_thr_stop_for_mysql_no_error(thr, trx);
 	} else {
 		que_thr_stop_for_mysql(thr);
+		ut_ad(err != DB_QUE_THR_SUSPENDED);
 
-		if (err != DB_QUE_THR_SUSPENDED) {
-			ibool	was_lock_wait;
-
-			was_lock_wait = row_mysql_handle_errors(
-				&err, trx, thr, NULL);
-
-			if (was_lock_wait) {
-				goto run_again;
-			}
-		} else {
-			que_thr_t*	run_thr;
-			que_node_t*	parent;
-
-			parent = que_node_get_parent(thr);
-
-			run_thr = que_fork_start_command(
-				static_cast<que_fork_t*>(parent));
-
-			ut_a(run_thr == thr);
-
-			/* There was a lock wait but the thread was not
-			in a ready to run or running state. */
-			trx->error_state = DB_LOCK_WAIT;
-
+		if (row_mysql_handle_errors(&err, trx, thr, NULL)) {
 			goto run_again;
 		}
 	}
@@ -3782,7 +3760,8 @@ funct_exit:
 
 	row_mysql_unlock_data_dictionary(trx);
 
-	dict_stats_update(table, DICT_STATS_EMPTY_TABLE);
+	dict_stats_update(table, DICT_STATS_EMPTY_TABLE, trx);
+	trx_commit_for_mysql(trx);
 
 	trx->op_info = "";
 
@@ -3970,17 +3949,6 @@ row_drop_table_for_mysql(
 	if (!dict_table_is_temporary(table)) {
 
 		dict_stats_recalc_pool_del(table);
-
-		/* Remove stats for this table and all of its indexes from the
-		persistent storage if it exists and if there are stats for this
-		table in there. This function creates its own trx and commits
-		it. */
-		char	errstr[1024];
-		err = dict_stats_drop_table(name, errstr, sizeof(errstr));
-
-		if (err != DB_SUCCESS) {
-			ib_logf(IB_LOG_LEVEL_WARN, "%s", errstr);
-		}
 	}
 
 	/* Move the table the the non-LRU list so that it isn't
@@ -4282,13 +4250,19 @@ row_drop_table_for_mysql(
 		ibool	is_temp;
 
 	case DB_SUCCESS:
-		/* Clone the name, in case it has been allocated
-		from table->heap, which will be freed by
-		dict_table_remove_from_cache(table) below. */
 		space_id = table->space;
 		ibd_file_missing = table->ibd_file_missing;
 
 		is_temp = DICT_TF2_FLAG_IS_SET(table, DICT_TF2_TEMPORARY);
+
+		if (!is_temp) {
+			char	errstr[1024];
+			if (dict_stats_drop_table(name, errstr, sizeof errstr,
+						  trx)
+			    != DB_SUCCESS) {
+				ib_logf(IB_LOG_LEVEL_WARN, "%s", errstr);
+			}
+		}
 
 		/* If there is a temp path then the temp flag is set.
 		However, during recovery or reloading the table object

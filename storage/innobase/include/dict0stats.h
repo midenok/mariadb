@@ -1,6 +1,7 @@
 /*****************************************************************************
 
 Copyright (c) 2009, 2016, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2017, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -111,13 +112,12 @@ dict_stats_auto_recalc_is_enabled(
 /*==============================*/
 	const dict_table_t*	table);	/*!< in: table */
 
-/*********************************************************************//**
-Initialize table's stats for the first time when opening a table. */
+/** Initialize table statistics for the first time when opening a table.
+@param[in,out]	table	freshly opened table
+@param[in,out]	trx	transaction */
 UNIV_INLINE
 void
-dict_stats_init(
-/*============*/
-	dict_table_t*	table);	/*!< in/out: table */
+dict_stats_init(dict_table_t* table, trx_t* trx);
 
 /*********************************************************************//**
 Deinitialize table's stats after the last close of the table. This is
@@ -129,71 +129,72 @@ dict_stats_deinit(
 	dict_table_t*	table)	/*!< in/out: table */
 	MY_ATTRIBUTE((nonnull));
 
-/*********************************************************************//**
-Calculates new estimates for table and index statistics. The statistics
-are used in query optimization.
+/** Calculate new estimates for table and index statistics.
+@param[in,out]	table			table
+@param[in]	stats_upd_option	how to update statistics
+@param[in,out]	trx			transaction
 @return DB_* error code or DB_SUCCESS */
 UNIV_INTERN
 dberr_t
 dict_stats_update(
-/*==============*/
-	dict_table_t*		table,	/*!< in/out: table */
-	dict_stats_upd_option_t	stats_upd_option);
-					/*!< in: whether to (re) calc
-					the stats or to fetch them from
-					the persistent storage */
+	dict_table_t*		table,
+	dict_stats_upd_option_t	stats_upd_option,
+	trx_t*			trx);
 
-/*********************************************************************//**
-Removes the information for a particular index's stats from the persistent
-storage if it exists and if there is data stored for this index.
-This function creates its own trx and commits it.
+/** Remove the persistent statistics for an index.
+@param[in]	db_and_table	schema and table name, e.g., 'db/table'
+@param[in]	iname		index name
+@param[out]	errstr		error message (when not returning DB_SUCCESS)
+@param[in]	errstr_sz	sizeof errstr
+@param[in,out]	trx		transaction
 @return DB_SUCCESS or error code */
 UNIV_INTERN
 dberr_t
 dict_stats_drop_index(
-/*==================*/
-	const char*	tname,	/*!< in: table name */
-	const char*	iname,	/*!< in: index name */
-	char*		errstr, /*!< out: error message if != DB_SUCCESS
-				is returned */
-	ulint		errstr_sz);/*!< in: size of the errstr buffer */
+	const char*	db_and_table,
+	const char*	iname,
+	char*		errstr,
+	size_t		errstr_sz,
+	trx_t*		trx);
 
-/*********************************************************************//**
-Removes the statistics for a table and all of its indexes from the
-persistent storage if it exists and if there is data stored for the table.
-This function creates its own transaction and commits it.
+/** Remove the persistent statistics for a table and all of its indexes.
+@param[in]	db_and_table	schema and table name, e.g., 'db/table'
+@param[out]	errstr		error message (when not returning DB_SUCCESS)
+@param[in]	errstr_sz	sizeof errstr
+@param[in,out]	trx		transaction
 @return DB_SUCCESS or error code */
 UNIV_INTERN
 dberr_t
 dict_stats_drop_table(
-/*==================*/
-	const char*	table_name,	/*!< in: table name */
-	char*		errstr,		/*!< out: error message
-					if != DB_SUCCESS is returned */
-	ulint		errstr_sz);	/*!< in: size of errstr buffer */
+	const char*	db_and_table,
+	char*		errstr,
+	size_t		errstr_sz,
+	trx_t*		trx);
 
-/*********************************************************************//**
-Fetches or calculates new estimates for index statistics. */
+/** Calculate index statistics.
+@param[in,out]	index	index tree
+@param[in,out]	trx	transaction (for persistent statistics)
+@return DB_SUCCESS or error code */
 UNIV_INTERN
-void
-dict_stats_update_for_index(
-/*========================*/
-	dict_index_t*	index)	/*!< in/out: index */
+dberr_t
+dict_stats_update_for_index(dict_index_t* index, trx_t* trx)
 	MY_ATTRIBUTE((nonnull));
 
-/*********************************************************************//**
-Renames a table in InnoDB persistent stats storage.
-This function creates its own transaction and commits it.
+/** Rename a table in the InnoDB persistent statistics storage.
+@param[in]	old_name	old schema and table name, e.g., 'db/table'
+@param[in]	new_name	new schema and table name, e.g., 'db/table'
+@param[out]	errstr		error message (when not returning DB_SUCCESS)
+@param[in]	errstr_sz	sizeof errstr
+@param[in,out]	trx		transaction
 @return DB_SUCCESS or error code */
 UNIV_INTERN
 dberr_t
 dict_stats_rename_table(
-/*====================*/
-	const char*	old_name,	/*!< in: old table name */
-	const char*	new_name,	/*!< in: new table name */
-	char*		errstr,		/*!< out: error string if != DB_SUCCESS
-					is returned */
-	size_t		errstr_sz);	/*!< in: errstr size */
+	const char*	old_name,
+	const char*	new_name,
+	char*		errstr,
+	size_t		errstr_sz,
+	trx_t*		trx);
 
 #ifndef UNIV_NONINL
 #include "dict0stats.ic"
