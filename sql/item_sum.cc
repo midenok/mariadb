@@ -1291,7 +1291,7 @@ Item_sum_sp::fix_fields(THD *thd, Item **ref)
     if (args[i]->fix_fields(thd, args + i) || args[i]->check_cols(1))
       return TRUE;
     set_if_bigger(decimals, args[i]->decimals);
-    with_subselect|= args[i]->with_subselect;
+    m_with_subquery|= args[i]->with_subquery();
     with_window_func|= args[i]->with_window_func;
   }
   result_field= NULL;

@@ -1333,8 +1333,8 @@ public:
   {
     return sp_result_field;
   }
-  Item *get_copy(THD *thd, MEM_ROOT *mem_root)
-  { return get_item_copy<Item_sum_sp>(thd, mem_root, this); }
+  Item *get_copy(THD *thd)
+  { return get_item_copy<Item_sum_sp>(thd, this); }
 };
 
 /* Items to get the value of a stored sum function */
