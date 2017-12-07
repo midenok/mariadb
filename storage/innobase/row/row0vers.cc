@@ -126,7 +126,7 @@ row_vers_impl_x_locked_low(
 		if (corrupt) {
 			lock_report_trx_id_insanity(
 				trx_id, clust_rec, clust_index, clust_offsets,
-				trx_sys_get_max_trx_id());
+				trx_sys->get_max_trx_id());
 		}
 		mem_heap_free(heap);
 		DBUG_RETURN(0);

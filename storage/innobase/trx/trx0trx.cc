@@ -1167,8 +1167,8 @@ trx_t::assign_temp_rseg()
 	rsegs.m_noredo.rseg = rseg;
 
 	if (id == 0) {
+		id = trx_sys->get_new_trx_id();
 		mutex_enter(&trx_sys->mutex);
-		id = trx_sys_get_new_trx_id();
 		trx_sys->rw_trx_ids.push_back(id);
 		trx_sys->rw_trx_set.insert(TrxTrack(id, this));
 		mutex_exit(&trx_sys->mutex);
@@ -1257,7 +1257,7 @@ trx_start_low(
 
 		trx_sys_mutex_enter();
 
-		trx->id = trx_sys_get_new_trx_id();
+		trx->id = trx_sys->get_new_trx_id();
 
 		trx_sys->rw_trx_ids.push_back(trx->id);
 
@@ -1292,12 +1292,11 @@ trx_start_low(
 			to write to the temporary table. */
 
 			if (read_write) {
-
-				trx_sys_mutex_enter();
-
 				ut_ad(!srv_read_only_mode);
 
-				trx->id = trx_sys_get_new_trx_id();
+				trx->id = trx_sys->get_new_trx_id();
+
+				trx_sys_mutex_enter();
 
 				trx_sys->rw_trx_ids.push_back(trx->id);
 
@@ -1340,7 +1339,7 @@ trx_serialise(trx_t* trx, trx_rseg_t* rseg)
 
 	trx_sys_mutex_enter();
 
-	trx->no = trx_sys_get_new_trx_id();
+	trx->no = trx_sys->get_new_trx_id();
 
 	/* Track the minimum serialisation number. */
 	UT_LIST_ADD_LAST(trx_sys->serialisation_list, trx);
@@ -3040,6 +3039,7 @@ trx_set_rw_mode(
 	ut_ad(!trx->in_rw_trx_list);
 	ut_ad(!trx_is_autocommit_non_locking(trx));
 	ut_ad(!trx->read_only);
+	ut_ad(trx->id == 0);
 
 	if (high_level_read_only) {
 		return;
@@ -3058,8 +3058,7 @@ trx_set_rw_mode(
 
 	mutex_enter(&trx_sys->mutex);
 
-	ut_ad(trx->id == 0);
-	trx->id = trx_sys_get_new_trx_id();
+	trx->id = trx_sys->get_new_trx_id();
 
 	trx_sys->rw_trx_ids.push_back(trx->id);
 
