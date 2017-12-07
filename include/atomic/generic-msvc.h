@@ -61,48 +61,16 @@ static inline int64 my_atomic_add64(int64 volatile *a, int64 v)
   return (int64)InterlockedExchangeAdd64((volatile LONGLONG*)a, (LONGLONG)v);
 }
 
-static inline int32 my_atomic_load32(int32 volatile *a)
-{
-  return (int32)InterlockedCompareExchange((volatile LONG *)a, 0, 0);
-}
+#define my_atomic_load32(a) (int32) InterlockedCompareExchange((volatile LONG *) a, 0, 0)
+#define my_atomic_load64(a) (int64) InterlockedCompareExchange64((volatile LONGLONG *) a, 0, 0)
+#define my_atomic_loadptr(a) InterlockedCompareExchangePointer(a, 0, 0)
 
-static inline int64 my_atomic_load64(int64 volatile *a)
-{
-  return (int64)InterlockedCompareExchange64((volatile LONGLONG *)a, 0, 0);
-}
+#define my_atomic_fas32(a, v) (int32) InterlockedExchange((volatile LONG *) a, v)
+#define my_atomic_fas64(a, v) (int64) InterlockedExchange64((volatile LONGLONG *) a, v)
+#define my_atomic_fasptr(a, v) InterlockedExchangePointer(a, v)
 
-static inline void* my_atomic_loadptr(void * volatile *a)
-{
-  return InterlockedCompareExchangePointer(a, 0, 0);
-}
+#define my_atomic_store32(a, v) (void) InterlockedExchange((volatile LONG *) a, v)
+#define my_atomic_store64(a, v) (void) InterlockedExchange64((volatile LONGLONG *) a, v)
+#define my_atomic_storeptr(a, v) (void) InterlockedExchangePointer(a, v)
 
-static inline int32 my_atomic_fas32(int32 volatile *a, int32 v)
-{
-  return (int32)InterlockedExchange((volatile LONG*)a, v);
-}
-
-static inline int64 my_atomic_fas64(int64 volatile *a, int64 v)
-{
-  return (int64)InterlockedExchange64((volatile LONGLONG*)a, v);
-}
-
-static inline void * my_atomic_fasptr(void * volatile *a, void * v)
-{
-  return InterlockedExchangePointer(a, v);
-}
-
-static inline void my_atomic_store32(int32 volatile *a, int32 v)
-{
-  (void)InterlockedExchange((volatile LONG*)a, v);
-}
-
-static inline void my_atomic_store64(int64 volatile *a, int64 v)
-{
-  (void)InterlockedExchange64((volatile LONGLONG*)a, v);
-}
-
-static inline void my_atomic_storeptr(void * volatile *a, void *v)
-{
-  (void)InterlockedExchangePointer(a, v);
-}
 #endif /* ATOMIC_MSC_INCLUDED */

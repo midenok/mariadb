@@ -58,49 +58,16 @@ static inline int64 my_atomic_add64(int64 volatile *a, int64 v)
   return __sync_fetch_and_add(a, v);
 }
 
-static inline int32 my_atomic_fas32(int32 volatile *a, int32 v)
-{
-  return __sync_lock_test_and_set(a, v);
-}
+#define my_atomic_fas32(a, v) __sync_lock_test_and_set(a, v)
+#define my_atomic_fas64(a, v) __sync_lock_test_and_set(a, v)
+#define my_atomic_fasptr(a, v) __sync_lock_test_and_set(a, v)
 
-static inline int64 my_atomic_fas64(int64 volatile *a, int64 v)
-{
-  return __sync_lock_test_and_set(a, v);
-}
+#define my_atomic_load32(a) (typeof(*a)) __sync_fetch_and_or((int32*) a, 0)
+#define my_atomic_load64(a) (typeof(*a)) __sync_fetch_and_or(int64*) a, 0)
+#define my_atomic_loadptr(a) (typeof(*a)) __sync_fetch_and_or((void*) a, 0)
 
-static inline void * my_atomic_fasptr(void * volatile *a, void * v)
-{
-  return __sync_lock_test_and_set(a, v);
-}
-
-static inline int32 my_atomic_load32(int32 volatile *a)
-{
-  return __sync_fetch_and_or(a, 0);
-}
-
-static inline int64 my_atomic_load64(int64 volatile *a)
-{
-  return __sync_fetch_and_or(a, 0);
-}
-
-static inline void* my_atomic_loadptr(void * volatile *a)
-{
-  return __sync_fetch_and_or(a, 0);
-}
-
-static inline void my_atomic_store32(int32 volatile *a, int32 v)
-{
-  (void) __sync_lock_test_and_set(a, v);
-}
-
-static inline void my_atomic_store64(int64 volatile *a, int64 v)
-{
-  (void) __sync_lock_test_and_set(a, v);
-}
-
-static inline void my_atomic_storeptr(void * volatile *a, void *v)
-{
-  (void) __sync_lock_test_and_set(a, v);
-}
+#define my_atomic_store32(a, v) (void) __sync_lock_test_and_set(a, v)
+#define my_atomic_store64(a, v) (void) __sync_lock_test_and_set(a, v)
+#define my_atomic_storeptr(a, v) (void) __sync_lock_test_and_set(a, v)
 
 #endif /* GCC_SYNC_INCLUDED */

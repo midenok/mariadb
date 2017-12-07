@@ -361,7 +361,7 @@ lock_loop:
 
 		/* Set waiters before checking lock_word to ensure wake-up
 		signal is sent. This may lead to some unnecessary signals. */
-		my_atomic_fas32_explicit((int32*) &lock->waiters, 1, MY_MEMORY_ORDER_ACQUIRE);
+		my_atomic_fas32_explicit(&lock->waiters, 1, MY_MEMORY_ORDER_ACQUIRE);
 
 		if (rw_lock_s_lock_low(lock, pass, file_name, line)) {
 
@@ -624,8 +624,6 @@ rw_lock_sx_lock_low(
 		if (!pass && os_thread_eq(lock->writer_thread, thread_id)) {
 			/* This thread owns an X or SX lock */
 			if (lock->sx_recursive++ == 0) {
-				int32_t lock_word = my_atomic_load32_explicit(&lock->lock_word,
-									      MY_MEMORY_ORDER_RELAXED);
 				/* This thread is making first SX-lock request
 				and it must be holding at least one X-lock here
 				because:
@@ -645,13 +643,17 @@ rw_lock_sx_lock_low(
 				  thread working on this lock and it is safe to
 				  read and write to the lock_word. */
 
+#ifdef UNIV_DEBUG
+				int32_t lock_word =
+#endif
+				my_atomic_add32_explicit(&lock->lock_word, -X_LOCK_HALF_DECR,
+							 MY_MEMORY_ORDER_RELAXED);
+
 				ut_ad((lock_word == 0)
 				      || ((lock_word <= -X_LOCK_DECR)
 					  && (lock_word
 					      > -(X_LOCK_DECR
 						  + X_LOCK_HALF_DECR))));
-				my_atomic_add32_explicit(&lock->lock_word, -X_LOCK_HALF_DECR,
-							 MY_MEMORY_ORDER_RELAXED);
 			}
 		} else {
 			/* Another thread locked before us */
@@ -743,7 +745,7 @@ lock_loop:
 
 	/* Waiters must be set before checking lock_word, to ensure signal
 	is sent. This could lead to a few unnecessary wake-up signals. */
-	my_atomic_fas32_explicit((int32*) &lock->waiters, 1, MY_MEMORY_ORDER_ACQUIRE);
+	my_atomic_fas32_explicit(&lock->waiters, 1, MY_MEMORY_ORDER_ACQUIRE);
 
 	if (rw_lock_x_lock_low(lock, pass, file_name, line)) {
 		sync_array_free_cell(sync_arr, cell);
@@ -848,7 +850,7 @@ lock_loop:
 
 	/* Waiters must be set before checking lock_word, to ensure signal
 	is sent. This could lead to a few unnecessary wake-up signals. */
-	my_atomic_fas32_explicit((int32*) &lock->waiters, 1, MY_MEMORY_ORDER_ACQUIRE);
+	my_atomic_fas32_explicit(&lock->waiters, 1, MY_MEMORY_ORDER_ACQUIRE);
 
 	if (rw_lock_sx_lock_low(lock, pass, file_name, line)) {
 
@@ -891,11 +893,11 @@ rw_lock_validate(
 
 	ut_ad(lock);
 
-	lock_word = my_atomic_load32_explicit((int32*) &lock->lock_word,
+	lock_word = my_atomic_load32_explicit(&lock->lock_word,
 					      MY_MEMORY_ORDER_RELAXED);
 
 	ut_ad(lock->magic_n == RW_LOCK_MAGIC_N);
-	ut_ad(my_atomic_load32_explicit((int32*) &lock->waiters,
+	ut_ad(my_atomic_load32_explicit(&lock->waiters,
 					MY_MEMORY_ORDER_RELAXED) < 2);
 	ut_ad(lock_word > -(2 * X_LOCK_DECR));
 	ut_ad(lock_word <= X_LOCK_DECR);
@@ -1160,12 +1162,12 @@ rw_lock_list_print_info(
 
 		count++;
 
-		if (my_atomic_load32_explicit((int32*) &lock->lock_word, MY_MEMORY_ORDER_RELAXED) != X_LOCK_DECR) {
+		if (my_atomic_load32_explicit(&lock->lock_word, MY_MEMORY_ORDER_RELAXED) != X_LOCK_DECR) {
 
 			fprintf(file, "RW-LOCK: %p ", (void*) lock);
 
-			if (my_atomic_load32_explicit((int32*) &lock->waiters, MY_MEMORY_ORDER_RELAXED)) {
-				fputs(" Waiters for the lock exist\n", file);
+			if (int32_t waiters= my_atomic_load32_explicit(&lock->waiters, MY_MEMORY_ORDER_RELAXED)) {
+				fprintf(file, " (%d waiters)\n", waiters);
 			} else {
 				putc('\n', file);
 			}

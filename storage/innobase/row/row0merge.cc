@@ -1984,7 +1984,7 @@ row_merge_read_clustered_index(
 			}
 
 			if (dbug_run_purge
-			    || my_atomic_load32_explicit((int32*) &dict_index_get_lock(clust_index)->waiters,
+			    || my_atomic_load32_explicit(&clust_index->lock.waiters,
 							 MY_MEMORY_ORDER_RELAXED)) {
 				/* There are waiters on the clustered
 				index tree lock, likely the purge

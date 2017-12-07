@@ -77,7 +77,7 @@ rw_lock_get_writer(
 /*===============*/
 	const rw_lock_t*	lock)	/*!< in: rw-lock */
 {
-	int32_t lock_word = my_atomic_load32_explicit((int32*) &lock->lock_word,
+	int32_t lock_word = my_atomic_load32_explicit(&lock->lock_word,
 						      MY_MEMORY_ORDER_RELAXED);
 
 	ut_ad(lock_word <= X_LOCK_DECR);
@@ -110,7 +110,7 @@ rw_lock_get_reader_count(
 /*=====================*/
 	const rw_lock_t*	lock)	/*!< in: rw-lock */
 {
-	int32_t lock_word = my_atomic_load32_explicit((int32*) &lock->lock_word,
+	int32_t lock_word = my_atomic_load32_explicit(&lock->lock_word,
 						      MY_MEMORY_ORDER_RELAXED);
 	ut_ad(lock_word <= X_LOCK_DECR);
 
@@ -147,7 +147,7 @@ rw_lock_get_x_lock_count(
 /*=====================*/
 	const rw_lock_t*	lock)	/*!< in: rw-lock */
 {
-	int32_t lock_copy = my_atomic_load32_explicit((int32*) &lock->lock_word,
+	int32_t lock_copy = my_atomic_load32_explicit(&lock->lock_word,
 						      MY_MEMORY_ORDER_RELAXED);
 	ut_ad(lock_copy <= X_LOCK_DECR);
 
@@ -181,7 +181,7 @@ rw_lock_get_sx_lock_count(
 	const rw_lock_t*	lock)	/*!< in: rw-lock */
 {
 #ifdef UNIV_DEBUG
-	int32_t lock_copy = my_atomic_load32_explicit((int32*) &lock->lock_word,
+	int32_t lock_copy = my_atomic_load32_explicit(&lock->lock_word,
 						      MY_MEMORY_ORDER_RELAXED);
 
 	ut_ad(lock_copy <= X_LOCK_DECR);
@@ -324,14 +324,12 @@ rw_lock_x_lock_func_nowait(
 			/* There are 1 x-locks */
 			my_atomic_add32_explicit(&lock->lock_word, -X_LOCK_DECR,
 						 MY_MEMORY_ORDER_RELAXED);
-			/* Watch for too many recursive locks */
-			ut_ad(oldval - X_LOCK_DECR < 0);
 		} else if (oldval <= -X_LOCK_DECR) {
 			/* There are 2 or more x-locks */
 			my_atomic_add32_explicit(&lock->lock_word, -1,
 						 MY_MEMORY_ORDER_RELAXED);
 			/* Watch for too many recursive locks */
-			ut_ad(oldval - 1 < 0);
+			ut_ad(oldval < 1);
 		} else {
 			/* Failure */
 			return(FALSE);
@@ -427,9 +425,9 @@ rw_lock_x_unlock_func(
 		We need to signal read/write waiters.
 		We do not need to signal wait_ex waiters, since they cannot
 		exist when there is a writer. */
-		if (my_atomic_load32_explicit((int32*) &lock->waiters,
+		if (my_atomic_load32_explicit(&lock->waiters,
 					      MY_MEMORY_ORDER_RELAXED)) {
-			my_atomic_store32_explicit((int32*) &lock->waiters, 0,
+			my_atomic_store32_explicit(&lock->waiters, 0,
 						   MY_MEMORY_ORDER_RELAXED);
 			os_event_set(lock->event);
 			sync_array_object_signalled();
@@ -487,9 +485,9 @@ rw_lock_sx_unlock_func(
 			waiters. We do not need to signal wait_ex waiters,
 			since they cannot exist when there is an sx-lock
 			holder. */
-			if (my_atomic_load32_explicit((int32*) &lock->waiters,
+			if (my_atomic_load32_explicit(&lock->waiters,
 						      MY_MEMORY_ORDER_RELAXED)) {
-				my_atomic_store32_explicit((int32*) &lock->waiters, 0,
+				my_atomic_store32_explicit(&lock->waiters, 0,
 							   MY_MEMORY_ORDER_RELAXED);
 				os_event_set(lock->event);
 				sync_array_object_signalled();
