@@ -62,9 +62,9 @@ static inline int64 my_atomic_add64(int64 volatile *a, int64 v)
 #define my_atomic_fas64(a, v) __sync_lock_test_and_set(a, v)
 #define my_atomic_fasptr(a, v) __sync_lock_test_and_set(a, v)
 
-#define my_atomic_load32(a) (typeof(*a)) __sync_fetch_and_or((int32*) a, 0)
-#define my_atomic_load64(a) (typeof(*a)) __sync_fetch_and_or(int64*) a, 0)
-#define my_atomic_loadptr(a) (typeof(*a)) __sync_fetch_and_or((void*) a, 0)
+#define my_atomic_load32(a) __sync_fetch_and_or((int32*) a, 0)
+#define my_atomic_load64(a) __sync_fetch_and_or((int64*) a, 0)
+#define my_atomic_loadptr(a) __sync_fetch_and_or((void*) a, 0)
 
 #define my_atomic_store32(a, v) (void) __sync_lock_test_and_set(a, v)
 #define my_atomic_store64(a, v) (void) __sync_lock_test_and_set(a, v)

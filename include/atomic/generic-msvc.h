@@ -75,25 +75,25 @@ static inline int64 my_atomic_add64(int64 volatile *a, int64 v)
   https://msdn.microsoft.com/en-us/library/windows/desktop/ms684122(v=vs.85).aspx
 */
 
-static inline int32_t my_atomic_load32_low(const int32_t volatile *a)
+static inline int32 my_atomic_load32_low(const int32 volatile *a)
 {
-  int32_t value= *a;
+  int32 value= *a;
   MemoryBarrier();
   return value;
 }
 
-static inline int64_t my_atomic_load64_low(const int64_t volatile *a)
+static inline int64 my_atomic_load64_low(const int64 volatile *a)
 {
 #ifdef _M_X64
-  int64_t value= *a;
+  int64 value= *a;
   MemoryBarrier();
   return value;
 #else
-  return (int64_t) InterlockedCompareExchange64((volatile LONGLONG *) a, 0, 0);
+  return (int64) InterlockedCompareExchange64((volatile LONGLONG *) a, 0, 0);
 #endif
 }
 
-static inline void* my_atomic_loadptr(const void * volatile *a)
+static inline void* my_atomic_loadptr(void * volatile *a)
 {
   void *value= *a;
   MemoryBarrier();
@@ -101,26 +101,26 @@ static inline void* my_atomic_loadptr(const void * volatile *a)
 }
 
 /* Silence signed/unsigned argument warnings */
-#define my_atomic_load32(a) my_atomic_load32_low((const volatile int32_t *) a)
-#define my_atomic_load64(a) my_atomic_load64_low((const volatile int64_t *) a)
+#define my_atomic_load32(a) my_atomic_load32_low((const volatile int32 *) a)
+#define my_atomic_load64(a) my_atomic_load64_low((const volatile int64 *) a)
 
 #define my_atomic_fas32(a, v) (int32) InterlockedExchange((volatile LONG *) a, v)
 #define my_atomic_fas64(a, v) (int64) InterlockedExchange64((volatile LONGLONG *) a, v)
 #define my_atomic_fasptr(a, v) InterlockedExchangePointer(a, v)
 
-static inline void my_atomic_store32_low(int32_t volatile *a, int32_t v)
+static inline void my_atomic_store32_low(int32 volatile *a, int32 v)
 {
   MemoryBarrier();
   *a= v;
 }
 
-static inline void my_atomic_store64_low(int64_t volatile *a, int64_t v)
+static inline void my_atomic_store64_low(int64 volatile *a, int64 v)
 {
 #ifdef _M_X64
   MemoryBarrier();
   *a= v;
 #else
-  (void)InterlockedExchange64((volatile LONGLONG*)a, v);
+  (void) InterlockedExchange64((volatile LONGLONG *) a, v);
 #endif
 }
 
@@ -130,7 +130,7 @@ static inline void my_atomic_storeptr(void * volatile *a, void *v)
   *a= v;
 }
 
-#define my_atomic_store32(a, v) my_atomic_store32_low((volatile int32_t *) a, (int32_t) v)
-#define my_atomic_store64(a, v) my_atomic_store64_low((volatile int64_t *) a, (int64_t) v)
+#define my_atomic_store32(a, v) my_atomic_store32_low((volatile int32 *) a, (int32) v)
+#define my_atomic_store64(a, v) my_atomic_store64_low((volatile int64 *) a, (int64) v)
 
 #endif /* ATOMIC_MSC_INCLUDED */
