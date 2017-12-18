@@ -1044,11 +1044,13 @@ handle_rpl_parallel_thread(void *arg)
          inside an event group; no more events will be queued to us, so we need
          to abort the group (force_abort==1).
        - Thread pool shutdown (rpt->stop==1).
+       - Thread has "killed" flag set (thd->killed==1).
     */
     while (!( (events= rpt->event_queue) ||
               (rpt->current_owner && !in_event_group) ||
               (rpt->current_owner && group_rgi->parallel_entry->force_abort) ||
-              rpt->stop))
+              rpt->stop) ||
+              thd->killed)
     {
       if (!wait_count++)
         thd->set_time_for_next_stage();
@@ -2071,7 +2073,10 @@ rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
                                           old_stage);
           *did_enter_cond= true;
         }
-        mysql_cond_wait(&thr->COND_rpl_thread_queue, &thr->LOCK_rpl_thread);
+        if (!thr->killed)
+        {
+           mysql_cond_wait(&thr->COND_rpl_thread_queue, &thr->LOCK_rpl_thread);
+        }
       }
     }
   }
