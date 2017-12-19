@@ -4810,7 +4810,7 @@ double Field_double::val_real(void)
 longlong Field_double::val_int_from_real(bool want_unsigned_result)
 {
   Converter_double_to_longlong conv(val_real(), want_unsigned_result);
-  if (conv.error())
+  if (!want_unsigned_result && conv.error())
     conv.push_warning(get_thd(), Field_double::val_real(), false);
   return conv.result();
 }
