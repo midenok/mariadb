@@ -205,12 +205,9 @@ a
 30
 31
 CREATE TABLE t12(a DOUBLE AUTO_INCREMENT KEY) ENGINE = InnoDB;
-INSERT INTO t12 VALUES(0), (0), (0), (0), (-1), (-10), (0),
-(20), (30), (31);
+INSERT INTO t12 VALUES(0), (0), (0), (0), (0), (20), (30), (31);
 SELECT * FROM t12;
 a
--10
--1
 1
 2
 3
