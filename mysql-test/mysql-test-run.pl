@@ -224,6 +224,7 @@ our @opt_mysqld_envs;
 
 my $opt_stress;
 my $opt_tail_lines= 20;
+my $opt_quiet= 0;
 
 my $opt_dry_run;
 
@@ -374,20 +375,23 @@ main();
 
 
 sub main {
+  my @saved_argv= @ARGV;
+  command_line_setup();
+
   # Default, verbosity on
-  report_option('verbose', 0);
+  report_option('verbose', $opt_quiet ? undef : 0);
 
   # This is needed for test log evaluation in "gen-build-status-page"
   # in all cases where the calling tool does not log the commands
   # directly before it executes them, like "make test-force-pl" in RPM builds.
-  mtr_report("Logging: $0 ", join(" ", @ARGV));
+  mtr_report("Logging: $0 ", join(" ", @saved_argv));
 
-  command_line_setup();
 
   # --help will not reach here, so now it's safe to assume we have binaries
   My::SafeProcess::find_bin();
 
-  print "vardir: $opt_vardir\n";
+  # FIXME: is it needed?
+  mtr_report("vardir: $opt_vardir");
   initialize_servers();
   init_timers();
 
@@ -508,10 +512,14 @@ sub main {
   #######################################################################
 
   mtr_report();
-  mtr_print_thick_line();
-  mtr_print_header($opt_parallel > 1);
+  if (!$opt_quiet)
+  {
+    mtr_print_thick_line();
+    mtr_print_header($opt_parallel > 1);
+  }
 
   mark_time_used('init');
+  report_option('verbose', 0);
 
   my ($prefix, $fail, $completed, $extra_warnings)=
     run_test_server($server, $tests, $opt_parallel);
@@ -1230,6 +1238,7 @@ sub command_line_setup {
 	     'result-file'              => \$opt_resfile,
 	     'stress=s'                 => \$opt_stress,
 	     'tail-lines=i'             => \$opt_tail_lines,
+	     'quiet'                    => \$opt_quiet,
              'dry-run'                  => \$opt_dry_run,
 
              'help|h'                   => \$opt_usage,
@@ -6290,6 +6299,7 @@ Misc options
                         mysql-stress-test.pl. Options are separated by comma.
   tail-lines=N          Number of lines of the result to include in a failure
                         report.
+  quiet                 Produce concise output.
 
 Some options that control enabling a feature for normal test runs,
 can be turned off by prepending 'no' to the option, e.g. --notimer.
