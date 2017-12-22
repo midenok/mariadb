@@ -519,10 +519,11 @@ sub main {
   }
 
   mark_time_used('init');
-  report_option('verbose', 0);
 
+  report_option('verbose', 0);
   my ($prefix, $fail, $completed, $extra_warnings)=
     run_test_server($server, $tests, $opt_parallel);
+  report_option('verbose', $opt_quiet ? undef : 0);
 
   exit(0) if $opt_start_exit;
 
@@ -574,11 +575,13 @@ sub main {
     ++$num_tests
   }
 
-  mtr_print_line();
+  mtr_print_line()
+    unless $opt_quiet;
 
   print_total_times($opt_parallel) if $opt_report_times;
 
-  mtr_report_stats($prefix, $fail, $completed, $extra_warnings);
+  mtr_report_stats($prefix, $fail, $completed, $extra_warnings)
+    unless $opt_quiet;
 
   if ($opt_gcov) {
     mtr_report("Running dgcov");
@@ -654,6 +657,7 @@ sub run_test_server ($$$) {
 
 	  # Report test status
 	  mtr_report_test($result);
+          report_option('verbose', $opt_quiet ? undef : 0);
 
 	  if ( $result->is_failed() ) {
 
