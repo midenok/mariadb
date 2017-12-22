@@ -779,7 +779,7 @@ row_ins_foreign_trx_print(
 	heap_size = mem_heap_get_size(trx->lock.lock_heap);
 	lock_mutex_exit();
 
-	trx_sys_mutex_enter();
+	mutex_enter(&trx_sys.mutex);
 
 	mutex_enter(&dict_foreign_err_mutex);
 	rewind(dict_foreign_err_file);
@@ -789,7 +789,7 @@ row_ins_foreign_trx_print(
 	trx_print_low(dict_foreign_err_file, trx, 600,
 		      n_rec_locks, n_trx_locks, heap_size);
 
-	trx_sys_mutex_exit();
+	mutex_exit(&trx_sys.mutex);
 
 	ut_ad(mutex_own(&dict_foreign_err_mutex));
 }

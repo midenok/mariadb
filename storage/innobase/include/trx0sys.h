@@ -52,9 +52,6 @@ typedef UT_LIST_BASE_NODE_T(trx_t) trx_ut_list_t;
 class MVCC;
 class ReadView;
 
-/** The transaction system */
-extern trx_sys_t*	trx_sys;
-
 /** Checks if a page address is the trx sys header page.
 @param[in]	page_id	page id
 @return true if trx sys header page */
@@ -66,11 +63,6 @@ trx_sys_hdr_page(
 /** Initialize the transaction system main-memory data structures. */
 void trx_sys_init_at_db_start();
 
-/*****************************************************************//**
-Creates the trx_sys instance and initializes purge_queue and mutex. */
-void
-trx_sys_create(void);
-/*================*/
 /*****************************************************************//**
 Creates and initializes the transaction system at the database creation. */
 void
@@ -211,22 +203,10 @@ bool
 trx_sys_read_wsrep_checkpoint(XID* xid);
 #endif /* WITH_WSREP */
 
-/*****************************************************************//**
-Shutdown/Close the transaction system. */
-void
-trx_sys_close(void);
-/*===============*/
 /** Create the rollback segments.
 @return	whether the creation succeeded */
 bool
 trx_sys_create_rsegs();
-
-/*********************************************************************
-Check if there are any active (non-prepared) transactions.
-@return total number of active transactions or 0 if none */
-ulint
-trx_sys_any_active_transactions(void);
-/*=================================*/
 
 /** The automatically created system rollback segment has this id */
 #define TRX_SYS_SYSTEM_RSEG_ID	0
@@ -800,12 +780,11 @@ private:
     number. Accessed and updated with atomic operations.
   */
 
-  char pad0[CACHE_LINE_SIZE];
-  trx_id_t m_max_trx_id;
-  char pad1[CACHE_LINE_SIZE];
+  trx_id_t m_max_trx_id MY_ALIGNED(CACHE_LINE_SIZE);
 
 
 public:
+	MY_ALIGNED(CACHE_LINE_SIZE)
 	TrxSysMutex	mutex;		/*!< mutex protecting most fields in
 					this structure except when noted
 					otherwise */
@@ -820,8 +799,7 @@ public:
 					transactions which exist or existed */
 #endif /* UNIV_DEBUG */
 
-	/** Avoid false sharing */
-	char	pad2[CACHE_LINE_SIZE];
+	MY_ALIGNED(CACHE_LINE_SIZE)
 	trx_ut_list_t	mysql_trx_list;	/*!< List of transactions created
 					for MySQL. All user transactions are
 					on mysql_trx_list. The rw_trx_hash
@@ -832,6 +810,7 @@ public:
 					transactions that have not yet been
 					started in InnoDB. */
 
+	MY_ALIGNED(CACHE_LINE_SIZE)
 	trx_ids_t	rw_trx_ids;	/*!< Array of Read write transaction IDs
 					for MVCC snapshot. A ReadView would take
 					a snapshot of these transactions whose
@@ -841,13 +820,11 @@ public:
 					to ensure right order of removal and
 					consistent snapshot. */
 
-	/** Avoid false sharing */
-	char	pad3[CACHE_LINE_SIZE];
+	MY_ALIGNED(CACHE_LINE_SIZE)
 	/** Temporary rollback segments */
 	trx_rseg_t*	temp_rsegs[TRX_SYS_N_RSEGS];
-	/** Avoid false sharing */
-	char	pad4[CACHE_LINE_SIZE];
 
+	MY_ALIGNED(CACHE_LINE_SIZE)
 	trx_rseg_t*	rseg_array[TRX_SYS_N_RSEGS];
 					/*!< Pointer array to rollback
 					segments; NULL if slot not in use;
@@ -861,16 +838,13 @@ public:
 					transactions), protected by
 					rseg->mutex */
 
-  char rw_trx_hash_pre_pad[CACHE_LINE_SIZE];
-
 
   /**
     Lock-free hash of in memory read-write transactions.
     Works faster when it is on it's own cache line (tested).
   */
 
-  rw_trx_hash_t rw_trx_hash;
-  char rw_trx_hash_post_pad[CACHE_LINE_SIZE];
+  rw_trx_hash_t rw_trx_hash MY_ALIGNED(CACHE_LINE_SIZE);
 
 	ulint		n_prepared_trx;	/*!< Number of transactions currently
 					in the XA PREPARED state */
@@ -885,13 +859,24 @@ public:
 					if such transactions exist. */
 
   /**
+    Constructor.
+
+    We only initialise rw_trx_ids here as it is impossible to postpone it's
+    initialisation to create().
+  */
+
+  trx_sys_t(): rw_trx_ids(ut_allocator<trx_id_t>(mem_key_trx_sys_t_rw_trx_ids))
+  {}
+
+
+  /**
     Returns the minimum trx id in rw trx list.
 
     This is the smallest id for which the trx can possibly be active. (But, you
     must look at the trx->state to find out if the minimum trx id transaction
     itself is active, or already committed.)
 
-    @return the minimum trx id, or trx_sys->m_max_trx_id if the trx list is
+    @return the minimum trx id, or trx_sys.m_max_trx_id if the trx list is
             empty
   */
 
@@ -908,7 +893,7 @@ public:
     Determines the maximum transaction id.
 
     @return maximum currently allocated trx id; will be stale after the
-            next call to trx_sys->get_new_trx_id()
+            next call to trx_sys.get_new_trx_id()
   */
 
   trx_id_t get_max_trx_id(void)
@@ -934,7 +919,7 @@ public:
 
   trx_id_t get_new_trx_id()
   {
-    ut_ad(mutex_own(&trx_sys->mutex));
+    ut_ad(mutex_own(&mutex));
     trx_id_t id= static_cast<trx_id_t>(my_atomic_add64_explicit(
       reinterpret_cast<int64*>(&m_max_trx_id), 1, MY_MEMORY_ORDER_RELAXED));
 
@@ -955,6 +940,16 @@ public:
   }
 
 
+  /** Create the instance */
+  void create();
+
+  /** Close the transaction system on shutdown */
+  void close();
+
+  /** @return total number of active (non-prepared) transactions */
+  ulint any_active_transactions();
+
+
 private:
   static my_bool get_min_trx_id_callback(rw_trx_hash_element_t *element,
                                          trx_id_t *id)
@@ -965,18 +960,9 @@ private:
   }
 };
 
-/** Test if trx_sys->mutex is owned. */
-#define trx_sys_mutex_own() (trx_sys->mutex.is_owned())
 
-/** Acquire the trx_sys->mutex. */
-#define trx_sys_mutex_enter() do {			\
-	mutex_enter(&trx_sys->mutex);			\
-} while (0)
-
-/** Release the trx_sys->mutex. */
-#define trx_sys_mutex_exit() do {			\
-	trx_sys->mutex.exit();				\
-} while (0)
+/** The transaction system */
+extern trx_sys_t trx_sys;
 
 #include "trx0sys.ic"
 
