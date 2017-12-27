@@ -2196,8 +2196,7 @@ trx_mark_sql_stat_end(
 }
 
 /**********************************************************************//**
-Prints info about a transaction.
-Caller must hold trx_sys->mutex. */
+Prints info about a transaction. */
 void
 trx_print_low(
 /*==========*/
@@ -2218,7 +2217,7 @@ trx_print_low(
 	ibool		newline;
 	const char*	op_info;
 
-	ut_ad(trx_sys_mutex_own());
+	trx_mutex_enter(const_cast<trx_t*>(trx));
 
 	fprintf(f, "TRANSACTION " TRX_ID_FMT, trx_get_id_for_print(trx));
 
@@ -2315,11 +2314,12 @@ state_ok:
 		innobase_mysql_print_thd(
 			f, trx->mysql_thd, static_cast<uint>(max_query_len));
 	}
+	trx_mutex_exit(const_cast<trx_t*>(trx));
 }
 
 /**********************************************************************//**
 Prints info about a transaction.
-The caller must hold lock_sys->mutex and trx_sys->mutex.
+The caller must hold lock_sys->mutex.
 When possible, use trx_print() instead. */
 void
 trx_print_latched(
@@ -2330,7 +2330,6 @@ trx_print_latched(
 					or 0 to use the default max length */
 {
 	ut_ad(lock_mutex_own());
-	ut_ad(trx_sys_mutex_own());
 
 	trx_print_low(f, trx, max_query_len,
 		      lock_number_of_rows_locked(&trx->lock),
