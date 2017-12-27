@@ -813,34 +813,6 @@ trx_resurrect_table_locks(
 	}
 }
 
-/** Mapping read-write transactions from id to transaction instance, for
-creating read views and during trx id lookup for MVCC and locking. */
-struct TrxTrack {
-	explicit TrxTrack(trx_id_t id, trx_t* trx = NULL)
-		:
-		m_id(id),
-		m_trx(trx)
-	{
-		// Do nothing
-	}
-
-	trx_id_t	m_id;
-	trx_t*		m_trx;
-};
-
-/**
-Comparator for TrxMap */
-struct TrxTrackCmp {
-
-	bool operator() (const TrxTrack& lhs, const TrxTrack& rhs) const
-	{
-		return(lhs.m_id < rhs.m_id);
-	}
-};
-
-typedef std::set<TrxTrack, TrxTrackCmp, ut_allocator<TrxTrack> >
-	TrxIdSet;
-
 
 /**
   Resurrect the transactions that were doing inserts/updates the time of the
@@ -849,7 +821,7 @@ typedef std::set<TrxTrack, TrxTrackCmp, ut_allocator<TrxTrack> >
 
 static void trx_resurrect(trx_undo_t *undo, trx_rseg_t *rseg,
                           ib_time_t start_time, uint64_t *rows_to_undo,
-                          TrxIdSet *set, bool is_old_insert)
+                          bool is_old_insert)
 {
   trx_t *trx;
 
@@ -928,7 +900,6 @@ static void trx_resurrect(trx_undo_t *undo, trx_rseg_t *rseg,
     trx->table_id= undo->table_id;
   }
 
-  set->insert(TrxTrack(trx->id, trx));
   trx_sys->rw_trx_hash.insert(trx);
   trx_sys->rw_trx_hash.put_pins(trx);
   trx_sys->rw_trx_ids.push_back(trx->id);
@@ -947,7 +918,6 @@ static void trx_resurrect(trx_undo_t *undo, trx_rseg_t *rseg,
 void
 trx_lists_init_at_db_start()
 {
-	TrxIdSet set;
 	uint64_t	rows_to_undo	= 0;
 	ut_a(srv_is_being_started);
 	ut_ad(!srv_was_started);
@@ -979,7 +949,7 @@ trx_lists_init_at_db_start()
 		while (undo) {
 			trx_undo_t* next = UT_LIST_GET_NEXT(undo_list, undo);
 			trx_resurrect(undo, rseg, start_time, &rows_to_undo,
-				      &set, true);
+				      true);
 			undo = next;
 		}
 
@@ -1009,14 +979,14 @@ trx_lists_init_at_db_start()
 				}
 			} else {
 				trx_resurrect(undo, rseg, start_time,
-					      &rows_to_undo, &set, false);
+					      &rows_to_undo, false);
 			}
 		}
 	}
 
-	if (set.size()) {
+	if (trx_sys->rw_trx_hash.size()) {
 
-		ib::info() << set.size()
+		ib::info() << trx_sys->rw_trx_hash.size()
 			<< " transaction(s) which must be rolled back or"
 			" cleaned up in total " << rows_to_undo
 			<< " row operations to undo";
@@ -1024,14 +994,6 @@ trx_lists_init_at_db_start()
 		ib::info() << "Trx id counter is " << trx_sys->max_trx_id;
 	}
 
-	TrxIdSet::iterator	end = set.end();
-
-	for (TrxIdSet::iterator it = set.begin();
-	     it != end;
-	     ++it) {
-
-		UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, it->m_trx);
-	}
 	std::sort(trx_sys->rw_trx_ids.begin(), trx_sys->rw_trx_ids.end());
 }
 
@@ -1249,8 +1211,6 @@ trx_start_low(
 		ut_ad(trx->rsegs.m_redo.rseg != 0
 		      || srv_read_only_mode
 		      || srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO);
-
-		UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, trx);
 
 		ut_d(trx->in_rw_trx_list = true);
 #ifdef UNIV_DEBUG
@@ -1605,7 +1565,7 @@ trx_update_mod_tables_timestamp(
 Erase the transaction from running transaction lists and serialization
 list. Active RW transaction list of a MVCC snapshot(ReadView::prepare)
 won't include this transaction after this call. All implicit locks are
-also released by this call as trx is removed from rw_trx_list.
+also released by this call as trx is removed from rw_trx_hash.
 @param[in] trx		Transaction to erase, must have an ID > 0
 @param[in] serialised	true if serialisation log was written */
 static
@@ -1623,7 +1583,6 @@ trx_erase_lists(
 	} else {
 
 		trx_sys_mutex_enter();
-		UT_LIST_REMOVE(trx_sys->rw_trx_list, trx);
 		ut_d(trx->in_rw_trx_list = false);
 
 		if (trx->read_view != NULL) {
@@ -2813,7 +2772,7 @@ trx_start_if_not_started_xa_low(
 			/* If the transaction is tagged as read-only then
 			it can only write to temp tables and for such
 			transactions we don't want to move them to the
-			trx_sys_t::rw_trx_list. */
+			trx_sys_t::rw_trx_hash. */
 			if (!trx->read_only) {
 				trx_set_rw_mode(trx);
 			}
@@ -2974,10 +2933,7 @@ trx_set_rw_mode(
 	}
 #endif /* UNIV_DEBUG */
 
-	UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, trx);
-
 	ut_d(trx->in_rw_trx_list = true);
-
 	mutex_exit(&trx_sys->mutex);
 	trx_sys->rw_trx_hash.insert(trx);
 }
