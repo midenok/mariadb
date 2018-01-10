@@ -9550,7 +9550,19 @@ int init_ftfuncs(THD *thd, SELECT_LEX *select_lex, bool no_order)
     DBUG_PRINT("info",("Performing FULLTEXT search"));
 
     while ((ifm=li++))
-      ifm->init_search(no_order);
+#if MYSQL_VERSION_ID < 100213
+      if (ifm->fixed)
+#endif
+        ifm->init_search(no_order);
+#if MYSQL_VERSION_ID < 100213
+      else
+        /*
+          it mean that clause where was FT function was removed, so we have
+          to remove the function from the list.
+        */
+        li.remove();
+#endif
+
   }
   return 0;
 }
