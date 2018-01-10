@@ -948,6 +948,9 @@ struct trx_t {
 	Recovered XA:
 	* NOT_STARTED -> PREPARED -> COMMITTED -> (freed)
 
+	Recovered XA followed by XA ROLLBACK:
+	* NOT_STARTED -> PREPARED -> ACTIVE -> COMMITTED -> (freed)
+
 	XA (2PC) (shutdown or disconnect before ROLLBACK or COMMIT):
 	* NOT_STARTED -> PREPARED -> (freed)
 

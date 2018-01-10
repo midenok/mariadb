@@ -47,6 +47,7 @@ Created 2/6/1997 Heikki Tuuri
 
 /** Check whether all non-virtual columns in a virtual index match that of in
 the cluster index
+@param[in,out]	caller_trx	trx of current thread
 @param[in]	index		the secondary index
 @param[in]	row		the cluster index row in dtuple form
 @param[in]	ext		externally stored column prefix or NULL
@@ -65,6 +66,7 @@ row_vers_non_vc_match(
 	ulint*			n_non_v_col);
 /** Determine if an active transaction has inserted or modified a secondary
 index record.
+@param[in,out]	caller_trx	trx of current thread
 @param[in]	clust_rec	clustered index record
 @param[in]	clust_index	clustered index
 @param[in]	rec		secondary index record
@@ -76,6 +78,7 @@ index record.
 UNIV_INLINE
 trx_t*
 row_vers_impl_x_locked_low(
+	trx_t*		caller_trx,
 	const rec_t*	clust_rec,
 	dict_index_t*	clust_index,
 	const rec_t*	rec,
@@ -118,7 +121,7 @@ row_vers_impl_x_locked_low(
 		DBUG_RETURN(0);
 	}
 
-	trx_t*	trx = trx_sys->rw_trx_hash.find(trx_id, true);
+	trx_t*	trx = trx_sys->rw_trx_hash.find(caller_trx, trx_id, true);
 
 	if (trx == 0) {
 		/* The transaction that modified or inserted clust_rec is no
@@ -190,7 +193,7 @@ row_vers_impl_x_locked_low(
 		inserting a delete-marked record. */
 		ut_ad(prev_version
 		      || !rec_get_deleted_flag(version, comp)
-		      || !trx_sys->rw_trx_hash.find(trx_id));
+		      || !trx_sys->rw_trx_hash.find(caller_trx, trx_id));
 
 		/* Free version and clust_offsets. */
 		mem_heap_free(old_heap);
@@ -343,6 +346,7 @@ result_check:
 
 /** Determine if an active transaction has inserted or modified a secondary
 index record.
+@param[in,out]	caller_trx	trx of current thread
 @param[in]	rec	secondary index record
 @param[in]	index	secondary index
 @param[in]	offsets	rec_get_offsets(rec, index)
@@ -350,6 +354,7 @@ index record.
 @retval	NULL if the record was committed */
 trx_t*
 row_vers_impl_x_locked(
+	trx_t*		caller_trx,
 	const rec_t*	rec,
 	dict_index_t*	index,
 	const ulint*	offsets)
@@ -390,7 +395,8 @@ row_vers_impl_x_locked(
 		trx = 0;
 	} else {
 		trx = row_vers_impl_x_locked_low(
-			clust_rec, clust_index, rec, index, offsets, &mtr);
+				caller_trx, clust_rec, clust_index, rec, index,
+				offsets, &mtr);
 
 		ut_ad(trx == 0 || trx_is_referenced(trx));
 	}
@@ -1235,6 +1241,7 @@ which should be seen by a semi-consistent read. */
 void
 row_vers_build_for_semi_consistent_read(
 /*====================================*/
+	trx_t*		caller_trx,/*!<in/out: trx of current thread */
 	const rec_t*	rec,	/*!< in: record in a clustered index; the
 				caller must have a latch on the page; this
 				latch locks the top of the stack of versions
@@ -1280,7 +1287,7 @@ row_vers_build_for_semi_consistent_read(
 			rec_trx_id = version_trx_id;
 		}
 
-		if (!trx_sys->rw_trx_hash.find(version_trx_id)) {
+		if (!trx_sys->rw_trx_hash.find(caller_trx, version_trx_id)) {
 committed_version_trx:
 			/* We found a version that belongs to a
 			committed transaction: return it. */

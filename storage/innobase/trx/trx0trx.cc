@@ -734,7 +734,8 @@ trx_resurrect_table_locks(
 	trx_undo_rec_t*		undo_rec;
 	table_id_set		tables;
 
-	ut_ad(!trx_state_eq(trx, TRX_STATE_COMMITTED_IN_MEMORY));
+	ut_ad(trx_state_eq(trx, TRX_STATE_ACTIVE) ||
+	      trx_state_eq(trx, TRX_STATE_PREPARED));
 	if (undo->empty) {
 
 		return;
@@ -964,8 +965,36 @@ trx_resurrect_update(
 	}
 }
 
+/** Mapping read-write transactions from id to transaction instance, for
+creating read views and during trx id lookup for MVCC and locking. */
+struct TrxTrack {
+	explicit TrxTrack(trx_id_t id, trx_t* trx = NULL)
+		:
+		m_id(id),
+		m_trx(trx)
+	{
+		// Do nothing
+	}
+
+	trx_id_t	m_id;
+	trx_t*		m_trx;
+};
+
+/**
+Comparator for TrxMap */
+struct TrxTrackCmp {
+
+	bool operator() (const TrxTrack& lhs, const TrxTrack& rhs) const
+	{
+		return(lhs.m_id < rhs.m_id);
+	}
+};
+
+typedef std::set<TrxTrack, TrxTrackCmp, ut_allocator<TrxTrack> >
+	TrxIdSet;
+
 static inline void trx_sys_add_trx_at_init(trx_t *trx, trx_undo_t *undo,
-                                           ib_uint64_t *rows_to_undo,
+                                           uint64_t *rows_to_undo,
                                            TrxIdSet *set)
 {
   ut_ad(trx->id != 0);
@@ -980,7 +1009,7 @@ static inline void trx_sys_add_trx_at_init(trx_t *trx, trx_undo_t *undo,
     trx_sys->rw_trx_ids.push_back(trx->id);
     trx_resurrect_table_locks(trx, undo);
     if (trx_state_eq(trx, TRX_STATE_ACTIVE))
-      *rows_to_undo += trx->undo_no;
+      *rows_to_undo+= trx->undo_no;
   }
 #ifdef UNIV_DEBUG
   trx->in_rw_trx_list= true;
@@ -994,7 +1023,7 @@ void
 trx_lists_init_at_db_start()
 {
 	TrxIdSet set;
-	ib_uint64_t	rows_to_undo	= 0;
+	uint64_t	rows_to_undo	= 0;
 	ut_a(srv_is_being_started);
 	ut_ad(!srv_was_started);
 	ut_ad(!purge_sys);
@@ -1026,7 +1055,8 @@ trx_lists_init_at_db_start()
 		     undo = UT_LIST_GET_NEXT(undo_list, undo)) {
 			trx_t*	trx = trx_resurrect_insert(undo, rseg);
 			trx->start_time = start_time;
-			trx_sys_add_trx_at_init(trx, undo, &rows_to_undo, &set);
+			trx_sys_add_trx_at_init(trx, undo, &rows_to_undo,
+						&set);
 		}
 
 		/* Ressurrect other transactions. */
@@ -1035,8 +1065,9 @@ trx_lists_init_at_db_start()
 		     undo = UT_LIST_GET_NEXT(undo_list, undo)) {
 
 			/* Check if trx_id was already registered first. */
-			TrxIdSet::iterator it = set.find(TrxTrack(undo->trx_id));
-			trx_t *trx= (it == set.end() ? 0 : it->m_trx);
+			TrxIdSet::iterator it =
+				set.find(TrxTrack(undo->trx_id));
+			trx_t *trx= it == set.end() ? 0 : it->m_trx;
 
 			if (trx == NULL) {
 				trx = trx_allocate_for_background();
@@ -1047,21 +1078,16 @@ trx_lists_init_at_db_start()
 			}
 
 			trx_resurrect_update(trx, undo, rseg);
-			trx_sys_add_trx_at_init(trx, undo, &rows_to_undo, &set);
+			trx_sys_add_trx_at_init(trx, undo, &rows_to_undo,
+						&set);
 		}
 	}
 
 	if (set.size()) {
-		const char*	unit		= "";
-
-		if (rows_to_undo > 1000000000) {
-			unit = "M";
-			rows_to_undo = rows_to_undo / 1000000;
-		}
 
 		ib::info() << set.size()
 			<< " transaction(s) which must be rolled back or"
-			" cleaned up in total " << rows_to_undo << unit
+			" cleaned up in total " << rows_to_undo
 			<< " row operations to undo";
 
 		ib::info() << "Trx id counter is " << trx_sys->max_trx_id;
@@ -1261,12 +1287,12 @@ trx_start_low(
 	ut_ad(!trx->in_rw_trx_list);
 
 	/* No other thread can access this trx object through rw_trx_hash, thus
-	we don't need trx_sys->mutex protection for that purpose. Still this trx
-	can be found through trx_sys->mysql_trx_list, which means state change
-	must be protected by e.g. trx->mutex.
+	we don't need trx_sys->mutex protection for that purpose. Still this
+	trx can be found through trx_sys->mysql_trx_list, which means state
+	change must be protected by e.g. trx->mutex.
 
-	For now we update it without mutex protection, because original code did
-	it this way. It has to be reviewed and fixed properly. */
+	For now we update it without mutex protection, because original code
+	did it this way. It has to be reviewed and fixed properly. */
 	trx->state = TRX_STATE_ACTIVE;
 
 	/* By default all transactions are in the read-only list unless they
@@ -1277,14 +1303,6 @@ trx_start_low(
 
 	if (!trx->read_only
 	    && (trx->mysql_thd == 0 || read_write || trx->ddl)) {
-		/* Only trx object owner thread or concurrent thread iterating
-		rw_trx_hash and holding trx->element->mutex is allowed to access
-		trx->in_rw_trx_list.
-
-		No extra protection is required if these conditions are met. We
-		just need to make sure it is updated when trx object is not in
-		rw_trx_hash. */
-		ut_d(trx->in_rw_trx_list = true);
 
 		trx->rsegs.m_redo.rseg = trx_assign_rseg_low();
 
@@ -1303,6 +1321,7 @@ trx_start_low(
 
 		UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, trx);
 
+		ut_d(trx->in_rw_trx_list = true);
 #ifdef UNIV_DEBUG
 		if (trx->id > trx_sys->rw_max_trx_id) {
 			trx_sys->rw_max_trx_id = trx->id;
@@ -1670,12 +1689,13 @@ trx_erase_lists(
 
 	if (trx->read_only || trx->rsegs.m_redo.rseg == NULL) {
 
-		ut_ad(!trx->in_rw_trx_list);
 		trx_sys_mutex_enter();
+		ut_ad(!trx->in_rw_trx_list);
 	} else {
 
 		trx_sys_mutex_enter();
 		UT_LIST_REMOVE(trx_sys->rw_trx_list, trx);
+		ut_d(trx->in_rw_trx_list = false);
 		ut_ad(trx_sys_validate_trx_list());
 
 		if (trx->read_view != NULL) {
@@ -1695,7 +1715,6 @@ trx_erase_lists(
 	trx_sys->rw_trx_ids.erase(it);
 	trx_sys_mutex_exit();
 	trx_sys->rw_trx_hash.erase(trx);
-	ut_d(trx->in_rw_trx_list = false);
 }
 
 /****************************************************************//**
@@ -3077,8 +3096,6 @@ trx_set_rw_mode(
 
 	ut_ad(trx->rsegs.m_redo.rseg != 0);
 
-	ut_d(trx->in_rw_trx_list = true);
-
 	mutex_enter(&trx_sys->mutex);
 	trx->id = trx_sys_get_new_trx_id();
 
@@ -3096,6 +3113,8 @@ trx_set_rw_mode(
 #endif /* UNIV_DEBUG */
 
 	UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, trx);
+
+	ut_d(trx->in_rw_trx_list = true);
 
 	mutex_exit(&trx_sys->mutex);
 	trx_sys->rw_trx_hash.insert(trx);

@@ -447,17 +447,31 @@ FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID. */
 #define TRX_SYS_DOUBLEWRITE_BLOCK_SIZE	FSP_EXTENT_SIZE
 /* @} */
 
-trx_t* innobase_get_trx();
+trx_t* current_trx();
 
 struct rw_trx_hash_element_t
 {
+  rw_trx_hash_element_t(): trx(0)
+  {
+    mutex_create(LATCH_ID_RW_TRX_HASH_ELEMENT, &mutex);
+  }
+
+
+  ~rw_trx_hash_element_t()
+  {
+    mutex_free(&mutex);
+  }
+
+
   trx_id_t id; /* lf_hash_init() relies on this to be first in the struct */
   trx_t *trx;
   ib_mutex_t mutex;
 };
 
 
-/** Wrapper around LF_HASH to store set of in memory read-write transactions. */
+/**
+  Wrapper around LF_HASH to store set of in memory read-write transactions.
+*/
 
 class rw_trx_hash_t
 {
@@ -467,53 +481,44 @@ class rw_trx_hash_t
   /**
     Constructor callback for lock-free allocator.
 
-    Object is just allocated and is not yet accessible via LF_HASH by concurrent
-    threads. Object can be reused multiple times before it is freed. Every time
-    object is being reused initializer() callback is called.
+    Object is just allocated and is not yet accessible via rw_trx_hash by
+    concurrent threads. Object can be reused multiple times before it is freed.
+    Every time object is being reused initializer() callback is called.
   */
 
   static void rw_trx_hash_constructor(uchar *arg)
   {
-    rw_trx_hash_element_t *element =
-      reinterpret_cast<rw_trx_hash_element_t*>(arg + LF_HASH_OVERHEAD);
-    element->trx = 0;
-    mutex_create(LATCH_ID_RW_TRX_HASH_ELEMENT, &element->mutex);
+    new(arg + LF_HASH_OVERHEAD) rw_trx_hash_element_t();
   }
 
 
   /**
     Destructor callback for lock-free allocator.
 
-    Object is about to be freed and is not accessible via LF_HASH by concurrent
-    threads.
+    Object is about to be freed and is not accessible via rw_trx_hash by
+    concurrent threads.
   */
 
   static void rw_trx_hash_destructor(uchar *arg)
   {
-    rw_trx_hash_element_t *element =
-      reinterpret_cast<rw_trx_hash_element_t*>(arg + LF_HASH_OVERHEAD);
-    /*
-      XA transactions can live longer than InnoDB if they're not
-      explicitely committed or rolled back.
-    */
-    ut_ad(element->trx == 0 || element->trx->xid);
-    mutex_free(&element->mutex);
+    reinterpret_cast<rw_trx_hash_element_t*>
+      (arg + LF_HASH_OVERHEAD)->~rw_trx_hash_element_t();
   }
 
 
   /**
     Initializer callback for lock-free hash.
 
-    Object is not yet accessible via LF_HASH by concurrent threads, but is about
-    to become such. Object id can be changed only by this callback and remains
-    the same until all pins to this object are released.
+    Object is not yet accessible via rw_trx_hash by concurrent threads, but is
+    about to become such. Object id can be changed only by this callback and
+    remains the same until all pins to this object are released.
 
     Object trx can be changed to 0 by erase() under object mutex protection,
-    which indicates it is about to be removed from lock-free hash and become not
-    accessible by concurrent threads.
+    which indicates it is about to be removed from lock-free hash and become
+    not accessible by concurrent threads.
   */
 
-  static void rw_trx_hash_initializer(LF_HASH *hash __attribute__((unused)),
+  static void rw_trx_hash_initializer(LF_HASH *,
                                       rw_trx_hash_element_t *element,
                                       trx_t *trx)
   {
@@ -522,6 +527,15 @@ class rw_trx_hash_t
     trx->rw_trx_hash_element= element;
   }
 
+
+  /**
+    Gets LF_HASH pins.
+
+    Pins are used to protect object from being destroyed or reused. They are
+    normally stored in trx object for quick access. If caller doesn't have trx
+    available, we try to get it using currnet_trx(). If caller doesn't have trx
+    at all, temporary pins are allocated.
+  */
 
   LF_PINS *get_pins(trx_t *trx)
   {
@@ -552,6 +566,17 @@ public:
   }
 
 
+  /**
+    Releases LF_HASH pins.
+
+    Must be called by thread that owns trx_t object when the latter is being
+    "detached" from thread (e.g. released to the pool by trx_free()). Can be
+    called earlier if thread is expected not to use rw_trx_hash.
+
+    Since pins are not allowed to be transferred to another thread,
+    initialisation thread calls this for recovered transactions.
+  */
+
   void put_pins(trx_t *trx)
   {
     if (trx->rw_trx_hash_pins)
@@ -575,16 +600,17 @@ public:
     holding lock_sys->mutex. Caller is responsible for calling
     trx_release_reference() when it is done playing with trx.
 
-    Ideally this method should get caller rw_trx_hash_pins along with trx object
-    as a parameter, similar to insert() and erase(). However most callers loose
-    trx early in their call chains and it is not that easy to pass them through.
+    Ideally this method should get caller rw_trx_hash_pins along with trx
+    object as a parameter, similar to insert() and erase(). However most
+    callers lose trx early in their call chains and it is not that easy to pass
+    them through.
 
     So we take more expensive approach: get trx through current_thd()->ha_data.
     Some threads don't have trx attached to THD, and at least server
     initialisation thread, fts_optimize_thread, srv_master_thread,
-    dict_stats_thread, srv_monitor_thread, btr_defragment_thread don't even have
-    THD at all. For such cases we allocate pins only for duration of search and
-    free them immediately.
+    dict_stats_thread, srv_monitor_thread, btr_defragment_thread don't even
+    have THD at all. For such cases we allocate pins only for duration of
+    search and free them immediately.
 
     This has negative performance impact and should be fixed eventually (by
     passing caller_trx as a parameter). Still stream of DML is more or less Ok.
@@ -623,8 +649,8 @@ public:
           trx_reference(trx);
 #ifdef UNIV_DEBUG
         mutex_enter(&trx->mutex);
-        ut_a(trx_state_eq(trx, TRX_STATE_ACTIVE) ||
-             trx_state_eq(trx, TRX_STATE_PREPARED));
+        ut_ad(trx_state_eq(trx, TRX_STATE_ACTIVE) ||
+              trx_state_eq(trx, TRX_STATE_PREPARED));
         mutex_exit(&trx->mutex);
 #endif
       }
@@ -638,21 +664,22 @@ public:
 
   trx_t *find(trx_id_t trx_id, bool do_ref_count= false)
   {
-    return find(innobase_get_trx(), trx_id, do_ref_count);
+    return find(current_trx(), trx_id, do_ref_count);
   }
 
 
   /**
     Inserts trx to lock-free hash.
 
-    Object becomes accessible via LF_HASH.
+    Object becomes accessible via rw_trx_hash.
   */
 
   void insert(trx_t *trx)
   {
     ut_ad(trx_state_eq(trx, TRX_STATE_ACTIVE) ||
           trx_state_eq(trx, TRX_STATE_PREPARED));
-    int res= lf_hash_insert(&hash, get_pins(trx), reinterpret_cast<void*>(trx));
+    int res= lf_hash_insert(&hash, get_pins(trx),
+                            reinterpret_cast<void*>(trx));
     ut_a(res == 0);
   }
 
@@ -660,8 +687,8 @@ public:
   /**
     Removes trx from lock-free hash.
 
-    Object becomes not accessible via LF_HASH. But it still can be pinned by
-    concurrent find(), which is supposed to release it immediately after
+    Object becomes not accessible via rw_trx_hash. But it still can be pinned
+    by concurrent find(), which is supposed to release it immediately after
     it sees object trx is 0.
   */
 
@@ -691,30 +718,6 @@ public:
   int32_t size()
   {
     return my_atomic_load32_explicit(&hash.count, MY_MEMORY_ORDER_RELAXED);
-  }
-
-
-  /**
-    Iterates the hash.
-
-    May return the same element multiple times if hash is under contention.
-    Elements can be added or removed while this method is being executed.
-  */
-
-  int iterate(trx_t *caller_trx, my_hash_walk_action action, void *argument)
-  {
-    LF_PINS *pins= caller_trx ? get_pins(caller_trx) : lf_hash_get_pins(&hash);
-    ut_a(pins);
-    int res= lf_hash_iterate(&hash, pins, action, argument);
-    if (!caller_trx)
-      lf_hash_put_pins(pins);
-    return res;
-  }
-
-
-  int iterate(my_hash_walk_action action, void *argument)
-  {
-    return iterate(innobase_get_trx(), action, argument);
   }
 };
 
@@ -791,15 +794,16 @@ struct trx_sys_t {
 					transactions), protected by
 					rseg->mutex */
 
+  const char rw_trx_hash_pre_pad[CACHE_LINE_SIZE];
+
 
   /**
     Lock-free hash of in memory read-write transactions.
     Works faster when it is on it's own cache line (tested).
   */
 
-  const char pad5[CACHE_LINE_SIZE];
   rw_trx_hash_t rw_trx_hash;
-  const char pad6[CACHE_LINE_SIZE];
+  const char rw_trx_hash_post_pad[CACHE_LINE_SIZE];
 
 	ulint		n_prepared_trx;	/*!< Number of transactions currently
 					in the XA PREPARED state */

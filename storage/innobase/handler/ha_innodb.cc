@@ -2819,10 +2819,14 @@ check_trx_exists(
 	return(trx);
 }
 
-/*************************************************************************
-Gets current trx. */
-trx_t*
-innobase_get_trx()
+/**
+  Gets current trx.
+
+  This function may be called during InnoDB initialisation, when
+  innodb_hton_ptr->slot is not yet set to meaningful value.
+*/
+
+trx_t *current_trx()
 {
 	THD *thd=current_thd;
 	if (likely(thd != 0) && innodb_hton_ptr->slot != HA_SLOT_UNDEF) {
