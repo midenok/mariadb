@@ -366,7 +366,11 @@ bool mysql_derived_merge(THD *thd, LEX *lex, TABLE_LIST *derived)
                        derived->get_unit()));
 
   if (derived->merged)
+  {
+
+    DBUG_PRINT("info", ("Irreversibly merged: exit"));
     DBUG_RETURN(FALSE);
+  }
 
   if (dt_select->uncacheable & UNCACHEABLE_RAND)
   {
@@ -645,6 +649,12 @@ bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived)
           thd->lex->sql_command == SQLCOM_DELETE_MULTI))))
     DBUG_RETURN(FALSE);
 
+  if (derived->merged)
+  {
+    DBUG_PRINT("info", ("Irreversibly merged: exit"));
+    DBUG_RETURN(FALSE);
+  }
+
   SELECT_LEX *first_select= unit->first_select();
 
   /* prevent name resolving out of derived table */
@@ -795,6 +805,11 @@ bool mysql_derived_optimize(THD *thd, LEX *lex, TABLE_LIST *derived)
   DBUG_PRINT("enter", ("Alias: '%s'  Unit: %p",
                        (derived->alias ? derived->alias : "<NULL>"),
                        derived->get_unit()));
+  if (derived->merged)
+  {
+    DBUG_PRINT("info", ("Irreversibly merged: exit"));
+    DBUG_RETURN(FALSE);
+  }
 
   if (unit->optimized)
     DBUG_RETURN(FALSE);

@@ -1011,4 +1011,20 @@ id	id	data
 2	2	yes
 1	NULL	NULL
 drop table t1;
+#
+# MDEV-14786: Server crashes in Item_cond::transform on 2nd
+# execution of SP querying from a view
+#
+create table t1 (i int, row_start timestamp(6) not null default now(),
+row_end timestamp(6) not null default '2038-01-19 04:14:07.999999');
+create view v1 as select i from t1 where i < 5 and (row_end =
+TIMESTAMP'2030-01-01 0:0:0' or row_end is null);
+create procedure pr(x int) select i from v1;
+call pr(1);
+i
+call pr(2);
+i
+drop procedure pr;
+drop view v1;
+drop table t1;
 # end of 5.5

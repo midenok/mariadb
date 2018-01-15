@@ -4478,4 +4478,11 @@ public:
   void close() {}
 };
 
+#ifdef DBUG_OFF
+static inline const char *dbug_print_item(Item *item) { return NULL; }
+#else
+extern const char *dbug_print_item(Item *item);
+#endif
+
+
 #endif /* SQL_ITEM_INCLUDED */
