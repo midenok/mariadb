@@ -686,7 +686,7 @@ trx_disconnect_from_mysql(
 	UT_LIST_REMOVE(trx_sys.mysql_trx_list, trx);
 
 	if (trx->read_view != NULL) {
-		trx_sys.mvcc->view_close(trx->read_view, true);
+		trx_sys.mvcc.view_close(trx->read_view, true);
 	}
 
 	if (prepared) {
@@ -1585,7 +1585,7 @@ trx_erase_lists(
 		ut_d(trx->in_rw_trx_list = false);
 
 		if (trx->read_view != NULL) {
-			trx_sys.mvcc->view_close(trx->read_view, true);
+			trx_sys.mvcc.view_close(trx->read_view, true);
 		}
 	}
 
@@ -1643,7 +1643,7 @@ trx_commit_in_memory(
 		ut_ad(trx_state_eq(trx, TRX_STATE_ACTIVE));
 
 		if (trx->read_view != NULL) {
-			trx_sys.mvcc->view_close(trx->read_view, false);
+			trx_sys.mvcc.view_close(trx->read_view, false);
 		}
 
 		MONITOR_INC(MONITOR_TRX_NL_RO_COMMIT);
@@ -1675,7 +1675,7 @@ trx_commit_in_memory(
 		if (trx->read_only || trx->rsegs.m_redo.rseg == NULL) {
 			MONITOR_INC(MONITOR_TRX_RO_COMMIT);
 			if (trx->read_view != NULL) {
-				trx_sys.mvcc->view_close(
+				trx_sys.mvcc.view_close(
 					trx->read_view, false);
 			}
 		} else {
@@ -1939,7 +1939,7 @@ trx_assign_read_view(
 		return(NULL);
 
 	} else if (!MVCC::is_view_active(trx->read_view)) {
-		trx_sys.mvcc->view_open(trx->read_view, trx);
+		trx_sys.mvcc.view_open(trx->read_view, trx);
 	}
 
 	return(trx->read_view);

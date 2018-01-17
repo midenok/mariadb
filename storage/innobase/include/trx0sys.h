@@ -48,10 +48,6 @@ Created 3/26/1996 Heikki Tuuri
 
 typedef UT_LIST_BASE_NODE_T(trx_t) trx_ut_list_t;
 
-// Forward declaration
-class MVCC;
-class ReadView;
-
 /** Checks if a page address is the trx sys header page.
 @param[in]	page_id	page id
 @return true if trx sys header page */
@@ -782,6 +778,7 @@ private:
 
   trx_id_t m_max_trx_id MY_ALIGNED(CACHE_LINE_SIZE);
 
+  bool m_initialised;
 
 public:
 	MY_ALIGNED(CACHE_LINE_SIZE)
@@ -789,7 +786,8 @@ public:
 					this structure except when noted
 					otherwise */
 
-	MVCC*		mvcc;		/*!< Multi version concurrency control
+	MY_ALIGNED(CACHE_LINE_SIZE)
+	MVCC		mvcc;		/*!< Multi version concurrency control
 					manager */
 	trx_ut_list_t	serialisation_list;
 					/*!< Ordered on trx_t::no of all the
@@ -865,7 +863,8 @@ public:
     initialisation to create().
   */
 
-  trx_sys_t(): rw_trx_ids(ut_allocator<trx_id_t>(mem_key_trx_sys_t_rw_trx_ids))
+  trx_sys_t(): m_initialised(false),
+    rw_trx_ids(ut_allocator<trx_id_t>(mem_key_trx_sys_t_rw_trx_ids))
   {}
 
 
@@ -938,6 +937,9 @@ public:
   {
     m_max_trx_id= value;
   }
+
+
+  bool is_initialised() { return m_initialised; }
 
 
   /** Create the instance */
