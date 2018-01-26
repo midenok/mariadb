@@ -5512,7 +5512,7 @@ get_var_with_binlog(THD *thd, enum_sql_command sql_command,
 
     List<set_var_base> tmp_var_list;
     LEX *sav_lex= thd->lex, lex_tmp;
-    thd->lex= &lex_tmp;
+    thd->lex= thd->stmt_lex= &lex_tmp;
     lex_start(thd);
     tmp_var_list.push_back(new (thd->mem_root)
                            set_var_user(new (thd->mem_root)

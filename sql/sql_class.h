@@ -1028,6 +1028,21 @@ public:
   LEX_STRING name; /* name for named prepared statements */
   LEX *lex;                                     // parse tree descriptor
   /*
+    LEX whith represent curent statement (conventional, SP or PS)
+
+    For example during view parsing THD::lex will point to the views LEX and
+    THD::stmt_lex will point on LEX of the statement where the view will be
+    included
+
+    Now used to have alwais correct select numbering inside statemet
+    (LEX::current_select_number) without storing and restoring a global
+    counter which was THD::select_number.
+
+    TODO: make some unified statement representation (now SP has different)
+    to store such data like LEX::current_select_number.
+  */
+  LEX *stmt_lex;
+  /*
     Points to the query associated with this statement. It's const, but
     we need to declare it char * because all table handlers are written
     in C and need to point to it.
@@ -2690,7 +2705,6 @@ public:
   uint	     tmp_table, global_disable_checkpoint;
   uint	     server_status,open_options;
   enum enum_thread_type system_thread;
-  uint       select_number;             //number of select (used for EXPLAIN)
   /*
     Current or next transaction isolation level.
     When a connection is established, the value is taken from

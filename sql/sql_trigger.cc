@@ -1378,7 +1378,7 @@ bool Table_triggers_list::check_n_load(THD *thd, const char *db,
       ulonglong save_sql_mode= thd->variables.sql_mode;
       LEX_STRING *on_table_name;
 
-      thd->lex= &lex;
+      thd->lex= thd->stmt_lex= &lex;
 
       save_db.str= thd->db;
       save_db.length= thd->db_length;
