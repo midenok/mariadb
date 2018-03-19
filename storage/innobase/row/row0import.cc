@@ -1981,6 +1981,14 @@ PageConverter::update_page(
 {
 	dberr_t		err = DB_SUCCESS;
 
+	ut_ad(!block->page.zip.data == !is_compressed_table());
+
+	if (block->page.zip.data) {
+		m_page_zip_ptr = &block->page.zip;
+	} else {
+		ut_ad(!m_page_zip_ptr);
+	}
+
 	switch (page_type = fil_page_get_type(get_frame(block))) {
 	case FIL_PAGE_TYPE_FSP_HDR:
 		/* Work directly on the uncompressed page headers. */
@@ -2043,46 +2051,40 @@ updated then its state must be set to BUF_PAGE_NOT_USED.
 dberr_t
 PageConverter::operator() (os_offset_t, buf_block_t* block) UNIV_NOTHROW
 {
-	ulint		page_type;
-
-	if (is_compressed_table()) {
-		m_page_zip_ptr = &block->page.zip;
-	} else {
-		ut_ad(m_page_zip_ptr == 0);
-	}
-
-	dberr_t err = update_page(block, page_type);
-	if (err == DB_SUCCESS) {
-		/* Note: For compressed pages this function will write to the
-		zip descriptor and for uncompressed pages it will write to
-		page (ie. the block->frame). Therefore the caller should write
-		out the descriptor contents and not block->frame for compressed
-		pages. */
-
-		if (!is_compressed_table() || page_type == FIL_PAGE_INDEX) {
-
-			buf_flush_init_for_writing(
-				!is_compressed_table()
-				? block->frame : block->page.zip.data,
-				!is_compressed_table() ? 0 : m_page_zip_ptr,
-				m_current_lsn);
-		} else {
-			/* Calculate and update the checksum of non-btree
-			pages for compressed tables explicitly here. */
-
-			buf_flush_update_zip_checksum(
-				get_frame(block), get_zip_size(),
-				m_current_lsn);
-		}
-	}
-
 	/* If we already had an old page with matching number
 	in the buffer pool, evict it now, because
 	we no longer evict the pages on DISCARD TABLESPACE. */
 	buf_page_get_gen(get_space_id(), get_zip_size(), block->page.offset,
 			 RW_NO_LATCH, NULL, BUF_EVICT_IF_IN_POOL,
 			 __FILE__, __LINE__, NULL);
-	return(err);
+
+	ulint		page_type;
+
+	dberr_t err = update_page(block, page_type);
+	if (err != DB_SUCCESS) return err;
+
+	/* Note: For compressed pages this function will write to the
+	zip descriptor and for uncompressed pages it will write to
+	page (ie. the block->frame). Therefore the caller should write
+	out the descriptor contents and not block->frame for compressed
+	pages. */
+
+	if (!is_compressed_table() || page_type == FIL_PAGE_INDEX) {
+		buf_flush_init_for_writing(
+			block->page.zip.data
+			? block->page.zip.data
+			: block->frame,
+			block->page.zip.data ? &block->page.zip : NULL,
+			m_current_lsn);
+	} else {
+		/* Calculate and update the checksum of non-btree
+		pages for compressed tables explicitly here. */
+		buf_flush_update_zip_checksum(
+			get_frame(block), get_zip_size(),
+			m_current_lsn);
+	}
+
+	return DB_SUCCESS;
 }
 
 /*****************************************************************//**
@@ -3396,10 +3398,9 @@ fil_iterate(
 
 	ut_ad(!srv_read_only_mode);
 
-	/* TODO: For compressed tables we do a lot of useless
+	/* TODO: For ROW_FORMAT=COMPRESSED tables we do a lot of useless
 	copying for non-index pages. Unfortunately, it is
 	required by buf_zip_decompress() */
-	const bool	row_compressed = callback.get_zip_size() > 0;
 
 	for (offset = iter.start; offset < iter.end; offset += n_bytes) {
 		if (callback.is_interrupted()) {
@@ -3407,18 +3408,12 @@ fil_iterate(
 		}
 
 		byte*		io_buffer = iter.io_buffer;
-
 		block->frame = io_buffer;
 
-		if (row_compressed) {
-			page_zip_des_init(&block->page.zip);
-			page_zip_set_size(&block->page.zip, iter.page_size);
-			block->page.zip.data = block->frame + UNIV_PAGE_SIZE;
-			ut_d(block->page.zip.m_external = true);
-			ut_ad(iter.page_size == callback.get_zip_size());
-
+		if (block->page.zip.data) {
 			/* Zip IO is done in the compressed page buffer. */
 			io_buffer = block->page.zip.data;
+			ut_ad(PAGE_ZIP_MATCH(block->frame, &block->page.zip));
 		}
 
 		/* We have to read the exact number of bytes. Otherwise the
@@ -3481,7 +3476,8 @@ fil_iterate(
 				if (decrypted) {
 					updated = true;
 				} else {
-					if (!page_compressed && !row_compressed) {
+					if (!page_compressed
+					    && !block->page.zip.data) {
 						block->frame = src;
 						frame_changed = true;
 					} else {
@@ -3565,8 +3561,9 @@ page_corrupted:
 
 			if (encrypted) {
 				memcpy(writeptr + (i * size),
-					row_compressed ? block->page.zip.data :
-					block->frame, size);
+				       block->page.zip.data
+				       ? block->page.zip.data : block->frame,
+				       size);
 			}
 
 			if (frame_changed) {
@@ -3734,6 +3731,13 @@ fil_tablespace_iterate(
 		err = DB_IO_ERROR;
 
 	} else if ((err = callback.init(file_size, &block)) == DB_SUCCESS) {
+		if (const ulint zip_size = callback.get_zip_size()) {
+			page_zip_set_size(&block.page.zip, zip_size);
+			/* ROW_FORMAT=COMPRESSED is not optimised for block IO
+			for now. We do the IMPORT page by page. */
+			n_io_buffers = 1;
+		}
+
 		fil_iterator_t	iter;
 
 		iter.file = file;
@@ -3753,14 +3757,6 @@ fil_tablespace_iterate(
 		/* read (optional) crypt data */
 		iter.crypt_data = fil_space_read_crypt_data(
 			0, page, crypt_data_offset);
-
-		/* Compressed pages can't be optimised for block IO for now.
-		We do the IMPORT page by page. */
-
-		if (callback.get_zip_size() > 0) {
-			iter.n_io_buffers = 1;
-			ut_a(iter.page_size == callback.get_zip_size());
-		}
 
 		/** If tablespace is encrypted, it needs extra buffers */
 		if (iter.crypt_data != NULL) {
@@ -3784,6 +3780,13 @@ fil_tablespace_iterate(
 				(2 + iter.n_io_buffers) * UNIV_PAGE_SIZE);
 			iter.crypt_io_buffer = static_cast<byte*>(
 				ut_align(crypt_io_buffer, UNIV_PAGE_SIZE));
+		}
+
+		if (block.page.zip.ssize) {
+			ut_ad(iter.n_io_buffers == 1);
+			block.frame = iter.io_buffer;
+			block.page.zip.data = block.frame + UNIV_PAGE_SIZE;
+			ut_d(block.page.zip.m_external = true);
 		}
 
 		err = fil_iterate(iter, &block, callback);
