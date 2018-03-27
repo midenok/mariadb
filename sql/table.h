@@ -1801,6 +1801,8 @@ class SJ_MATERIALIZATION_INFO;
 class Index_hint;
 class Item_in_subselect;
 
+class TR_table;
+struct Name_resolution_context;
 /* trivial class, for %union in sql_yacc.yy */
 struct vers_history_point_t
 {
@@ -1808,25 +1810,38 @@ struct vers_history_point_t
   Item *item;
 };
 
+enum tr_field_id_t {
+  FLD_TRX_ID= 0,
+  FLD_COMMIT_ID,
+  FLD_BEGIN_TS,
+  FLD_COMMIT_TS,
+  FLD_ISO_LEVEL,
+  FIELD_COUNT
+};
+
 class Vers_history_point : public vers_history_point_t
 {
   void fix_item();
 
 public:
+  TABLE_LIST *tr_table;
+
   Vers_history_point() { empty(); }
   Vers_history_point(vers_sys_type_t unit_arg, Item *item_arg)
   {
     unit= unit_arg;
     item= item_arg;
+    tr_table= NULL;
     fix_item();
   }
   Vers_history_point(vers_history_point_t p)
   {
     unit= p.unit;
     item= p.item;
+    tr_table= NULL;
     fix_item();
   }
-  void empty() { unit= VERS_UNDEFINED; item= NULL; }
+  void empty() { unit= VERS_UNDEFINED; item= NULL; tr_table= NULL; }
   void print(String *str, enum_query_type, const char *prefix, size_t plen) const;
   bool resolve_unit(THD *thd);
   bool resolve_unit_trx_id(THD *thd)
@@ -1843,6 +1858,7 @@ public:
   }
   void bad_expression_data_type_error(const char *type) const;
   bool eq(const vers_history_point_t &point) const;
+  Item *make_trx_id(THD *thd, Name_resolution_context &ctx) const;
 };
 
 struct vers_select_conds_t
@@ -2982,16 +2998,9 @@ class TR_table: public TABLE_LIST
   THD *thd;
   Open_tables_backup *open_tables_backup;
 
-public:
-  enum field_id_t {
-    FLD_TRX_ID= 0,
-    FLD_COMMIT_ID,
-    FLD_BEGIN_TS,
-    FLD_COMMIT_TS,
-    FLD_ISO_LEVEL,
-    FIELD_COUNT
-  };
+  enum init_type {NO_INIT};
 
+public:
   enum enabled {NO, MAYBE, YES};
   static enum enabled use_transaction_registry;
 
@@ -3000,6 +3009,12 @@ public:
      @param[in] Current transaction is read-write.
    */
   TR_table(THD *_thd, bool rw= false);
+  TR_table(init_type n, THD *_thd);
+
+  bool setup_select();
+  static
+  bool add_subquery(THD* thd, Vers_history_point &p, SELECT_LEX *sl, uint &subq_n, bool backwards= false);
+
   /**
      Opens a transaction_registry table.
 

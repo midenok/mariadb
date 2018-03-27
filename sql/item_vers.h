@@ -24,12 +24,12 @@
 
 class Item_func_trt_ts: public Item_datetimefunc
 {
-  TR_table::field_id_t trt_field;
+  tr_field_id_t trt_field;
 public:
-  Item_func_trt_ts(THD *thd, Item* a, TR_table::field_id_t _trt_field);
+  Item_func_trt_ts(THD *thd, Item* a, tr_field_id_t _trt_field);
   const char *func_name() const
   {
-    if (trt_field == TR_table::FLD_BEGIN_TS)
+    if (trt_field == FLD_BEGIN_TS)
     {
       return "trt_begin_ts";
     }
@@ -43,25 +43,25 @@ public:
 
 class Item_func_trt_id : public Item_longlong_func
 {
-  TR_table::field_id_t trt_field;
+  tr_field_id_t trt_field;
   bool backwards;
 
   longlong get_by_trx_id(ulonglong trx_id);
   longlong get_by_commit_ts(MYSQL_TIME &commit_ts, bool backwards);
 
 public:
-  Item_func_trt_id(THD *thd, Item* a, TR_table::field_id_t _trt_field, bool _backwards= false);
-  Item_func_trt_id(THD *thd, Item* a, Item* b, TR_table::field_id_t _trt_field);
+  Item_func_trt_id(THD *thd, Item* a, tr_field_id_t _trt_field, bool _backwards= false);
+  Item_func_trt_id(THD *thd, Item* a, Item* b, tr_field_id_t _trt_field);
 
   const char *func_name() const
   {
     switch (trt_field)
     {
-    case TR_table::FLD_TRX_ID:
+    case FLD_TRX_ID:
       return "trt_trx_id";
-    case TR_table::FLD_COMMIT_ID:
+    case FLD_COMMIT_ID:
         return "trt_commit_id";
-    case TR_table::FLD_ISO_LEVEL:
+    case FLD_ISO_LEVEL:
       return "trt_iso_level";
     default:
       DBUG_ASSERT(0);
