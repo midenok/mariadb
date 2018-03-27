@@ -8506,6 +8506,163 @@ bool fk_modifies_child(enum_fk_option opt)
   return can_write[opt];
 }
 
+
+#define newx new (thd->mem_root)
+Item* Vers_history_point::make_trx_id(THD* thd, Name_resolution_context& ctx) const
+{
+  if (unit != VERS_TIMESTAMP)
+    return item;
+  DBUG_ASSERT(tr_table);
+  DBUG_ASSERT(tr_table->table);
+  DBUG_ASSERT(FLD_TRX_ID < tr_table->table->s->fields);
+  return newx Item_field(thd, &ctx, tr_table->table->field[FLD_TRX_ID]);
+}
+
+class LEX_context
+{
+  LEX *lex;
+  SELECT_LEX *current_select;
+  int nest_level;
+
+public:
+  LEX_context(LEX *_lex, SELECT_LEX *new_select) :
+    lex(_lex),
+    current_select(_lex->current_select),
+    nest_level(_lex->nest_level)
+  {
+    lex->current_select= new_select;
+    lex->nest_level= new_select->nest_level;
+  }
+  ~LEX_context()
+  {
+    lex->current_select= current_select;
+    lex->nest_level= nest_level;
+  }
+};
+
+bool TR_table::add_subquery(THD* thd, Vers_history_point &p,
+                            SELECT_LEX *cur_select, uint &subq_n,
+                            bool backwards)
+{
+  LEX *lex= thd->lex;
+  if (!lex->expr_allows_subselect)
+  {
+    my_error(ER_VERS_TRT_SUBQUERY_FAILED, MYF(0));
+    return true;
+  }
+
+  Query_arena_stmt on_stmt_arena(thd); // FIXME: is it needed?
+  lex->derived_tables|= DERIVED_SUBQUERY;
+
+  LEX_context lex_ctx(lex, cur_select);
+  if (mysql_new_select(lex, 1, NULL))
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+  mysql_init_select(lex);
+  SELECT_LEX *sel= lex->current_select;
+  sel->linkage= DERIVED_TABLE_TYPE;
+  { // add fields
+    sel->parsing_place= SELECT_LIST;
+    static const LEX_CSTRING trx_id_name= {C_STRING_WITH_LEN("transaction_id")};
+    Item_field *trx_id= newx Item_field(thd, lex->current_context(),
+      MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &trx_id_name);
+    if (!trx_id)
+    {
+       my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    sel->add_item_to_list(thd, trx_id);
+  }
+  { // add table
+    sel->parsing_place= NO_MATTER;
+    Table_ident *ti= newx Table_ident(thd, &MYSQL_SCHEMA_NAME,
+                                      &TRANSACTION_REG_NAME, true);
+    if (!ti)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+
+    sel->table_join_options= 0;
+    TABLE_LIST *tl= sel->add_table_to_list(thd, ti, &TRANSACTION_REG_NAME,
+                                sel->get_table_join_options(),
+                                TL_READ, MDL_SHARED_READ, NULL, NULL, NULL);
+    if (!tl)
+      return true;
+    sel->add_joined_table(tl);
+    sel->context.table_list= tl;
+    sel->context.first_name_resolution_table= tl;
+  }
+  static const LEX_CSTRING commit_ts_name= {C_STRING_WITH_LEN("commit_timestamp")};
+  { // set WHERE
+    sel->parsing_place= IN_WHERE;
+    Item_field *commit_ts= newx Item_field(thd, lex->current_context(),
+      MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
+    if (!commit_ts)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    COND *cond= newx Item_func_le(thd, commit_ts, p.item);
+    sel->where= normalize_cond(thd, cond);
+    cond->top_level_item();
+  }
+  { // add ORDER
+    sel->parsing_place= IN_ORDER_BY;
+    Item_field *commit_ts= newx Item_field(thd, lex->current_context(),
+      MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
+    if (!commit_ts)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    sel->add_order_to_list(thd, commit_ts, backwards);
+  }
+  { // set LIMIT
+    sel->parsing_place= NO_MATTER;
+    sel->select_limit= new (thd->mem_root) Item_uint(thd, 1);
+    if (!sel->select_limit)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    sel->offset_limit= 0;
+    sel->explicit_limit= 1;
+    lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_LIMIT);
+  }
+  { // add subquery to outer query
+    lex->current_select= cur_select;
+    SELECT_LEX_UNIT *unit= sel->master_unit();
+    Table_ident *ti= newx Table_ident(unit);
+    if (ti == NULL)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    static const LEX_CSTRING subq_prefix= {C_STRING_WITH_LEN("__trt_")};
+    String *alias_str= newx String(subq_prefix.str, table_alias_charset);
+    if (!alias_str)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    alias_str->append_ulonglong(subq_n);
+    LEX_CSTRING alias= alias_str->lex_cstring();
+    TABLE_LIST *subquery= cur_select->add_table_to_list(thd, ti, &alias, 0,
+                                                   TL_READ, MDL_SHARED_READ);
+    if (!subquery)
+      return true;
+
+    cur_select->add_joined_table(subquery);
+    p.tr_table= subquery;
+    subq_n++;
+  }
+
+  return false;
+}
+
 enum TR_table::enabled TR_table::use_transaction_registry= TR_table::MAYBE;
 
 TR_table::TR_table(THD* _thd, bool rw) :
@@ -8513,6 +8670,13 @@ TR_table::TR_table(THD* _thd, bool rw) :
 {
   init_one_table(&MYSQL_SCHEMA_NAME, &TRANSACTION_REG_NAME,
                  NULL, rw ? TL_WRITE : TL_READ);
+}
+
+TR_table::TR_table(init_type n, THD* _thd) :
+  thd(_thd), open_tables_backup(NULL)
+{
+  TABLE_LIST *this_tl= static_cast<TABLE_LIST *>(this);
+  bzero((char *) this_tl, sizeof(*this_tl));
 }
 
 bool TR_table::open()
@@ -8585,7 +8749,6 @@ bool TR_table::update(ulonglong start_id, ulonglong end_id)
   return error;
 }
 
-#define newx new (thd->mem_root)
 bool TR_table::query(ulonglong trx_id)
 {
   if (!table && open())
@@ -8698,6 +8861,12 @@ bool TR_table::query_sees(bool &result, ulonglong trx_id1, ulonglong trx_id0,
   if (trx_id1 == ULONGLONG_MAX || trx_id0 == 0)
   {
     result= true;
+    return false;
+  }
+
+  if (trx_id0 == ULONGLONG_MAX || trx_id1 == 0)
+  {
+    result= false;
     return false;
   }
 

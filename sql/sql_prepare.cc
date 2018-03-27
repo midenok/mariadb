@@ -2251,6 +2251,8 @@ static bool check_prepared_statement(Prepared_statement *stmt)
   DBUG_PRINT("enter",("command: %d  param_count: %u",
                       sql_command, stmt->param_count));
 
+  if (sql_command == SQLCOM_SELECT && lex->vers_add_trt_query(thd))
+    goto error;
   lex->first_lists_tables_same();
   tables= lex->query_tables;
 

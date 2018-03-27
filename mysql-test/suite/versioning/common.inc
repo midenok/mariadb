@@ -36,7 +36,7 @@ end~~
 
 delimiter ;~~
 
-create function check_result (cond boolean)
+create function if not exists check_result (cond boolean)
     returns char(50) deterministic
     return if(cond = 1, '[CORRECT]', '[WRONG]');
 

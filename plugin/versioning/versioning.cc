@@ -25,7 +25,7 @@
 #include "vers_utils.h"
 
 /* System Versioning: TRT_TRX_ID(), TRT_COMMIT_ID(), TRT_BEGIN_TS(), TRT_COMMIT_TS(), TRT_ISO_LEVEL() */
-template <TR_table::field_id_t TRT_FIELD>
+template <tr_field_id_t TRT_FIELD>
 class Create_func_trt : public Create_native_func
 {
 public:
@@ -38,10 +38,10 @@ protected:
   virtual ~Create_func_trt<TRT_FIELD>() {}
 };
 
-template<TR_table::field_id_t TRT_FIELD>
+template<tr_field_id_t TRT_FIELD>
 Create_func_trt<TRT_FIELD> Create_func_trt<TRT_FIELD>::s_singleton;
 
-template <TR_table::field_id_t TRT_FIELD>
+template <tr_field_id_t TRT_FIELD>
 Item*
 Create_func_trt<TRT_FIELD>::create_native(THD *thd, LEX_CSTRING *name,
   List<Item> *item_list)
@@ -58,13 +58,13 @@ Create_func_trt<TRT_FIELD>::create_native(THD *thd, LEX_CSTRING *name,
     Item *param_1= item_list->pop();
     switch (TRT_FIELD)
     {
-    case TR_table::FLD_BEGIN_TS:
-    case TR_table::FLD_COMMIT_TS:
+    case FLD_BEGIN_TS:
+    case FLD_COMMIT_TS:
       func= new (thd->mem_root) Item_func_trt_ts(thd, param_1, TRT_FIELD);
       break;
-    case TR_table::FLD_TRX_ID:
-    case TR_table::FLD_COMMIT_ID:
-    case TR_table::FLD_ISO_LEVEL:
+    case FLD_TRX_ID:
+    case FLD_COMMIT_ID:
+    case FLD_ISO_LEVEL:
       func= new (thd->mem_root) Item_func_trt_id(thd, param_1, TRT_FIELD);
       break;
     default:
@@ -78,8 +78,8 @@ Create_func_trt<TRT_FIELD>::create_native(THD *thd, LEX_CSTRING *name,
     Item *param_2= item_list->pop();
     switch (TRT_FIELD)
     {
-    case TR_table::FLD_TRX_ID:
-    case TR_table::FLD_COMMIT_ID:
+    case FLD_TRX_ID:
+    case FLD_COMMIT_ID:
       func= new (thd->mem_root) Item_func_trt_id(thd, param_1, param_2, TRT_FIELD);
       break;
     default:
@@ -140,11 +140,11 @@ Create_func_trt_trx_sees<X> Create_func_trt_trx_sees<X>::s_singleton;
 
 static Native_func_registry func_array[] =
 {
-  { { C_STRING_WITH_LEN("TRT_BEGIN_TS") }, BUILDER(Create_func_trt<TR_table::FLD_BEGIN_TS>)},
-  { { C_STRING_WITH_LEN("TRT_COMMIT_ID") }, BUILDER(Create_func_trt<TR_table::FLD_COMMIT_ID>)},
-  { { C_STRING_WITH_LEN("TRT_COMMIT_TS") }, BUILDER(Create_func_trt<TR_table::FLD_COMMIT_TS>)},
-  { { C_STRING_WITH_LEN("TRT_ISO_LEVEL") }, BUILDER(Create_func_trt<TR_table::FLD_ISO_LEVEL>)},
-  { { C_STRING_WITH_LEN("TRT_TRX_ID") }, BUILDER(Create_func_trt<TR_table::FLD_TRX_ID>)},
+  { { C_STRING_WITH_LEN("TRT_BEGIN_TS") }, BUILDER(Create_func_trt<FLD_BEGIN_TS>)},
+  { { C_STRING_WITH_LEN("TRT_COMMIT_ID") }, BUILDER(Create_func_trt<FLD_COMMIT_ID>)},
+  { { C_STRING_WITH_LEN("TRT_COMMIT_TS") }, BUILDER(Create_func_trt<FLD_COMMIT_TS>)},
+  { { C_STRING_WITH_LEN("TRT_ISO_LEVEL") }, BUILDER(Create_func_trt<FLD_ISO_LEVEL>)},
+  { { C_STRING_WITH_LEN("TRT_TRX_ID") }, BUILDER(Create_func_trt<FLD_TRX_ID>)},
   { { C_STRING_WITH_LEN("TRT_TRX_SEES") }, BUILDER(Create_func_trt_trx_sees<Item_func_trt_trx_sees>)},
   { { C_STRING_WITH_LEN("TRT_TRX_SEES_EQ") }, BUILDER(Create_func_trt_trx_sees<Item_func_trt_trx_sees_eq>)},
   { {0, 0}, NULL}

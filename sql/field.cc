@@ -2102,7 +2102,7 @@ bool Field_vers_trx_id::get_date(MYSQL_TIME *ltime, ulonglong fuzzydate, ulonglo
   bool found= trt.query(trx_id);
   if (found)
   {
-    trt[TR_table::FLD_COMMIT_TS]->get_date(&cache, fuzzydate);
+    trt[FLD_COMMIT_TS]->get_date(&cache, fuzzydate);
     *ltime= cache;
     cached= trx_id;
     return false;

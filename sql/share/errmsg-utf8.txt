@@ -7926,3 +7926,5 @@ ER_TRUNCATE_ILLEGAL_VERS
 
 WARN_VERS_MODIFY_HISTORY
         eng "Modifying history is prohibited, set `secure_timestamp` to NO or SUPER"
+ER_VERS_TRT_SUBQUERY_FAILED
+        eng "Failed to add transaction registry subquery"
