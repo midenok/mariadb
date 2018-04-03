@@ -8584,7 +8584,15 @@ bool TR_table::open()
   if (use_transaction_registry == MAYBE)
     error= check(error);
 
-  use_transaction_registry= error ? NO : YES;
+  if (!error)
+  {
+    use_transaction_registry= YES;
+    setup_table_map(table, this, 0);
+  }
+  else
+  {
+    use_transaction_registry= NO;
+  }
 
   return error;
 }
