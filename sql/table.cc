@@ -8724,6 +8724,14 @@ bool TR_table::query(MYSQL_TIME &commit_time, bool backwards)
     return false;
   int quick= select->test_quick_select(thd, table->s->keys_in_use, 0, UINT_MAX32,
                             false, false, false);
+  if (select->quick && select->quick->reset())
+  {
+    if (thd->killed)
+      my_error(ER_QUERY_INTERRUPTED, MYF(0));
+    else
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return false;
+  }
   error= init_read_record(&info, thd, table, select, NULL,
                           1 /* use_record_cache */, true /* print_error */,
                           false /* disable_rr_cache */);
