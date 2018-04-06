@@ -3004,6 +3004,11 @@ public:
      @param[in] Current transaction is read-write.
    */
   TR_table(THD *_thd, bool rw= false);
+
+  bool setup_select();
+  static
+  bool add_to_list(THD *thd, st_select_lex *select);
+
   /**
      Opens a transaction_registry table.
 

@@ -717,6 +717,20 @@ void vers_select_conds_t::print(String *str, enum_query_type query_type)
   }
 }
 
+bool TR_table::setup_select()
+{
+  DBUG_ASSERT(!mdl_request.ticket);
+  mdl_request.init(MDL_key::TABLE, db.str, table_name.str,
+                   mdl_request.type, mdl_request.duration);
+  // Since we modified SELECT_LEX::table_list, we need to invalidate current SP
+  if (thd->spcont)
+  {
+    DBUG_ASSERT(thd->spcont->m_sp);
+    thd->spcont->m_sp->set_sp_cache_version(0);
+  }
+  return false;
+}
+
 int SELECT_LEX::vers_setup_conds(THD *thd, TABLE_LIST *tables, COND **where_expr)
 {
   DBUG_ENTER("SELECT_LEX::vers_setup_cond");

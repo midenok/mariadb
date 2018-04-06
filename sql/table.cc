@@ -8558,6 +8558,19 @@ bool fk_modifies_child(enum_fk_option opt)
   return can_write[opt];
 }
 
+bool TR_table::add_to_list(THD* thd, SELECT_LEX* select)
+{
+  return false;
+  Table_ident *ti= new (thd->mem_root) Table_ident(thd, &MYSQL_SCHEMA_NAME,
+                                                   &TRANSACTION_REG_NAME, true);
+  // FIXME: check if already added
+  if (!select->add_table_to_list(thd, ti, &TRANSACTION_REG_NAME,
+                                  select->get_table_join_options(),
+                                  TL_READ, MDL_SHARED_READ))
+    return true;
+  return false;
+}
+
 enum TR_table::enabled TR_table::use_transaction_registry= TR_table::MAYBE;
 
 TR_table::TR_table(THD* _thd, bool rw) :

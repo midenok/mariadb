@@ -9243,6 +9243,8 @@ system_time_expr:
           AS OF_SYM history_point
           {
             Lex->vers_conditions.init(SYSTEM_TIME_AS_OF, $3);
+            if (TR_table::add_to_list(thd, Select))
+              MYSQL_YYABORT;
           }
         | ALL
           {
@@ -9252,11 +9254,15 @@ system_time_expr:
           TO_SYM history_point
           {
             Lex->vers_conditions.init(SYSTEM_TIME_FROM_TO, $2, $4);
+            if (TR_table::add_to_list(thd, Select))
+              MYSQL_YYABORT;
           }
         | BETWEEN_SYM history_point
           AND_SYM history_point
           {
             Lex->vers_conditions.init(SYSTEM_TIME_BETWEEN, $2, $4);
+            if (TR_table::add_to_list(thd, Select))
+              MYSQL_YYABORT;
           }
         ;
 
