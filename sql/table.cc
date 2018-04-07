@@ -8597,15 +8597,7 @@ bool TR_table::open()
   if (use_transaction_registry == MAYBE)
     error= check(error);
 
-  if (!error)
-  {
-    use_transaction_registry= YES;
-    setup_table_map(table, this, 0);
-  }
-  else
-  {
-    use_transaction_registry= NO;
-  }
+  use_transaction_registry= error ? NO : YES;
 
   return error;
 }
@@ -8676,12 +8668,8 @@ bool TR_table::query(ulonglong trx_id)
   if ((error= setup_conds(thd, this, dummy, &conds)))
     return false;
   select= make_select(table, 0, 0, conds, NULL, 0, &error);
-  if (error)
-  {
-    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+  if (error || !select)
     return false;
-  }
-  DBUG_ASSERT(select);
   // FIXME: (performance) force index 'transaction_id'
   error= init_read_record(&info, thd, table, select, NULL,
                           1 /* use_record_cache */, true /* print_error */,
@@ -8711,27 +8699,12 @@ bool TR_table::query(MYSQL_TIME &commit_time, bool backwards)
     conds= newx Item_func_ge(thd, field, value);
   else
     conds= newx Item_func_le(thd, field, value);
-  if (setup_conds(thd, this, dummy, &conds))
+  if ((error= setup_conds(thd, this, dummy, &conds)))
     return false;
+  // FIXME: (performance) force index 'commit_timestamp'
   select= make_select(table, 0, 0, conds, NULL, 0, &error);
-  if (error)
-  {
-    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+  if (error || !select)
     return false;
-  }
-  DBUG_ASSERT(select);
-  if (process_index_hints(table))
-    return false;
-  int quick= select->test_quick_select(thd, table->s->keys_in_use, 0, UINT_MAX32,
-                            false, false, false);
-  if (select->quick && select->quick->reset())
-  {
-    if (thd->killed)
-      my_error(ER_QUERY_INTERRUPTED, MYF(0));
-    else
-      my_error(ER_OUT_OF_RESOURCES, MYF(0));
-    return false;
-  }
   error= init_read_record(&info, thd, table, select, NULL,
                           1 /* use_record_cache */, true /* print_error */,
                           false /* disable_rr_cache */);
