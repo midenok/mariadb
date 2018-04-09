@@ -3258,6 +3258,55 @@ mysql_execute_command(THD *thd)
     already.
   */
   DBUG_ASSERT(! thd->transaction_rollback_request || thd->in_sub_stmt);
+
+  if (thd->lex->sql_command == SQLCOM_SELECT)
+  {
+    lex->derived_tables|= DERIVED_SUBQUERY;
+    if (lex->expr_allows_subselect &&
+        lex->sql_command != (int)SQLCOM_PURGE /* FIXME: is it needed? */)
+    {
+      DBUG_ASSERT(lex->current_select->linkage != GLOBAL_OPTIONS_TYPE); /* FIXME: is it needed? */
+      if (mysql_new_select(lex, 1, NULL))
+        ; // FIXME: error
+      mysql_init_select(lex);
+      SELECT_LEX *sel= lex->current_select;
+      sel->linkage= DERIVED_TABLE_TYPE;
+      sel->parsing_place= SELECT_LIST;
+      { // add fields
+        LEX_CSTRING trx_id_name= {C_STRING_WITH_LEN("transaction_id")};
+        Item_field *item= new (thd->mem_root) Item_field(thd, lex->current_context(),
+          MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &trx_id_name);
+        if (!item)
+          ; // FIXME: error
+        sel->add_item_to_list(thd, item);
+      }
+      { // add table
+        sel->table_join_options= 0;
+        TABLE_LIST *tl= TR_table::add_to_list(thd, sel);
+        if (!tl)
+        {
+          // FIXME: error
+        }
+        sel->add_joined_table(tl);
+        sel->context.table_list= tl;
+        sel->context.first_name_resolution_table= tl;
+      }
+      { // set LIMIT
+        sel->select_limit= new (thd->mem_root) Item_uint(thd, 1);
+        if (!sel->select_limit)
+          // FIXME: error
+        sel->offset_limit= 0;
+        sel->explicit_limit= 1;
+        lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_LIMIT);
+      }
+    }
+    else
+    {
+      // FIXME: error
+    }
+  }
+
+
   /*
     In many cases first table of main SELECT_LEX have special meaning =>
     check that it is first table in global list and relink it first in 
