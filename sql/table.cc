@@ -8585,8 +8585,8 @@ bool TR_table::add_subquery(THD* thd, Item *timestamp, bool backwards)
   mysql_init_select(lex);
   SELECT_LEX *sel= lex->current_select;
   sel->linkage= DERIVED_TABLE_TYPE;
-  sel->parsing_place= SELECT_LIST;
   { // add fields
+    sel->parsing_place= SELECT_LIST;
     static const LEX_CSTRING trx_id_name= {C_STRING_WITH_LEN("transaction_id")};
     Item_field *trx_id= newx Item_field(thd, lex->current_context(),
       MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &trx_id_name);
@@ -8595,6 +8595,7 @@ bool TR_table::add_subquery(THD* thd, Item *timestamp, bool backwards)
     sel->add_item_to_list(thd, trx_id);
   }
   { // add table
+    sel->parsing_place= NO_MATTER;
     sel->table_join_options= 0;
     TABLE_LIST *tl= TR_table::add_to_list(thd, sel);
     if (!tl)
@@ -8605,8 +8606,9 @@ bool TR_table::add_subquery(THD* thd, Item *timestamp, bool backwards)
     sel->context.table_list= tl;
     sel->context.first_name_resolution_table= tl;
   }
+  static const LEX_CSTRING commit_ts_name= {C_STRING_WITH_LEN("commit_timestamp")};
   { // set WHERE
-    static const LEX_CSTRING commit_ts_name= {C_STRING_WITH_LEN("commit_timestamp")};
+    sel->parsing_place= IN_WHERE;
     Item_field *commit_ts= newx Item_field(thd, lex->current_context(),
       MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
     if (!commit_ts)
@@ -8615,9 +8617,16 @@ bool TR_table::add_subquery(THD* thd, Item *timestamp, bool backwards)
     sel->where= normalize_cond(thd, cond);
     cond->top_level_item();
   }
-  { // FIXME: add ORDER
+  { // add ORDER
+    sel->parsing_place= IN_ORDER_BY;
+    Item_field *commit_ts= newx Item_field(thd, lex->current_context(),
+      MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
+    if (!commit_ts)
+      return true; // FIXME: error
+    sel->add_order_to_list(thd, commit_ts, backwards);
   }
   { // set LIMIT
+    sel->parsing_place= NO_MATTER;
     sel->select_limit= new (thd->mem_root) Item_uint(thd, 1);
     if (!sel->select_limit)
       return true; // FIXME: error
