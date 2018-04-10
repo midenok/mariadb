@@ -3008,6 +3008,8 @@ public:
   bool setup_select();
   static
   TABLE_LIST* add_to_list(THD *thd, st_select_lex *select);
+  static
+  bool add_subquery(THD* thd, Item *timestamp, bool backwards= false);
 
   /**
      Opens a transaction_registry table.

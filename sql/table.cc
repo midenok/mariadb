@@ -8558,9 +8558,10 @@ bool fk_modifies_child(enum_fk_option opt)
   return can_write[opt];
 }
 
+#define newx new (thd->mem_root)
 TABLE_LIST* TR_table::add_to_list(THD* thd, SELECT_LEX* select)
 {
-  Table_ident *ti= new (thd->mem_root) Table_ident(thd, &MYSQL_SCHEMA_NAME,
+  Table_ident *ti= newx Table_ident(thd, &MYSQL_SCHEMA_NAME,
                                                    &TRANSACTION_REG_NAME, true);
   if (!ti)
     return NULL;
@@ -8568,6 +8569,64 @@ TABLE_LIST* TR_table::add_to_list(THD* thd, SELECT_LEX* select)
   return select->add_table_to_list(thd, ti, &TRANSACTION_REG_NAME,
                                   select->get_table_join_options(),
                                   TL_READ, MDL_SHARED_READ);
+}
+
+bool TR_table::add_subquery(THD* thd, Item *timestamp, bool backwards)
+{
+  LEX  *lex= thd->lex;
+  if (!lex->expr_allows_subselect)
+    return true; // FIXME: error
+
+  lex->derived_tables|= DERIVED_SUBQUERY;
+
+  DBUG_ASSERT(lex->current_select->linkage != GLOBAL_OPTIONS_TYPE); /* FIXME: is it needed? */
+  if (mysql_new_select(lex, 1, NULL))
+    return true; // FIXME: error
+  mysql_init_select(lex);
+  SELECT_LEX *sel= lex->current_select;
+  sel->linkage= DERIVED_TABLE_TYPE;
+  sel->parsing_place= SELECT_LIST;
+  { // add fields
+    static const LEX_CSTRING trx_id_name= {C_STRING_WITH_LEN("transaction_id")};
+    Item_field *trx_id= newx Item_field(thd, lex->current_context(),
+      MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &trx_id_name);
+    if (!trx_id)
+      return true; // FIXME: error
+    sel->add_item_to_list(thd, trx_id);
+  }
+  { // add table
+    sel->table_join_options= 0;
+    TABLE_LIST *tl= TR_table::add_to_list(thd, sel);
+    if (!tl)
+    {
+      return true; // FIXME: error
+    }
+    sel->add_joined_table(tl); // FIXME: is it needed?
+    sel->context.table_list= tl;
+    sel->context.first_name_resolution_table= tl;
+  }
+  { // set WHERE
+    static const LEX_CSTRING commit_ts_name= {C_STRING_WITH_LEN("commit_timestamp")};
+    Item_field *commit_ts= newx Item_field(thd, lex->current_context(),
+      MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
+    if (!commit_ts)
+      return true; // FIXME: error
+    COND *cond= newx Item_func_le(thd, commit_ts, timestamp);
+    sel->where= normalize_cond(thd, cond);
+    cond->top_level_item();
+  }
+  { // FIXME: add ORDER
+  }
+  { // set LIMIT
+    sel->select_limit= new (thd->mem_root) Item_uint(thd, 1);
+    if (!sel->select_limit)
+      return true; // FIXME: error
+    sel->offset_limit= 0;
+    sel->explicit_limit= 1;
+    lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_LIMIT);
+  }
+
+  return false;
 }
 
 enum TR_table::enabled TR_table::use_transaction_registry= TR_table::MAYBE;
@@ -8650,7 +8709,6 @@ bool TR_table::update(ulonglong start_id, ulonglong end_id)
   return error;
 }
 
-#define newx new (thd->mem_root)
 bool TR_table::query(ulonglong trx_id)
 {
   if (!table && open())
