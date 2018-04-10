@@ -1807,11 +1807,13 @@ class SJ_MATERIALIZATION_INFO;
 class Index_hint;
 class Item_in_subselect;
 
+class TR_table;
 /* trivial class, for %union in sql_yacc.yy */
 struct vers_history_point_t
 {
   vers_sys_type_t unit;
   Item *item;
+  TR_table *trt;
 };
 
 class Vers_history_point : public vers_history_point_t
@@ -1824,15 +1826,17 @@ public:
   {
     unit= unit_arg;
     item= item_arg;
+    trt= NULL;
     fix_item();
   }
   Vers_history_point(vers_history_point_t p)
   {
     unit= p.unit;
     item= p.item;
+    trt= p.trt;
     fix_item();
   }
-  void empty() { unit= VERS_UNDEFINED; item= NULL; }
+  void empty() { unit= VERS_UNDEFINED; item= NULL; trt= NULL; }
   void print(String *str, enum_query_type, const char *prefix, size_t plen);
   void resolve_unit(bool timestamps_only);
 };
@@ -2986,6 +2990,8 @@ class TR_table: public TABLE_LIST
   THD *thd;
   Open_tables_backup *open_tables_backup;
 
+  enum init_type {NO_INIT};
+
 public:
   enum field_id_t {
     FLD_TRX_ID= 0,
@@ -3004,12 +3010,11 @@ public:
      @param[in] Current transaction is read-write.
    */
   TR_table(THD *_thd, bool rw= false);
+  TR_table(init_type n, THD *_thd);
 
   bool setup_select();
   static
-  TABLE_LIST* add_to_list(THD *thd, st_select_lex *select);
-  static
-  bool add_subquery(THD* thd, Item *timestamp, bool backwards= false);
+  bool add_subquery(THD* thd, Vers_history_point &p, bool backwards= false);
 
   /**
      Opens a transaction_registry table.

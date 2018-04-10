@@ -8559,19 +8559,7 @@ bool fk_modifies_child(enum_fk_option opt)
 }
 
 #define newx new (thd->mem_root)
-TABLE_LIST* TR_table::add_to_list(THD* thd, SELECT_LEX* select)
-{
-  Table_ident *ti= newx Table_ident(thd, &MYSQL_SCHEMA_NAME,
-                                                   &TRANSACTION_REG_NAME, true);
-  if (!ti)
-    return NULL;
-  // FIXME: check if already added
-  return select->add_table_to_list(thd, ti, &TRANSACTION_REG_NAME,
-                                  select->get_table_join_options(),
-                                  TL_READ, MDL_SHARED_READ);
-}
-
-bool TR_table::add_subquery(THD* thd, Item *timestamp, bool backwards)
+bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
 {
   LEX  *lex= thd->lex;
   if (!lex->expr_allows_subselect)
@@ -8596,15 +8584,24 @@ bool TR_table::add_subquery(THD* thd, Item *timestamp, bool backwards)
   }
   { // add table
     sel->parsing_place= NO_MATTER;
-    sel->table_join_options= 0;
-    TABLE_LIST *tl= TR_table::add_to_list(thd, sel);
-    if (!tl)
-    {
+    Table_ident *ti= newx Table_ident(thd, &MYSQL_SCHEMA_NAME,
+                                      &TRANSACTION_REG_NAME, true);
+    if (!ti)
       return true; // FIXME: error
-    }
-    sel->add_joined_table(tl); // FIXME: is it needed?
-    sel->context.table_list= tl;
-    sel->context.first_name_resolution_table= tl;
+
+    TR_table *trt= newx TR_table(NO_INIT, thd);
+    if (!trt)
+      return true; // FIXME: error
+
+    sel->table_join_options= 0;
+    if (!sel->add_table_to_list(thd, ti, &TRANSACTION_REG_NAME,
+                                sel->get_table_join_options(),
+                                TL_READ, MDL_SHARED_READ, NULL, NULL, NULL, trt))
+      return true; // FIXME: error
+    sel->add_joined_table(trt); // FIXME: is it needed?
+    sel->context.table_list= trt;
+    sel->context.first_name_resolution_table= trt;
+    p.trt= trt;
   }
   static const LEX_CSTRING commit_ts_name= {C_STRING_WITH_LEN("commit_timestamp")};
   { // set WHERE
@@ -8613,7 +8610,7 @@ bool TR_table::add_subquery(THD* thd, Item *timestamp, bool backwards)
       MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
     if (!commit_ts)
       return true; // FIXME: error
-    COND *cond= newx Item_func_le(thd, commit_ts, timestamp);
+    COND *cond= newx Item_func_le(thd, commit_ts, p.item);
     sel->where= normalize_cond(thd, cond);
     cond->top_level_item();
   }
@@ -8645,6 +8642,13 @@ TR_table::TR_table(THD* _thd, bool rw) :
 {
   init_one_table(&MYSQL_SCHEMA_NAME, &TRANSACTION_REG_NAME,
                  NULL, rw ? TL_WRITE : TL_READ);
+}
+
+TR_table::TR_table(init_type n, THD* _thd) :
+  thd(_thd), open_tables_backup(NULL)
+{
+  TABLE_LIST *this_tl= static_cast<TABLE_LIST *>(this);
+  bzero((char *) this_tl, sizeof(*this_tl));
 }
 
 bool TR_table::open()
