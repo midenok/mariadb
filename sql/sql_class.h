@@ -1962,6 +1962,10 @@ public:
 
   Global_read_lock()
     : m_state(GRL_NONE),
+#ifdef WITH_WSREP
+      provider_paused(false),
+      provider_desynced_paused(false),
+#endif
       m_mdl_global_shared_lock(NULL),
       m_mdl_blocks_commits_lock(NULL)
   {}
@@ -1981,11 +1985,28 @@ public:
     }
     return FALSE;
   }
+#ifdef WITH_WSREP
+  bool wsrep_pause(void);
+  wsrep_status_t wsrep_resume(void);
+  bool wsrep_pause_once(bool *already_paused);
+  wsrep_status_t wsrep_resume_once(void);
+  bool provider_resumed() const { return !provider_paused; }
+  void pause_provider(bool val) { provider_paused= val; }
+#endif /* WITH_WSREP */
   bool make_global_read_lock_block_commit(THD *thd);
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
 private:
   enum_grl_state m_state;
+#ifdef WITH_WSREP
+  /* FLUSH TABLE <table> WITH READ LOCK
+  FLUSH TABLES <table> FOR EXPORT
+  and so while unlocking such context provider needs to resumed. */
+  bool provider_paused;
+
+  /* Mark this true only when both action are successful. */
+  bool provider_desynced_paused;
+#endif /* WITH_WSREP */
   /**
     In order to acquire the global read lock, the connection must
     acquire shared metadata lock in GLOBAL namespace, to prohibit

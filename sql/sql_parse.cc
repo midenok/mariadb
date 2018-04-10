@@ -5163,6 +5163,21 @@ end_with_restore_list:
     }
     if (thd->global_read_lock.is_acquired())
       thd->global_read_lock.unlock_global_read_lock(thd);
+#ifdef WITH_WSREP
+      /*
+        This is for resuming the provider when used for
+        FLUSH TABLES <table> WITH READ LOCK  or
+        FLUSH TABLES <table> FOR EXPORT.
+        Note, the return value for resume is ignored here because
+        we don't want to fail the query if provider is already resumed.
+
+        Also, note that this is done after GRL is unlocked.
+        This is important because provider is resumed there
+        and we don't want do it again.
+      */
+    if (WSREP(thd) && table_lock)
+        thd->global_read_lock.wsrep_resume_once();
+#endif /* WITH_WSREP */
     if (res)
       goto error;
     my_ok(thd);
