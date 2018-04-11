@@ -1813,7 +1813,6 @@ struct vers_history_point_t
 {
   vers_sys_type_t unit;
   Item *item;
-  TR_table *trt;
 };
 
 class Vers_history_point : public vers_history_point_t
@@ -1821,6 +1820,8 @@ class Vers_history_point : public vers_history_point_t
   void fix_item();
 
 public:
+  TR_table *trt;
+
   Vers_history_point() { empty(); }
   Vers_history_point(vers_sys_type_t unit_arg, Item *item_arg)
   {
@@ -1833,7 +1834,7 @@ public:
   {
     unit= p.unit;
     item= p.item;
-    trt= p.trt;
+    trt= NULL;
     fix_item();
   }
   void empty() { unit= VERS_UNDEFINED; item= NULL; trt= NULL; }

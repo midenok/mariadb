@@ -1,0 +1,3 @@
+create or replace table t1 (pk int primary key) engine=myisam with system versioning partition by key() partitions 3;
+insert into t1 values (11), (12);
+delete from t1 where pk in (11, 12);
