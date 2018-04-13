@@ -933,11 +933,13 @@ int SELECT_LEX::vers_setup_conds(THD *thd, TABLE_LIST *tables, COND **where_expr
         cond1= newx Item_func_eq(thd, row_end, curr);
         break;
       case SYSTEM_TIME_AS_OF:
-        if (false && vers_conditions.start.unit == VERS_TIMESTAMP)
+        if (vers_conditions.start.unit == VERS_TIMESTAMP)
         {
-          TR_table *trt= vers_conditions.start.trt;
+          TABLE_LIST *trt= vers_conditions.start.trt;
           DBUG_ASSERT(trt);
-          trx_id0= newx Item_field(thd, &this->context, (*trt)[TR_table::FLD_TRX_ID]);
+          DBUG_ASSERT(trt->table);
+          DBUG_ASSERT(TR_table::FLD_TRX_ID < trt->table->s->fields);
+          trx_id0= newx Item_field(thd, &this->context, trt->table->field[TR_table::FLD_TRX_ID]);
         }
         else
         {

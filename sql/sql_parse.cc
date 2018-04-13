@@ -8186,9 +8186,9 @@ TABLE_LIST *st_select_lex::add_table_to_list(THD *thd,
 					     enum_mdl_type mdl_type,
 					     List<Index_hint> *index_hints_arg,
                                              List<String> *partition_names,
-                                             LEX_STRING *option,
-                                             TABLE_LIST *ptr)
+                                             LEX_STRING *option)
 {
+  register TABLE_LIST *ptr;
   TABLE_LIST *UNINIT_VAR(previous_table_ref); /* The table preceding the current one. */
   LEX_CSTRING alias_str;
   LEX *lex= thd->lex;
@@ -8224,7 +8224,7 @@ TABLE_LIST *st_select_lex::add_table_to_list(THD *thd,
     if (!(alias_str.str= (char*) thd->memdup(alias_str.str, alias_str.length+1)))
       DBUG_RETURN(0);
   }
-  if (!ptr && !(ptr= (TABLE_LIST *) thd->calloc(sizeof(TABLE_LIST))))
+  if (!(ptr = (TABLE_LIST *) thd->calloc(sizeof(TABLE_LIST))))
     DBUG_RETURN(0);				/* purecov: inspected */
   if (table->db.str)
   {

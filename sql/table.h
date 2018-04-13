@@ -1820,7 +1820,7 @@ class Vers_history_point : public vers_history_point_t
   void fix_item();
 
 public:
-  TR_table *trt;
+  TABLE_LIST *trt;
 
   Vers_history_point() { empty(); }
   Vers_history_point(vers_sys_type_t unit_arg, Item *item_arg)
