@@ -3224,6 +3224,8 @@ bool Sql_cmd_call::execute(THD *thd)
     TRUE        Error
 */
 
+const char *dbug_print_select(SELECT_LEX *sl);
+
 int
 mysql_execute_command(THD *thd)
 {
@@ -3279,6 +3281,7 @@ mysql_execute_command(THD *thd)
       default:;
       };
     }
+    const char *z= dbug_print_select(&lex->select_lex);
   }
 
   /*
