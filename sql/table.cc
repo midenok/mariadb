@@ -8595,7 +8595,7 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
                                 TL_READ, MDL_SHARED_READ, NULL, NULL, NULL);
     if (!tl)
       return true; // FIXME: error
-    sel->add_joined_table(tl); // FIXME: is it needed?
+    sel->add_joined_table(tl);
     sel->context.table_list= tl;
     sel->context.first_name_resolution_table= tl;
     p.trt= tl;
@@ -8627,6 +8627,19 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
     sel->offset_limit= 0;
     sel->explicit_limit= 1;
     lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_LIMIT);
+  }
+  { // add subquery to outer query
+    SELECT_LEX_UNIT *unit= sel->master_unit();
+    Table_ident *ti= new (thd->mem_root) Table_ident(unit);
+    if (ti == NULL)
+      return true; // FIXME: error
+    static LEX_CSTRING subq_name= {C_STRING_WITH_LEN("_trt_subquery")}; // FIXME: generate
+    TABLE_LIST *subquery= thd->lex->select_lex.add_table_to_list(thd, ti, &subq_name, 0,
+                                                   TL_READ, MDL_SHARED_READ);
+    if (!subquery)
+      return true; // FIXME: error
+
+    thd->lex->select_lex.add_joined_table(subquery);
   }
 
   return false;
