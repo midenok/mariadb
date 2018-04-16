@@ -8565,6 +8565,7 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
   if (!lex->expr_allows_subselect)
     return true; // FIXME: error
 
+  Query_arena_stmt on_stmt_arena(thd);
   lex->derived_tables|= DERIVED_SUBQUERY;
 
   DBUG_ASSERT(lex->current_select->linkage != GLOBAL_OPTIONS_TYPE); /* FIXME: is it needed? */

@@ -7119,6 +7119,29 @@ bool LEX::set_variable(const LEX_CSTRING *name1,
 }
 
 
+void LEX::vers_add_trt_query(THD *thd)
+{
+  for (TABLE_LIST *tl= query_tables; tl; tl= tl->next_global)
+  {
+    switch (tl->vers_conditions.type)
+    {
+    case SYSTEM_TIME_AS_OF:
+    case SYSTEM_TIME_BEFORE:
+      if (tl->vers_conditions.start.unit == VERS_TRX_ID)
+        break;
+      if (TR_table::add_subquery(thd, tl->vers_conditions.start))
+        ; // FIXME: error
+      break;
+    case SYSTEM_TIME_FROM_TO:
+    case SYSTEM_TIME_BETWEEN:
+      DBUG_ASSERT(0); // FIXME
+      break;
+    default:;
+    };
+  }
+}
+
+
 #ifdef MYSQL_SERVER
 uint binlog_unsafe_map[256];
 

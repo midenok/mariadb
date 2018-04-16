@@ -3260,26 +3260,7 @@ mysql_execute_command(THD *thd)
   DBUG_ASSERT(! thd->transaction_rollback_request || thd->in_sub_stmt);
 
   if (thd->lex->sql_command == SQLCOM_SELECT)
-  {
-    for (TABLE_LIST *tl= lex->query_tables; tl; tl= tl->next_global)
-    {
-      switch (tl->vers_conditions.type)
-      {
-      case SYSTEM_TIME_AS_OF:
-      case SYSTEM_TIME_BEFORE:
-        if (tl->vers_conditions.start.unit == VERS_TRX_ID)
-          break;
-        if (TR_table::add_subquery(thd, tl->vers_conditions.start))
-          ; // FIXME: error
-        break;
-      case SYSTEM_TIME_FROM_TO:
-      case SYSTEM_TIME_BETWEEN:
-        DBUG_ASSERT(0); // FIXME
-        break;
-      default:;
-      };
-    }
-  }
+    thd->lex->vers_add_trt_query(thd);
 
   /*
     In many cases first table of main SELECT_LEX have special meaning =>
