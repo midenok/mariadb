@@ -8561,7 +8561,7 @@ bool fk_modifies_child(enum_fk_option opt)
 #define newx new (thd->mem_root)
 bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
 {
-  LEX  *lex= thd->lex;
+  LEX *lex= thd->lex;
   if (!lex->expr_allows_subselect)
     return true; // FIXME: error
 
@@ -8599,7 +8599,6 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
     sel->add_joined_table(tl);
     sel->context.table_list= tl;
     sel->context.first_name_resolution_table= tl;
-    p.trt= tl;
   }
   static const LEX_CSTRING commit_ts_name= {C_STRING_WITH_LEN("commit_timestamp")};
   { // set WHERE
@@ -8641,6 +8640,7 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
       return true; // FIXME: error
 
     thd->lex->select_lex.add_joined_table(subquery);
+    p.trt= subquery;
   }
 
   return false;
