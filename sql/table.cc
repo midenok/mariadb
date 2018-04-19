@@ -8629,6 +8629,7 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
     lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_LIMIT);
   }
   { // add subquery to outer query
+    thd->lex->current_select= &thd->lex->select_lex;
     SELECT_LEX_UNIT *unit= sel->master_unit();
     Table_ident *ti= new (thd->mem_root) Table_ident(unit);
     if (ti == NULL)
