@@ -8563,14 +8563,19 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
 {
   LEX *lex= thd->lex;
   if (!lex->expr_allows_subselect)
-    return true; // FIXME: error
+  {
+    my_error(ER_VERS_TRT_SUBQUERY_FAILED, MYF(0));
+    return true;
+  }
 
   Query_arena_stmt on_stmt_arena(thd);
   lex->derived_tables|= DERIVED_SUBQUERY;
 
-  DBUG_ASSERT(lex->current_select->linkage != GLOBAL_OPTIONS_TYPE); /* FIXME: is it needed? */
   if (mysql_new_select(lex, 1, NULL))
-    return true; // FIXME: error
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
   mysql_init_select(lex);
   SELECT_LEX *sel= lex->current_select;
   sel->linkage= DERIVED_TABLE_TYPE;
@@ -8580,7 +8585,10 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
     Item_field *trx_id= newx Item_field(thd, lex->current_context(),
       MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &trx_id_name);
     if (!trx_id)
-      return true; // FIXME: error
+    {
+       my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
     sel->add_item_to_list(thd, trx_id);
   }
   { // add table
@@ -8588,14 +8596,17 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
     Table_ident *ti= newx Table_ident(thd, &MYSQL_SCHEMA_NAME,
                                       &TRANSACTION_REG_NAME, true);
     if (!ti)
-      return true; // FIXME: error
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
 
     sel->table_join_options= 0;
     TABLE_LIST *tl= sel->add_table_to_list(thd, ti, &TRANSACTION_REG_NAME,
                                 sel->get_table_join_options(),
                                 TL_READ, MDL_SHARED_READ, NULL, NULL, NULL);
     if (!tl)
-      return true; // FIXME: error
+      return true;
     sel->add_joined_table(tl);
     sel->context.table_list= tl;
     sel->context.first_name_resolution_table= tl;
@@ -8606,7 +8617,10 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
     Item_field *commit_ts= newx Item_field(thd, lex->current_context(),
       MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
     if (!commit_ts)
-      return true; // FIXME: error
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
     COND *cond= newx Item_func_le(thd, commit_ts, p.item);
     sel->where= normalize_cond(thd, cond);
     cond->top_level_item();
@@ -8616,14 +8630,20 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
     Item_field *commit_ts= newx Item_field(thd, lex->current_context(),
       MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
     if (!commit_ts)
-      return true; // FIXME: error
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
     sel->add_order_to_list(thd, commit_ts, backwards);
   }
   { // set LIMIT
     sel->parsing_place= NO_MATTER;
     sel->select_limit= new (thd->mem_root) Item_uint(thd, 1);
     if (!sel->select_limit)
-      return true; // FIXME: error
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
     sel->offset_limit= 0;
     sel->explicit_limit= 1;
     lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_LIMIT);
@@ -8633,12 +8653,15 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
     SELECT_LEX_UNIT *unit= sel->master_unit();
     Table_ident *ti= new (thd->mem_root) Table_ident(unit);
     if (ti == NULL)
-      return true; // FIXME: error
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
     static LEX_CSTRING subq_name= {C_STRING_WITH_LEN("_trt_subquery")}; // FIXME: generate
     TABLE_LIST *subquery= thd->lex->select_lex.add_table_to_list(thd, ti, &subq_name, 0,
                                                    TL_READ, MDL_SHARED_READ);
     if (!subquery)
-      return true; // FIXME: error
+      return true;
 
     thd->lex->select_lex.add_joined_table(subquery);
     p.trt= subquery;

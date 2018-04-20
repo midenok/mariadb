@@ -7919,3 +7919,6 @@ ER_VERS_DB_PROHIBITED
 
 ER_VERS_MULTIPLE_CTE
         eng "Multiple %`s prohibited in historical CTE query"
+
+ER_VERS_TRT_SUBQUERY_FAILED
+        eng "Failed to add transaction registry subquery"

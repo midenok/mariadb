@@ -7119,7 +7119,7 @@ bool LEX::set_variable(const LEX_CSTRING *name1,
 }
 
 
-void LEX::vers_add_trt_query(THD *thd)
+bool LEX::vers_add_trt_query(THD *thd)
 {
   for (TABLE_LIST *tl= query_tables; tl; tl= tl->next_global)
   {
@@ -7130,15 +7130,19 @@ void LEX::vers_add_trt_query(THD *thd)
       if (tl->vers_conditions.start.unit == VERS_TRX_ID)
         break;
       if (TR_table::add_subquery(thd, tl->vers_conditions.start))
-        ; // FIXME: error
+        return true;
       break;
     case SYSTEM_TIME_FROM_TO:
     case SYSTEM_TIME_BETWEEN:
-      DBUG_ASSERT(0); // FIXME
+      if (TR_table::add_subquery(thd, tl->vers_conditions.start, true))
+        return true;
+      if (TR_table::add_subquery(thd, tl->vers_conditions.end))
+        return true;
       break;
     default:;
     };
   }
+  return false;
 }
 
 
