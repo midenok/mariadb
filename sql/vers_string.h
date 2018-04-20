@@ -115,7 +115,7 @@ public:
   {
     return Storage::ptr();
   }
-  operator LEX_CSTRING& () const
+  operator LEX_CSTRING () const
   {
     return this->lex_cstring();
   }

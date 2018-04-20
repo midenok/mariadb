@@ -7121,6 +7121,7 @@ bool LEX::set_variable(const LEX_CSTRING *name1,
 
 bool LEX::vers_add_trt_query(THD *thd)
 {
+  uint subq_n= 0;
   for (TABLE_LIST *tl= query_tables; tl; tl= tl->next_global)
   {
     switch (tl->vers_conditions.type)
@@ -7129,14 +7130,14 @@ bool LEX::vers_add_trt_query(THD *thd)
     case SYSTEM_TIME_BEFORE:
       if (tl->vers_conditions.start.unit == VERS_TRX_ID)
         break;
-      if (TR_table::add_subquery(thd, tl->vers_conditions.start))
+      if (TR_table::add_subquery(thd, tl->vers_conditions.start, subq_n))
         return true;
       break;
     case SYSTEM_TIME_FROM_TO:
     case SYSTEM_TIME_BETWEEN:
-      if (TR_table::add_subquery(thd, tl->vers_conditions.start, true))
+      if (TR_table::add_subquery(thd, tl->vers_conditions.start, subq_n, true))
         return true;
-      if (TR_table::add_subquery(thd, tl->vers_conditions.end))
+      if (TR_table::add_subquery(thd, tl->vers_conditions.end, subq_n))
         return true;
       break;
     default:;

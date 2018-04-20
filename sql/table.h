@@ -3015,7 +3015,7 @@ public:
 
   bool setup_select();
   static
-  bool add_subquery(THD* thd, Vers_history_point &p, bool backwards= false);
+  bool add_subquery(THD* thd, Vers_history_point &p, uint &subq_n, bool backwards= false);
 
   /**
      Opens a transaction_registry table.

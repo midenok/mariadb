@@ -8559,7 +8559,7 @@ bool fk_modifies_child(enum_fk_option opt)
 }
 
 #define newx new (thd->mem_root)
-bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
+bool TR_table::add_subquery(THD* thd, Vers_history_point &p, uint &subq_n, bool backwards)
 {
   LEX *lex= thd->lex;
   if (!lex->expr_allows_subselect)
@@ -8651,20 +8651,29 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, bool backwards)
   { // add subquery to outer query
     thd->lex->current_select= &thd->lex->select_lex;
     SELECT_LEX_UNIT *unit= sel->master_unit();
-    Table_ident *ti= new (thd->mem_root) Table_ident(unit);
+    Table_ident *ti= newx Table_ident(unit);
     if (ti == NULL)
     {
       my_error(ER_OUT_OF_RESOURCES, MYF(0));
       return true;
     }
-    static LEX_CSTRING subq_name= {C_STRING_WITH_LEN("_trt_subquery")}; // FIXME: generate
-    TABLE_LIST *subquery= thd->lex->select_lex.add_table_to_list(thd, ti, &subq_name, 0,
+    static const LEX_CSTRING subq_prefix= {C_STRING_WITH_LEN("__trt_")};
+    SString *alias_str= newx SString(subq_prefix);
+    if (!alias_str)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    alias_str->append_ulonglong(subq_n);
+    LEX_CSTRING alias= *alias_str;
+    TABLE_LIST *subquery= thd->lex->select_lex.add_table_to_list(thd, ti, &alias, 0,
                                                    TL_READ, MDL_SHARED_READ);
     if (!subquery)
       return true;
 
     thd->lex->select_lex.add_joined_table(subquery);
     p.trt= subquery;
+    subq_n++;
   }
 
   return false;
