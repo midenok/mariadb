@@ -287,6 +287,7 @@ enum enum_drop_mode
 #define TL_OPTION_IGNORE_LEAVES 4
 #define TL_OPTION_ALIAS         8
 #define TL_OPTION_SEQUENCE      16
+#define TL_OPTION_DONT_RESOLVE  32
 
 typedef List<Item> List_item;
 typedef Mem_root_array<ORDER*, true> Group_list_ptrs;

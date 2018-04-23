@@ -7542,6 +7542,23 @@ bool setup_tables(THD *thd, Name_resolution_context *context,
   if (setup_natural_join_row_types(thd, from_clause, context))
     DBUG_RETURN(1);
 
+  TABLE_LIST *prev_tl= NULL;
+  for (table_list= context->first_name_resolution_table; table_list;
+       table_list= table_list->next_name_resolution_table)
+  {
+    if (table_list->dont_resolve)
+    {
+      if (prev_tl)
+        prev_tl->next_name_resolution_table= table_list->next_name_resolution_table;
+      else
+      {
+        context->first_name_resolution_table= table_list->next_name_resolution_table;
+        continue;
+      }
+    }
+    prev_tl= table_list;
+  }
+
   DBUG_RETURN(0);
 }
 
