@@ -8650,8 +8650,9 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p,
     }
     alias_str->append_ulonglong(subq_n);
     LEX_CSTRING alias= alias_str->lex_cstring();
-    TABLE_LIST *subquery= cur_select->add_table_to_list(thd, ti, &alias, 0,
-                                                   TL_READ, MDL_SHARED_READ);
+    TABLE_LIST *subquery= cur_select->add_table_to_list(thd, ti, &alias,
+							TL_OPTION_DONT_RESOLVE,
+							TL_READ, MDL_SHARED_READ);
     if (!subquery)
       return true;
 

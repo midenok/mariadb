@@ -8293,6 +8293,7 @@ TABLE_LIST *st_select_lex::add_table_to_list(THD *thd,
   ptr->force_index= MY_TEST(table_options & TL_OPTION_FORCE_INDEX);
   ptr->ignore_leaves= MY_TEST(table_options & TL_OPTION_IGNORE_LEAVES);
   ptr->sequence=      MY_TEST(table_options & TL_OPTION_SEQUENCE);
+  ptr->dont_resolve= MY_TEST(table_options & TL_OPTION_DONT_RESOLVE);
   ptr->derived=	    table->sel;
   if (!ptr->derived && is_infoschema_db(&ptr->db))
   {
@@ -8353,7 +8354,7 @@ TABLE_LIST *st_select_lex::add_table_to_list(THD *thd,
     }
   }
   /* Store the table reference preceding the current one. */
-  if (table_list.elements > 0 && likely(!ptr->sequence))
+  if (!ptr->dont_resolve && table_list.elements > 0 && likely(!ptr->sequence))
   {
     /*
       table_list.next points to the last inserted TABLE_LIST->next_local'
