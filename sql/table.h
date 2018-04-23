@@ -1830,29 +1830,28 @@ class Vers_history_point : public vers_history_point_t
   void fix_item();
 
 public:
-  TABLE_LIST *trt;
+  TABLE_LIST *tr_table;
 
   Vers_history_point() { empty(); }
   Vers_history_point(vers_sys_type_t unit_arg, Item *item_arg)
   {
     unit= unit_arg;
     item= item_arg;
-    trt= NULL;
+    tr_table= NULL;
     fix_item();
   }
   Vers_history_point(vers_history_point_t p)
   {
     unit= p.unit;
     item= p.item;
-    trt= NULL;
+    tr_table= NULL;
     fix_item();
   }
-  void empty() { unit= VERS_UNDEFINED; item= NULL; trt= NULL; }
+  void empty() { unit= VERS_UNDEFINED; item= NULL; tr_table= NULL; }
   void print(String *str, enum_query_type, const char *prefix, size_t plen);
   void resolve_unit(bool timestamps_only);
 
-  Item_field *make_tr_field(THD *thd, Name_resolution_context &ctx,
-                           tr_field_id_t field) const;
+  Item *get_item(THD *thd, Name_resolution_context &ctx) const;
 };
 
 struct vers_select_conds_t

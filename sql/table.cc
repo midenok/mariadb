@@ -8560,13 +8560,14 @@ bool fk_modifies_child(enum_fk_option opt)
 
 
 #define newx new (thd->mem_root)
-Item_field* Vers_history_point::make_tr_field(
-  THD* thd, Name_resolution_context& ctx, tr_field_id_t field) const
+Item* Vers_history_point::get_item(THD* thd, Name_resolution_context& ctx) const
 {
-  DBUG_ASSERT(trt);
-  DBUG_ASSERT(trt->table);
-  DBUG_ASSERT(field < trt->table->s->fields);
-  return newx Item_field(thd, &ctx, trt->table->field[field]);
+  if (unit != VERS_TIMESTAMP)
+    return item;
+  DBUG_ASSERT(tr_table);
+  DBUG_ASSERT(tr_table->table);
+  DBUG_ASSERT(FLD_TRX_ID < tr_table->table->s->fields);
+  return newx Item_field(thd, &ctx, tr_table->table->field[FLD_TRX_ID]);
 }
 
 bool TR_table::add_subquery(THD* thd, Vers_history_point &p, uint &subq_n, bool backwards)
@@ -8683,7 +8684,7 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p, uint &subq_n, bool 
       return true;
 
     thd->lex->select_lex.add_joined_table(subquery);
-    p.trt= subquery;
+    p.tr_table= subquery;
     subq_n++;
   }
 
