@@ -26,7 +26,7 @@
 #include "tztime.h"
 #include "item.h"
 
-Item_func_trt_ts::Item_func_trt_ts(THD *thd, Item* a, TR_table::field_id_t _trt_field) :
+Item_func_trt_ts::Item_func_trt_ts(THD *thd, Item* a, tr_field_id_t _trt_field) :
   Item_datetimefunc(thd, a),
   trt_field(_trt_field)
 {
@@ -71,7 +71,7 @@ Item_func_trt_ts::get_date(MYSQL_TIME *res, ulonglong fuzzy_date)
 }
 
 
-Item_func_trt_id::Item_func_trt_id(THD *thd, Item* a, TR_table::field_id_t _trt_field,
+Item_func_trt_id::Item_func_trt_id(THD *thd, Item* a, tr_field_id_t _trt_field,
                                    bool _backwards) :
   Item_longlong_func(thd, a),
   trt_field(_trt_field),
@@ -83,7 +83,7 @@ Item_func_trt_id::Item_func_trt_id(THD *thd, Item* a, TR_table::field_id_t _trt_
   DBUG_ASSERT(arg_count == 1 && args[0]);
 }
 
-Item_func_trt_id::Item_func_trt_id(THD *thd, Item* a, Item* b, TR_table::field_id_t _trt_field) :
+Item_func_trt_id::Item_func_trt_id(THD *thd, Item* a, Item* b, tr_field_id_t _trt_field) :
   Item_longlong_func(thd, a, b),
   trt_field(_trt_field),
   backwards(false)
@@ -133,7 +133,7 @@ Item_func_trt_id::val_int()
 {
   if (args[0]->is_null())
   {
-    if (arg_count < 2 || trt_field == TR_table::FLD_TRX_ID)
+    if (arg_count < 2 || trt_field == FLD_TRX_ID)
     {
       null_value= true;
       return 0;

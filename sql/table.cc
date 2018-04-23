@@ -8558,7 +8558,17 @@ bool fk_modifies_child(enum_fk_option opt)
   return can_write[opt];
 }
 
+
 #define newx new (thd->mem_root)
+Item_field* Vers_history_point::make_tr_field(
+  THD* thd, Name_resolution_context& ctx, tr_field_id_t field) const
+{
+  DBUG_ASSERT(trt);
+  DBUG_ASSERT(trt->table);
+  DBUG_ASSERT(field < trt->table->s->fields);
+  return newx Item_field(thd, &ctx, trt->table->field[field]);
+}
+
 bool TR_table::add_subquery(THD* thd, Vers_history_point &p, uint &subq_n, bool backwards)
 {
   LEX *lex= thd->lex;

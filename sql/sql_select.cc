@@ -935,11 +935,7 @@ int SELECT_LEX::vers_setup_conds(THD *thd, TABLE_LIST *tables, COND **where_expr
       case SYSTEM_TIME_AS_OF:
         if (vers_conditions.start.unit == VERS_TIMESTAMP)
         {
-          TABLE_LIST *trt= vers_conditions.start.trt;
-          DBUG_ASSERT(trt);
-          DBUG_ASSERT(trt->table);
-          DBUG_ASSERT(TR_table::FLD_TRX_ID < trt->table->s->fields);
-          trx_id0= newx Item_field(thd, &this->context, trt->table->field[TR_table::FLD_TRX_ID]);
+          trx_id0= vers_conditions.start.make_tr_field(thd, context, FLD_TRX_ID);
         }
         else
         {
@@ -951,10 +947,10 @@ int SELECT_LEX::vers_setup_conds(THD *thd, TABLE_LIST *tables, COND **where_expr
       case SYSTEM_TIME_FROM_TO:
       case SYSTEM_TIME_BETWEEN:
         trx_id0= vers_conditions.start.unit == VERS_TIMESTAMP
-          ? newx Item_func_trt_id(thd, vers_conditions.start.item, TR_table::FLD_TRX_ID, true)
+          ? newx Item_func_trt_id(thd, vers_conditions.start.item, FLD_TRX_ID, true)
           : vers_conditions.start.item;
         trx_id1= vers_conditions.end.unit == VERS_TIMESTAMP
-          ? newx Item_func_trt_id(thd, vers_conditions.end.item, TR_table::FLD_TRX_ID, false)
+          ? newx Item_func_trt_id(thd, vers_conditions.end.item, FLD_TRX_ID, false)
           : vers_conditions.end.item;
         cond1= vers_conditions.type == SYSTEM_TIME_FROM_TO
           ? newx Item_func_trt_trx_sees(thd, trx_id1, row_start)
@@ -963,7 +959,7 @@ int SELECT_LEX::vers_setup_conds(THD *thd, TABLE_LIST *tables, COND **where_expr
         break;
       case SYSTEM_TIME_BEFORE:
         trx_id0= vers_conditions.start.unit == VERS_TIMESTAMP
-          ? newx Item_func_trt_id(thd, vers_conditions.start.item, TR_table::FLD_TRX_ID)
+          ? newx Item_func_trt_id(thd, vers_conditions.start.item, FLD_TRX_ID)
           : vers_conditions.start.item;
         cond1= newx Item_func_lt(thd, row_end, trx_id0);
         break;

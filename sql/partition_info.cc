@@ -2680,7 +2680,7 @@ bool partition_info::vers_trx_id_to_ts(THD* thd, Field* in_trx_id, Field_timesta
     return true;
   }
   MYSQL_TIME ts;
-  trt[TR_table::FLD_COMMIT_TS]->get_date(&ts, 0);
+  trt[FLD_COMMIT_TS]->get_date(&ts, 0);
   out_ts.store_time_dec(&ts, 6);
   return false;
 }
