@@ -46,14 +46,14 @@ begin
   drop table tmp;
 end~~
 
-create procedure concat_exec2(a varchar(255), b varchar(255))
+create procedure if not exists concat_exec2(a varchar(255), b varchar(255))
 begin
   prepare stmt from concat(a, b);
   execute stmt;
   deallocate prepare stmt;
 end~~
 
-create procedure concat_exec3(a varchar(255), b varchar(255), c varchar(255))
+create procedure if not exists concat_exec3(a varchar(255), b varchar(255), c varchar(255))
 begin
   prepare stmt from concat(a, b, c);
   execute stmt;
@@ -61,7 +61,7 @@ begin
 end~~
 delimiter ;~~
 
-create function check_result (cond boolean)
+create function if not exists check_result (cond boolean)
     returns char(50) deterministic
     return if(cond = 1, '[CORRECT]', '[WRONG]');
 
