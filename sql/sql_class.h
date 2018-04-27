@@ -814,13 +814,10 @@ typedef struct system_status_var
   ulong filesort_pq_sorts_;
 
   /* Features used */
-  ulong feature_custom_aggregate_functions; /* +1 when custom aggregate
-                                            functions are used */
   ulong feature_dynamic_columns;    /* +1 when creating a dynamic column */
   ulong feature_fulltext;	    /* +1 when MATCH is used */
   ulong feature_gis;                /* +1 opening a table with GIS features */
   ulong feature_invisible_columns;     /* +1 opening a table with invisible column */
-  ulong feature_json;		    /* +1 when JSON function appears in the statement */
   ulong feature_locale;		    /* +1 when LOCALE is set */
   ulong feature_subquery;	    /* +1 when subqueries are used */
   ulong feature_timezone;	    /* +1 when XPATH is used */
@@ -1911,7 +1908,7 @@ public:
   void unlink_all_closed_tables(THD *thd,
                                 MYSQL_LOCK *lock,
                                 size_t reopen_count);
-  bool reopen_tables(THD *thd, bool need_reopen);
+  bool reopen_tables(THD *thd);
   bool restore_lock(THD *thd, TABLE_LIST *dst_table_list, TABLE *table,
                     MYSQL_LOCK *lock);
   void add_back_last_deleted_lock(TABLE_LIST *dst_table_list);
@@ -1965,6 +1962,10 @@ public:
 
   Global_read_lock()
     : m_state(GRL_NONE),
+#ifdef WITH_WSREP
+      provider_paused(false),
+      provider_desynced_paused(false),
+#endif
       m_mdl_global_shared_lock(NULL),
       m_mdl_blocks_commits_lock(NULL)
   {}
@@ -1984,11 +1985,28 @@ public:
     }
     return FALSE;
   }
+#ifdef WITH_WSREP
+  bool wsrep_pause(void);
+  wsrep_status_t wsrep_resume(void);
+  bool wsrep_pause_once(bool *already_paused);
+  wsrep_status_t wsrep_resume_once(void);
+  bool provider_resumed() const { return !provider_paused; }
+  void pause_provider(bool val) { provider_paused= val; }
+#endif /* WITH_WSREP */
   bool make_global_read_lock_block_commit(THD *thd);
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
 private:
   enum_grl_state m_state;
+#ifdef WITH_WSREP
+  /* FLUSH TABLE <table> WITH READ LOCK
+  FLUSH TABLES <table> FOR EXPORT
+  and so while unlocking such context provider needs to resumed. */
+  bool provider_paused;
+
+  /* Mark this true only when both action are successful. */
+  bool provider_desynced_paused;
+#endif /* WITH_WSREP */
   /**
     In order to acquire the global read lock, the connection must
     acquire shared metadata lock in GLOBAL namespace, to prohibit
@@ -3117,7 +3135,7 @@ public:
     Reset to FALSE when we leave the sub-statement mode.
   */
   bool       is_fatal_sub_stmt_error;
-  bool	     rand_used, time_zone_used;
+  bool	     query_start_used, rand_used, time_zone_used;
   bool       query_start_sec_part_used;
   /* for IS NULL => = last_insert_id() fix in remove_eq_conds() */
   bool       substitute_null_with_insert_id;
@@ -3428,9 +3446,7 @@ public:
     return !MY_TEST(variables.sql_mode & MODE_NO_BACKSLASH_ESCAPES);
   }
   const Type_handler *type_handler_for_date() const;
-  bool timestamp_to_TIME(MYSQL_TIME *ltime, my_time_t ts,
-                         ulong sec_part, ulonglong fuzzydate);
-  inline my_time_t query_start() { return start_time; }
+  inline my_time_t query_start() { query_start_used=1; return start_time; }
   inline ulong query_start_sec_part()
   { query_start_sec_part_used=1; return start_time_sec_part; }
   MYSQL_TIME query_start_TIME();
@@ -3442,7 +3458,7 @@ public:
   } system_time;
 
   ulong systime_sec_part() { query_start_sec_part_used=1; return system_time.sec_part; }
-  my_time_t systime() { return system_time.sec; }
+  my_time_t systime() { query_start_used=1; return system_time.sec; }
 
 private:
   void set_system_time()
@@ -3726,21 +3742,20 @@ public:
     @param length     - length of the string
     @param repertoire - the repertoire of the string
   */
-  Item_basic_constant *make_string_literal(const char *str, size_t length,
-                                           uint repertoire);
-  Item_basic_constant *make_string_literal(const Lex_string_with_metadata_st &str)
+  Item *make_string_literal(const char *str, size_t length,
+                            uint repertoire);
+  Item *make_string_literal(const Lex_string_with_metadata_st &str)
   {
     uint repertoire= str.repertoire(variables.character_set_client);
     return make_string_literal(str.str, str.length, repertoire);
   }
-  Item_basic_constant *make_string_literal_nchar(const Lex_string_with_metadata_st &str);
-  Item_basic_constant *make_string_literal_charset(const Lex_string_with_metadata_st &str,
-                                                   CHARSET_INFO *cs);
+  Item *make_string_literal_nchar(const Lex_string_with_metadata_st &str);
+  Item *make_string_literal_charset(const Lex_string_with_metadata_st &str,
+                                    CHARSET_INFO *cs);
+  Item *make_string_literal_concat(Item *item1, const LEX_CSTRING &str);
   void add_changed_table(TABLE *table);
   void add_changed_table(const char *key, size_t key_length);
   CHANGED_TABLE_LIST * changed_table_dup(const char *key, size_t key_length);
-  void prepare_explain_fields(select_result *result, List<Item> *field_list,
-                              uint8 explain_flags, bool is_analyze);
   int send_explain_fields(select_result *result, uint8 explain_flags,
                           bool is_analyze);
   void make_explain_field_list(List<Item> &field_list, uint8 explain_flags,
@@ -5148,6 +5163,7 @@ class select_insert :public select_result_interceptor {
   ulonglong autoinc_value_of_last_inserted_row; // autogenerated or not
   COPY_INFO info;
   bool insert_into_view;
+  bool versioned_write;
   select_insert(THD *thd_arg, TABLE_LIST *table_list_par,
 		TABLE *table_par, List<Item> *fields_par,
 		List<Item> *update_fields, List<Item> *update_values,
@@ -6119,15 +6135,11 @@ public:
   sent by the user (ie: stored procedure).
 */
 #define CF_SKIP_QUESTIONS       (1U << 1)
-#ifdef WITH_WSREP
+
 /**
   Do not check that wsrep snapshot is ready before allowing this command
 */
 #define CF_SKIP_WSREP_CHECK     (1U << 2)
-#else
-#define CF_SKIP_WSREP_CHECK     0
-#endif /* WITH_WSREP */
-
 /**
   Do not allow it for COM_MULTI batch
 */

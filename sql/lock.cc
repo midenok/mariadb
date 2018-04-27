@@ -379,7 +379,7 @@ end:
 
 static int lock_external(THD *thd, TABLE **tables, uint count)
 {
-  uint i;
+  reg1 uint i;
   int lock_type,error;
   DBUG_ENTER("lock_external");
 
@@ -539,7 +539,7 @@ void mysql_lock_remove(THD *thd, MYSQL_LOCK *locked,TABLE *table)
 {
   if (locked)
   {
-    uint i;
+    reg1 uint i;
     for (i=0; i < locked->table_count; i++)
     {
       if (locked->table[i] == table)
@@ -747,7 +747,6 @@ static int unlock_external(THD *thd, TABLE **table,uint count)
            - GET_LOCK_UNLOCK      : If we should send TL_IGNORE to store lock
            - GET_LOCK_STORE_LOCKS : Store lock info in TABLE
            - GET_LOCK_SKIP_SEQUENCES : Ignore sequences (for temporary unlock)
-           - GET_LOCK_ON_THD      : Store lock in thd->mem_root
 */
 
 MYSQL_LOCK *get_lock_data(THD *thd, TABLE **table_ptr, uint count, uint flags)
@@ -1084,21 +1083,27 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
     thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
     m_mdl_blocks_commits_lock= NULL;
 #ifdef WITH_WSREP
-    if (WSREP(thd) || wsrep_node_is_donor())
+    if (thd->wsrep_sst_donor)
     {
-      wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
-      wsrep->resume(wsrep);
-      /* resync here only if we did implicit desync earlier */
-      if (!wsrep_desync && wsrep_node_is_synced())
+      /* If this is sst_donor then it is resync internally.
+      So only resume the cluster. */
+      wsrep_resume();
+    }
+    else if (WSREP(thd) && provider_desynced_paused)
+    {
+      /* Function will take care of decrementing reference count
+      if it is not the last one to get called. Last one will
+      perform the resume action. */
+      wsrep_resume();
+
+      int ret = wsrep->resync(wsrep);
+      if (ret != WSREP_OK)
       {
-        int ret = wsrep->resync(wsrep);
-        if (ret != WSREP_OK)
-        {
-          WSREP_WARN("resync failed %d for FTWRL: db: %s, query: %s",
-                     ret, thd->get_db(), thd->query());
-          DBUG_VOID_RETURN;
-        }
+        WSREP_WARN("resync failed %d for FTWRL: db: %s, query: %s", ret,
+                   (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+        DBUG_VOID_RETURN;
       }
+      provider_desynced_paused= false;
     }
 #endif /* WITH_WSREP */
   }
@@ -1156,63 +1161,118 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
 
 #ifdef WITH_WSREP
-  /* Native threads should bail out before wsrep oprations to follow.
-     Donor servicing thread is an exception, it should pause provider but not desync,
-     as it is already desynced in donor state
-  */
-  if (!WSREP(thd) && !wsrep_node_is_donor())
+  if (thd->wsrep_sst_donor)
   {
-    DBUG_RETURN(FALSE);
+    /* If this is sst_donor then it is already desync internally.
+    So only pause the cluster */
+    if (!wsrep_pause())
+      DBUG_RETURN(TRUE);
   }
-
-  /* if already desynced or donor, avoid double desyncing 
-     if not in PC and synced, desyncing is not possible either
-  */
-  if (wsrep_desync || !wsrep_node_is_synced())
-  {
-    WSREP_DEBUG("desync set upfont, skipping implicit desync for FTWRL: %d",
-                wsrep_desync);
-  }
-  else
+  else if (WSREP(thd) && !provider_desynced_paused)
   {
     int rcode;
-    WSREP_DEBUG("running implicit desync for node");
+    WSREP_DEBUG("Running implicit desync for node from FTWRL");
     rcode = wsrep->desync(wsrep);
-    if (rcode != WSREP_OK)
+    if (rcode == WSREP_TRX_FAIL && strcmp(wsrep_cluster_status, "Primary") != 0)
+    {
+      WSREP_DEBUG("desync failed while non-Primary, ignoring failure");
+    }
+    else if (rcode != WSREP_OK)
     {
       WSREP_WARN("FTWRL desync failed %d for schema: %s, query: %s",
-                 rcode, thd->get_db(), thd->query());
+                 rcode, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
       my_message(ER_LOCK_DEADLOCK, "wsrep desync failed for FTWRL", MYF(0));
       DBUG_RETURN(TRUE);
     }
-  }
 
-  long long ret = wsrep->pause(wsrep);
-  if (ret >= 0)
-  {
-    wsrep_locked_seqno= ret;
-  }
-  else if (ret != -ENOSYS) /* -ENOSYS - no provider */
-  {
-    long long ret = wsrep->pause(wsrep);
-    if (ret >= 0)
+    if (!wsrep_pause())
     {
-      wsrep_locked_seqno= ret;
-    }
-    else if (ret != -ENOSYS) /* -ENOSYS - no provider */
-    {
-      WSREP_ERROR("Failed to pause provider: %lld (%s)", -ret, strerror(-ret));
-
-      DBUG_ASSERT(m_mdl_blocks_commits_lock == NULL);
-      wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
-      my_error(ER_LOCK_DEADLOCK, MYF(0));
+      /* pause failed so rollback desync action too. */
+      wsrep->resync(wsrep);
       DBUG_RETURN(TRUE);
-     }
+    }
+
+    provider_desynced_paused= true;
   }
 #endif /* WITH_WSREP */
+
   DBUG_RETURN(FALSE);
 }
 
+#ifdef WITH_WSREP
+/**
+  Pause the galera provider.
+  Also set wsrep_locked_seqno to sequence number returned.
+
+  @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
+  @retval True   Provider has been paused.
+*/
+bool Global_read_lock::wsrep_pause()
+{
+  wsrep_seqno_t ret = wsrep->pause(wsrep);
+  if (ret >= 0)
+  {
+    wsrep_locked_seqno= ret;
+    pause_provider(true);
+  }
+  else if (ret != -ENOSYS) /* -ENOSYS - no provider */
+  {
+    WSREP_ERROR("Failed to pause provider: %lld (%s)", (long long)-ret, strerror(-ret));
+
+    /* m_mdl_blocks_commits_lock is always NULL here */
+    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+    my_error(ER_LOCK_DEADLOCK, MYF(0));
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+/**
+  Resume the galera provider.
+  Also set wsrep_locked_seqno to sequence number returned.
+
+  @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
+  @retval True   Provider has been paused.
+*/
+wsrep_status_t Global_read_lock::wsrep_resume()
+{
+  wsrep_status_t ret;
+
+  wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+  ret = wsrep->resume(wsrep);
+
+  if (ret != WSREP_OK)
+  {
+    WSREP_WARN("failed to resume provider: %d", ret);
+  }
+  else
+  {
+    pause_provider(false);
+  }
+
+  return ret;
+}
+
+bool Global_read_lock::wsrep_pause_once(bool *already_paused)
+{
+    if (!provider_paused)
+    {
+      *already_paused= FALSE;
+      return wsrep_pause();
+    }
+    *already_paused= TRUE;
+    return TRUE;
+}
+
+wsrep_status_t Global_read_lock::wsrep_resume_once(void)
+{
+    if (provider_paused)
+      return wsrep_resume();
+    return WSREP_OK;
+}
+
+#endif /* WITH_WSREP */
 
 /**
   Set explicit duration for metadata locks which are used to implement GRL.
