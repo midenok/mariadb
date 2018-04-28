@@ -5569,14 +5569,29 @@ end_with_restore_list:
 
     if (first_table && lex->type & (REFRESH_READ_LOCK|REFRESH_FOR_EXPORT))
     {
+#ifdef WITH_WSREP
+      bool already_paused;
+#endif /* WITH_WSREP */
       /* Check table-level privileges. */
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
 
-      if (flush_tables_with_read_lock(thd, all_tables))
+#ifdef WITH_WSREP
+      if (WSREP(thd) &&
+          !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
-
+#endif /* WITH_WSREP */
+      if (flush_tables_with_read_lock(thd, all_tables))
+#ifdef WITH_WSREP
+      {
+        if (WSREP(thd) && !already_paused)
+          thd->global_read_lock.wsrep_resume_once();
+        goto error;
+      }
+#else
+        goto error;
+#endif /* WITH_WSREP */
       my_ok(thd);
       break;
     }

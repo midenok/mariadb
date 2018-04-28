@@ -10615,6 +10615,20 @@ ha_innobase::wsrep_append_keys(
 		DBUG_RETURN(0);
 	}
 
+	/* If certification of table with non-PK is blocked by setting
+	relevant configuration option wsrep_certify_nonPK = OFF/0 then
+	ensure that thd->wsrep_ws_handle->trx_id = WSREP_UNDEFINED_TRX_ID.
+	If not then make sure you set it to WSREP_UNDEFINED_TRX_ID.
+	But what may cause trx_id to set if append-key is blocked ?
+	CREATE TABLE ... SELECT statement will cause a fake_trx_id to set
+	while processing SELECT statement. */
+	if (!key_appended && !wsrep_certify_nonPK) {
+		WSREP_WARN("Table without explict primary key (not-recommended)"
+			   " and certification of nonPK table is OFF too");
+		wsrep_ws_handle_for_trx(
+			wsrep_thd_ws_handle(thd), WSREP_UNDEFINED_TRX_ID);
+	}
+
 	DBUG_RETURN(0);
 }
 #endif /* WITH_WSREP */
@@ -19259,7 +19273,7 @@ wsrep_fake_trx_id(
 	trx_id_t trx_id = trx_sys.get_new_trx_id();
 	WSREP_DEBUG("innodb fake trx id: " TRX_ID_FMT " thd: %s",
 		    trx_id, wsrep_thd_query(thd));
-	wsrep_ws_handle_for_trx(wsrep_thd_ws_handle(thd), trx_id);
+	(void)wsrep_ws_handle_for_trx(wsrep_thd_ws_handle(thd), trx_id);
 }
 
 #endif /* WITH_WSREP */
