@@ -1827,8 +1827,22 @@ public:
     fix_item();
   }
   void empty() { unit= VERS_UNDEFINED; item= NULL; }
-  void print(String *str, enum_query_type, const char *prefix, size_t plen);
-  void resolve_unit(bool timestamps_only);
+  void print(String *str, enum_query_type, const char *prefix, size_t plen) const;
+  bool resolve_unit(THD *thd);
+  bool resolve_unit_trx_id(THD *thd)
+  {
+    if (unit == VERS_UNDEFINED)
+      unit= VERS_TRX_ID;
+    return false;
+  }
+  bool resolve_unit_timestamp(THD *thd)
+  {
+    if (unit == VERS_UNDEFINED)
+      unit= VERS_TIMESTAMP;
+    return false;
+  }
+  void bad_expression_data_type_error(const char *type) const;
+  bool eq(const vers_history_point_t &point) const;
 };
 
 struct vers_select_conds_t
@@ -1857,27 +1871,20 @@ struct vers_select_conds_t
     end= _end;
   }
 
-  void print(String *str, enum_query_type query_type);
+  void print(String *str, enum_query_type query_type) const;
 
   bool init_from_sysvar(THD *thd);
 
-  bool operator== (vers_system_time_t b)
-  {
-    return type == b;
-  }
-  bool operator!= (vers_system_time_t b)
-  {
-    return type != b;
-  }
-  operator bool() const
+  bool is_set() const
   {
     return type != SYSTEM_TIME_UNSPECIFIED;
   }
-  void resolve_units(bool timestamps_only);
+  bool resolve_units(THD *thd);
   bool user_defined() const
   {
     return !from_query && type != SYSTEM_TIME_UNSPECIFIED;
   }
+  bool eq(const vers_select_conds_t &conds) const;
 };
 
 /*

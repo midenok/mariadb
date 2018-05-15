@@ -222,7 +222,7 @@ trx_undo_page_get_prev_rec(trx_undo_rec_t* rec, ulint page_no, ulint offset)
 	page_t*	undo_page;
 	ulint	start;
 
-	undo_page = (page_t*) ut_align_down(rec, UNIV_PAGE_SIZE);
+	undo_page = (page_t*) ut_align_down(rec, srv_page_size);
 
 	start = trx_undo_page_get_start(undo_page, page_no, offset);
 
@@ -388,15 +388,10 @@ trx_undo_get_first_rec(
 @param[in]	ptr	log record
 @param[in]	end_ptr	end of log record buffer
 @param[in,out]	page	page or NULL
-@param[in,out]	mtr	mini-transaction
 @return	end of log record
 @retval	NULL	if the log record is incomplete */
 byte*
-trx_undo_parse_page_init(
-	const byte*	ptr,
-	const byte*	end_ptr,
-	page_t*		page,
-	mtr_t*		mtr)
+trx_undo_parse_page_init(const byte* ptr, const byte* end_ptr, page_t* page)
 {
 	ulint type = mach_parse_compressed(&ptr, end_ptr);
 
@@ -420,14 +415,12 @@ trx_undo_parse_page_init(
 @param[in]	ptr	redo log record
 @param[in]	end_ptr	end of log buffer
 @param[in,out]	page	undo log page or NULL
-@param[in,out]	mtr	mini-transaction
 @return end of log record or NULL */
 byte*
 trx_undo_parse_page_header_reuse(
 	const byte*	ptr,
 	const byte*	end_ptr,
-	page_t*		undo_page,
-	mtr_t*		mtr)
+	page_t*		undo_page)
 {
 	trx_id_t	trx_id = mach_u64_parse_compressed(&ptr, end_ptr);
 
@@ -615,7 +608,7 @@ trx_undo_header_create(
 
 	new_free = free + TRX_UNDO_LOG_OLD_HDR_SIZE;
 
-	ut_a(free + TRX_UNDO_LOG_XA_HDR_SIZE < UNIV_PAGE_SIZE - 100);
+	ut_a(free + TRX_UNDO_LOG_XA_HDR_SIZE < srv_page_size - 100);
 
 	mach_write_to_2(page_hdr + TRX_UNDO_PAGE_START, new_free);
 
@@ -761,13 +754,11 @@ trx_undo_parse_page_header(
 }
 
 /** Allocate an undo log page.
-@param[in,out]	trx	transaction
 @param[in,out]	undo	undo log
 @param[in,out]	mtr	mini-transaction that does not hold any page latch
 @return	X-latched block if success
 @retval	NULL	on failure */
-buf_block_t*
-trx_undo_add_page(trx_t* trx, trx_undo_t* undo, mtr_t* mtr)
+buf_block_t* trx_undo_add_page(trx_undo_t* undo, mtr_t* mtr)
 {
 	trx_rseg_t*	rseg		= undo->rseg;
 	buf_block_t*	new_block	= NULL;
@@ -930,7 +921,7 @@ function_exit:
 			if (trunc_here) {
 				mlog_write_ulint(undo_page + TRX_UNDO_PAGE_HDR
 						 + TRX_UNDO_PAGE_FREE,
-						 trunc_here - undo_page,
+						 ulint(trunc_here - undo_page),
 						 MLOG_2BYTES, &mtr);
 			}
 
@@ -1153,7 +1144,7 @@ trx_undo_mem_create_at_db_start(trx_rseg_t* rseg, ulint id, ulint page_no,
 
 		if (const trx_undo_rec_t* rec = trx_undo_page_get_last_rec(
 			    last_page, page_no, offset)) {
-			undo->top_offset = rec - last_page;
+			undo->top_offset = ulint(rec - last_page);
 			undo->top_undo_no = trx_undo_rec_get_undo_no(rec);
 			ut_ad(!undo->empty());
 		} else {

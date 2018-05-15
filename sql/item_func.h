@@ -82,16 +82,19 @@ public:
   {
     with_sum_func= 0;
     with_field= 0;
+    with_param= 0;
   }
   Item_func(THD *thd, Item *a): Item_func_or_sum(thd, a)
   {
     with_sum_func= a->with_sum_func;
+    with_param= a->with_param;
     with_field= a->with_field;
   }
   Item_func(THD *thd, Item *a, Item *b):
     Item_func_or_sum(thd, a, b)
   {
     with_sum_func= a->with_sum_func || b->with_sum_func;
+    with_param= a->with_param || b->with_param;
     with_field= a->with_field || b->with_field;
   }
   Item_func(THD *thd, Item *a, Item *b, Item *c):
@@ -99,6 +102,7 @@ public:
   {
     with_sum_func= a->with_sum_func || b->with_sum_func || c->with_sum_func;
     with_field= a->with_field || b->with_field || c->with_field;
+    with_param= a->with_param || b->with_param || c->with_param;
   }
   Item_func(THD *thd, Item *a, Item *b, Item *c, Item *d):
     Item_func_or_sum(thd, a, b, c, d)
@@ -107,6 +111,8 @@ public:
                    c->with_sum_func || d->with_sum_func;
     with_field= a->with_field || b->with_field ||
                 c->with_field || d->with_field;
+    with_param= a->with_param || b->with_param ||
+                c->with_param || d->with_param;
   }
   Item_func(THD *thd, Item *a, Item *b, Item *c, Item *d, Item* e):
     Item_func_or_sum(thd, a, b, c, d, e)
@@ -115,6 +121,8 @@ public:
                    c->with_sum_func || d->with_sum_func || e->with_sum_func;
     with_field= a->with_field || b->with_field ||
                 c->with_field || d->with_field || e->with_field;
+    with_param= a->with_param || b->with_param ||
+                c->with_param || d->with_param || e->with_param;
   }
   Item_func(THD *thd, List<Item> &list):
     Item_func_or_sum(thd, list)
@@ -1607,14 +1615,13 @@ public:
   {
     name= a->name;
   }
-  double val_real() { return args[0]->val_real(); }
-  longlong val_int() { return args[0]->val_int(); }
-  String *val_str(String *str) { return args[0]->val_str(str); }
-  my_decimal *val_decimal(my_decimal *dec) { return args[0]->val_decimal(dec); }
+  double val_real() { return val_real_from_item(args[0]); }
+  longlong val_int() { return val_int_from_item(args[0]); }
+  String *val_str(String *str) { return val_str_from_item(args[0], str); }
+  my_decimal *val_decimal(my_decimal *dec)
+    { return val_decimal_from_item(args[0], dec); }
   bool get_date(MYSQL_TIME *ltime, ulonglong fuzzydate)
-  {
-    return args[0]->get_date(ltime, fuzzydate);
-  }
+    { return get_date_from_item(args[0], ltime, fuzzydate); }
   const char *func_name() const { return "rollup_const"; }
   bool const_item() const { return 0; }
   const Type_handler *type_handler() const { return args[0]->type_handler(); }
@@ -1622,9 +1629,7 @@ public:
   {
     collation= args[0]->collation;
     max_length= args[0]->max_length;
-    decimals=args[0]->decimals; 
-    /* The item could be a NULL constant. */
-    null_value= args[0]->is_null();
+    decimals=args[0]->decimals;
   }
   Item *get_copy(THD *thd)
   { return get_item_copy<Item_func_rollup_const>(thd, this); }

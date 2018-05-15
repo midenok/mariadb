@@ -144,7 +144,6 @@ dict_load_column_low(
 /** Load a virtual column "mapping" (to base columns) information
 from a SYS_VIRTUAL record
 @param[in,out]	table		table
-@param[in,out]	heap		memory heap
 @param[in,out]	column		mapped base column's dict_column_t
 @param[in,out]	table_id	table id
 @param[in,out]	pos		virtual column position
@@ -156,7 +155,6 @@ static
 const char*
 dict_load_virtual_low(
 	dict_table_t*	table,
-	mem_heap_t*	heap,
 	dict_col_t**	column,
 	table_id_t*	table_id,
 	ulint*		pos,
@@ -467,7 +465,6 @@ dict_process_sys_columns_rec(
 
 /** This function parses a SYS_VIRTUAL record and extracts virtual column
 information
-@param[in,out]	heap		heap memory
 @param[in]	rec		current SYS_COLUMNS rec
 @param[in,out]	table_id	table id
 @param[in,out]	pos		virtual column position
@@ -475,7 +472,6 @@ information
 @return error message, or NULL on success */
 const char*
 dict_process_sys_virtual_rec(
-	mem_heap_t*	heap,
 	const rec_t*	rec,
 	table_id_t*	table_id,
 	ulint*		pos,
@@ -484,7 +480,7 @@ dict_process_sys_virtual_rec(
 	const char*	err_msg;
 
 	/* Parse the record, and get "dict_col_t" struct filled */
-	err_msg = dict_load_virtual_low(NULL, heap, NULL, table_id,
+	err_msg = dict_load_virtual_low(NULL, NULL, table_id,
 					pos, base_pos, rec);
 
 	return(err_msg);
@@ -1138,7 +1134,7 @@ dict_sys_tables_type_valid(ulint type, bool not_redundant)
 	if (!not_redundant) {
 		/* SYS_TABLES.TYPE must be 1 or 1|DICT_TF_MASK_NO_ROLLBACK
 		for ROW_FORMAT=REDUNDANT. */
-		return !(type & ~(1 | DICT_TF_MASK_NO_ROLLBACK));
+		return !(type & ~(1U | DICT_TF_MASK_NO_ROLLBACK));
 	}
 
 	if (type >= 1U << DICT_TF_POS_UNUSED) {
@@ -1693,7 +1689,6 @@ static const char* dict_load_virtual_del = "delete-marked record in SYS_VIRTUAL"
 /** Load a virtual column "mapping" (to base columns) information
 from a SYS_VIRTUAL record
 @param[in,out]	table		table
-@param[in,out]	heap		memory heap
 @param[in,out]	column		mapped base column's dict_column_t
 @param[in,out]	table_id	table id
 @param[in,out]	pos		virtual column position
@@ -1705,7 +1700,6 @@ static
 const char*
 dict_load_virtual_low(
 	dict_table_t*	table,
-	mem_heap_t*	heap,
 	dict_col_t**	column,
 	table_id_t*	table_id,
 	ulint*		pos,
@@ -1965,7 +1959,7 @@ dict_load_virtual_one_col(
 
 		ut_a(btr_pcur_is_on_user_rec(&pcur));
 
-		err_msg = dict_load_virtual_low(table, heap,
+		err_msg = dict_load_virtual_low(table,
 						&v_col->base_col[i - skipped],
 						NULL,
 					        &pos, NULL, rec);
@@ -2032,7 +2026,7 @@ dict_load_field_low(
 	ulint		len;
 	unsigned	pos_and_prefix_len;
 	unsigned	prefix_len;
-	ibool		first_field;
+	bool		first_field;
 	ulint		position;
 
 	/* Either index or sys_field is supplied, not both */
@@ -2487,10 +2481,10 @@ dict_load_indexes(
 		}
 
 		ut_ad(index);
+		ut_ad(!dict_index_is_online_ddl(index));
 
 		/* Check whether the index is corrupted */
-		if (dict_index_is_corrupted(index)) {
-
+		if (index->is_corrupted()) {
 			ib::error() << "Index " << index->name
 				<< " of table " << table->name
 				<< " is corrupted";
@@ -3008,10 +3002,7 @@ err_exit:
 			table = NULL;
 			goto func_exit;
 		} else {
-			dict_index_t*	clust_index;
-			clust_index = dict_table_get_first_index(table);
-
-			if (dict_index_is_corrupted(clust_index)) {
+			if (table->indexes.start->is_corrupted()) {
 				table->corrupted = true;
 			}
 		}
@@ -3062,14 +3053,11 @@ err_exit:
 
 		if (!srv_force_recovery
 		    || !index
-		    || !dict_index_is_clust(index)) {
-
+		    || !index->is_primary()) {
 			dict_table_remove_from_cache(table);
 			table = NULL;
-
-		} else if (dict_index_is_corrupted(index)
+		} else if (index->is_corrupted()
 			   && table->is_readable()) {
-
 			/* It is possible we force to load a corrupted
 			clustered index if srv_load_corrupted is set.
 			Mark the table as corrupted in this case */

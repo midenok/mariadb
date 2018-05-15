@@ -2215,6 +2215,38 @@ select * from qn;
 
 drop table t1;
 
+--echo #
+--echo # MDEV-16086: tmp table for CTE is created as ARIA tables
+--echo #
+
+CREATE TABLE t1 (
+  Id int(11) not null AUTO_INCREMENT,
+  Parent varchar(15) not null,
+  Child varchar(15) not null,
+  PRIMARY KEY (Id)
+) ENGINE = MyISAM;
+
+INSERT INTO t1 (Parent, Child) VALUES
+  ('123', '456'),('456', '789'),('321', '654'),('654', '987');
+
+WITH RECURSIVE cte AS
+  ( SELECT b.Parent,
+           b.Child,
+           CAST(CONCAT(b.Child,',') AS CHAR(513)) Path
+   FROM t1 b
+   LEFT OUTER JOIN t1 bc ON b.Child = bc.Parent
+   WHERE bc.Id IS NULL
+   UNION ALL SELECT c.Parent,
+                    c.Child,
+                    CONCAT(p.Path,c.Child,',') Path
+   FROM t1 c
+   INNER JOIN cte p ON c.Child = p.Parent)
+SELECT *
+FROM cte
+ORDER BY Path;
+
+DROP TABLE t1;
+
 --echo # Start of 10.3 tests
 
 --echo #
@@ -2426,3 +2458,21 @@ with recursive destinations (city) as
 select * from destinations;
 
 drop table flights, distances;
+
+--echo #
+--echo # MDEV-15159: Forced nullability of columns in recursive CTE
+--echo #
+
+WITH RECURSIVE cte AS (
+	SELECT 1 AS a UNION ALL
+	SELECT NULL FROM cte WHERE a IS NOT NULL)
+SELECT * FROM cte;
+
+CREATE TABLE t1 (a int NOT NULL);
+INSERT INTO t1 VALUES (0);
+
+WITH RECURSIVE cte AS
+  (SELECT a FROM t1 where a=0 UNION SELECT NULL FROM cte)
+SELECT * FROM cte;
+
+DROP TABLE t1;

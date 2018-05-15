@@ -513,9 +513,7 @@ row_upd_rec_sys_fields_in_recovery(
 
 		field = rec_get_nth_field(rec, offsets, pos, &len);
 		ut_ad(len == DATA_TRX_ID_LEN);
-#if DATA_TRX_ID + 1 != DATA_ROLL_PTR
-# error "DATA_TRX_ID + 1 != DATA_ROLL_PTR"
-#endif
+		compile_time_assert(DATA_TRX_ID + 1 == DATA_ROLL_PTR);
 		trx_write_trx_id(field, trx_id);
 		trx_write_roll_ptr(field + DATA_TRX_ID_LEN, roll_ptr);
 	}
@@ -845,10 +843,7 @@ row_upd_index_write_log(
 	log_ptr += mach_write_compressed(log_ptr, n_fields);
 
 	for (i = 0; i < n_fields; i++) {
-
-#if MLOG_BUF_MARGIN <= 30
-# error "MLOG_BUF_MARGIN <= 30"
-#endif
+		compile_time_assert(MLOG_BUF_MARGIN > 30);
 
 		if (log_ptr + 30 > buf_end) {
 			mlog_close(mtr, log_ptr);
@@ -866,8 +861,8 @@ row_upd_index_write_log(
 		/* If this is a virtual column, mark it using special
 		field_no */
 		ulint	field_no = upd_fld_is_virtual_col(upd_field)
-				   ? REC_MAX_N_FIELDS + upd_field->field_no
-				   : upd_field->field_no;
+			? REC_MAX_N_FIELDS + unsigned(upd_field->field_no)
+			: unsigned(upd_field->field_no);
 
 		log_ptr += mach_write_compressed(log_ptr, field_no);
 		log_ptr += mach_write_compressed(log_ptr, len);
@@ -1326,7 +1321,7 @@ row_upd_index_replace_new_col_val(
 
 		/* Copy the locally stored prefix. */
 		memcpy(buf, data,
-		       uf->orig_len - BTR_EXTERN_FIELD_REF_SIZE);
+		       unsigned(uf->orig_len) - BTR_EXTERN_FIELD_REF_SIZE);
 
 		/* Copy the BLOB pointer. */
 		memcpy(buf + uf->orig_len - BTR_EXTERN_FIELD_REF_SIZE,
@@ -1366,7 +1361,7 @@ row_upd_index_replace_new_col_vals_index_pos(
 
 		field = dict_index_get_nth_field(index, i);
 		col = dict_field_get_col(field);
-		if (dict_col_is_virtual(col)) {
+		if (col->is_virtual()) {
 			const dict_v_col_t*	vcol = reinterpret_cast<
 							const dict_v_col_t*>(
 								col);
@@ -1420,7 +1415,7 @@ row_upd_index_replace_new_col_vals(
 
 		field = dict_index_get_nth_field(index, i);
 		col = dict_field_get_col(field);
-		if (dict_col_is_virtual(col)) {
+		if (col->is_virtual()) {
 			const dict_v_col_t*	vcol = reinterpret_cast<
 							const dict_v_col_t*>(
 								col);
@@ -1725,7 +1720,7 @@ row_upd_changes_ord_field_binary_func(
 		ind_field = dict_index_get_nth_field(index, i);
 		col = dict_field_get_col(ind_field);
 		col_no = dict_col_get_no(col);
-		is_virtual = dict_col_is_virtual(col);
+		is_virtual = col->is_virtual();
 
 		if (is_virtual) {
 			vcol = reinterpret_cast<const dict_v_col_t*>(col);
@@ -2353,7 +2348,7 @@ row_upd_sec_index_entry(
 		are no foreign key constraints referring to the index.
 		Change buffering is disabled for temporary tables and
 		spatial index. */
-		mode = (referenced || dict_table_is_temporary(index->table)
+		mode = (referenced || index->table->is_temporary()
 			|| dict_index_is_spatial(index))
 			? BTR_MODIFY_LEAF_ALREADY_S_LATCHED
 			: BTR_DELETE_MARK_LEAF_ALREADY_S_LATCHED;
@@ -2367,7 +2362,7 @@ row_upd_sec_index_entry(
 		are no foreign key constraints referring to the index.
 		Change buffering is disabled for temporary tables and
 		spatial index. */
-		mode = (referenced || dict_table_is_temporary(index->table)
+		mode = (referenced || index->table->is_temporary()
 			|| dict_index_is_spatial(index))
 			? BTR_MODIFY_LEAF
 			: BTR_DELETE_MARK_LEAF;
@@ -3054,7 +3049,7 @@ row_upd_clust_step(
 
 	mtr.start();
 
-	if (dict_table_is_temporary(node->table)) {
+	if (node->table->is_temporary()) {
 		/* Disable locking, because temporary tables are
 		private to the connection (no concurrent access). */
 		flags = node->table->no_rollback()

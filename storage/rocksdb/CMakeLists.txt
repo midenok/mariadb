@@ -99,6 +99,8 @@ SET(ROCKSDB_SE_SOURCES
   rdb_threads.h
   rdb_psi.h
   rdb_psi.cc
+  rdb_sst_info.cc
+  rdb_sst_info.h
 )
 
 # MariaDB: the following is added in build_rocksdb.cmake, when appropriate:
@@ -141,8 +143,6 @@ ADD_CONVENIENCE_LIBRARY(rocksdb_aux_lib
   event_listener.h
   rdb_perf_context.cc
   rdb_perf_context.h
-  rdb_sst_info.cc
-  rdb_sst_info.h
   rdb_buff.h
   rdb_mariadb_port.h
 )
@@ -182,9 +182,9 @@ IF(HAVE_SCHED_GETCPU)
   ADD_DEFINITIONS(-DHAVE_SCHED_GETCPU=1)
 ENDIF()
 
-IF (NOT "$ENV{WITH_TBB}" STREQUAL "")
+IF (WITH_TBB)
   SET(rocksdb_static_libs ${rocksdb_static_libs}
-  $ENV{WITH_TBB}/libtbb${PIC_EXT}.a)
+  ${WITH_TBB}/lib/libtbb${PIC_EXT}.a)
   ADD_DEFINITIONS(-DTBB)
 ENDIF()
 
@@ -210,7 +210,7 @@ MYSQL_ADD_EXECUTABLE(sst_dump rocksdb/tools/sst_dump.cc COMPONENT rocksdb-engine
 TARGET_LINK_LIBRARIES(sst_dump rocksdblib)
 
 MYSQL_ADD_EXECUTABLE(mysql_ldb tools/mysql_ldb.cc COMPONENT rocksdb-engine)
-TARGET_LINK_LIBRARIES(mysql_ldb rocksdb_tools rocksdb_aux_lib)
+TARGET_LINK_LIBRARIES(mysql_ldb rocksdb_tools rocksdb_aux_lib dbug)
 
 INSTALL_SCRIPT(myrocks_hotbackup COMPONENT rocksdb-engine)
 

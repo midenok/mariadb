@@ -718,6 +718,12 @@ protected:
       value= NULL;
     return value;
   }
+  bool get_date_from_item(Item *item, MYSQL_TIME *ltime, ulonglong fuzzydate)
+  {
+    bool rc= item->get_date(ltime, fuzzydate);
+    null_value= MY_TEST(rc || item->null_value);
+    return rc;
+  }
   /*
     This method is used if the item was not null but convertion to
     TIME/DATE/DATETIME failed. We return a zero date if allowed,
@@ -751,6 +757,7 @@ public:
                                            of a query with ROLLUP */ 
   bool null_value;			/* if item is null */
   bool with_sum_func;                   /* True if item contains a sum func */
+  bool with_param;                      /* True if contains an SP parameter */
   bool with_window_func;             /* True if item contains a window func */
   /**
     True if any item except Item_sum contains a field. Set during parsing.
@@ -843,6 +850,10 @@ public:
   virtual const Type_handler *cast_to_int_type_handler() const
   {
     return type_handler();
+  }
+  virtual const Type_handler *type_handler_for_system_time() const
+  {
+    return real_type_handler();
   }
   /* result_type() of an item specifies how the value should be returned */
   Item_result result_type() const
@@ -2025,7 +2036,7 @@ template <class T>
 inline Item* get_item_copy (THD *thd, T* item)
 {
   Item *copy= new (get_thd_memroot(thd)) T(*item);
-  if (copy)
+  if (likely(copy))
     copy->register_in(thd);
   return copy;
 }	
@@ -2162,7 +2173,7 @@ public:
   Item_args(THD *thd, Item *a, Item *b, Item *c)
   {
     arg_count= 0;
-    if ((args= (Item**) thd_alloc(thd, sizeof(Item*) * 3)))
+    if (likely((args= (Item**) thd_alloc(thd, sizeof(Item*) * 3))))
     {
       arg_count= 3;
       args[0]= a; args[1]= b; args[2]= c;
@@ -2171,7 +2182,7 @@ public:
   Item_args(THD *thd, Item *a, Item *b, Item *c, Item *d)
   {
     arg_count= 0;
-    if ((args= (Item**) thd_alloc(thd, sizeof(Item*) * 4)))
+    if (likely((args= (Item**) thd_alloc(thd, sizeof(Item*) * 4))))
     {
       arg_count= 4;
       args[0]= a; args[1]= b; args[2]= c; args[3]= d;
@@ -2180,7 +2191,7 @@ public:
   Item_args(THD *thd, Item *a, Item *b, Item *c, Item *d, Item* e)
   {
     arg_count= 5;
-    if ((args= (Item**) thd_alloc(thd, sizeof(Item*) * 5)))
+    if (likely((args= (Item**) thd_alloc(thd, sizeof(Item*) * 5))))
     {
       arg_count= 5;
       args[0]= a; args[1]= b; args[2]= c; args[3]= d; args[4]= e;
@@ -3180,9 +3191,9 @@ public:
   Field *result_field;
   Item_null_result(THD *thd): Item_null(thd), result_field(0) {}
   bool is_result_field() { return result_field != 0; }
-  const Type_handler *type_handler() const
+  enum_field_types field_type() const
   {
-    return result_field->type_handler();
+    return result_field->type();
   }
   void save_in_result_field(bool no_conversions)
   {
@@ -4199,7 +4210,7 @@ public:
   {
     // following assert is redundant, because fixed=1 assigned in constructor
     DBUG_ASSERT(fixed == 1);
-    ulonglong value= (ulonglong) Item_hex_hybrid::val_int();
+    longlong value= Item_hex_hybrid::val_int();
     int2my_decimal(E_DEC_FATAL_ERROR, value, TRUE, decimal_value);
     return decimal_value;
   }
@@ -4209,6 +4220,10 @@ public:
     return field->store_hex_hybrid(str_value.ptr(), str_value.length());
   }
   const Type_handler *cast_to_int_type_handler() const
+  {
+    return &type_handler_longlong;
+  }
+  const Type_handler *type_handler_for_system_time() const
   {
     return &type_handler_longlong;
   }

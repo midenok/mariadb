@@ -243,7 +243,7 @@ row_quiesce_write_table(
 		This field is also redundant, because the lengths
 		are a property of the character set encoding, which
 		in turn is encodedin prtype above. */
-		mach_write_to_4(ptr, col->mbmaxlen * 5 + col->mbminlen);
+		mach_write_to_4(ptr, ulint(col->mbmaxlen * 5 + col->mbminlen));
 		ptr += sizeof(ib_uint32_t);
 
 		mach_write_to_4(ptr, col->ind);
@@ -394,7 +394,7 @@ row_quiesce_write_header(
 	byte*		ptr = row;
 
 	/* Write the system page size. */
-	mach_write_to_4(ptr, UNIV_PAGE_SIZE);
+	mach_write_to_4(ptr, srv_page_size);
 	ptr += sizeof(ib_uint32_t);
 
 	/* Write the table->flags. */
@@ -635,7 +635,7 @@ row_quiesce_set_state(
 
 		return(DB_UNSUPPORTED);
 
-	} else if (dict_table_is_temporary(table)) {
+	} else if (table->is_temporary()) {
 
 		ib_senderrf(trx->mysql_thd, IB_LOG_LEVEL_WARN,
 			    ER_CANNOT_DISCARD_TEMPORARY_TABLE);
