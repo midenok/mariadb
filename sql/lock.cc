@@ -379,7 +379,7 @@ end:
 
 static int lock_external(THD *thd, TABLE **tables, uint count)
 {
-  reg1 uint i;
+  uint i;
   int lock_type,error;
   DBUG_ENTER("lock_external");
 
@@ -539,7 +539,7 @@ void mysql_lock_remove(THD *thd, MYSQL_LOCK *locked,TABLE *table)
 {
   if (locked)
   {
-    reg1 uint i;
+    uint i;
     for (i=0; i < locked->table_count; i++)
     {
       if (locked->table[i] == table)
@@ -747,6 +747,7 @@ static int unlock_external(THD *thd, TABLE **table,uint count)
            - GET_LOCK_UNLOCK      : If we should send TL_IGNORE to store lock
            - GET_LOCK_STORE_LOCKS : Store lock info in TABLE
            - GET_LOCK_SKIP_SEQUENCES : Ignore sequences (for temporary unlock)
+           - GET_LOCK_ON_THD      : Store lock in thd->mem_root
 */
 
 MYSQL_LOCK *get_lock_data(THD *thd, TABLE **table_ptr, uint count, uint flags)
@@ -1220,6 +1221,7 @@ bool Global_read_lock::wsrep_pause()
     WSREP_ERROR("Failed to pause provider: %lld (%s)", (long long)-ret, strerror(-ret));
 
     /* m_mdl_blocks_commits_lock is always NULL here */
+    DBUG_ASSERT(m_mdl_blocks_commits_lock == NULL);
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return FALSE;
