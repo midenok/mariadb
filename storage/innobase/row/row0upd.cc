@@ -3145,23 +3145,13 @@ row_upd_clust_step(
 
 	/* NOTE: the following function calls will also commit mtr */
 
-	if (node->is_delete) {
-		if (node->is_delete == PLAIN_DELETE) {
-			err = row_upd_del_mark_clust_rec(
-				node, index, offsets, thr, referenced,
+	if (node->is_delete == PLAIN_DELETE) {
+		err = row_upd_del_mark_clust_rec(
+			node, index, offsets, thr, referenced,
 #ifdef WITH_WSREP
-				foreign,
+			foreign,
 #endif
-				&mtr);
-		} else {
-			err = DB_SUCCESS;
-			row_upd_store_row(node, trx->mysql_thd,
-					  thr->prebuilt && thr->prebuilt->table
-						== node->table ?
-						thr->prebuilt->m_mysql_table :
-						NULL);
-			mtr_commit(&mtr);
-		}
+			&mtr);
 
 		if (err == DB_SUCCESS) {
 			node->state = UPD_NODE_UPDATE_ALL_SEC;
