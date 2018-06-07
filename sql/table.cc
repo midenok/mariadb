@@ -50,19 +50,6 @@
 #define MYSQL57_GENERATED_FIELD 128
 #define MYSQL57_GCOL_HEADER_SIZE 4
 
-struct extra2_fields
-{
-  LEX_CUSTRING version;
-  LEX_CUSTRING options;
-  Lex_ident engine;
-  LEX_CUSTRING gis;
-  LEX_CUSTRING field_flags;
-  LEX_CUSTRING system_period;
-  LEX_CUSTRING application_period;
-  void reset()
-  { bzero((void*)this, sizeof(*this)); }
-};
-
 static Virtual_column_info * unpack_vcol_info_from_frm(THD *, MEM_ROOT *,
               TABLE *, String *, Virtual_column_info **, bool *);
 static bool check_vcol_forward_refs(Field *, Virtual_column_info *,
