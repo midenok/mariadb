@@ -195,13 +195,14 @@ static void mysql_ha_close_childs(THD *thd, TABLE_LIST *current_table_list,
 
 static void mysql_ha_close_table(SQL_HANDLER *handler)
 {
+  DBUG_ENTER("mysql_ha_close_table");
   THD *thd= handler->thd;
   TABLE *table= handler->table;
   TABLE_LIST *current_table_list= NULL, *next_global;
 
   /* check if table was already closed */
   if (!table)
-    return;
+    DBUG_VOID_RETURN;
 
   if ((next_global= table->file->get_next_global_for_child()))
     current_table_list= next_global->parent_l;
@@ -232,6 +233,7 @@ static void mysql_ha_close_table(SQL_HANDLER *handler)
   }
   my_free(handler->lock);
   handler->init();
+  DBUG_VOID_RETURN;
 }
 
 /*
@@ -628,8 +630,7 @@ mysql_ha_fix_cond_and_key(SQL_HANDLER *handler,
     /* This can only be true for temp tables */
     if (table->query_id != thd->query_id)
       cond->cleanup();                          // File was reopened
-    if ((!cond->fixed &&
-	 cond->fix_fields(thd, &cond)) || cond->check_cols(1))
+    if (cond->fix_fields_if_needed_for_bool(thd, &cond))
       return 1;
   }
 
@@ -693,10 +694,9 @@ mysql_ha_fix_cond_and_key(SQL_HANDLER *handler,
       {
         my_bitmap_map *old_map;
 	/* note that 'item' can be changed by fix_fields() call */
-        if ((!item->fixed &&
-             item->fix_fields(thd, it_ke.ref())) ||
-	    (item= *it_ke.ref())->check_cols(1))
+        if (item->fix_fields_if_needed_for_scalar(thd, it_ke.ref()))
           return 1;
+        item= *it_ke.ref();
 	if (item->used_tables() & ~(RAND_TABLE_BIT | PARAM_TABLE_BIT))
         {
           my_error(ER_WRONG_ARGUMENTS,MYF(0),"HANDLER ... READ");

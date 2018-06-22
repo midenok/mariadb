@@ -1007,8 +1007,6 @@ public:
   { return state == STMT_PREPARED || state == STMT_EXECUTED; }
   inline bool is_conventional() const
   { return state == STMT_CONVENTIONAL_EXECUTION; }
-  inline bool is_sp_execute() const
-  { return is_stored_procedure; }
 
   inline void* alloc(size_t size) { return alloc_root(mem_root,size); }
   inline void* calloc(size_t size)
@@ -1102,21 +1100,6 @@ public:
 
   LEX_CSTRING name; /* name for named prepared statements */
   LEX *lex;                                     // parse tree descriptor
-  /*
-    LEX which represents current statement (conventional, SP or PS)
-
-    For example during view parsing THD::lex will point to the views LEX and
-    THD::stmt_lex will point to LEX of the statement where the view will be
-    included
-
-    Currently it is used to have always correct select numbering inside
-    statement (LEX::current_select_number) without storing and restoring a
-    global counter which was THD::select_number.
-
-    TODO: make some unified statement representation (now SP has different)
-    to store such data like LEX::current_select_number.
-  */
-  LEX *stmt_lex;
   /*
     Points to the query associated with this statement. It's const, but
     we need to declare it char * because all table handlers are written
@@ -2175,26 +2158,6 @@ struct wait_for_commit
   void reinit();
 };
 
-/*
-  Structure to store the start time for a query
-*/
-
-struct QUERY_START_TIME_INFO
-{
-  my_time_t start_time;
-  ulong     start_time_sec_part;
-  ulonglong start_utime, utime_after_lock;
-
-  void backup_query_start_time(QUERY_START_TIME_INFO *backup)
-  {
-    *backup= *this;
-  }
-  void restore_query_start_time(QUERY_START_TIME_INFO *backup)
-  {
-    *this= *backup;
-  }
-};
-
 extern "C" void my_message_sql(uint error, const char *str, myf MyFlags);
 
 /**
@@ -2213,8 +2176,7 @@ class THD :public Statement,
            */
            public Item_change_list,
            public MDL_context_owner,
-           public Open_tables_state,
-           public QUERY_START_TIME_INFO
+           public Open_tables_state
 {
 private:
   inline bool is_stmt_prepare() const
@@ -2439,10 +2401,12 @@ public:
   uint32     file_id;			// for LOAD DATA INFILE
   /* remote (peer) port */
   uint16     peer_port;
+  my_time_t  start_time;             // start_time and its sec_part 
+  ulong      start_time_sec_part;    // are almost always used separately
   my_hrtime_t user_time;
   // track down slow pthread_create
   ulonglong  prior_thr_create_utime, thr_create_utime;
-  ulonglong  utime_after_query;
+  ulonglong  start_utime, utime_after_lock, utime_after_query;
 
   // Process indicator
   struct {
@@ -3098,10 +3062,14 @@ public:
   } *killed_err;
 
   /* See also thd_killed() */
-  inline bool check_killed()
+  inline bool check_killed(bool dont_send_error_message= 0)
   {
     if (unlikely(killed))
+    {
+      if (!dont_send_error_message)
+        send_kill_message();
       return TRUE;
+    }
     if (apc_target.have_apc_requests())
       apc_target.process_apc_requests(); 
     return FALSE;
@@ -4133,6 +4101,16 @@ public:
     DBUG_VOID_RETURN;
   }
 
+  inline enum_binlog_format get_current_stmt_binlog_format()
+  {
+    return current_stmt_binlog_format;
+  }
+
+  inline void set_current_stmt_binlog_format(enum_binlog_format format)
+  {
+    current_stmt_binlog_format= format;
+  }
+
   inline void set_current_stmt_binlog_format_row()
   {
     DBUG_ENTER("set_current_stmt_binlog_format_row");
@@ -4609,6 +4587,12 @@ public:
 
 /* Members related to temporary tables. */
 public:
+  /* Opened table states. */
+  enum Temporary_table_state {
+    TMP_TABLE_IN_USE,
+    TMP_TABLE_NOT_IN_USE,
+    TMP_TABLE_ANY
+  };
   bool has_thd_temporary_tables();
 
   TABLE *create_and_open_tmp_table(handlerton *hton,
@@ -4619,8 +4603,10 @@ public:
                                    bool open_in_engine,
                                    bool open_internal_tables);
 
-  TABLE *find_temporary_table(const char *db, const char *table_name);
-  TABLE *find_temporary_table(const TABLE_LIST *tl);
+  TABLE *find_temporary_table(const char *db, const char *table_name,
+                              Temporary_table_state state= TMP_TABLE_IN_USE);
+  TABLE *find_temporary_table(const TABLE_LIST *tl,
+                              Temporary_table_state state= TMP_TABLE_IN_USE);
 
   TMP_TABLE_SHARE *find_tmp_table_share_w_base_key(const char *key,
                                                    uint key_length);
@@ -4646,13 +4632,6 @@ public:
 private:
   /* Whether a lock has been acquired? */
   bool m_tmp_tables_locked;
-
-  /* Opened table states. */
-  enum Temporary_table_state {
-    TMP_TABLE_IN_USE,
-    TMP_TABLE_NOT_IN_USE,
-    TMP_TABLE_ANY
-  };
 
   bool has_temporary_tables();
   uint create_tmp_table_def_key(char *key, const char *db,
@@ -4822,7 +4801,7 @@ public:
   void set_local_lex(sp_lex_local *sublex)
   {
     DBUG_ASSERT(lex->sphead);
-    lex= stmt_lex= sublex;
+    lex= sublex;
     /* Reset part of parser state which needs this. */
     m_parser_state->m_yacc.reset_before_substatement();
   }
@@ -5002,7 +4981,7 @@ public:
     unit= u;
     return 0;
   }
-  virtual int prepare2(void) { return 0; }
+  virtual int prepare2(JOIN *join) { return 0; }
   /*
     Because of peculiarities of prepared statements protocol
     we need to know number of columns in the result set (if
@@ -5011,7 +4990,7 @@ public:
   virtual uint field_count(List<Item> &fields) const
   { return fields.elements; }
   virtual bool send_result_set_metadata(List<Item> &list, uint flags)=0;
-  virtual bool initialize_tables (JOIN *join=0) { return 0; }
+  virtual bool initialize_tables (JOIN *join) { return 0; }
   virtual bool send_eof()=0;
   /**
     Check if this query returns a result set and therefore is allowed in
@@ -5246,7 +5225,7 @@ class select_insert :public select_result_interceptor {
 		enum_duplicates duplic, bool ignore);
   ~select_insert();
   int prepare(List<Item> &list, SELECT_LEX_UNIT *u);
-  virtual int prepare2(void);
+  virtual int prepare2(JOIN *join);
   virtual int send_data(List<Item> &items);
   virtual void store_values(List<Item> &values);
   virtual bool can_rollback_data() { return 0; }
@@ -5298,7 +5277,7 @@ public:
   // Needed for access from local class MY_HOOKS in prepare(), since thd is proteted.
   const THD *get_thd(void) { return thd; }
   const HA_CREATE_INFO *get_create_info() { return create_info; };
-  int prepare2(void) { return 0; }
+  int prepare2(JOIN *join) { return 0; }
 
 private:
   TABLE *create_table_from_items(THD *thd,
@@ -5563,7 +5542,7 @@ public:
   bool postponed_prepare(List<Item> &types);
   bool send_result_set_metadata(List<Item> &list, uint flags);
   int send_data(List<Item> &items);
-  bool initialize_tables (JOIN *join= NULL);
+  bool initialize_tables (JOIN *join);
   bool send_eof();
   bool flush() { return false; }
   bool check_simple_select() const
@@ -5982,6 +5961,7 @@ public:
   int prepare(List<Item> &list, SELECT_LEX_UNIT *u);
   int send_data(List<Item> &items);
   bool initialize_tables (JOIN *join);
+  int prepare2(JOIN *join);
   int  do_updates();
   bool send_eof();
   inline ha_rows num_found() const { return found; }

@@ -2651,12 +2651,6 @@ row_table_add_foreign_constraints(
 	ut_ad(rw_lock_own(dict_operation_lock, RW_LOCK_X));
 	ut_a(sql_string);
 
-	trx->op_info = "adding foreign keys";
-
-	trx_start_if_not_started_xa(trx, true);
-
-	trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
-
 	err = dict_create_foreign_constraints(
 		trx, sql_string, sql_length, name, reject_fks);
 
@@ -3157,11 +3151,7 @@ row_discard_tablespace(
 	}
 
 	/* Discard the physical file that is used for the tablespace. */
-	err = fil_delete_tablespace(table->space_id
-#ifdef BTR_CUR_HASH_ADAPT
-				   , true
-#endif /* BTR_CUR_HASH_ADAPT */
-				   );
+	err = fil_delete_tablespace(table->space_id);
 	switch (err) {
 	case DB_IO_ERROR:
 		ib::warn() << "ALTER TABLE " << table->name
@@ -3710,6 +3700,21 @@ defer:
 		/* Mark the index unusable. */
 		index->page = FIL_NULL;
 		rw_lock_x_unlock(dict_index_get_lock(index));
+	}
+
+	if (table->space_id != TRX_SYS_SPACE) {
+		/* On DISCARD TABLESPACE, we would not drop the
+		adaptive hash index entries. If the tablespace is
+		missing here, delete-marking the record in SYS_INDEXES
+		would not free any pages in the buffer pool. Thus,
+		dict_index_remove_from_cache() would hang due to
+		adaptive hash index entries existing in the buffer
+		pool.  To prevent this hang, and also to guarantee
+		that btr_search_drop_page_hash_when_freed() will avoid
+		calling btr_search_drop_page_hash_index() while we
+		hold the InnoDB dictionary lock, we will drop any
+		adaptive hash index entries upfront. */
+		buf_LRU_drop_page_hash_for_tablespace(table);
 	}
 
 	/* Deleting a row from SYS_INDEXES table will invoke

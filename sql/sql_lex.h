@@ -143,6 +143,7 @@ public:
   bool convert(THD *thd, const LEX_CSTRING *str, CHARSET_INFO *cs);
   bool copy_or_convert(THD *thd, const Lex_ident_cli_st *str, CHARSET_INFO *cs);
   bool is_null() const { return str == NULL; }
+  bool to_size_number(ulonglong *to) const;
 };
 
 
@@ -268,10 +269,10 @@ struct LEX_TYPE
 #else
 #include "lex_symbol.h"
 #ifdef MYSQL_LEX
-#include "item_func.h"            /* Cast_target used in sql_yacc.h */
-#include "sql_get_diagnostics.h"  /* Types used in sql_yacc.h */
+#include "item_func.h"            /* Cast_target used in sql_yacc.hh */
+#include "sql_get_diagnostics.h"  /* Types used in sql_yacc.hh */
 #include "sp_pcontext.h"
-#include "sql_yacc.h"
+#include "sql_yacc.hh"
 #define LEX_YYSTYPE YYSTYPE *
 #else
 #define LEX_YYSTYPE void *
@@ -318,13 +319,13 @@ enum enum_sp_aggregate_type
   GROUP_AGGREGATE
 };
 
-const LEX_STRING sp_data_access_name[]=
+const LEX_CSTRING sp_data_access_name[]=
 {
-  { C_STRING_WITH_LEN("") },
-  { C_STRING_WITH_LEN("CONTAINS SQL") },
-  { C_STRING_WITH_LEN("NO SQL") },
-  { C_STRING_WITH_LEN("READS SQL DATA") },
-  { C_STRING_WITH_LEN("MODIFIES SQL DATA") }
+  { STRING_WITH_LEN("") },
+  { STRING_WITH_LEN("CONTAINS SQL") },
+  { STRING_WITH_LEN("NO SQL") },
+  { STRING_WITH_LEN("READS SQL DATA") },
+  { STRING_WITH_LEN("MODIFIES SQL DATA") }
 };
 
 #define DERIVED_SUBQUERY        1
@@ -934,7 +935,7 @@ public:
   /*
     Point to the LEX in which it was created, used in view subquery detection.
 
-    TODO: make also st_select_lex::parent_stmt_lex (see THD::stmt_lex)
+    TODO: make also st_select_lex::parent_stmt_lex (see LEX::stmt_lex)
     and use st_select_lex::parent_lex & st_select_lex::parent_stmt_lex
     instead of global (from THD) references where it is possible.
   */
@@ -1037,6 +1038,11 @@ public:
   uint select_n_where_fields;
   /* reserved for exists 2 in */
   uint select_n_reserved;
+  /*
+   it counts the number of bit fields in the SELECT list. These are used when DISTINCT is
+   converted to a GROUP BY involving BIT fields.
+  */
+  uint hidden_bit_fields;
   enum_parsing_place parsing_place; /* where we are parsing expression */
   enum_parsing_place context_analysis_place; /* where we are in prepare */
   bool with_sum_func;   /* sum function indicator */
@@ -1058,6 +1064,11 @@ public:
   bool automatic_brackets; /* dummy select for INTERSECT precedence */
   /* TRUE when having fix field called in processing of this SELECT */
   bool having_fix_field;
+  /*
+    TRUE when fix field is called for a new condition pushed into the
+    HAVING clause of this SELECT
+  */
+  bool having_fix_field_for_pushed_cond;
   /* List of references to fields referenced from inner selects */
   List<Item_outer_ref> inner_refs_list;
   /* Number of Item_sum-derived objects in this SELECT */
@@ -1078,6 +1089,7 @@ public:
   */
   bool subquery_in_having;
   /* TRUE <=> this SELECT is correlated w.r.t. some ancestor select */
+  bool with_all_modifier;  /* used for selects in union */
   bool is_correlated;
   /*
     This variable is required to ensure proper work of subqueries and
@@ -2799,6 +2811,21 @@ struct LEX: public Query_tables_list
 
   // type information
   CHARSET_INFO *charset;
+  /*
+    LEX which represents current statement (conventional, SP or PS)
+
+    For example during view parsing THD::lex will point to the views LEX and
+    lex::stmt_lex will point to LEX of the statement where the view will be
+    included
+
+    Currently it is used to have always correct select numbering inside
+    statement (LEX::current_select_number) without storing and restoring a
+    global counter which was THD::select_number.
+
+    TODO: make some unified statement representation (now SP has different)
+    to store such data like LEX::current_select_number.
+  */
+  LEX *stmt_lex;
 
   LEX_CSTRING name;
   const char *help_arg;
@@ -3257,7 +3284,10 @@ public:
   void restore_backup_query_tables_list(Query_tables_list *backup);
 
   bool table_or_sp_used();
+
   bool is_partition_management() const;
+  bool part_values_current(THD *thd);
+  bool part_values_history(THD *thd);
 
   /**
     @brief check if the statement is a single-level join
@@ -3289,6 +3319,11 @@ public:
 
   void init_last_field(Column_definition *field, const LEX_CSTRING *name,
                        const CHARSET_INFO *cs);
+  bool last_field_generated_always_as_row_start_or_end(Lex_ident *p,
+                                                       const char *type,
+                                                       uint flags);
+  bool last_field_generated_always_as_row_start();
+  bool last_field_generated_always_as_row_end();
   bool set_bincmp(CHARSET_INFO *cs, bool bin);
 
   bool get_dynamic_sql_string(LEX_CSTRING *dst, String *buffer);
@@ -3298,7 +3333,7 @@ public:
     List_iterator_fast<Item> param_it(prepared_stmt_params);
     while (Item *param= param_it++)
     {
-      if (param->fix_fields(thd, 0) || param->check_cols(1))
+      if (param->fix_fields_if_needed_for_scalar(thd, 0))
         return true;
     }
     return false;
@@ -3600,6 +3635,17 @@ public:
   Item *make_item_colon_ident_ident(THD *thd,
                                     const Lex_ident_cli_st *a,
                                     const Lex_ident_cli_st *b);
+  // For "SELECT @@var", "SELECT @@var.field"
+  Item *make_item_sysvar(THD *thd,
+                         enum_var_type type,
+                         const LEX_CSTRING *name)
+  {
+    return make_item_sysvar(thd, type, name, &null_clex_str);
+  }
+  Item *make_item_sysvar(THD *thd,
+                         enum_var_type type,
+                         const LEX_CSTRING *name,
+                         const LEX_CSTRING *component);
   void sp_block_init(THD *thd, const LEX_CSTRING *label);
   void sp_block_init(THD *thd)
   {
@@ -3671,7 +3717,7 @@ public:
                                         Item *value);
   sp_variable *sp_add_for_loop_upper_bound(THD *thd, Item *value)
   {
-    LEX_CSTRING name= { C_STRING_WITH_LEN("[upper_bound]") };
+    LEX_CSTRING name= { STRING_WITH_LEN("[upper_bound]") };
     return sp_add_for_loop_variable(thd, &name, value);
   }
   bool sp_for_loop_intrange_declarations(THD *thd, Lex_for_loop_st *loop,
@@ -3756,6 +3802,7 @@ public:
            sp_for_loop_cursor_finalize(thd, loop) :
            sp_for_loop_intrange_finalize(thd, loop);
   }
+  bool sp_for_loop_outer_block_finalize(THD *thd, const Lex_for_loop_st &loop);
   /* End of FOR LOOP methods */
 
   bool add_signal_statement(THD *thd, const class sp_condition_value *value);
@@ -3914,6 +3961,15 @@ public:
     }
     return false;
   }
+
+  void tvc_start()
+  {
+    field_list.empty();
+    many_values.empty();
+    insert_list= 0;
+  }
+  bool tvc_finalize();
+  bool tvc_finalize_derived();
 };
 
 

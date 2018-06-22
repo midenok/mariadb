@@ -254,7 +254,12 @@ int TABLE::delete_row()
 
   store_record(this, record[1]);
   vers_update_end();
-  return file->ha_update_row(record[1], record[0]);
+  int res;
+  if ((res= file->extra(HA_EXTRA_REMEMBER_POS)))
+    return res;
+  if ((res= file->ha_update_row(record[1], record[0])))
+    return res;
+  return file->extra(HA_EXTRA_RESTORE_POS);
 }
 
 
@@ -324,13 +329,6 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
     DBUG_ASSERT(!conds);
     conds= table_list->on_expr;
     table_list->on_expr= NULL;
-
-    // trx_sees() in InnoDB reads row_start
-    if (!table->versioned(VERS_TIMESTAMP))
-    {
-      DBUG_ASSERT(table_list->vers_conditions.type == SYSTEM_TIME_BEFORE);
-      bitmap_set_bit(table->read_set, table->vers_end_field()->field_index);
-    }
   }
 
   if (mysql_handle_list_of_derived(thd->lex, table_list, DT_MERGE_FOR_INSERT))
@@ -951,7 +949,8 @@ int mysql_prepare_delete(THD *thd, TABLE_LIST *table_list,
     if (select_lex->vers_setup_conds(thd, table_list))
       DBUG_RETURN(true);
   }
-  if ((wild_num && setup_wild(thd, table_list, field_list, NULL, wild_num)) ||
+  if ((wild_num && setup_wild(thd, table_list, field_list, NULL, wild_num,
+                              &select_lex->hidden_bit_fields)) ||
       setup_fields(thd, Ref_ptr_array(),
                    field_list, MARK_COLUMNS_READ, NULL, NULL, 0) ||
       setup_conds(thd, table_list, select_lex->leaf_tables, conds) ||
@@ -1136,7 +1135,7 @@ multi_delete::initialize_tables(JOIN *join)
     TABLE_LIST *tbl= walk->correspondent_table->find_table_for_update();
     tables_to_delete_from|= tbl->table->map;
     if (delete_while_scanning &&
-        unique_table(thd, tbl, join->tables_list, false))
+        unique_table(thd, tbl, join->tables_list, 0))
     {
       /*
         If the table we are going to delete from appears

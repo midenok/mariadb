@@ -38,6 +38,7 @@ Created 2013/03/27 Allen Lai and Jimmy Yang
 #include "trx0undo.h"
 #include "srv0mon.h"
 #include "gis0geo.h"
+#include <cmath>
 
 /*************************************************************//**
 Initial split nodes info for R-tree split.
@@ -1952,7 +1953,7 @@ rtr_estimate_n_rows_in_range(
 
 	mtr.commit();
 
-	if (!isfinite(area)) {
+	if (!std::isfinite(area)) {
 		return(HA_POS_ERROR);
 	}
 

@@ -209,7 +209,6 @@ static char*	innobase_disable_monitor_counter;
 static char*	innobase_reset_monitor_counter;
 static char*	innobase_reset_all_monitor_counter;
 
-static ulong	innodb_change_buffering;
 static ulong	innodb_flush_method;
 
 /* This variable can be set in the server configure file, specifying
@@ -326,7 +325,7 @@ thd_destructor_proxy(void *)
 	need to be purged, so they have to be shut down before purge
 	threads if slow shutdown is requested.  */
 	srv_shutdown_bg_undo_sources();
-	srv_purge_wakeup();
+	srv_purge_shutdown();
 
 	destroy_thd(thd);
 	mysql_cond_destroy(&thd_destructor_cond);
@@ -2385,24 +2384,8 @@ static int mysql_tmpfile_path(const char *path, const char *prefix)
   DBUG_ASSERT((strlen(path) + strlen(prefix)) <= FN_REFLEN);
 
   char filename[FN_REFLEN];
-  File fd = create_temp_file(filename, path, prefix,
-#ifdef __WIN__
-                             O_BINARY | O_TRUNC | O_SEQUENTIAL |
-                             O_SHORT_LIVED |
-#endif /* __WIN__ */
-                             O_CREAT | O_EXCL | O_RDWR | O_TEMPORARY,
-                             MYF(MY_WME));
-  if (fd >= 0) {
-#ifndef __WIN__
-    /*
-      This can be removed once the following bug is fixed:
-      Bug #28903  create_temp_file() doesn't honor O_TEMPORARY option
-                  (file not removed) (Unix)
-    */
-    unlink(filename);
-#endif /* !__WIN__ */
-  }
-
+  File fd = create_temp_file(filename, path, prefix, O_BINARY | O_SEQUENTIAL,
+                             MYF(MY_WME | MY_TEMPORARY));
   return fd;
 }
 
@@ -3875,7 +3858,6 @@ static int innodb_init_params()
 	}
 
 	DBUG_ASSERT(innodb_change_buffering <= IBUF_USE_ALL);
-	ibuf_use = ibuf_use_t(innodb_change_buffering);
 
 	/* Check that interdependent parameters have sane values. */
 	if (srv_max_buf_pool_modified_pct < srv_max_dirty_pages_pct_lwm) {
@@ -14338,23 +14320,22 @@ ha_innobase::optimize(
 
 	This works OK otherwise, but MySQL locks the entire table during
 	calls to OPTIMIZE, which is undesirable. */
+	bool try_alter = true;
 
 	if (srv_defragment) {
 		int err= defragment_table(
 			m_prebuilt->table->name.m_name, NULL, false);
 
 		if (err == 0) {
-			return (HA_ADMIN_OK);
+			try_alter = false;
 		} else {
 			push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
 					    uint(err),
 				"InnoDB: Cannot defragment table %s: returned error code %d\n",
 				m_prebuilt->table->name, err);
 
-			if (err == ER_SP_ALREADY_EXISTS) {
-				return (HA_ADMIN_OK);
-			} else {
-				return (HA_ADMIN_TRY_ALTER);
+			if(err == ER_SP_ALREADY_EXISTS) {
+				try_alter = false;
 			}
 		}
 	}
@@ -14365,11 +14346,10 @@ ha_innobase::optimize(
 			fts_sync_table(m_prebuilt->table, false, true, false);
 			fts_optimize_table(m_prebuilt->table);
 		}
-		return(HA_ADMIN_OK);
-	} else {
-
-		return(HA_ADMIN_TRY_ALTER);
+		try_alter = false;
 	}
+
+	return try_alter ? HA_ADMIN_TRY_ALTER : HA_ADMIN_OK;
 }
 
 /*******************************************************************//**

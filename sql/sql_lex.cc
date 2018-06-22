@@ -31,6 +31,7 @@
 #include "sql_select.h"
 #include "sql_cte.h"
 #include "sql_signal.h"
+#include "sql_partition.h"
 
 
 void LEX::parse_error(uint err_number)
@@ -651,11 +652,11 @@ void lex_start(THD *thd)
 void LEX::start(THD *thd_arg)
 {
   DBUG_ENTER("LEX::start");
-  DBUG_PRINT("info", ("This: %p thd_arg->lex: %p thd_arg->stmt_lex: %p",
-             this, thd_arg->lex, thd_arg->stmt_lex));
+  DBUG_PRINT("info", ("This: %p thd_arg->lex: %p", this, thd_arg->lex));
 
   thd= unit.thd= thd_arg;
-  
+  stmt_lex= this; // default, should be rewritten for VIEWs And CTEs
+
   DBUG_ASSERT(!explain);
 
   context_stack.empty();
@@ -839,9 +840,12 @@ int Lex_input_stream::find_keyword(Lex_ident_cli_st *kwd,
     if ((symbol->tok == NOT_SYM) &&
         (m_thd->variables.sql_mode & MODE_HIGH_NOT_PRECEDENCE))
       return NOT2_SYM;
-    if ((symbol->tok == OR_OR_SYM) &&
-        !(m_thd->variables.sql_mode & MODE_PIPES_AS_CONCAT))
-      return OR2_SYM;
+    if ((symbol->tok == OR2_SYM) &&
+        (m_thd->variables.sql_mode & MODE_PIPES_AS_CONCAT))
+    {
+      return (m_thd->variables.sql_mode & MODE_ORACLE) ?
+             ORACLE_CONCAT_SYM : MYSQL_CONCAT_SYM;
+    }
 
     return symbol->tok;
   }
@@ -2251,6 +2255,7 @@ void st_select_lex::init_query()
   cond_pushed_into_where= cond_pushed_into_having= 0;
   olap= UNSPECIFIED_OLAP_TYPE;
   having_fix_field= 0;
+  having_fix_field_for_pushed_cond= 0;
   context.select_lex= this;
   context.init();
   /*
@@ -2271,6 +2276,7 @@ void st_select_lex::init_query()
   select_n_having_items= 0;
   n_sum_items= 0;
   n_child_sum_items= 0;
+  hidden_bit_fields= 0;
   subquery_in_having= explicit_limit= 0;
   is_item_list_lookup= 0;
   first_execution= 1;
@@ -2318,6 +2324,7 @@ void st_select_lex::init_select()
   select_limit= 0;      /* denotes the default limit = HA_POS_ERROR */
   offset_limit= 0;      /* denotes the default offset = 0 */
   with_sum_func= 0;
+  with_all_modifier= 0;
   is_correlated= 0;
   cur_pos_in_select_list= UNDEF_POS;
   cond_value= having_value= Item::COND_UNDEF;
@@ -2676,15 +2683,9 @@ ha_rows st_select_lex::get_offset()
   if (offset_limit)
   {
     // see comment for st_select_lex::get_limit()
-    bool fix_fields_successful= true;
-    if (!offset_limit->fixed)
-    {
-      fix_fields_successful= !offset_limit->fix_fields(master_unit()->thd,
-                                                       NULL);
-
-      DBUG_ASSERT(fix_fields_successful);
-    }
-    val= fix_fields_successful ? offset_limit->val_uint() : HA_POS_ERROR;
+    bool err= offset_limit->fix_fields_if_needed(master_unit()->thd, NULL);
+    DBUG_ASSERT(!err);
+    val= err ? HA_POS_ERROR : offset_limit->val_uint();
   }
 
   return (ha_rows)val;
@@ -2723,15 +2724,9 @@ ha_rows st_select_lex::get_limit()
       fix_fields() implementation. Also added runtime check against a result
       of fix_fields() in order to handle error condition in non-debug build.
     */
-    bool fix_fields_successful= true;
-    if (!select_limit->fixed)
-    {
-      fix_fields_successful= !select_limit->fix_fields(master_unit()->thd,
-                                                       NULL);
-
-      DBUG_ASSERT(fix_fields_successful);
-    }
-    val= fix_fields_successful ? select_limit->val_uint() : HA_POS_ERROR;
+    bool err= select_limit->fix_fields_if_needed(master_unit()->thd, NULL);
+    DBUG_ASSERT(!err);
+    val= err ? HA_POS_ERROR : select_limit->val_uint();
   }
 
   return (ha_rows)val;
@@ -2807,6 +2802,10 @@ ulong st_select_lex::get_table_join_options()
 
 bool st_select_lex::setup_ref_array(THD *thd, uint order_group_num)
 {
+
+  if (!((options & SELECT_DISTINCT) && !group_list.elements))
+    hidden_bit_fields= 0;
+
   // find_order_in_list() may need some extra space, so multiply by two.
   order_group_num*= 2;
 
@@ -2821,7 +2820,8 @@ bool st_select_lex::setup_ref_array(THD *thd, uint order_group_num)
                        select_n_reserved +
                        select_n_having_items +
                        select_n_where_fields +
-                       order_group_num) * 5;
+                       order_group_num +
+                       hidden_bit_fields) * 5;
   if (!ref_pointer_array.is_null())
   {
     /*
@@ -5891,6 +5891,26 @@ bool LEX::sp_for_loop_cursor_finalize(THD *thd, const Lex_for_loop_st &loop)
   return sp_while_loop_finalize(thd);
 }
 
+bool LEX::sp_for_loop_outer_block_finalize(THD *thd,
+                                           const Lex_for_loop_st &loop)
+{
+  Lex_spblock tmp;
+  tmp.curs= MY_TEST(loop.m_implicit_cursor);
+  if (unlikely(sp_block_finalize(thd, tmp))) // The outer DECLARE..BEGIN..END
+    return true;
+  if (!loop.is_for_loop_explicit_cursor())
+    return false;
+  /*
+    Explicit cursor FOR loop must close the cursor automatically.
+    Note, implicit cursor FOR loop does not need to close the cursor,
+    it's closed by sp_instr_cpop.
+  */
+  sp_instr_cclose *ic= new (thd->mem_root)
+                       sp_instr_cclose(sphead->instructions(), spcont,
+                                       loop.m_cursor_offset);
+  return ic == NULL || sphead->add_instr(ic);
+}
+
 /***************************************************************************/
 
 bool LEX::sp_declare_cursor(THD *thd, const LEX_CSTRING *name,
@@ -6615,6 +6635,31 @@ Item *LEX::make_item_colon_ident_ident(THD *thd,
 }
 
 
+Item *LEX::make_item_sysvar(THD *thd,
+                            enum_var_type type,
+                            const LEX_CSTRING *name,
+                            const LEX_CSTRING *component)
+
+{
+  Item *item;
+  DBUG_ASSERT(name->str);
+  /*
+    "SELECT @@global.global.variable" is not allowed
+    Note, "global" can come through TEXT_STRING_sys.
+  */
+  if (component->str && unlikely(check_reserved_words(name)))
+  {
+    thd->parse_error();
+    return NULL;
+  }
+  if (unlikely(!(item= get_system_var(thd, type, name, component))))
+    return NULL;
+  if (!((Item_func_get_system_var*) item)->is_written_to_binlog())
+    set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_VARIABLE);
+  return item;
+}
+
+
 Item_param *LEX::add_placeholder(THD *thd, const LEX_CSTRING *name,
                                  const char *start, const char *end)
 {
@@ -6780,6 +6825,7 @@ Item *LEX::create_item_func_nextval(THD *thd, Table_ident *table_ident)
                                                           TL_WRITE_ALLOW_WRITE,
                                                           MDL_SHARED_WRITE))))
     return NULL;
+  thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   return new (thd->mem_root) Item_func_nextval(thd, table);
 }
 
@@ -6792,6 +6838,7 @@ Item *LEX::create_item_func_lastval(THD *thd, Table_ident *table_ident)
                                                           TL_READ,
                                                           MDL_SHARED_READ))))
     return NULL;
+  thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   return new (thd->mem_root) Item_func_lastval(thd, table);
 }
 
@@ -7967,4 +8014,172 @@ bool Lex_ident_sys_st::convert(THD *thd,
   str=    tmp.str;
   length= tmp.length;
   return false;
+}
+
+
+bool Lex_ident_sys_st::to_size_number(ulonglong *to) const
+{
+  ulonglong number;
+  uint text_shift_number= 0;
+  longlong prefix_number;
+  const char *start_ptr= str;
+  size_t str_len= length;
+  const char *end_ptr= start_ptr + str_len;
+  int error;
+  prefix_number= my_strtoll10(start_ptr, (char**) &end_ptr, &error);
+  if (likely((start_ptr + str_len - 1) == end_ptr))
+  {
+    switch (end_ptr[0])
+    {
+      case 'g':
+      case 'G': text_shift_number+=30; break;
+      case 'm':
+      case 'M': text_shift_number+=20; break;
+      case 'k':
+      case 'K': text_shift_number+=10; break;
+      default:
+        my_error(ER_WRONG_SIZE_NUMBER, MYF(0));
+        return true;
+    }
+    if (unlikely(prefix_number >> 31))
+    {
+      my_error(ER_SIZE_OVERFLOW_ERROR, MYF(0));
+      return true;
+    }
+    number= prefix_number << text_shift_number;
+  }
+  else
+  {
+    my_error(ER_WRONG_SIZE_NUMBER, MYF(0));
+    return true;
+  }
+  *to= number;
+  return false;
+}
+
+
+bool LEX::part_values_current(THD *thd)
+{
+  partition_element *elem= part_info->curr_part_elem;
+  if (!is_partition_management())
+  {
+    if (unlikely(part_info->part_type != VERSIONING_PARTITION))
+    {
+      my_error(ER_PARTITION_WRONG_TYPE, MYF(0), "SYSTEM_TIME");
+      return true;
+    }
+  }
+  else
+  {
+    DBUG_ASSERT(create_last_non_select_table);
+    DBUG_ASSERT(create_last_non_select_table->table_name.str);
+    // FIXME: other ALTER commands?
+    my_error(ER_VERS_WRONG_PARTS, MYF(0),
+             create_last_non_select_table->table_name.str);
+    return true;
+  }
+  elem->type(partition_element::CURRENT);
+  DBUG_ASSERT(part_info->vers_info);
+  part_info->vers_info->now_part= elem;
+  if (unlikely(part_info->init_column_part(thd)))
+    return true;
+  return false;
+}
+
+
+bool LEX::part_values_history(THD *thd)
+{
+  partition_element *elem= part_info->curr_part_elem;
+  if (!is_partition_management())
+  {
+    if (unlikely(part_info->part_type != VERSIONING_PARTITION))
+    {
+      my_error(ER_PARTITION_WRONG_TYPE, MYF(0), "SYSTEM_TIME");
+      return true;
+    }
+  }
+  else
+  {
+    part_info->vers_init_info(thd);
+    elem->id= UINT_MAX32;
+  }
+  DBUG_ASSERT(part_info->vers_info);
+  if (unlikely(part_info->vers_info->now_part))
+  {
+    DBUG_ASSERT(create_last_non_select_table);
+    DBUG_ASSERT(create_last_non_select_table->table_name.str);
+    my_error(ER_VERS_WRONG_PARTS, MYF(0),
+             create_last_non_select_table->table_name.str);
+    return true;
+  }
+  elem->type(partition_element::HISTORY);
+  if (unlikely(part_info->init_column_part(thd)))
+    return true;
+  return false;
+}
+
+
+bool LEX::last_field_generated_always_as_row_start_or_end(Lex_ident *p,
+                                                          const char *type,
+                                                          uint flag)
+{
+  if (unlikely(p->str))
+  {
+    my_error(ER_VERS_DUPLICATE_ROW_START_END, MYF(0), type,
+             last_field->field_name.str);
+    return true;
+  }
+  last_field->flags|= (flag | NOT_NULL_FLAG);
+  DBUG_ASSERT(p);
+  *p= last_field->field_name;
+  return false;
+}
+
+
+
+bool LEX::last_field_generated_always_as_row_start()
+{
+  Vers_parse_info &info= vers_get_info();
+  Lex_ident *p= &info.as_row.start;
+  return last_field_generated_always_as_row_start_or_end(p, "START",
+                                                         VERS_SYS_START_FLAG);
+}
+
+
+bool LEX::last_field_generated_always_as_row_end()
+{
+  Vers_parse_info &info= vers_get_info();
+  Lex_ident *p= &info.as_row.end;
+  return last_field_generated_always_as_row_start_or_end(p, "END",
+                                                         VERS_SYS_END_FLAG);
+}
+
+
+bool LEX::tvc_finalize()
+{
+  mysql_init_select(this);
+  if (unlikely(!(current_select->tvc=
+               new (thd->mem_root)
+               table_value_constr(many_values,
+                                  current_select,
+                                  current_select->options))))
+    return true;
+  many_values.empty();
+  return false;
+}
+
+
+bool LEX::tvc_finalize_derived()
+{
+  derived_tables|= DERIVED_SUBQUERY;
+  if (unlikely(!expr_allows_subselect || sql_command == (int)SQLCOM_PURGE))
+  {
+    thd->parse_error();
+    return true;
+  }
+  if (current_select->linkage == GLOBAL_OPTIONS_TYPE ||
+      unlikely(mysql_new_select(this, 1, NULL)))
+    return true;
+  current_select->linkage= DERIVED_TABLE_TYPE;
+  return tvc_finalize();
 }

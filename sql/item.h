@@ -368,11 +368,37 @@ typedef enum monotonicity_info
 
 class sp_rcontext;
 
+/**
+  A helper class to collect different behavior of various kinds of SP variables:
+  - local SP variables and SP parameters
+  - PACKAGE BODY routine variables
+  - (there will be more kinds in the future)
+*/
+
 class Sp_rcontext_handler
 {
 public:
   virtual ~Sp_rcontext_handler() {}
+  /**
+    A prefix used for SP variable names in queries:
+    - EXPLAIN EXTENDED
+    - SHOW PROCEDURE CODE
+    Local variables and SP parameters have empty prefixes.
+    Package body variables are marked with a special prefix.
+    This improves readability of the output of these queries,
+    especially when a local variable or a parameter has the same
+    name with a package body variable.
+  */
   virtual const LEX_CSTRING *get_name_prefix() const= 0;
+  /**
+    At execution time THD->spcont points to the run-time context (sp_rcontext)
+    of the currently executed routine.
+    Local variables store their data in the sp_rcontext pointed by thd->spcont.
+    Package body variables store data in separate sp_rcontext that belongs
+    to the package.
+    This method provides access to the proper sp_rcontext structure,
+    depending on the SP variable kind.
+  */
   virtual sp_rcontext *get_rcontext(sp_rcontext *ctx) const= 0;
 };
 
@@ -790,6 +816,23 @@ public:
   void init_make_send_field(Send_field *tmp_field,enum enum_field_types type);
   virtual void cleanup();
   virtual void make_send_field(THD *thd, Send_field *field);
+
+  bool fix_fields_if_needed(THD *thd, Item **ref)
+  {
+    return fixed ? false : fix_fields(thd, ref);
+  }
+  bool fix_fields_if_needed_for_scalar(THD *thd, Item **ref)
+  {
+    return fix_fields_if_needed(thd, ref) || check_cols(1);
+  }
+  bool fix_fields_if_needed_for_bool(THD *thd, Item **ref)
+  {
+    return fix_fields_if_needed_for_scalar(thd, ref);
+  }
+  bool fix_fields_if_needed_for_order_by(THD *thd, Item **ref)
+  {
+    return fix_fields_if_needed_for_scalar(thd, ref);
+  }
   virtual bool fix_fields(THD *, Item **);
   /*
     Fix after some tables has been pulled out. Basically re-calculate all
@@ -1128,7 +1171,13 @@ public:
       Similar to val_str()
   */
   virtual String *val_str_ascii(String *str);
-  
+
+  /*
+    Returns the result of val_str_ascii(), translating NULLs back
+    to empty strings (if MODE_EMPTY_STRING_IS_NULL is set).
+  */
+  String *val_str_ascii_revert_empty_string_is_null(THD *thd, String *str);
+
   /*
     Returns the val_str() value converted to the given character set.
   */
@@ -1710,7 +1759,7 @@ public:
     fields.
   */
   virtual bool check_partition_func_processor(void *arg) { return 1;}
-  virtual bool vcol_in_partition_func_processor(void *arg) { return 0; }
+  virtual bool post_fix_fields_part_expr_processor(void *arg) { return 0; }
   virtual bool rename_fields_processor(void *arg) { return 0; }
   /** Processor used to check acceptability of an item in the defining
       expression for a virtual column 
@@ -2997,8 +3046,7 @@ public:
                                          cond_equal_ref);
   }
   bool is_result_field() { return false; }
-  void set_result_field(Field *field_arg) {}
-  void save_in_result_field(bool no_conversions) { }
+  void save_in_result_field(bool no_conversions);
   Item *get_tmp_table_item(THD *thd);
   bool collect_item_field_processor(void * arg);
   bool add_field_to_set_processor(void * arg);
@@ -3007,7 +3055,7 @@ public:
   bool register_field_in_write_map(void *arg);
   bool register_field_in_bitmap(void *arg);
   bool check_partition_func_processor(void *int_arg) {return FALSE;}
-  bool vcol_in_partition_func_processor(void *bool_arg);
+  bool post_fix_fields_part_expr_processor(void *bool_arg);
   bool check_valid_arguments_processor(void *bool_arg);
   bool check_field_expression_processor(void *arg);
   bool enumerate_field_refs_processor(void *arg);
@@ -4632,7 +4680,7 @@ public:
     also to make printing of items inherited from Item_sum uniform.
   */
   virtual const char *func_name() const= 0;
-  virtual void fix_length_and_dec()= 0;
+  virtual bool fix_length_and_dec()= 0;
   bool const_item() const { return const_item_cache; }
   table_map used_tables() const { return used_tables_cache; }
   Item* build_clone(THD *thd);
@@ -4659,6 +4707,7 @@ public:
   */
   Field *sp_result_field;
   Item_sp(THD *thd, Name_resolution_context *context_arg, sp_name *name_arg);
+  Item_sp(THD *thd, Item_sp *item);
   const char *func_name(THD *thd) const;
   void cleanup();
   bool sp_check_access(THD *thd);
@@ -4915,8 +4964,7 @@ public:
 
   bool fix_fields(THD *thd, Item **it)
   {
-    if ((!(*ref)->fixed && (*ref)->fix_fields(thd, ref)) ||
-        (*ref)->check_cols(1))
+    if ((*ref)->fix_fields_if_needed_for_scalar(thd, ref))
       return TRUE;
     return Item_ref::fix_fields(thd, it);
   }
@@ -4954,8 +5002,7 @@ public:
   bool fix_fields(THD *thd, Item **it)
   {
     DBUG_ASSERT(ident->type() == FIELD_ITEM || ident->type() == REF_ITEM);
-    if ((!ident->fixed && ident->fix_fields(thd, ref)) ||
-        ident->check_cols(1))
+    if (ident->fix_fields_if_needed_for_scalar(thd, ref))
       return TRUE;
     set_properties();
     return FALSE;

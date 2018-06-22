@@ -166,9 +166,9 @@ sql/mysql_tzinfo_to_sql
 sql/mysqld
 sql/sql_builtin.cc
 sql/sql_yacc.cc
-sql/sql_yacc.h
+sql/sql_yacc.hh
 sql/sql_yacc_ora.cc
-sql/sql_yacc_ora.h
+sql/sql_yacc_ora.hh
 storage/heap/hp_test1
 storage/heap/hp_test2
 storage/maria/aria_chk
@@ -220,6 +220,8 @@ storage/tokudb/PerconaFT/tools/tokudb_load
 storage/tokudb/PerconaFT/tools/tokuftdump
 storage/tokudb/PerconaFT/tools/tokuft_logprint
 storage/tokudb/PerconaFT/xz/
+storage/tokudb/tokudb.cnf
+storage/tokudb/tokudb.conf
 strings/conf_to_src
 support-files/MySQL-shared-compat.spec
 support-files/binary-configure

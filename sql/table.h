@@ -1848,7 +1848,6 @@ public:
 struct vers_select_conds_t
 {
   vers_system_time_t type;
-  bool from_query:1;
   bool used:1;
   Vers_history_point start;
   Vers_history_point end;
@@ -1856,7 +1855,7 @@ struct vers_select_conds_t
   void empty()
   {
     type= SYSTEM_TIME_UNSPECIFIED;
-    used= from_query= false;
+    used= false;
     start.empty();
     end.empty();
   }
@@ -1866,7 +1865,7 @@ struct vers_select_conds_t
             Vers_history_point _end= Vers_history_point())
   {
     type= _type;
-    used= from_query= false;
+    used= false;
     start= _start;
     end= _end;
   }
@@ -1880,10 +1879,6 @@ struct vers_select_conds_t
     return type != SYSTEM_TIME_UNSPECIFIED;
   }
   bool resolve_units(THD *thd);
-  bool user_defined() const
-  {
-    return !from_query && type != SYSTEM_TIME_UNSPECIFIED;
-  }
   bool eq(const vers_select_conds_t &conds) const;
 };
 
@@ -2268,7 +2263,7 @@ struct TABLE_LIST
   /* TABLE_TYPE_UNKNOWN if any type is acceptable */
   Table_type    required_type;
   handlerton	*db_type;		/* table_type for handler */
-  char		timestamp_buffer[20];	/* buffer for timestamp (19+1) */
+  char		timestamp_buffer[MAX_DATETIME_WIDTH + 1];
   /*
     This TABLE_LIST object is just placeholder for prelocking, it will be
     used for implicit LOCK TABLES only and won't be used in real statement.
@@ -2300,8 +2295,6 @@ struct TABLE_LIST
   /* TODO: replace with derived_type */
   bool          merged;
   bool          merged_for_insert;
-  /* TRUE <=> don't prepare this derived table/view as it should be merged.*/
-  bool          skip_prepare_derived;
   bool          sequence;  /* Part of NEXTVAL/CURVAL/LASTVAL */
 
   /*
@@ -2311,7 +2304,6 @@ struct TABLE_LIST
   List<Item>    used_items;
   /* Sublist (tail) of persistent used_items */
   List<Item>    persistent_used_items;
-  Item          **materialized_items;
 
   /* View creation context. */
 
@@ -2882,7 +2874,7 @@ enum get_table_share_flags {
   GTS_FORCE_DISCOVERY      = 16
 };
 
-size_t max_row_length(TABLE *table, const uchar *data);
+size_t max_row_length(TABLE *table, MY_BITMAP const *cols, const uchar *data);
 
 void init_mdl_requests(TABLE_LIST *table_list);
 

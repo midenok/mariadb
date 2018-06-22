@@ -99,7 +99,7 @@ sp_map_item_type(const Type_handler *handler)
 
 bool Item_splocal::append_for_log(THD *thd, String *str)
 {
-  if (fix_fields(thd, NULL))
+  if (fix_fields_if_needed(thd, NULL))
     return true;
 
   if (limit_clause_param)
@@ -137,7 +137,7 @@ bool Item_splocal::append_value_for_log(THD *thd, String *str)
 
 bool Item_splocal_row_field::append_for_log(THD *thd, String *str)
 {
-  if (fix_fields(thd, NULL))
+  if (fix_fields_if_needed(thd, NULL))
     return true;
 
   if (limit_clause_param)
@@ -369,19 +369,18 @@ Item *THD::sp_prepare_func_item(Item **it_addr, uint cols)
 /**
   Fix an Item for evaluation for SP.
 */
+
 Item *THD::sp_fix_func_item(Item **it_addr)
 {
   DBUG_ENTER("THD::sp_fix_func_item");
-  if (!(*it_addr)->fixed &&
-      (*it_addr)->fix_fields(this, it_addr))
+  if ((*it_addr)->fix_fields_if_needed(this, it_addr))
   {
     DBUG_PRINT("info", ("fix_fields() failed"));
     DBUG_RETURN(NULL);
   }
   it_addr= (*it_addr)->this_item_addr(this, it_addr);
 
-  if (!(*it_addr)->fixed &&
-      (*it_addr)->fix_fields(this, it_addr))
+  if ((*it_addr)->fix_fields_if_needed(this, it_addr))
   {
     DBUG_PRINT("info", ("fix_fields() failed"));
     DBUG_RETURN(NULL);
@@ -594,6 +593,7 @@ sp_package::~sp_package()
 /*
   Test if two routines have equal specifications
 */
+
 bool sp_head::eq_routine_spec(const sp_head *sp) const
 {
   // TODO: Add tests for equal return data types (in case of FUNCTION)
@@ -836,7 +836,7 @@ sp_head::~sp_head()
     thd->lex->sphead= NULL;
     lex_end(thd->lex);
     delete thd->lex;
-    thd->lex= thd->stmt_lex= lex;
+    thd->lex= lex;
   }
 
   my_hash_free(&m_sptabs);
@@ -1153,7 +1153,7 @@ sp_head::execute(THD *thd, bool merge_da_on_success)
               backup_arena;
   query_id_t old_query_id;
   TABLE *old_derived_tables;
-  LEX *old_lex, *old_stmt_lex;
+  LEX *old_lex;
   Item_change_list old_change_list;
   String old_packet;
   uint old_server_status;
@@ -1260,7 +1260,6 @@ sp_head::execute(THD *thd, bool merge_da_on_success)
     do it in each instruction
   */
   old_lex= thd->lex;
-  old_stmt_lex= thd->stmt_lex;
   /*
     We should also save Item tree change list to avoid rollback something
     too early in the calling query.
@@ -1417,7 +1416,6 @@ sp_head::execute(THD *thd, bool merge_da_on_success)
   DBUG_ASSERT(thd->Item_change_list::is_empty());
   old_change_list.move_elements_to(thd);
   thd->lex= old_lex;
-  thd->stmt_lex= old_stmt_lex;
   thd->set_query_id(old_query_id);
   DBUG_ASSERT(!thd->derived_tables);
   thd->derived_tables= old_derived_tables;
@@ -1607,6 +1605,7 @@ bool sp_head::check_execute_access(THD *thd) const
   @retval           NULL - error (access denided or EOM)
   @retval          !NULL - success (the invoker has rights to all %TYPE tables)
 */
+
 sp_rcontext *sp_head::rcontext_create(THD *thd, Field *ret_value,
                                       Row_definition_list *defs,
                                       bool switch_security_ctx)
@@ -1784,6 +1783,7 @@ err_with_cleanup:
 /*
   Execute the package initialization section.
 */
+
 bool sp_package::instantiate_if_needed(THD *thd)
 {
   List<Item> args;
@@ -2459,6 +2459,7 @@ sp_head::merge_lex(THD *thd, LEX *oldlex, LEX *sublex)
 /**
   Put the instruction on the backpatch list, associated with the label.
 */
+
 int
 sp_head::push_backpatch(THD *thd, sp_instr *i, sp_label *lab,
                         List<bp_t> *list, backpatch_instr_type itype)
@@ -2514,6 +2515,7 @@ sp_head::push_backpatch_goto(THD *thd, sp_pcontext *ctx, sp_label *lab)
   Update all instruction with this label in the backpatch list to
   the current position.
 */
+
 void
 sp_head::backpatch(sp_label *lab)
 {
@@ -3041,6 +3043,7 @@ bool sp_head::add_instr_preturn(THD *thd, sp_pcontext *spcont)
 
   QQ: Perhaps we need a dedicated sp_instr_nop for this purpose.
 */
+
 bool sp_head::replace_instr_to_nop(THD *thd, uint ip)
 {
   sp_instr *instr= get_instr(ip);
@@ -3165,6 +3168,7 @@ sp_head::opt_mark()
   @return
     0 if ok, !=0 on error.
 */
+
 int
 sp_head::show_routine_code(THD *thd)
 {
@@ -3272,7 +3276,7 @@ sp_lex_keeper::reset_lex_and_exec_core(THD *thd, uint *nextp,
     We should not save old value since it is saved/restored in
     sp_head::execute() when we are entering/leaving routine.
   */
-  thd->lex= thd->stmt_lex= m_lex;
+  thd->lex= m_lex;
 
   thd->set_query_id(next_query_id());
 
@@ -3467,7 +3471,6 @@ sp_instr_stmt::execute(THD *thd, uint *nextp)
   int res;
   bool save_enable_slow_log;
   const CSET_STRING query_backup= thd->query_string;
-  QUERY_START_TIME_INFO time_info;
   Sub_statement_state backup_state;
   DBUG_ENTER("sp_instr_stmt::execute");
   DBUG_PRINT("info", ("command: %d", m_lex_keeper.sql_command()));
@@ -3477,15 +3480,7 @@ sp_instr_stmt::execute(THD *thd, uint *nextp)
   thd->profiling.set_query_source(m_query.str, m_query.length);
 #endif
 
-  if ((save_enable_slow_log= thd->enable_slow_log))
-  {
-    /*
-      Save start time info for the CALL statement and overwrite it with the
-      current time for log_slow_statement() to log the individual query timing.
-    */
-    thd->backup_query_start_time(&time_info);
-    thd->set_time();
-  }
+  save_enable_slow_log= thd->enable_slow_log;
   thd->store_slow_query_state(&backup_state);
 
   if (!(res= alloc_query(thd, m_query.str, m_query.length)) &&
@@ -3549,9 +3544,6 @@ sp_instr_stmt::execute(THD *thd, uint *nextp)
       thd->get_stmt_da()->reset_diagnostics_area();
     }
   }
-  /* Restore the original query start time */
-  if (thd->enable_slow_log)
-    thd->restore_query_start_time(&time_info);
 
   DBUG_RETURN(res || thd->is_error());
 }
@@ -4409,7 +4401,7 @@ sp_instr_cfetch::print(String *str)
 int
 sp_instr_agg_cfetch::execute(THD *thd, uint *nextp)
 {
-  DBUG_ENTER("sp_instr_cfetch::execute");
+  DBUG_ENTER("sp_instr_agg_cfetch::execute");
   int res= 0;
   if (!thd->spcont->instr_ptr)
   {
@@ -4434,7 +4426,16 @@ sp_instr_agg_cfetch::execute(THD *thd, uint *nextp)
   DBUG_RETURN(res);
 }
 
+void
+sp_instr_agg_cfetch::print(String *str)
+{
 
+  uint rsrv= SP_INSTR_UINT_MAXLEN+11;
+
+  if (str->reserve(rsrv))
+    return;
+  str->qs_append(STRING_WITH_LEN("agg_cfetch"));
+}
 
 /*
   sp_instr_cursor_copy_struct class functions
@@ -4448,6 +4449,7 @@ sp_instr_agg_cfetch::execute(THD *thd, uint *nextp)
   - opens the cursor without copying data (materialization).
   - copies the cursor structure to the associated %ROWTYPE variable.
 */
+
 int
 sp_instr_cursor_copy_struct::exec_core(THD *thd, uint *nextp)
 {
@@ -4924,6 +4926,7 @@ sp_head::set_local_variable(THD *thd, sp_pcontext *spcont,
 /**
   Similar to set_local_variable(), but for ROW variable fields.
 */
+
 bool
 sp_head::set_local_variable_row_field(THD *thd, sp_pcontext *spcont,
                                       const Sp_rcontext_handler *rh,
@@ -5118,6 +5121,7 @@ bool sp_head::spvar_fill_table_rowtype_reference(THD *thd,
     END p1;
   Check that the first p1 and the last p1 match.
 */
+
 bool sp_head::check_package_routine_end_name(const LEX_CSTRING &end_name) const
 {
   LEX_CSTRING non_qualified_name= m_name;
@@ -5144,7 +5148,5 @@ err:
 
 ulong sp_head::sp_cache_version() const
 {
-  return m_parent ? m_parent->sp_cache_version() :
-                    m_sp_cache_version;
-
+  return m_parent ? m_parent->sp_cache_version() : m_sp_cache_version;
 }

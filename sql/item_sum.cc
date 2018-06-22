@@ -72,14 +72,14 @@ size_t Item_sum::ram_limitation(THD *thd)
 bool Item_sum::init_sum_func_check(THD *thd)
 {
   SELECT_LEX *curr_sel= thd->lex->current_select;
-  if (!curr_sel->name_visibility_map)
+  if (curr_sel && !curr_sel->name_visibility_map)
   {
     for (SELECT_LEX *sl= curr_sel; sl; sl= sl->context.outer_select())
     {
       curr_sel->name_visibility_map|= (1 << sl-> nest_level);
     }
   }
-  if (!(thd->lex->allow_sum_func & curr_sel->name_visibility_map))
+  if (!curr_sel || !(thd->lex->allow_sum_func & curr_sel->name_visibility_map))
   {
     my_message(ER_INVALID_GROUP_FUNC_USE, ER_THD(thd, ER_INVALID_GROUP_FUNC_USE),
                MYF(0));
@@ -1129,7 +1129,7 @@ Item_sum_num::fix_fields(THD *thd, Item **ref)
   maybe_null= sum_func() != COUNT_FUNC;
   for (uint i=0 ; i < arg_count ; i++)
   {
-    if (args[i]->fix_fields(thd, args + i) || args[i]->check_cols(1))
+    if (args[i]->fix_fields_if_needed_for_scalar(thd, &args[i]))
       return TRUE;
     set_if_bigger(decimals, args[i]->decimals);
     m_with_subquery|= args[i]->with_subquery();
@@ -1139,9 +1139,8 @@ Item_sum_num::fix_fields(THD *thd, Item **ref)
   result_field=0;
   max_length=float_length(decimals);
   null_value=1;
-  fix_length_and_dec();
-
-  if (check_sum_func(thd, ref))
+  if (fix_length_and_dec() ||
+      check_sum_func(thd, ref))
     return TRUE;
 
   memcpy (orig_args, args, sizeof (Item *) * arg_count);
@@ -1156,21 +1155,20 @@ Item_sum_hybrid::fix_fields(THD *thd, Item **ref)
   DBUG_ENTER("Item_sum_hybrid::fix_fields");
   DBUG_ASSERT(fixed == 0);
 
-  Item *item= args[0];
-
   if (init_sum_func_check(thd))
     DBUG_RETURN(TRUE);
 
   // 'item' can be changed during fix_fields
-  if ((!item->fixed && item->fix_fields(thd, args)) ||
-      (item= args[0])->check_cols(1))
+  if (args[0]->fix_fields_if_needed_for_scalar(thd, &args[0]))
     DBUG_RETURN(TRUE);
 
   m_with_subquery= args[0]->with_subquery();
   with_param= args[0]->with_param;
   with_window_func|= args[0]->with_window_func;
 
-  fix_length_and_dec();
+  if (fix_length_and_dec())
+    DBUG_RETURN(TRUE);
+
   if (!is_window_func_sum_expr())
     setup_hybrid(thd, args[0], NULL);
   result_field=0;
@@ -1184,11 +1182,11 @@ Item_sum_hybrid::fix_fields(THD *thd, Item **ref)
 }
 
 
-void Item_sum_hybrid::fix_length_and_dec()
+bool Item_sum_hybrid::fix_length_and_dec()
 {
   DBUG_ASSERT(args[0]->field_type() == args[0]->real_item()->field_type());
   DBUG_ASSERT(args[0]->result_type() == args[0]->real_item()->result_type());
-  (void) args[0]->type_handler()->Item_sum_hybrid_fix_length_and_dec(this);
+  return args[0]->type_handler()->Item_sum_hybrid_fix_length_and_dec(this);
 }
 
 
@@ -1269,6 +1267,12 @@ Item_sum_sp::Item_sum_sp(THD *thd, Name_resolution_context *context_arg,
   m_sp= sp;
 }
 
+Item_sum_sp::Item_sum_sp(THD *thd, Item_sum_sp *item):
+             Item_sum(thd, item), Item_sp(thd, item)
+{
+  maybe_null= item->maybe_null;
+  quick_group= item->quick_group;
+}
 
 bool
 Item_sum_sp::fix_fields(THD *thd, Item **ref)
@@ -1292,7 +1296,7 @@ Item_sum_sp::fix_fields(THD *thd, Item **ref)
 
   for (uint i= 0 ; i < arg_count ; i++)
   {
-    if (args[i]->fix_fields(thd, args + i) || args[i]->check_cols(1))
+    if (args[i]->fix_fields_if_needed_for_scalar(thd, &args[i]))
       return TRUE;
     set_if_bigger(decimals, args[i]->decimals);
     m_with_subquery|= args[i]->with_subquery();
@@ -1301,7 +1305,8 @@ Item_sum_sp::fix_fields(THD *thd, Item **ref)
   result_field= NULL;
   max_length= float_length(decimals);
   null_value= 1;
-  fix_length_and_dec();
+  if (fix_length_and_dec())
+    return TRUE;
 
   if (check_sum_func(thd, ref))
     return TRUE;
@@ -1383,14 +1388,14 @@ Item_sum_sp::cleanup()
   @note called from Item::fix_fields.
 */
 
-void
+bool
 Item_sum_sp::fix_length_and_dec()
 {
   DBUG_ENTER("Item_sum_sp::fix_length_and_dec");
   DBUG_ASSERT(sp_result_field);
   Type_std_attributes::set(sp_result_field->type_std_attributes());
-  Item_sum::fix_length_and_dec();
-  DBUG_VOID_RETURN;
+  bool res= Item_sum::fix_length_and_dec();
+  DBUG_RETURN(res);
 }
 
 const char *
@@ -1398,6 +1403,14 @@ Item_sum_sp::func_name() const
 {
   THD *thd= current_thd;
   return Item_sp::func_name(thd);
+}
+
+Item* Item_sum_sp::copy_or_same(THD *thd)
+{
+  Item_sum_sp *copy_item= new (thd->mem_root) Item_sum_sp(thd, this);
+  copy_item->init_result_field(thd, max_length, maybe_null, 
+                               &copy_item->null_value, &copy_item->name);
+  return copy_item;
 }
 
 /***********************************************************************
@@ -1478,14 +1491,16 @@ void Item_sum_sum::fix_length_and_dec_decimal()
 }
 
 
-void Item_sum_sum::fix_length_and_dec()
+bool Item_sum_sum::fix_length_and_dec()
 {
   DBUG_ENTER("Item_sum_sum::fix_length_and_dec");
   maybe_null=null_value=1;
-  args[0]->cast_to_int_type_handler()->Item_sum_sum_fix_length_and_dec(this);
+  if (args[0]->cast_to_int_type_handler()->
+      Item_sum_sum_fix_length_and_dec(this))
+    DBUG_RETURN(TRUE);
   DBUG_PRINT("info", ("Type: %s (%d, %d)", type_handler()->name().ptr(),
                       max_length, (int) decimals));
-  DBUG_VOID_RETURN;
+  DBUG_RETURN(FALSE);
 }
 
 
@@ -1902,15 +1917,17 @@ void Item_sum_avg::fix_length_and_dec_double()
 }
 
 
-void Item_sum_avg::fix_length_and_dec()
+bool Item_sum_avg::fix_length_and_dec()
 {
   DBUG_ENTER("Item_sum_avg::fix_length_and_dec");
   prec_increment= current_thd->variables.div_precincrement;
   maybe_null=null_value=1;
-  args[0]->cast_to_int_type_handler()->Item_sum_avg_fix_length_and_dec(this);
+  if (args[0]->cast_to_int_type_handler()->
+      Item_sum_avg_fix_length_and_dec(this))
+    DBUG_RETURN(TRUE);
   DBUG_PRINT("info", ("Type: %s (%d, %d)", type_handler()->name().ptr(),
                       max_length, (int) decimals));
-  DBUG_VOID_RETURN;
+  DBUG_RETURN(FALSE);
 }
 
 
@@ -2027,7 +2044,7 @@ double Item_sum_std::val_real()
 {
   DBUG_ASSERT(fixed == 1);
   double nr= Item_sum_variance::val_real();
-  if (my_isinf(nr))
+  if (std::isinf(nr))
     return DBL_MAX;
   DBUG_ASSERT(nr >= 0.0);
   return sqrt(nr);
@@ -2122,7 +2139,7 @@ void Item_sum_variance::fix_length_and_dec_decimal()
 }
 
 
-void Item_sum_variance::fix_length_and_dec()
+bool Item_sum_variance::fix_length_and_dec()
 {
   DBUG_ENTER("Item_sum_variance::fix_length_and_dec");
   maybe_null= null_value= 1;
@@ -2134,11 +2151,11 @@ void Item_sum_variance::fix_length_and_dec()
     type of the result is an implementation-defined aproximate numeric
     type.
   */
-
-  args[0]->type_handler()->Item_sum_variance_fix_length_and_dec(this);
+  if (args[0]->type_handler()->Item_sum_variance_fix_length_and_dec(this))
+    DBUG_RETURN(TRUE);
   DBUG_PRINT("info", ("Type: %s (%d, %d)", type_handler()->name().ptr(),
                       max_length, (int)decimals));
-  DBUG_VOID_RETURN;
+  DBUG_RETURN(FALSE);
 }
 
 
@@ -3364,13 +3381,13 @@ my_decimal *Item_sum_udf_int::val_decimal(my_decimal *dec)
 
 /** Default max_length is max argument length. */
 
-void Item_sum_udf_str::fix_length_and_dec()
+bool Item_sum_udf_str::fix_length_and_dec()
 {
   DBUG_ENTER("Item_sum_udf_str::fix_length_and_dec");
   max_length=0;
   for (uint i = 0; i < arg_count; i++)
     set_if_bigger(max_length,args[i]->max_length);
-  DBUG_VOID_RETURN;
+  DBUG_RETURN(FALSE);
 }
 
 
@@ -3895,9 +3912,7 @@ Item_func_group_concat::fix_fields(THD *thd, Item **ref)
 
   for (i=0 ; i < arg_count ; i++)
   {
-    if ((!args[i]->fixed &&
-         args[i]->fix_fields(thd, args + i)) ||
-        args[i]->check_cols(1))
+    if (args[i]->fix_fields_if_needed_for_scalar(thd, &args[i]))
       return TRUE;
     m_with_subquery|= args[i]->with_subquery();
     with_param|= args[i]->with_param;

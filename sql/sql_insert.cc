@@ -749,12 +749,6 @@ bool mysql_insert(THD *thd,TABLE_LIST *table_list,
              table_list->table_name.str);
     DBUG_RETURN(TRUE);
   }
-  /*
-    mark the table_list as a target for insert, to skip the DT/view prepare phase 
-    for correct access rights checks
-    TODO: remove this hack
-  */
-  table_list->skip_prepare_derived= TRUE;
 
   if (table_list->lock_type == TL_WRITE_DELAYED)
   {
@@ -1323,7 +1317,7 @@ static bool check_view_insertability(THD * thd, TABLE_LIST *view)
   /* check simplicity and prepare unique test of view */
   for (trans= trans_start; trans != trans_end; trans++)
   {
-    if (!trans->item->fixed && trans->item->fix_fields(thd, &trans->item))
+    if (trans->item->fix_fields_if_needed(thd, &trans->item))
     {
       thd->column_usage= saved_column_usage;
       DBUG_RETURN(TRUE);
@@ -1583,7 +1577,8 @@ bool mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
   {
     Item *fake_conds= 0;
     TABLE_LIST *duplicate;
-    if ((duplicate= unique_table(thd, table_list, table_list->next_global, 1)))
+    if ((duplicate= unique_table(thd, table_list, table_list->next_global,
+                                 CHECK_DUP_ALLOW_DIFFERENT_ALIAS)))
     {
       update_non_unique_table_error(table_list, "INSERT", duplicate);
       DBUG_RETURN(TRUE);
@@ -3786,7 +3781,7 @@ select_insert::prepare(List<Item> &values, SELECT_LEX_UNIT *u)
     0   OK
 */
 
-int select_insert::prepare2(void)
+int select_insert::prepare2(JOIN *)
 {
   DBUG_ENTER("select_insert::prepare2");
   if (thd->lex->current_select->options & OPTION_BUFFER_RESULT &&

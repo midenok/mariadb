@@ -749,6 +749,23 @@ os_file_handle_error_no_exit(
 			name, operation, false, on_error_silent));
 }
 
+/** Handle RENAME error.
+@param name	old name of the file
+@param new_name	new name of the file */
+static void os_file_handle_rename_error(const char* name, const char* new_name)
+{
+	if (os_file_get_last_error(true) != OS_FILE_DISK_FULL) {
+		ib::error() << "Cannot rename file '" << name << "' to '"
+			<< new_name << "'";
+	} else if (!os_has_said_disk_full) {
+		os_has_said_disk_full = true;
+		/* Disk full error is reported irrespective of the
+		on_error_silent setting. */
+		ib::error() << "Full disk prevents renaming file '"
+			<< name << "' to '" << new_name << "'";
+	}
+}
+
 /** Does simulated AIO. This function should be called by an i/o-handler
 thread.
 
@@ -773,9 +790,7 @@ os_aio_simulated_handler(
 
 #ifdef _WIN32
 static HANDLE win_get_syncio_event();
-#endif
 
-#ifdef _WIN32
 /**
  Wrapper around Windows DeviceIoControl() function.
 
@@ -3227,7 +3242,7 @@ os_file_rename_func(
 	ret = rename(oldpath, newpath);
 
 	if (ret != 0) {
-		os_file_handle_error_no_exit(oldpath, "rename", FALSE);
+		os_file_handle_rename_error(oldpath, newpath);
 
 		return(false);
 	}
@@ -3844,7 +3859,8 @@ os_file_create_simple_func(
 		/* Use default security attributes and no template file. */
 
 		file = CreateFile(
-			(LPCTSTR) name, access, FILE_SHARE_READ, NULL,
+			(LPCTSTR) name, access,
+			FILE_SHARE_READ | FILE_SHARE_DELETE, NULL,
 			create_flag, attributes, NULL);
 
 		if (file == INVALID_HANDLE_VALUE) {
@@ -4088,7 +4104,7 @@ os_file_create_func(
 	DWORD		create_flag;
 	DWORD		share_mode = srv_operation != SRV_OPERATION_NORMAL
 		? FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
-		: FILE_SHARE_READ;
+		: FILE_SHARE_READ | FILE_SHARE_DELETE;
 
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW) {
 		WAIT_ALLOW_WRITES();
@@ -4294,7 +4310,7 @@ os_file_create_simple_no_error_handling_func(
 	DWORD		attributes	= 0;
 	DWORD		share_mode = srv_operation != SRV_OPERATION_NORMAL
 		? FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
-		: FILE_SHARE_READ;
+		: FILE_SHARE_READ | FILE_SHARE_DELETE;
 
 	ut_a(name);
 
@@ -4507,8 +4523,7 @@ os_file_rename_func(
 		return(true);
 	}
 
-	os_file_handle_error_no_exit(oldpath, "rename", false);
-
+	os_file_handle_rename_error(oldpath, newpath);
 	return(false);
 }
 

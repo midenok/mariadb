@@ -1623,11 +1623,7 @@ dict_table_rename_in_cache(
 			return(DB_OUT_OF_MEMORY);
 		}
 
-		fil_delete_tablespace(table->space->id
-#ifdef BTR_CUR_HASH_ADAPT
-				      , true
-#endif /* BTR_CUR_HASH_ADAPT */
-				      );
+		fil_delete_tablespace(table->space_id);
 
 		/* Delete any temp file hanging around. */
 		if (os_file_status(filepath, &exists, &ftype)
@@ -2593,28 +2589,13 @@ dict_index_remove_from_cache_low(
 	zero. See also: dict_table_can_be_evicted() */
 
 	do {
-		ulint ref_count = btr_search_info_get_ref_count(info, index);
-
-		if (ref_count == 0) {
+		if (!btr_search_info_get_ref_count(info, index)) {
 			break;
 		}
 
-		/* Sleep for 10ms before trying again. */
-		os_thread_sleep(10000);
-		++retries;
+		buf_LRU_drop_page_hash_for_tablespace(table);
 
-		if (retries % 500 == 0) {
-			/* No luck after 5 seconds of wait. */
-			ib::error() << "Waited for " << retries / 100
-				<< " secs for hash index"
-				" ref_count (" << ref_count << ") to drop to 0."
-				" index: " << index->name
-				<< " table: " << table->name;
-		}
-
-		/* To avoid a hang here we commit suicide if the
-		ref_count doesn't drop to zero in 600 seconds. */
-		ut_a(retries < 60000);
+		ut_a(++retries < 10000);
 	} while (srv_shutdown_state == SRV_SHUTDOWN_NONE || !lru_evict);
 #endif /* BTR_CUR_HASH_ADAPT */
 
@@ -2631,37 +2612,7 @@ dict_index_remove_from_cache_low(
 	UT_LIST_REMOVE(table->indexes, index);
 
 	/* Remove the index from affected virtual column index list */
-	if (dict_index_has_virtual(index)) {
-		const dict_col_t*	col;
-		const dict_v_col_t*	vcol;
-
-		for (ulint i = 0; i < dict_index_get_n_fields(index); i++) {
-			col =  dict_index_get_nth_col(index, i);
-			if (col->is_virtual()) {
-				vcol = reinterpret_cast<const dict_v_col_t*>(
-					col);
-
-				/* This could be NULL, when we do add virtual
-				column, add index together. We do not need to
-				track this virtual column's index */
-				if (vcol->v_indexes == NULL) {
-					continue;
-				}
-
-				dict_v_idx_list::iterator	it;
-
-				for (it = vcol->v_indexes->begin();
-				     it != vcol->v_indexes->end(); ++it) {
-					dict_v_idx_t	v_index = *it;
-					if (v_index.index == index) {
-						vcol->v_indexes->erase(it);
-						break;
-					}
-				}
-			}
-
-		}
-	}
+	index->detach_columns();
 
 	dict_mem_index_free(index);
 }
@@ -4635,6 +4586,11 @@ loop:
 		/**********************************************************/
 		/* The following call adds the foreign key constraints
 		to the data dictionary system tables on disk */
+		trx->op_info = "adding foreign keys";
+
+		trx_start_if_not_started_xa(trx, true);
+
+		trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
 
 		error = dict_create_add_foreigns_to_dictionary(
 			local_fk_set, table, trx);
@@ -4829,23 +4785,6 @@ col_loop1:
 			" failed. Parse error in '%s'"
 			" near '%s'.",
 			operation, create_name, start_of_latest_foreign, orig);
-		return(DB_CANNOT_ADD_CONSTRAINT);
-	}
-
-	/* Don't allow foreign keys on partitioned tables yet. */
-	ptr1 = dict_scan_to(ptr, "PARTITION");
-	if (ptr1) {
-		ptr1 = dict_accept(cs, ptr1, "PARTITION", &success);
-		if (success && my_isspace(cs, *ptr1)) {
-			ptr2 = dict_accept(cs, ptr1, "BY", &success);
-			if (success) {
-				my_error(ER_FOREIGN_KEY_ON_PARTITIONED,MYF(0));
-				return(DB_CANNOT_ADD_CONSTRAINT);
-			}
-		}
-	}
-	if (dict_table_is_partition(table)) {
-		my_error(ER_FOREIGN_KEY_ON_PARTITIONED,MYF(0));
 		return(DB_CANNOT_ADD_CONSTRAINT);
 	}
 

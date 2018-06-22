@@ -28,9 +28,9 @@ ${SSL_INTERNAL_INCLUDE_DIRS}
 )
 
 SET(GEN_SOURCES
-${CMAKE_BINARY_DIR}/sql/sql_yacc.h 
+${CMAKE_BINARY_DIR}/sql/sql_yacc.hh 
 ${CMAKE_BINARY_DIR}/sql/sql_yacc.cc
-${CMAKE_BINARY_DIR}/sql/sql_yacc_ora.h
+${CMAKE_BINARY_DIR}/sql/sql_yacc_ora.hh
 ${CMAKE_BINARY_DIR}/sql/sql_yacc_ora.cc
 ${CMAKE_BINARY_DIR}/sql/lex_hash.h 
 )
@@ -445,9 +445,9 @@ IF(NOT DISABLE_SHARED)
     # Clean direct output flags, as 2 targets have the same base name
     # libmysqld
     SET_TARGET_PROPERTIES(libmysqld PROPERTIES CLEAN_DIRECT_OUTPUT 1)
-    TARGET_LINK_LIBRARIES(libmysqld ${CRC32_VPMSUM_LIBRARY})
+    TARGET_LINK_LIBRARIES(libmysqld ${CRC32_LIBRARY})
     SET_TARGET_PROPERTIES(mysqlserver PROPERTIES CLEAN_DIRECT_OUTPUT 1)
-    TARGET_LINK_LIBRARIES(mysqlserver ${CRC32_VPMSUM_LIBRARY})
+    TARGET_LINK_LIBRARIES(mysqlserver ${CRC32_LIBRARY})
     IF(LIBMYSQLD_SO_EXTRA_LIBS)
        TARGET_LINK_LIBRARIES(libmysqld ${LIBMYSQLD_SO_EXTRA_LIBS})
     ENDIF()
