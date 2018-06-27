@@ -767,6 +767,7 @@ typedef struct system_variables
 
   vers_asof_timestamp_t vers_asof_timestamp;
   ulong vers_alter_history;
+  my_bool vers_modify_history;
 } SV;
 
 /**
@@ -4813,6 +4814,7 @@ public:
 private:
   /* Whether a lock has been acquired? */
   bool m_tmp_tables_locked;
+  bool modify_history_warned;
 
   bool has_temporary_tables();
   uint create_tmp_table_def_key(char *key, const char *db,
@@ -5071,6 +5073,8 @@ public:
   Item *sp_fix_func_item(Item **it_addr);
   Item *sp_prepare_func_item(Item **it_addr, uint cols= 1);
   bool sp_eval_expr(Field *result_field, Item **expr_item_ptr);
+
+  bool vers_modify_history();
 };
 
 /** A short cut for thd->get_stmt_da()->set_ok_status(). */
