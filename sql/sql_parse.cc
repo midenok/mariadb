@@ -3247,7 +3247,9 @@ mysql_execute_command(THD *thd)
   */
   DBUG_ASSERT(! thd->transaction_rollback_request || thd->in_sub_stmt);
 
-  if (!thd->stmt_arena->is_stmt_execute() && thd->lex->sql_command == SQLCOM_SELECT)
+  if (TR_table::use_transaction_registry &&
+      !thd->stmt_arena->is_stmt_execute() &&
+      thd->lex->sql_command == SQLCOM_SELECT)
     thd->lex->vers_add_trt_query(thd);
 
   /*
