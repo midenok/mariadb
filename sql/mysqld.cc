@@ -6109,6 +6109,21 @@ int mysqld_main(int argc, char **argv)
       exit(0);
     }
   }
+  else if (TR_table::use_transaction_registry)
+  {
+    THD *thd= new THD(0);
+    if (!thd)
+    {
+      sql_print_error("Can't allocate memory for TRT init");
+      unireg_abort(1);
+    }
+    thd->thread_stack= (char*) &thd;
+    thd->store_globals();
+    thd->set_db(&MYSQL_SCHEMA_NAME);
+
+    TR_table trt(thd);
+    trt.open();
+  }
 
   create_shutdown_thread();
   start_handle_manager();
