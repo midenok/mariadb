@@ -8694,7 +8694,15 @@ bool TR_table::open()
   thd->temporary_tables= temporary_tables;
 
   if (use_transaction_registry == MAYBE)
-    error= check(error);
+  {
+    if (error)
+    {
+      sql_print_warning("%`s.%`s does not exist (open failed).", db.str,
+                        table_name.str);
+      return error;
+    }
+    error= check();
+  }
 
   use_transaction_registry= error ? NO : YES;
 
@@ -8923,15 +8931,8 @@ void TR_table::warn_schema_incorrect(const char *reason)
   }
 }
 
-bool TR_table::check(bool error)
+bool TR_table::check()
 {
-  if (error)
-  {
-    sql_print_warning("%`s.%`s does not exist (open failed).", db.str,
-                      table_name.str);
-    return true;
-  }
-
   if (table->file->ht->db_type != DB_TYPE_INNODB)
   {
     warn_schema_incorrect("Wrong table engine (expected InnoDB)");
