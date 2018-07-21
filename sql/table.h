@@ -3090,7 +3090,7 @@ public:
 
      @retval true if schema is incorrect and false otherwise
    */
-  bool check(bool error);
+  bool check();
 
   TABLE * operator-> () const
   {
