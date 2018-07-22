@@ -8697,8 +8697,7 @@ bool TR_table::open()
   {
     if (error)
     {
-      sql_print_warning("%`s.%`s does not exist (open failed).", db.str,
-                        table_name.str);
+      use_transaction_registry= NO;
       return error;
     }
     error= check();
