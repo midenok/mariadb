@@ -8540,10 +8540,23 @@ public:
   }
 };
 
+bool TR_table::add_to_lex(THD* thd)
+{
+  TABLE_LIST *tl;
+  if (unlikely(!(tl= (TABLE_LIST *) thd->calloc(sizeof(TABLE_LIST)))))
+    return true;
+
+  tl->init_one_table(&MYSQL_SCHEMA_NAME, &TRANSACTION_REG_NAME,
+                     &TRANSACTION_REG_NAME, TL_READ);
+  thd->lex->add_to_query_tables(tl);
+  return false;
+}
+
 bool TR_table::add_subquery(THD* thd, Vers_history_point &p,
                             SELECT_LEX *cur_select, uint &subq_n,
                             bool backwards)
 {
+  return false;
   LEX *lex= thd->lex;
   if (!lex->expr_allows_subselect)
   {

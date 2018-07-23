@@ -6466,6 +6466,9 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
                                      (ulonglong) thd->variables.select_limit);
   }
 
+  if (TR_table::add_to_lex(thd))
+    return 1;
+
   if (!(res= open_and_lock_tables(thd, all_tables, TRUE, 0)))
   {
     if (lex->describe)
