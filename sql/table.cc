@@ -8540,23 +8540,25 @@ public:
   }
 };
 
-bool TR_table::add_to_lex(THD* thd)
+TABLE_LIST* TR_table::add_to_lex(THD* thd)
 {
   TABLE_LIST *tl;
   if (unlikely(!(tl= (TABLE_LIST *) thd->calloc(sizeof(TABLE_LIST)))))
-    return true;
+    return NULL;
 
   tl->init_one_table(&MYSQL_SCHEMA_NAME, &TRANSACTION_REG_NAME,
                      &TRANSACTION_REG_NAME, TL_READ);
+  tl->is_fqtn= true;
+  tl->is_alias= true;
+  tl->cacheable_table= true;
   thd->lex->add_to_query_tables(tl);
-  return false;
+  return tl;
 }
 
 bool TR_table::add_subquery(THD* thd, Vers_history_point &p,
                             SELECT_LEX *cur_select, uint &subq_n,
                             bool backwards)
 {
-  return false;
   LEX *lex= thd->lex;
   if (!lex->expr_allows_subselect)
   {
@@ -8607,6 +8609,118 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p,
     sel->add_joined_table(tl);
     sel->context.table_list= tl;
     sel->context.first_name_resolution_table= tl;
+  }
+  static const LEX_CSTRING commit_ts_name= {C_STRING_WITH_LEN("commit_timestamp")};
+  { // set WHERE
+    sel->parsing_place= IN_WHERE;
+    Item_field *commit_ts= newx Item_field(thd, lex->current_context(),
+      MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
+    if (!commit_ts)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    COND *cond= newx Item_func_le(thd, commit_ts, p.item);
+    sel->where= normalize_cond(thd, cond);
+    cond->top_level_item();
+  }
+  { // add ORDER
+    sel->parsing_place= IN_ORDER_BY;
+    Item_field *commit_ts= newx Item_field(thd, lex->current_context(),
+      MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &commit_ts_name);
+    if (!commit_ts)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    sel->add_order_to_list(thd, commit_ts, backwards);
+  }
+  { // set LIMIT
+    sel->parsing_place= NO_MATTER;
+    sel->select_limit= new (thd->mem_root) Item_uint(thd, 1);
+    if (!sel->select_limit)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    sel->offset_limit= 0;
+    sel->explicit_limit= 1;
+    lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_LIMIT);
+  }
+  { // add subquery to outer query
+    lex->current_select= cur_select;
+    SELECT_LEX_UNIT *unit= sel->master_unit();
+    Table_ident *ti= newx Table_ident(unit);
+    if (ti == NULL)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    static const LEX_CSTRING subq_prefix= {C_STRING_WITH_LEN("__trt_")};
+    String *alias_str= newx String(subq_prefix.str, table_alias_charset);
+    if (!alias_str)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    alias_str->append_ulonglong(subq_n);
+    LEX_CSTRING alias= alias_str->lex_cstring();
+    TABLE_LIST *subquery= cur_select->add_table_to_list(thd, ti, &alias,
+							TL_OPTION_DONT_RESOLVE,
+							TL_READ, MDL_SHARED_READ);
+    if (!subquery)
+      return true;
+
+    cur_select->add_joined_table(subquery);
+    p.tr_table= subquery;
+    subq_n++;
+  }
+
+  return false;
+}
+
+bool TR_table::add_subquery2(THD* thd, TABLE_LIST *trtl, Vers_history_point &p,
+                            SELECT_LEX *cur_select, uint &subq_n,
+                            bool backwards)
+{
+  LEX *lex= thd->lex;
+  if (!lex->expr_allows_subselect)
+  {
+    my_error(ER_VERS_TRT_SUBQUERY_FAILED, MYF(0));
+    return true;
+  }
+
+  Query_arena_stmt on_stmt_arena(thd); // FIXME: is it needed?
+  lex->derived_tables|= DERIVED_SUBQUERY;
+
+  LEX_context lex_ctx(lex, cur_select);
+  if (mysql_new_select(lex, 1, NULL))
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+  mysql_init_select(lex);
+  SELECT_LEX *sel= lex->current_select;
+  sel->linkage= DERIVED_TABLE_TYPE;
+  { // add fields
+    sel->parsing_place= SELECT_LIST;
+    static const LEX_CSTRING trx_id_name= {C_STRING_WITH_LEN("transaction_id")};
+    Item_field *trx_id= newx Item_field(thd, lex->current_context(),
+      MYSQL_SCHEMA_NAME.str, TRANSACTION_REG_NAME.str, &trx_id_name);
+    if (!trx_id)
+    {
+       my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    sel->add_item_to_list(thd, trx_id);
+  }
+  { // add table
+    sel->parsing_place= NO_MATTER;
+    sel->table_join_options= 0;
+    trtl->select_lex= sel;
+    sel->add_joined_table(trtl);
+    sel->context.table_list= trtl;
+    sel->context.first_name_resolution_table= trtl;
   }
   static const LEX_CSTRING commit_ts_name= {C_STRING_WITH_LEN("commit_timestamp")};
   { // set WHERE
