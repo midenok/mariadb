@@ -35,7 +35,6 @@
 
 typedef bool (*dt_processor)(THD *thd, LEX *lex, TABLE_LIST *derived);
 
-bool mysql_derived_init(THD *thd, LEX *lex, TABLE_LIST *derived);
 bool mysql_derived_prepare(THD *thd, LEX *lex, TABLE_LIST *derived);
 bool mysql_derived_optimize(THD *thd, LEX *lex, TABLE_LIST *derived);
 bool mysql_derived_merge(THD *thd, LEX *lex, TABLE_LIST *derived);

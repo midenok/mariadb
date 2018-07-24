@@ -8786,6 +8786,9 @@ bool TR_table::add_subquery2(THD* thd, TABLE_LIST *trtl, Vers_history_point &p,
     cur_select->add_joined_table(subquery);
     p.tr_table= subquery;
     subq_n++;
+
+    if (mysql_derived_init(thd, lex, subquery))
+      return true;
   }
 
   return false;
