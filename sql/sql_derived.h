@@ -23,6 +23,7 @@ struct LEX;
 bool mysql_handle_derived(LEX *lex, uint phases);
 bool mysql_handle_single_derived(LEX *lex, TABLE_LIST *derived, uint phases);
 bool mysql_handle_list_of_derived(LEX *lex, TABLE_LIST *dt_list, uint phases);
+bool mysql_derived_init(THD *thd, LEX *lex, TABLE_LIST *derived);
 bool mysql_derived_reinit(THD *thd, LEX *lex, TABLE_LIST *derived);
 
 /**
