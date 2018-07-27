@@ -6457,7 +6457,7 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
   LEX	*lex= thd->lex;
   select_result *result=lex->result;
   bool res;
-  TABLE_LIST *trtl;
+  TABLE_LIST *trtl= NULL;
   /* assign global limit variable if limit is not given */
   {
     SELECT_LEX *param= lex->unit.global_parameters();
@@ -6472,7 +6472,7 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
 
   if (!(res= open_and_lock_tables(thd, all_tables, TRUE, 0)))
   {
-    if (lex->vers_add_trt_query2(thd, trtl))
+    if (trtl && lex->vers_add_trt_query2(thd, trtl))
       return 1;
     if (lex->describe)
     {

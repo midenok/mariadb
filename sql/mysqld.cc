@@ -6099,6 +6099,7 @@ int mysqld_main(int argc, char **argv)
 
   if (opt_bootstrap)
   {
+    TR_table::use_transaction_registry= TR_table::NO;
     select_thread_in_use= 0;                    // Allow 'kill' to work
     bootstrap(mysql_stdin);
     if (!kill_in_progress)
