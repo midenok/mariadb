@@ -7238,13 +7238,12 @@ bool LEX::vers_add_trt_query2(THD *thd, TABLE_LIST *trtl)
   uint subq_n= 0;
   for (TABLE_LIST *tl= query_tables; tl; tl= tl->next_global)
   {
-    if (!tl->vers_conditions.is_set())
+    if (!tl->vers_conditions.is_set() || tl->is_view_or_derived())
       continue;
     DBUG_ASSERT(tl->table);
     if (!tl->table->versioned(VERS_TRX_ID))
       continue;
-    SELECT_LEX *select_lex=
-      tl->derived ? tl->derived->first_select() : tl->select_lex;
+    SELECT_LEX *select_lex= tl->select_lex;
     switch (tl->vers_conditions.type)
     {
     case SYSTEM_TIME_AS_OF:
