@@ -2990,7 +2990,7 @@ class TR_table: public TABLE_LIST
   enum init_type {NO_INIT};
 
 public:
-  enum enabled {NO, MAYBE, YES};
+  enum enabled {NO= 0, MAYBE, YES};
   static enum enabled use_transaction_registry;
 
   /**
