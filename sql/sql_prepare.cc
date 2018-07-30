@@ -2253,7 +2253,7 @@ static bool check_prepared_statement(Prepared_statement *stmt)
 
   if (TR_table::use_transaction_registry &&
       sql_command == SQLCOM_SELECT &&
-      lex->vers_add_trt_query(thd))
+      !TR_table::add_to_lex(thd, lex))
     goto error;
   lex->first_lists_tables_same();
   tables= lex->query_tables;

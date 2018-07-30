@@ -8540,8 +8540,9 @@ public:
   }
 };
 
-TABLE_LIST* TR_table::add_to_lex(THD* thd)
+TABLE_LIST* TR_table::add_to_lex(THD* thd, LEX* lex)
 {
+  Query_arena_stmt on_stmt_arena(thd);
   TABLE_LIST *tl;
   if (unlikely(!(tl= (TABLE_LIST *) thd->calloc(sizeof(TABLE_LIST)))))
     return NULL;
@@ -8551,7 +8552,8 @@ TABLE_LIST* TR_table::add_to_lex(THD* thd)
   tl->is_fqtn= true;
   tl->is_alias= true;
   tl->cacheable_table= true;
-  thd->lex->add_to_query_tables(tl);
+  tl->select_lex= lex->current_select;
+  lex->add_to_query_tables(tl);
   return tl;
 }
 

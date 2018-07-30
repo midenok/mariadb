@@ -6467,7 +6467,10 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
                                      (ulonglong) thd->variables.select_limit);
   }
 
-  if (TR_table::use_transaction_registry && !(trtl= TR_table::add_to_lex(thd)))
+  if (TR_table::use_transaction_registry &&
+      thd->lex->sql_command == SQLCOM_SELECT &&
+      thd->stmt_arena->is_conventional() &&
+      !(trtl= TR_table::add_to_lex(thd, thd->lex)))
     return 1;
 
   if (!(res= open_and_lock_tables(thd, all_tables, TRUE, 0)))
