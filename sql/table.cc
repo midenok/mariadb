@@ -8703,6 +8703,7 @@ bool TR_table::add_subquery2(THD* thd, TABLE_LIST *trtl, Vers_history_point &p,
     sel->parsing_place= NO_MATTER;
     sel->table_join_options= 0;
     trtl->select_lex= sel;
+    sel->table_list.link_in_list(trtl, &trtl->next_local);
     sel->add_joined_table(trtl);
     sel->context.table_list= trtl;
     sel->context.first_name_resolution_table= trtl;
