@@ -8515,7 +8515,7 @@ Item* Vers_history_point::make_trx_id(THD* thd, Name_resolution_context& ctx) co
   DBUG_ASSERT(tr_subquery);
   DBUG_ASSERT(tr_subquery->table);
   DBUG_ASSERT(FLD_TRX_ID < tr_subquery->table->s->fields);
-  return newx Item_field(thd, &ctx, tr_table->table->field[FLD_TRX_ID]);
+  return newx Item_field(thd, &ctx, tr_subquery->table->field[FLD_TRX_ID]);
 }
 
 class LEX_context
