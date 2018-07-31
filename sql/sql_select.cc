@@ -885,6 +885,7 @@ int SELECT_LEX::vers_setup_conds(THD *thd, TABLE_LIST *tables)
         cond3= newx Item_func_le(thd, point_in_time1, point_in_time2);
         break;
       case SYSTEM_TIME_BEFORE:
+        DBUG_ASSERT(thd->lex->sql_command == SQLCOM_DELETE);
         cond1= newx Item_func_lt(thd, row_end, point_in_time1);
         break;
       default:
@@ -922,7 +923,10 @@ int SELECT_LEX::vers_setup_conds(THD *thd, TABLE_LIST *tables)
 	  cond3= newx Item_func_le(thd, point_in_time1, point_in_time2);
         break;
       case SYSTEM_TIME_BEFORE:
-        trx_id0= vers_conditions.start.make_trx_id(thd, context);
+        DBUG_ASSERT(thd->lex->sql_command == SQLCOM_DELETE);
+        trx_id0= vers_conditions.start.unit == VERS_TIMESTAMP
+          ? newx Item_func_trt_id(thd, point_in_time1, FLD_TRX_ID, true)
+          : point_in_time1;
         cond1= newx Item_func_trt_trx_sees(thd, trx_id0, row_end);
         break;
       default:
