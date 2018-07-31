@@ -3002,8 +3002,6 @@ public:
 
   bool setup_select();
   static
-  TABLE_LIST* add_to_lex(THD* thd, LEX* lex);
-  static
   bool add_subquery(THD* thd, Vers_history_point &p, SELECT_LEX *sl, uint &subq_n, bool backwards= false);
   static
   bool add_subquery2(THD* thd, TABLE_LIST *trtl, Vers_history_point &p, SELECT_LEX *sl, uint &subq_n, bool backwards= false);

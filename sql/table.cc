@@ -8540,23 +8540,6 @@ public:
   }
 };
 
-TABLE_LIST* TR_table::add_to_lex(THD* thd, LEX* lex)
-{
-  Query_arena_stmt on_stmt_arena(thd);
-  TABLE_LIST *tl;
-  if (unlikely(!(tl= (TABLE_LIST *) thd->calloc(sizeof(TABLE_LIST)))))
-    return NULL;
-
-  tl->init_one_table(&MYSQL_SCHEMA_NAME, &TRANSACTION_REG_NAME,
-                     &TRANSACTION_REG_NAME, TL_READ);
-  tl->is_fqtn= true;
-  tl->is_alias= true;
-  tl->cacheable_table= true;
-  tl->select_lex= lex->current_select;
-  lex->add_to_query_tables(tl);
-  return tl;
-}
-
 bool TR_table::add_subquery(THD* thd, Vers_history_point &p,
                             SELECT_LEX *cur_select, uint &subq_n,
                             bool backwards)

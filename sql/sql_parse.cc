@@ -6457,7 +6457,6 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
   LEX	*lex= thd->lex;
   select_result *result=lex->result;
   bool res;
-  TABLE_LIST *trtl= NULL;
   /* assign global limit variable if limit is not given */
   {
     SELECT_LEX *param= lex->unit.global_parameters();
@@ -6470,12 +6469,12 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
   if (TR_table::use_transaction_registry &&
       thd->lex->sql_command == SQLCOM_SELECT &&
       thd->stmt_arena->is_conventional() &&
-      !(trtl= TR_table::add_to_lex(thd, thd->lex)))
+      thd->lex->vers_add_trt(thd))
     return 1;
 
   if (!(res= open_and_lock_tables(thd, all_tables, TRUE, 0)))
   {
-    if (trtl && lex->vers_add_trt_query2(thd, trtl))
+    if (thd->lex->trt && lex->vers_add_trt_query2(thd))
       return 1;
     if (lex->describe)
     {
