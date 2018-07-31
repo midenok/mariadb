@@ -8512,9 +8512,9 @@ Item* Vers_history_point::make_trx_id(THD* thd, Name_resolution_context& ctx) co
 {
   if (unit != VERS_TIMESTAMP)
     return item;
-  DBUG_ASSERT(tr_table);
-  DBUG_ASSERT(tr_table->table);
-  DBUG_ASSERT(FLD_TRX_ID < tr_table->table->s->fields);
+  DBUG_ASSERT(tr_subquery);
+  DBUG_ASSERT(tr_subquery->table);
+  DBUG_ASSERT(FLD_TRX_ID < tr_subquery->table->s->fields);
   return newx Item_field(thd, &ctx, tr_table->table->field[FLD_TRX_ID]);
 }
 
@@ -8657,7 +8657,7 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p,
       return true;
 
     cur_select->add_joined_table(subquery);
-    p.tr_table= subquery;
+    p.tr_subquery= subquery;
     subq_n++;
   }
 
@@ -8770,7 +8770,7 @@ bool TR_table::add_subquery2(THD* thd, TABLE_LIST *trtl, Vers_history_point &p,
       return true;
 
     cur_select->add_joined_table(subquery);
-    p.tr_table= subquery;
+    p.tr_subquery= subquery;
     subq_n++;
 
     if (mysql_derived_init(thd, lex, subquery))

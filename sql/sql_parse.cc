@@ -6467,14 +6467,14 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
   }
 
   if (TR_table::use_transaction_registry &&
-      thd->lex->sql_command == SQLCOM_SELECT &&
+      lex->sql_command == SQLCOM_SELECT &&
       thd->stmt_arena->is_conventional() &&
-      thd->lex->vers_add_trt(thd))
+      lex->vers_add_trt(thd))
     return 1;
 
   if (!(res= open_and_lock_tables(thd, all_tables, TRUE, 0)))
   {
-    if (thd->lex->trt && lex->vers_add_trt_query2(thd))
+    if (lex->trt && lex->vers_add_trt_query2(thd))
       return 1;
     if (lex->describe)
     {
