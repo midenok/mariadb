@@ -6121,9 +6121,12 @@ int mysqld_main(int argc, char **argv)
     thd->thread_stack= (char*) &thd;
     thd->store_globals();
     thd->set_db(&MYSQL_SCHEMA_NAME);
-
-    TR_table trt(thd);
-    trt.open();
+    {
+      TR_table trt(thd);
+      trt.open();
+      ha_commit_one_phase(thd, false);
+    }
+    delete thd;
   }
 
   create_shutdown_thread();
