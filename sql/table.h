@@ -1824,24 +1824,24 @@ class Vers_history_point : public vers_history_point_t
   void fix_item();
 
 public:
-  TABLE_LIST *tr_table;
+  TABLE_LIST *tr_subquery;
 
   Vers_history_point() { empty(); }
   Vers_history_point(vers_sys_type_t unit_arg, Item *item_arg)
   {
     unit= unit_arg;
     item= item_arg;
-    tr_table= NULL;
+    tr_subquery= NULL;
     fix_item();
   }
   Vers_history_point(vers_history_point_t p)
   {
     unit= p.unit;
     item= p.item;
-    tr_table= NULL;
+    tr_subquery= NULL;
     fix_item();
   }
-  void empty() { unit= VERS_TIMESTAMP; item= NULL; tr_table= NULL; }
+  void empty() { unit= VERS_TIMESTAMP; item= NULL; tr_subquery= NULL; }
   void print(String *str, enum_query_type, const char *prefix, size_t plen) const;
   bool resolve_unit(THD *thd);
   void bad_expression_data_type_error(const char *type) const;
