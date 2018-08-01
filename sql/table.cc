@@ -8718,7 +8718,17 @@ bool TR_table::add_subquery2(THD* thd, TABLE_LIST *trtl, Vers_history_point &p,
       my_error(ER_OUT_OF_RESOURCES, MYF(0));
       return true;
     }
-    COND *cond= newx Item_func_le(thd, commit_ts, p.item);
+    COND *cond;
+    if (backwards)
+    {
+      // Question: is it better to use 'gt' instead of 'ge' for FROM .. TO?
+      // (same for 'le')
+      cond= newx Item_func_ge(thd, commit_ts, p.item);
+    }
+    else
+    {
+      cond= newx Item_func_le(thd, commit_ts, p.item);
+    }
     sel->where= normalize_cond(thd, cond);
     cond->top_level_item();
   }
