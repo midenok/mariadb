@@ -7926,3 +7926,6 @@ ER_TRUNCATE_ILLEGAL_VERS
 
 WARN_VERS_MODIFY_HISTORY
         eng "Modifying history is prohibited, set `secure_timestamp` to NO or SUPER"
+
+ER_VERS_PARTITION_BY_ROW_END
+        eng "Cannot use ROW END field for partitioning"
