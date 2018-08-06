@@ -3946,6 +3946,18 @@ public:
     return create_info.period_info;
   }
 
+  void add_period(Lex_ident name, Lex_ident_sys_st start, Lex_ident_sys_st end)
+  {
+    Table_period_info &info= get_table_period_info();
+    info.set_period(start, end);
+    info.name= name;
+
+    Virtual_column_info *constr= new Virtual_column_info();
+    constr->expr= lt_creator.create(thd, create_item_ident_nosp(thd, &start),
+                                   create_item_ident_nosp(thd, &end));
+    add_constraint(&name, constr, false);
+  }
+
   sp_package *get_sp_package() const;
 
   /**
