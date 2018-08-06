@@ -1723,6 +1723,15 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
     status_var_increment(thd->status_var.feature_system_versioning);
   } // if (system_period == NULL)
 
+  if (extra2.application_period)
+  {
+    period_name.length= extra2.application_period_len - 2*sizeof(uint16);
+    period_name.str= strmake_root(&mem_root, (char*)extra2.application_period, period_name.length);
+    const uchar *field_pos= extra2.application_period + period_name.length;
+    period_start_fieldno= uint2korr(field_pos);
+    period_end_fieldno= uint2korr(field_pos + sizeof(uint16));
+  }
+
   for (i=0 ; i < share->fields; i++, strpos+=field_pack_length, field_ptr++)
   {
     uint pack_flag, interval_nr, unireg_type, recpos, field_length;

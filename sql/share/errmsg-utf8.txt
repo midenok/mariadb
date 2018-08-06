@@ -7926,3 +7926,12 @@ ER_TRUNCATE_ILLEGAL_VERS
 
 WARN_VERS_MODIFY_HISTORY
         eng "Modifying history is prohibited, set `secure_timestamp` to NO or SUPER"
+
+ER_PERIOD_FIELD_NOT_FOUND
+        eng "Field %s in PERIOD FOR %s is not found in table"
+
+ER_PERIOD_TYPES_MISMATCH
+        eng "PERIOD FOR %s fields types mismatch"
+
+ER_PERIOD_MAX_COUNT_EXCEEDED
+        eng "cannot specify more than one %s-time period"

@@ -6551,7 +6551,13 @@ period_for_system_time:
           PERIOD_SYM FOR_SYSTEM_TIME_SYM '(' ident ',' ident ')'
           {
             Vers_parse_info &info= Lex->vers_get_info();
-            info.set_system_time($4, $6);
+            info.set_period($4, $6);
+          }
+        | PERIOD_SYM FOR_SYM ident '(' ident ',' ident ')'
+          {
+            Table_period_info &info= Lex->get_table_period_info();
+            info.set_period($5, $7);
+            info.name= $3;
           }
         ;
 

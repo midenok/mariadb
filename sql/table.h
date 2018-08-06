@@ -780,6 +780,39 @@ struct TABLE_SHARE
     return field[row_end_field];
   }
 
+  uint16 period_start_fieldno;
+  uint16 period_end_fieldno;
+  Lex_ident period_name;
+
+  Field *period_start_field()
+  {
+    return field[period_start_fieldno];
+  }
+
+  Field *period_end_field()
+  {
+    return field[period_end_fieldno];
+  }
+private:
+  Field *period_get_field(const char *period_name_arg, bool start)
+  {
+    if (strcmp(period_name_arg, "SYSTEM_TIME") == 0)
+      return start ? vers_start_field() : vers_end_field();
+    else if (strcmp(period_name.str, period_name_arg) == 0)
+      return start ? period_start_field() : period_end_field();
+    return NULL;
+  }
+
+public:
+  Field *period_start_field(const char *period_name)
+  {
+    return period_get_field(period_name, true);
+  }
+
+  Field *period_end_field(const char *period_name_arg)
+  {
+    return period_get_field(period_name, false);
+  }
   /**
     Cache the checked structure of this table.
 

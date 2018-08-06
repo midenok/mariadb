@@ -2046,6 +2046,18 @@ end_options:
   append_directory(thd, packet, "INDEX", create_info.index_file_name);
 }
 
+static void append_period(THD *thd, String *packet, const LEX_CSTRING &start,
+                          const LEX_CSTRING &end, const LEX_CSTRING &period)
+{
+  packet->append(STRING_WITH_LEN(",\n  PERIOD FOR "));
+  append_identifier(thd, packet, period.str, period.length);
+  packet->append(STRING_WITH_LEN(" ("));
+  append_identifier(thd, packet, start.str, start.length);
+  packet->append(STRING_WITH_LEN(", "));
+  append_identifier(thd, packet, end.str, end.length);
+  packet->append(STRING_WITH_LEN(")"));
+}
+
 /*
   Build a CREATE TABLE statement for a table.
 
@@ -2351,17 +2363,14 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
   {
     const Field *fs = table->vers_start_field();
     const Field *fe = table->vers_end_field();
+    Lex_ident system_time(STRING_WITH_LEN("SYSTEM_TIME"));
     DBUG_ASSERT(fs);
     DBUG_ASSERT(fe);
     explicit_fields= fs->invisible < INVISIBLE_SYSTEM;
     DBUG_ASSERT(!explicit_fields || fe->invisible < INVISIBLE_SYSTEM);
     if (explicit_fields)
     {
-      packet->append(STRING_WITH_LEN(",\n  PERIOD FOR SYSTEM_TIME ("));
-      append_identifier(thd,packet,fs->field_name.str, fs->field_name.length);
-      packet->append(STRING_WITH_LEN(", "));
-      append_identifier(thd,packet,fe->field_name.str, fe->field_name.length);
-      packet->append(STRING_WITH_LEN(")"));
+      append_period(thd, packet, fs->field_name, fe->field_name, system_time);
     }
     else
     {
@@ -2369,6 +2378,15 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
       DBUG_ASSERT(fe->invisible == INVISIBLE_SYSTEM);
     }
   }
+
+  if (table->s->period_name)
+  {
+    append_period(thd, packet,
+                  table->s->period_start_field()->field_name,
+                  table->s->period_end_field()->field_name,
+                  table->s->period_name);
+  }
+
 
   /*
     Get possible foreign key definitions stored in InnoDB and append them

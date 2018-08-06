@@ -3940,6 +3940,12 @@ public:
   {
     return create_info.vers_info;
   }
+
+  Table_period_info& get_table_period_info()
+  {
+    return create_info.period_info;
+  }
+
   sp_package *get_sp_package() const;
 
   /**

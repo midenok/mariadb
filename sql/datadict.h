@@ -43,6 +43,8 @@ struct extra2_fields
   const uchar *system_period;
   const uchar *field_flags;
   size_t field_flags_len;
+  const uchar *application_period;
+  size_t application_period_len;
 };
 
 /*
