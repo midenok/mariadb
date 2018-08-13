@@ -7070,10 +7070,10 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
     // copy info from existing table
     create_info->options|= HA_VERSIONED_TABLE;
 
-    DBUG_ASSERT(share->vers_start_field());
-    DBUG_ASSERT(share->vers_end_field());
-    Lex_ident start(share->vers_start_field()->field_name);
-    Lex_ident end(share->vers_end_field()->field_name);
+    DBUG_ASSERT(share->vers.start_field());
+    DBUG_ASSERT(share->vers.end_field());
+    Lex_ident start(share->vers.start_field()->field_name);
+    Lex_ident end(share->vers.end_field()->field_name);
     DBUG_ASSERT(start.str);
     DBUG_ASSERT(end.str);
 
@@ -7252,6 +7252,9 @@ bool Table_scope_and_contents_source_st::check_fields(
   bool res= vers_check_system_fields(thd, alter_info, table_name, db);
   if (res)
     return true;
+
+  if (!period_info.name)
+    return false;
 
   Table_period_info::start_end_t &period= period_info.period;
   const Create_field *row_start= NULL;

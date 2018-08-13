@@ -311,6 +311,12 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
 
   THD_STAGE_INFO(thd, stage_init_update);
 
+  if (table_list->period_conditions.is_set() && table_list->vers_conditions.is_set())
+  {
+    my_error(ER_SYNTAX_ERROR, MYF(0));
+    DBUG_RETURN(true);
+  }
+
   bool truncate_history= table_list->vers_conditions.is_set();
   if (truncate_history)
   {
@@ -334,6 +340,14 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
       conds= table_list->on_expr;
       table_list->on_expr= NULL;
     }
+  }
+  if (!conds)
+  {
+    if (select_lex->period_setup_conds(thd, table_list))
+      DBUG_RETURN(TRUE);
+
+    conds= table_list->on_expr;
+    table_list->on_expr= NULL;
   }
 
   if (mysql_handle_list_of_derived(thd->lex, table_list, DT_MERGE_FOR_INSERT))

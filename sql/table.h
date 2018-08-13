@@ -765,53 +765,38 @@ struct TABLE_SHARE
   /**
     System versioning support.
    */
+   struct period_info_t
+   {
+     TABLE_SHARE *s;
+     uint16 start_fieldno;
+     uint16 end_fieldno;
+     Lex_ident name;
+
+     Field *start_field()
+     {
+       return s->field[start_fieldno];
+     }
+     Field *end_field()
+     {
+       return s->field[end_fieldno];
+     }
+     Field *get_field(bool start)
+     {
+       return start ? start_field() : end_field();
+     }
+   };
 
   vers_sys_type_t versioned;
-  uint16 row_start_field;
-  uint16 row_end_field;
+  period_info_t vers;
+  period_info_t period;
 
-  Field *vers_start_field()
+  period_info_t *get_period(const char *period_name)
   {
-    return field[row_start_field];
-  }
-
-  Field *vers_end_field()
-  {
-    return field[row_end_field];
-  }
-
-  uint16 period_start_fieldno;
-  uint16 period_end_fieldno;
-  Lex_ident period_name;
-
-  Field *period_start_field()
-  {
-    return field[period_start_fieldno];
-  }
-
-  Field *period_end_field()
-  {
-    return field[period_end_fieldno];
-  }
-private:
-  Field *period_get_field(const char *period_name_arg, bool start)
-  {
-    if (strcmp(period_name_arg, "SYSTEM_TIME") == 0)
-      return start ? vers_start_field() : vers_end_field();
-    else if (strcmp(period_name.str, period_name_arg) == 0)
-      return start ? period_start_field() : period_end_field();
+    if (strcmp(period_name, "SYSTEM_TIME") == 0)
+      return &vers;
+    else if (strcmp(period.name.str, period_name) == 0)
+      return &period;
     return NULL;
-  }
-
-public:
-  Field *period_start_field(const char *period_name)
-  {
-    return period_get_field(period_name, true);
-  }
-
-  Field *period_end_field(const char *period_name_arg)
-  {
-    return period_get_field(period_name, false);
   }
   /**
     Cache the checked structure of this table.
@@ -1564,13 +1549,13 @@ public:
   Field *vers_start_field() const
   {
     DBUG_ASSERT(s && s->versioned);
-    return field[s->row_start_field];
+    return field[s->vers.start_fieldno];
   }
 
   Field *vers_end_field() const
   {
     DBUG_ASSERT(s && s->versioned);
-    return field[s->row_end_field];
+    return field[s->vers.end_fieldno];
   }
 
   ulonglong vers_start_id() const;
@@ -1884,6 +1869,7 @@ struct vers_select_conds_t
   bool used:1;
   Vers_history_point start;
   Vers_history_point end;
+  Lex_ident name;
 
   void empty()
   {
@@ -1895,12 +1881,14 @@ struct vers_select_conds_t
 
   void init(vers_system_time_t _type,
             Vers_history_point _start= Vers_history_point(),
-            Vers_history_point _end= Vers_history_point())
+            Vers_history_point _end= Vers_history_point(),
+            Lex_ident          _name= "SYSTEM_TIME")
   {
     type= _type;
     used= false;
     start= _start;
     end= _end;
+    name= _name;
   }
 
   vers_select_conds_t& operator= (const vers_select_conds_t& src)
@@ -2433,6 +2421,7 @@ struct TABLE_LIST
 
   /* System Versioning */
   vers_select_conds_t vers_conditions;
+  vers_select_conds_t period_conditions;
 
   /**
      @brief

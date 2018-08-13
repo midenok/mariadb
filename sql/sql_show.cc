@@ -2379,12 +2379,12 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
     }
   }
 
-  if (table->s->period_name)
+  if (table->s->period.name)
   {
     append_period(thd, packet,
-                  table->s->period_start_field()->field_name,
-                  table->s->period_end_field()->field_name,
-                  table->s->period_name);
+                  table->s->period.start_field()->field_name,
+                  table->s->period.end_field()->field_name,
+                  table->s->period.name);
   }
 
 

@@ -402,6 +402,8 @@ void init_tmp_table_share(THD *thd, TABLE_SHARE *share, const char *key,
   share->frm_version= 		 FRM_VER_CURRENT;
   share->not_usable_by_query_cache= 1;
   share->can_do_row_logging= 0;           // No row logging
+  share->vers.s=                 share;
+  share->period.s=               share;
 
   /*
     table_map_id is also used for MERGE tables to suppress repeated
@@ -1145,6 +1147,15 @@ end:
   DBUG_RETURN(res);
 }
 
+static bool init_period_from_extra2(TABLE_SHARE::period_info_t &period,
+                                    const uchar *data)
+{
+  period.start_fieldno= uint2korr(data);
+  period.end_fieldno= uint2korr(data + sizeof(uint16));
+  return period.start_fieldno >= period.s->fields
+         || period.end_fieldno >= period.s->fields;
+}
+
 /**
   Read data from a binary .frm file image into a TABLE_SHARE
 
@@ -1702,34 +1713,34 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
   }
 
   /* Set system versioning information. */
+  vers.s= this;
+  vers.name= Lex_ident(STRING_WITH_LEN("SYSTEM_TIME"));
   if (system_period == NULL)
   {
     versioned= VERS_UNDEFINED;
-    row_start_field= 0;
-    row_end_field= 0;
+    vers.start_fieldno= 0;
+    vers.end_fieldno= 0;
   }
   else
   {
     DBUG_PRINT("info", ("Setting system versioning informations"));
-    uint16 row_start= uint2korr(system_period);
-    uint16 row_end= uint2korr(system_period + sizeof(uint16));
-    if (row_start >= share->fields || row_end >= share->fields)
+    if (init_period_from_extra2(vers, system_period))
       goto err;
-    DBUG_PRINT("info", ("Columns with system versioning: [%d, %d]", row_start, row_end));
+    DBUG_PRINT("info", ("Columns with system versioning: [%d, %d]",
+                        vers.start_fieldno, vers.end_fieldno));
     versioned= VERS_TIMESTAMP;
     vers_can_native= plugin_hton(se_plugin)->flags & HTON_NATIVE_SYS_VERSIONING;
-    row_start_field= row_start;
-    row_end_field= row_end;
     status_var_increment(thd->status_var.feature_system_versioning);
   } // if (system_period == NULL)
 
   if (extra2.application_period)
   {
-    period_name.length= extra2.application_period_len - 2*sizeof(uint16);
-    period_name.str= strmake_root(&mem_root, (char*)extra2.application_period, period_name.length);
-    const uchar *field_pos= extra2.application_period + period_name.length;
-    period_start_fieldno= uint2korr(field_pos);
-    period_end_fieldno= uint2korr(field_pos + sizeof(uint16));
+    period.s= this;
+    period.name.length= extra2.application_period_len - 2*sizeof(uint16);
+    period.name.str= strmake_root(&mem_root, (char*)extra2.application_period, period.name.length);
+    const uchar *field_pos= extra2.application_period + period.name.length;
+    if (init_period_from_extra2(period, field_pos))
+      goto err;
   }
 
   for (i=0 ; i < share->fields; i++, strpos+=field_pack_length, field_ptr++)
@@ -1958,9 +1969,9 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
 
     if (versioned)
     {
-      if (i == row_start_field)
+      if (i == vers.start_fieldno)
         flags|= VERS_SYS_START_FLAG;
-      else if (i == row_end_field)
+      else if (i == vers.end_fieldno)
         flags|= VERS_SYS_END_FLAG;
 
       if (flags & VERS_SYSTEM_FIELD)
@@ -6376,9 +6387,9 @@ void TABLE::mark_columns_needed_for_delete()
 
   if (s->versioned)
   {
-    bitmap_set_bit(read_set, s->vers_start_field()->field_index);
-    bitmap_set_bit(read_set, s->vers_end_field()->field_index);
-    bitmap_set_bit(write_set, s->vers_end_field()->field_index);
+    bitmap_set_bit(read_set, s->vers.start_field()->field_index);
+    bitmap_set_bit(read_set, s->vers.end_field()->field_index);
+    bitmap_set_bit(write_set, s->vers.end_field()->field_index);
   }
 }
 

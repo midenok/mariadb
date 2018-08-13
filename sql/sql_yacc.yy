@@ -888,10 +888,10 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %parse-param { THD *thd }
 %lex-param { THD *thd }
 /*
-  Currently there are 62 shift/reduce conflicts.
+  Currently there are 63 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 62
+%expect 63
 
 /*
    Comments for TOKENS.
@@ -1101,6 +1101,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %token  PERCENT_RANK_SYM
 %token  PERCENTILE_CONT_SYM
 %token  PERCENTILE_DISC_SYM
+%token  PORTION
 %token  POSITION_SYM                  /* SQL-2003-N */
 %token  PRECISION                     /* SQL-2003-R */
 %token  PRIMARY_SYM                   /* SQL-2003-R */
@@ -1855,7 +1856,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
         opt_default_time_precision
         case_stmt_body opt_bin_mod opt_for_system_time_clause
         opt_if_exists_table_element opt_if_not_exists_table_element
-        opt_recursive opt_format_xid
+        opt_recursive opt_format_xid opt_for_portion_of_time_clause
 
 %type <object_ddl_options>
         create_or_replace
@@ -9268,6 +9269,17 @@ history_point:
             $$= Vers_history_point($1, $2);
           }
         ;
+opt_for_portion_of_time_clause:
+          /* empty */
+          {
+            $$= false;
+          }
+        | FOR_SYM PORTION OF_SYM ident system_time_expr FROM history_point TO_SYM history_point
+          {
+            $$= true;
+            Lex->period_conditions.init(SYSTEM_TIME_FROM_TO, $7, $9, $4);
+          }
+        ;
 
 opt_for_system_time_clause:
           /* empty */
@@ -11782,9 +11794,9 @@ table_primary_ident:
             SELECT_LEX *sel= Select;
             sel->table_join_options= 0;
           }
-          table_ident opt_use_partition opt_for_system_time_clause opt_table_alias opt_key_definition
+          table_ident opt_use_partition opt_for_portion_of_time_clause opt_for_system_time_clause opt_table_alias opt_key_definition
           {
-            if (unlikely(!($$= Select->add_table_to_list(thd, $2, $5,
+            if (unlikely(!($$= Select->add_table_to_list(thd, $2, $6,
                                                          Select->get_table_join_options(),
                                                          YYPS->m_lock_type,
                                                          YYPS->m_mdl_type,
@@ -11795,6 +11807,8 @@ table_primary_ident:
             TABLE_LIST *tl= $$;
             Select->add_joined_table(tl);
             if ($4)
+              tl->period_conditions= Lex->period_conditions;
+            if ($5)
               tl->vers_conditions= Lex->vers_conditions;
           }
         ;

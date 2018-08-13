@@ -1910,7 +1910,8 @@ struct Table_period_info
   Table_period_info():
     set_count(0) {}
   Table_period_info(const char *name_arg, size_t size) :
-    name(name_arg, size) {}
+    name(name_arg, size),
+    set_count(0) {}
 
   Lex_ident name;
 
