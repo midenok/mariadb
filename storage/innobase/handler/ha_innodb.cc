@@ -16039,8 +16039,7 @@ ha_innobase::get_auto_increment(
 				    thd_get_thread_id(ha_thd()),
 				    current, autoinc);
 
-			if (!wsrep_on(ha_thd()))
-			{
+			if (!wsrep_on(ha_thd())) {
 				current = autoinc - prebuilt->autoinc_increment;
 
 				current = innobase_next_autoinc(
