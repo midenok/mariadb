@@ -7935,3 +7935,6 @@ ER_PERIOD_TYPES_MISMATCH
 
 ER_PERIOD_MAX_COUNT_EXCEEDED
         eng "cannot specify more than one %s-time period"
+
+ER_PERIOD_NOT_FOUND
+        eng "PERIOD %s is not found in table"

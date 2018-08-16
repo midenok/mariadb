@@ -721,11 +721,17 @@ void vers_select_conds_t::print(String *str, enum_query_type query_type) const
   }
 }
 
-void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
-                             vers_select_conds_t &conds, bool timestamp)
+int period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
+                            vers_select_conds_t &conds, bool timestamp)
 {
 #define newx new (thd->mem_root)
   TABLE_SHARE::period_info_t *period = table->table->s->get_period(conds.name);
+
+  if (!period)
+  {
+    my_error(ER_PERIOD_NOT_FOUND, MYF(0), conds.name.str);
+    return -1;
+  }
   const LEX_CSTRING &fstart= period->start_field()->field_name;
   const LEX_CSTRING &fend= period->end_field()->field_name;
 
@@ -820,6 +826,7 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
     cond1= and_items(thd, cond3, cond1);
     table->on_expr= and_items(thd, table->on_expr, cond1);
   }
+  return 0;
 #undef newx
 }
 
@@ -840,7 +847,8 @@ int SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables, Item *where)
   for (TABLE_LIST *table= tables; table; table= table->next_local)
   {
     vers_select_conds_t &conds= table->period_conditions;
-    period_update_condition(thd, table, this, table->period_conditions, true);
+    if (period_update_condition(thd, table, this, conds, true))
+      DBUG_RETURN(-1);
 
     Item *row_start= conds.field_start;
     Item *row_end=   conds.field_end;
@@ -988,7 +996,11 @@ int SELECT_LEX::vers_setup_conds(THD *thd, TABLE_LIST *tables)
       }
     }
 
-    period_update_condition(thd, table, this, vers_conditions, timestamps_only);
+    int res= period_update_condition(thd, table, this, vers_conditions,
+                                     timestamps_only);
+    DBUG_ASSERT(!res);
+    if (res)
+      DBUG_RETURN(res);
 
     table->vers_conditions.type= SYSTEM_TIME_ALL;
   } // for (table= tables; ...)

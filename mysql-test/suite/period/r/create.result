@@ -1,0 +1,37 @@
+create or replace table t (id int primary key, s date, e date,
+period for mytime(s,e));
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `id` int(11) NOT NULL,
+  `s` date DEFAULT NULL,
+  `e` date DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  PERIOD FOR `mytime` (`s`, `e`),
+  CONSTRAINT `mytime` CHECK (`s` < `e`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+create or replace table t (id int primary key, s timestamp(6), e timestamp(6),
+period for mytime(s,e));
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `id` int(11) NOT NULL,
+  `s` timestamp(6) NOT NULL DEFAULT current_timestamp(6) ON UPDATE current_timestamp(6),
+  `e` timestamp(6) NOT NULL DEFAULT '0000-00-00 00:00:00.000000',
+  PRIMARY KEY (`id`),
+  PERIOD FOR `mytime` (`s`, `e`),
+  CONSTRAINT `mytime` CHECK (`s` < `e`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+create or replace table t (id int primary key, s datetime, e date,
+period for mytime(s,e));
+ERROR HY000: PERIOD FOR mytime fields types mismatch
+create or replace table t (id int primary key, s int, e date,
+period for mytime(s,e));
+ERROR 42000: Incorrect column specifier for column 's'
+create or replace table t (id int primary key, s date, e date,
+period for mytime(s,x));
+ERROR HY000: Field x in PERIOD FOR mytime is not found in table
+create or replace table t (id int primary key, s date, e date,
+period for mytime(s,e),
+period for mytime2(s,e));
+ERROR HY000: cannot specify more than one application-time period

@@ -326,8 +326,7 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
       DBUG_RETURN(true);
     }
 
-    TABLE *table= table_list->table;
-    DBUG_ASSERT(table);
+    DBUG_ASSERT(table_list->table);
 
     DBUG_ASSERT(!conds || thd->stmt_arena->is_stmt_execute());
 
@@ -382,8 +381,8 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
     sel_result->disable_my_ok_calls();
     thd->lex->select_lex.where= period_conds.insert_cond;
 
-    DBUG_ASSERT(table);
-    table->use_all_columns();
+    DBUG_ASSERT(table_list->table);
+    table_list->table->use_all_columns();
     err= handle_select(thd, thd->lex, sel_result, OPTION_SETUP_TABLES_DONE);
     if (err)
       DBUG_RETURN(true);
