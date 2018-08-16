@@ -372,10 +372,10 @@ LEX_CUSTRING build_frm_image(THD *thd, const LEX_CSTRING *table,
     *pos++= EXTRA2_PERIOD_FOR_SYSTEM_TIME;
     *pos++= 2 * sizeof(uint16);
     int2store(pos, get_fieldno_by_name(create_info, create_fields,
-                                       create_info->vers_info.period.start));
+                                       create_info->vers_info.as_row.start));
     pos+= sizeof(uint16);
     int2store(pos, get_fieldno_by_name(create_info, create_fields,
-                                       create_info->vers_info.period.end));
+                                       create_info->vers_info.as_row.end));
     pos+= sizeof(uint16);
   }
 

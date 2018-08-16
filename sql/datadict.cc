@@ -300,6 +300,7 @@ bool dd_read_extra2(const uchar *frm_image, size_t len, extra2_fields *fields)
             DBUG_RETURN(true);
           fields->application_period= extra2;
           fields->application_period_len= length;
+          break;
         default:
           /* abort frm parsing if it's an unknown but important extra2 value */
           if (type >= EXTRA2_ENGINE_IMPORTANT)
