@@ -735,8 +735,6 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
   conds.field_end=   newx Item_field(thd, &select->context,
                                      table->db.str, table->alias.str,
                                      thd->make_clex_string(fend));
-  Item *row_start= conds.field_start;
-  Item *row_end= conds.field_end;
 
   Item *cond1= NULL, *cond2= NULL, *cond3= NULL, *curr= NULL;
   if (timestamp)
@@ -748,35 +746,24 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
       thd->variables.time_zone->gmt_sec_to_TIME(&max_time, TIMESTAMP_MAX_VALUE);
       max_time.second_part= TIME_MAX_SECOND_PART;
       curr= newx Item_datetime_literal(thd, &max_time, TIME_SECOND_PART_DIGITS);
-      cond1= newx Item_func_eq(thd, row_end, curr);
+      cond1= newx Item_func_eq(thd, conds.field_end, curr);
       break;
     case SYSTEM_TIME_AS_OF:
-      cond1= newx Item_func_le(thd, row_start, conds.start.item);
-      cond2= newx Item_func_gt(thd, row_end, conds.start.item);
+      cond1= newx Item_func_le(thd, conds.field_start, conds.start.item);
+      cond2= newx Item_func_gt(thd, conds.field_end, conds.start.item);
       break;
     case SYSTEM_TIME_FROM_TO:
-      cond1= newx Item_func_lt(thd, row_start, conds.end.item);
-      cond2= newx Item_func_gt(thd, row_end, conds.start.item);
+      cond1= newx Item_func_lt(thd, conds.field_start, conds.end.item);
+      cond2= newx Item_func_gt(thd, conds.field_end, conds.start.item);
       cond3= newx Item_func_lt(thd, conds.start.item, conds.end.item);
-
-      // Also prepare search conditions for PORTION OF TIME case
-      conds.insert_cond= and_items(thd,
-          newx Item_func_lt(thd, row_start, conds.start.item),
-          newx Item_func_gt(thd, row_end,   conds.end.item));
-      conds.lhs_cond= and_items(thd,
-          newx Item_func_lt(thd, row_start, conds.start.item),
-          newx Item_func_gt(thd, row_end,   conds.start.item));
-      conds.rhs_cond= and_items(thd,
-          newx Item_func_lt(thd, row_start, conds.end.item),
-          newx Item_func_gt(thd, row_end,   conds.end.item));
       break;
     case SYSTEM_TIME_BETWEEN:
-      cond1= newx Item_func_le(thd, row_start, conds.end.item);
-      cond2= newx Item_func_gt(thd, row_end, conds.start.item);
+      cond1= newx Item_func_le(thd, conds.field_start, conds.end.item);
+      cond2= newx Item_func_gt(thd, conds.field_end, conds.start.item);
       cond3= newx Item_func_le(thd, conds.start.item, conds.end.item);
       break;
     case SYSTEM_TIME_BEFORE:
-      cond1= newx Item_func_lt(thd, row_end, conds.start.item);
+      cond1= newx Item_func_lt(thd, conds.field_end, conds.start.item);
       break;
     default:
       DBUG_ASSERT(0);
@@ -804,23 +791,23 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
     {
     case SYSTEM_TIME_UNSPECIFIED:
       curr= newx Item_int(thd, ULONGLONG_MAX);
-      cond1= newx Item_func_eq(thd, row_end, curr);
+      cond1= newx Item_func_eq(thd, conds.field_end, curr);
       break;
     case SYSTEM_TIME_AS_OF:
-      cond1= newx Item_func_trt_trx_sees_eq(thd, trx_id0, row_start);
-      cond2= newx Item_func_trt_trx_sees(thd, row_end, trx_id0);
+      cond1= newx Item_func_trt_trx_sees_eq(thd, trx_id0, conds.field_start);
+      cond2= newx Item_func_trt_trx_sees(thd, conds.field_end, trx_id0);
       break;
     case SYSTEM_TIME_FROM_TO:
-      cond1= newx Item_func_trt_trx_sees(thd, trx_id1, row_start);
+      cond1= newx Item_func_trt_trx_sees(thd, trx_id1, conds.field_start);
       cond3= newx Item_func_lt(thd, conds.start.item, conds.end.item);
       break;
     case SYSTEM_TIME_BETWEEN:
-      cond1= newx Item_func_trt_trx_sees_eq(thd, trx_id1, row_start);
-      cond2= newx Item_func_trt_trx_sees_eq(thd, row_end, trx_id0);
+      cond1= newx Item_func_trt_trx_sees_eq(thd, trx_id1, conds.field_start);
+      cond2= newx Item_func_trt_trx_sees_eq(thd, conds.field_end, trx_id0);
       cond3= newx Item_func_le(thd, conds.start.item, conds.end.item);
       break;
     case SYSTEM_TIME_BEFORE:
-      cond1= newx Item_func_trt_trx_sees(thd, trx_id0, row_end);
+      cond1= newx Item_func_trt_trx_sees(thd, trx_id0, conds.field_end);
       break;
     default:
       DBUG_ASSERT(0);
@@ -836,7 +823,7 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
 #undef newx
 }
 
-int SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables, Item *conds)
+int SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables, Item *where)
 {
   DBUG_ENTER("SELECT_LEX::period_setup_conds");
 
@@ -852,12 +839,30 @@ int SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables, Item *conds)
 
   for (TABLE_LIST *table= tables; table; table= table->next_local)
   {
-    vers_select_conds_t &period_conds= table->period_conditions;
+    vers_select_conds_t &conds= table->period_conditions;
     period_update_condition(thd, table, this, table->period_conditions, true);
-    table->on_expr= and_items(thd, conds, table->on_expr);
-    period_conds.lhs_cond= and_items(thd, conds, period_conds.lhs_cond);
-    period_conds.rhs_cond= and_items(thd, conds, period_conds.rhs_cond);
-    period_conds.insert_cond= and_items(thd, conds, period_conds.insert_cond);
+
+    Item *row_start= conds.field_start;
+    Item *row_end=   conds.field_end;
+    Item *from_val=  conds.start.item;
+    Item *to_val=    conds.end.item;
+    Lt_creator &lt=  lt_creator;
+    Gt_creator &gt=  gt_creator;
+
+    // Also prepare search conditions for PORTION OF TIME case
+    conds.insert_cond= and_items(thd, lt.create(thd, row_start, from_val),
+                                      gt.create(thd, row_end,   to_val));
+    conds.lhs_cond=    and_items(thd, lt.create(thd, row_start, from_val),
+                                      gt.create(thd, row_end,   from_val));
+    conds.rhs_cond=    and_items(thd, lt.create(thd, row_start, to_val),
+                                      gt.create(thd, row_end,   to_val));
+
+    table->on_expr= and_items(thd, where, table->on_expr);
+
+    where= and_items(thd, where, lt.create(thd, from_val, to_val));
+    conds.lhs_cond= and_items(thd, where, conds.lhs_cond);
+    conds.rhs_cond= and_items(thd, where, conds.rhs_cond);
+    conds.insert_cond= and_items(thd, where, conds.insert_cond);
   }
   DBUG_RETURN(0);
 }
