@@ -66,7 +66,7 @@ t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
   `trx_start` timestamp(6) GENERATED ALWAYS AS ROW START INVISIBLE,
   `trx_end` timestamp(6) GENERATED ALWAYS AS ROW END INVISIBLE,
-  PERIOD FOR `SYSTEM_TIME` (`trx_start`, `trx_end`)
+  PERIOD FOR SYSTEM_TIME (`trx_start`, `trx_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t drop system versioning;
 ERROR HY000: Wrong parameters for `t`: missing 'DROP COLUMN `trx_start`'
@@ -262,7 +262,7 @@ t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
   `trx_start` timestamp(6) GENERATED ALWAYS AS ROW START INVISIBLE,
   `trx_end` timestamp(6) GENERATED ALWAYS AS ROW END INVISIBLE,
-  PERIOD FOR `SYSTEM_TIME` (`trx_start`, `trx_end`)
+  PERIOD FOR SYSTEM_TIME (`trx_start`, `trx_end`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 # Issue #211: drop of system columns required before drop system versioning
 alter table t drop column trx_start, drop column trx_end;
@@ -289,7 +289,7 @@ t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
   `trx_start` bigint(20) unsigned GENERATED ALWAYS AS ROW START INVISIBLE,
   `trx_end` bigint(20) unsigned GENERATED ALWAYS AS ROW END INVISIBLE,
-  PERIOD FOR `SYSTEM_TIME` (`trx_start`, `trx_end`)
+  PERIOD FOR SYSTEM_TIME (`trx_start`, `trx_end`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t drop column trx_start, drop column trx_end;
 call verify_trt;
@@ -495,7 +495,7 @@ t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
   `row_start` timestamp(6) GENERATED ALWAYS AS ROW START,
   `row_end` timestamp(6) GENERATED ALWAYS AS ROW END,
-  PERIOD FOR `SYSTEM_TIME` (`row_start`, `row_end`)
+  PERIOD FOR SYSTEM_TIME (`row_start`, `row_end`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 alter table t
 drop column row_start,

@@ -2047,10 +2047,14 @@ end_options:
 }
 
 static void append_period(THD *thd, String *packet, const LEX_CSTRING &start,
-                          const LEX_CSTRING &end, const LEX_CSTRING &period)
+                          const LEX_CSTRING &end, const LEX_CSTRING &period,
+                          bool ident)
 {
   packet->append(STRING_WITH_LEN(",\n  PERIOD FOR "));
-  append_identifier(thd, packet, period.str, period.length);
+  if (ident)
+    append_identifier(thd, packet, period.str, period.length);
+  else
+    packet->append(period);
   packet->append(STRING_WITH_LEN(" ("));
   append_identifier(thd, packet, start.str, start.length);
   packet->append(STRING_WITH_LEN(", "));
@@ -2363,14 +2367,14 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
   {
     const Field *fs = table->vers_start_field();
     const Field *fe = table->vers_end_field();
-    Lex_ident system_time(STRING_WITH_LEN("SYSTEM_TIME"));
     DBUG_ASSERT(fs);
     DBUG_ASSERT(fe);
     explicit_fields= fs->invisible < INVISIBLE_SYSTEM;
     DBUG_ASSERT(!explicit_fields || fe->invisible < INVISIBLE_SYSTEM);
     if (explicit_fields)
     {
-      append_period(thd, packet, fs->field_name, fe->field_name, system_time);
+      append_period(thd, packet, fs->field_name, fe->field_name,
+                    table->s->vers.name, false);
     }
     else
     {
@@ -2384,7 +2388,7 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
     append_period(thd, packet,
                   table->s->period.start_field()->field_name,
                   table->s->period.end_field()->field_name,
-                  table->s->period.name);
+                  table->s->period.name, true);
   }
 
 
