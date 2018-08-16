@@ -780,10 +780,6 @@ struct TABLE_SHARE
      {
        return s->field[end_fieldno];
      }
-     Field *get_field(bool start)
-     {
-       return start ? start_field() : end_field();
-     }
    };
 
   vers_sys_type_t versioned;
