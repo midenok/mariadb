@@ -6502,9 +6502,7 @@ period_for_system_time:
           }
         | PERIOD_SYM FOR_SYM ident '(' ident ',' ident ')'
           {
-            Table_period_info &info= Lex->get_table_period_info();
-            info.set_period($5, $7);
-            info.name= $3;
+            Lex->add_period($3, $5, $7);
           }
         ;
 

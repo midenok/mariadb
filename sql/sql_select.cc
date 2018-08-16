@@ -726,19 +726,19 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
 {
 #define newx new (thd->mem_root)
   TABLE_SHARE::period_info_t *period = table->table->s->get_period(conds.name);
-  const LEX_CSTRING *fstart=
-                    thd->make_clex_string(period->start_field()->field_name);
-  const LEX_CSTRING *fend=
-                    thd->make_clex_string(period->end_field()->field_name);
+  const LEX_CSTRING &fstart= period->start_field()->field_name;
+  const LEX_CSTRING &fend= period->end_field()->field_name;
 
-  Item *row_start=
-       newx Item_field(thd, &select->context, table->db.str, table->alias.str, fstart);
-  Item *row_end=
-       newx Item_field(thd, &select->context, table->db.str, table->alias.str, fend);
+  conds.field_start= newx Item_field(thd, &select->context,
+                                     table->db.str, table->alias.str,
+                                     thd->make_clex_string(fstart));
+  conds.field_end=   newx Item_field(thd, &select->context,
+                                     table->db.str, table->alias.str,
+                                     thd->make_clex_string(fend));
+  Item *row_start= conds.field_start;
+  Item *row_end= conds.field_end;
 
   Item *cond1= NULL, *cond2= NULL, *cond3= NULL, *curr= NULL;
-  Item *point_in_time1= conds.start.item;
-  Item *point_in_time2= conds.end.item;
   if (timestamp)
   {
     MYSQL_TIME max_time;
@@ -751,21 +751,32 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
       cond1= newx Item_func_eq(thd, row_end, curr);
       break;
     case SYSTEM_TIME_AS_OF:
-      cond1= newx Item_func_le(thd, row_start, point_in_time1);
-      cond2= newx Item_func_gt(thd, row_end, point_in_time1);
+      cond1= newx Item_func_le(thd, row_start, conds.start.item);
+      cond2= newx Item_func_gt(thd, row_end, conds.start.item);
       break;
     case SYSTEM_TIME_FROM_TO:
-      cond1= newx Item_func_lt(thd, row_start, point_in_time2);
-      cond2= newx Item_func_gt(thd, row_end, point_in_time1);
-      cond3= newx Item_func_lt(thd, point_in_time1, point_in_time2);
+      cond1= newx Item_func_lt(thd, row_start, conds.end.item);
+      cond2= newx Item_func_gt(thd, row_end, conds.start.item);
+      cond3= newx Item_func_lt(thd, conds.start.item, conds.end.item);
+
+      // Also prepare search conditions for PORTION OF TIME case
+      conds.insert_cond= and_items(thd,
+          newx Item_func_lt(thd, row_start, conds.start.item),
+          newx Item_func_gt(thd, row_end,   conds.end.item));
+      conds.lhs_cond= and_items(thd,
+          newx Item_func_lt(thd, row_start, conds.start.item),
+          newx Item_func_gt(thd, row_end,   conds.start.item));
+      conds.rhs_cond= and_items(thd,
+          newx Item_func_lt(thd, row_start, conds.end.item),
+          newx Item_func_gt(thd, row_end,   conds.end.item));
       break;
     case SYSTEM_TIME_BETWEEN:
-      cond1= newx Item_func_le(thd, row_start, point_in_time2);
-      cond2= newx Item_func_gt(thd, row_end, point_in_time1);
-      cond3= newx Item_func_le(thd, point_in_time1, point_in_time2);
+      cond1= newx Item_func_le(thd, row_start, conds.end.item);
+      cond2= newx Item_func_gt(thd, row_end, conds.start.item);
+      cond3= newx Item_func_le(thd, conds.start.item, conds.end.item);
       break;
     case SYSTEM_TIME_BEFORE:
-      cond1= newx Item_func_lt(thd, row_end, point_in_time1);
+      cond1= newx Item_func_lt(thd, row_end, conds.start.item);
       break;
     default:
       DBUG_ASSERT(0);
@@ -774,7 +785,20 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
   else
   {
     DBUG_ASSERT(table->table->s && table->table->s->db_plugin);
-    Item *trx_id0, *trx_id1;
+
+    Item *trx_id0= conds.start.item;
+    Item *trx_id1= conds.end.item;
+    if (conds.start.item && conds.start.unit == VERS_TIMESTAMP)
+    {
+      bool backwards= conds.type != SYSTEM_TIME_AS_OF;
+      trx_id0= newx Item_func_trt_id(thd, conds.start.item,
+                                     TR_table::FLD_TRX_ID, backwards);
+    }
+    if (conds.end.item && conds.end.unit == VERS_TIMESTAMP)
+    {
+      trx_id1= newx Item_func_trt_id(thd, conds.end.item,
+                                     TR_table::FLD_TRX_ID, false);
+    }
 
     switch (conds.type)
     {
@@ -783,33 +807,19 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
       cond1= newx Item_func_eq(thd, row_end, curr);
       break;
     case SYSTEM_TIME_AS_OF:
-      trx_id0= conds.start.unit == VERS_TIMESTAMP
-               ? newx Item_func_trt_id(thd, point_in_time1, TR_table::FLD_TRX_ID)
-      : point_in_time1;
       cond1= newx Item_func_trt_trx_sees_eq(thd, trx_id0, row_start);
       cond2= newx Item_func_trt_trx_sees(thd, row_end, trx_id0);
       break;
     case SYSTEM_TIME_FROM_TO:
-      cond3= newx Item_func_lt(thd, point_in_time1, point_in_time2);
-      /* fall through */
+      cond1= newx Item_func_trt_trx_sees(thd, trx_id1, row_start);
+      cond3= newx Item_func_lt(thd, conds.start.item, conds.end.item);
+      break;
     case SYSTEM_TIME_BETWEEN:
-      trx_id0= conds.start.unit == VERS_TIMESTAMP
-               ? newx Item_func_trt_id(thd, point_in_time1, TR_table::FLD_TRX_ID, true)
-      : point_in_time1;
-      trx_id1= conds.end.unit == VERS_TIMESTAMP
-               ? newx Item_func_trt_id(thd, point_in_time2, TR_table::FLD_TRX_ID, false)
-      : point_in_time2;
-      cond1= conds.type == SYSTEM_TIME_FROM_TO
-             ? newx Item_func_trt_trx_sees(thd, trx_id1, row_start)
-      : newx Item_func_trt_trx_sees_eq(thd, trx_id1, row_start);
+      cond1= newx Item_func_trt_trx_sees_eq(thd, trx_id1, row_start);
       cond2= newx Item_func_trt_trx_sees_eq(thd, row_end, trx_id0);
-      if (!cond3)
-        cond3= newx Item_func_le(thd, point_in_time1, point_in_time2);
+      cond3= newx Item_func_le(thd, conds.start.item, conds.end.item);
       break;
     case SYSTEM_TIME_BEFORE:
-      trx_id0= conds.start.unit == VERS_TIMESTAMP
-               ? newx Item_func_trt_id(thd, point_in_time1, TR_table::FLD_TRX_ID, true)
-      : point_in_time1;
       cond1= newx Item_func_trt_trx_sees(thd, trx_id0, row_end);
       break;
     default:
@@ -826,7 +836,7 @@ void period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
 #undef newx
 }
 
-int SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables)
+int SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables, Item *conds)
 {
   DBUG_ENTER("SELECT_LEX::period_setup_conds");
 
@@ -842,7 +852,12 @@ int SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables)
 
   for (TABLE_LIST *table= tables; table; table= table->next_local)
   {
+    vers_select_conds_t &period_conds= table->period_conditions;
     period_update_condition(thd, table, this, table->period_conditions, true);
+    table->on_expr= and_items(thd, conds, table->on_expr);
+    period_conds.lhs_cond= and_items(thd, conds, period_conds.lhs_cond);
+    period_conds.rhs_cond= and_items(thd, conds, period_conds.rhs_cond);
+    period_conds.insert_cond= and_items(thd, conds, period_conds.insert_cond);
   }
   DBUG_RETURN(0);
 }

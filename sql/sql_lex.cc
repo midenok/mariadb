@@ -755,6 +755,7 @@ void LEX::start(THD *thd_arg)
   win_spec= NULL;
 
   vers_conditions.empty();
+  period_conditions.empty();
 
   is_lex_started= TRUE;
   DBUG_VOID_RETURN;

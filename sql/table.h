@@ -792,6 +792,7 @@ struct TABLE_SHARE
 
   period_info_t *get_period(const char *period_name)
   {
+    DBUG_ASSERT(period_name);
     if (strcmp(period_name, "SYSTEM_TIME") == 0)
       return &vers;
     else if (strcmp(period.name.str, period_name) == 0)
@@ -1871,6 +1872,12 @@ struct vers_select_conds_t
   Vers_history_point end;
   Lex_ident name;
 
+  Item *lhs_cond;
+  Item *rhs_cond;
+  Item *insert_cond;
+  Item_field *field_start;
+  Item_field *field_end;
+
   void empty()
   {
     type= SYSTEM_TIME_UNSPECIFIED;
@@ -1897,6 +1904,7 @@ struct vers_select_conds_t
     used= src.used;
     start= src.start;
     end= src.end;
+    name= src.name;
     return *this;
   }
 
@@ -1989,6 +1997,7 @@ struct TABLE_LIST
     init_one_table(&table_arg->s->db, &table_arg->s->table_name,
                    NULL, lock_type);
     table= table_arg;
+    vers_conditions.name= table->s->vers.name;
   }
 
   inline void init_one_table_for_prelocking(const LEX_CSTRING *db_arg,

@@ -11,7 +11,7 @@ t1	CREATE TABLE `t1` (
   `x1` int(10) unsigned DEFAULT NULL,
   `row_start` SYS_DATATYPE GENERATED ALWAYS AS ROW START INVISIBLE COMMENT 'start',
   `row_end` SYS_DATATYPE GENERATED ALWAYS AS ROW END INVISIBLE COMMENT 'end',
-  PERIOD FOR SYSTEM_TIME (`row_start`, `row_end`)
+  PERIOD FOR `SYSTEM_TIME` (`row_start`, `row_end`)
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 show columns from t1;
 Field	Type	Null	Key	Default	Extra
@@ -318,7 +318,7 @@ t3	CREATE TABLE `t3` (
   `y` int(11) DEFAULT NULL,
   `st` timestamp(6) GENERATED ALWAYS AS ROW START INVISIBLE,
   `en` timestamp(6) GENERATED ALWAYS AS ROW END INVISIBLE,
-  PERIOD FOR SYSTEM_TIME (`st`, `en`)
+  PERIOD FOR `SYSTEM_TIME` (`st`, `en`)
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 select y from t3;
 y
@@ -473,7 +473,7 @@ t3	CREATE TABLE `t3` (
   `row_end` timestamp(6) NOT NULL DEFAULT '0000-00-00 00:00:00.000000',
   `st` timestamp(6) GENERATED ALWAYS AS ROW START INVISIBLE,
   `en` timestamp(6) GENERATED ALWAYS AS ROW END INVISIBLE,
-  PERIOD FOR SYSTEM_TIME (`st`, `en`)
+  PERIOD FOR `SYSTEM_TIME` (`st`, `en`)
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
 # MDEV-14828 Server crashes in JOIN::prepare / setup_fields on 2nd execution of PS [#437]
 create or replace table t1 (x int) with system versioning;

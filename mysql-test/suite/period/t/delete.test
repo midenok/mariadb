@@ -1,0 +1,9 @@
+create or replace table p (id int, s date, e date, period for apptime(s,e));
+
+insert into p values(1, '1999-01-01', '2018-12-12');
+insert into p values(1, '1999-01-01', '2017-01-01');
+insert into p values(1, '2017-01-01', '2019-01-01');
+delete from p for portion of apptime from '2000-01-01' to '2018-01-01';
+
+--error
+delete from p for portion of othertime from '2000-01-01' to '2018-01-01';

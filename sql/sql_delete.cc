@@ -341,13 +341,75 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
       table_list->on_expr= NULL;
     }
   }
-  if (!conds)
+  if (table_list->period_conditions.name)
   {
-    if (select_lex->period_setup_conds(thd, table_list))
-      DBUG_RETURN(TRUE);
+    if (table_list->is_view_or_derived())
+    {
+      my_error(ER_IT_IS_A_VIEW, MYF(0), table_list->table_name.str);
+      DBUG_RETURN(true);
+    }
+
+    int err= 0;
+    vers_select_conds_t &period_conds= table_list->period_conditions;
+
+    err= select_lex->period_setup_conds(thd, table_list, conds);
+    if (err)
+      DBUG_RETURN(true);
 
     conds= table_list->on_expr;
     table_list->on_expr= NULL;
+
+    List<Item> field_list, update_list, value_list;
+    ha_rows found= 0;
+    ha_rows updated= 0;
+
+    field_list.push_back(period_conds.field_start, thd->mem_root);
+    field_list.push_back(period_conds.field_end, thd->mem_root);
+    select_lex->item_list.push_back(period_conds.end.item, thd->mem_root);
+    select_lex->item_list.push_back(period_conds.field_end, thd->mem_root);
+
+    err= mysql_insert_select_prepare(thd);
+
+    select_insert *sel_result=
+            new (thd->mem_root) select_insert(thd, table_list, table_list->table,
+                                              &field_list, &update_list,
+                                              &value_list,
+                                              DUP_UPDATE, false);
+    if (err || !sel_result)
+      DBUG_RETURN(true);
+
+    // TODO investigate BATCH mode
+    sel_result->disable_my_ok_calls();
+    thd->lex->select_lex.where= period_conds.insert_cond;
+
+    DBUG_ASSERT(table);
+    table->use_all_columns();
+    err= handle_select(thd, thd->lex, sel_result, OPTION_SETUP_TABLES_DONE);
+    if (err)
+      DBUG_RETURN(true);
+    thd->lex->select_lex.where= conds;
+
+    field_list.empty();
+    select_lex->item_list.empty();
+    field_list.push_back(period_conds.field_end, thd->mem_root);
+    value_list.push_back(period_conds.start.item, thd->mem_root);
+
+    err= mysql_update_inner(thd, table_list, field_list, value_list,
+                            period_conds.lhs_cond, order_list->elements,
+                            order, limit, false, &found, &updated);
+    if (err)
+      DBUG_RETURN(true);
+
+    field_list.empty();
+    value_list.empty();
+    field_list.push_back(period_conds.field_start, thd->mem_root);
+    value_list.push_back(period_conds.end.item, thd->mem_root);
+
+    err= mysql_update_inner(thd, table_list, field_list, value_list,
+                            period_conds.rhs_cond, order_list->elements,
+                            order, limit, false, &found, &updated);
+    if (err)
+      DBUG_RETURN(true);
   }
 
   if (mysql_handle_list_of_derived(thd->lex, table_list, DT_MERGE_FOR_INSERT))

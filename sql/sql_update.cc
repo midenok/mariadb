@@ -280,6 +280,8 @@ int mysql_update_inner(THD *thd, TABLE_LIST *table_list, List<Item> &fields,
   query_plan.index= MAX_KEY;
   query_plan.using_filesort= FALSE;
   query_plan.updating_a_view= MY_TEST(table_list->view);
+  bool suppress_my_ok= thd->lex->sql_command == SQLCOM_DELETE
+                       && table_list->period_conditions.name;
   
   /* Calculate "table->covering_keys" based on the WHERE */
   table->covering_keys= table->s->keys_in_use;
@@ -1101,7 +1103,7 @@ update_end:
   }
 
 
-  if (likely(error < 0) && likely(!thd->lex->analyze_stmt))
+  if (likely(error < 0 && !thd->lex->analyze_stmt && !suppress_my_ok))
   {
     char buff[MYSQL_ERRMSG_SIZE];
     if (!table->versioned(VERS_TIMESTAMP) || !table->vers_write)

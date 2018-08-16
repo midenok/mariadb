@@ -891,7 +891,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
   Currently there are 63 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 63
+%expect 62
 
 /*
    Comments for TOKENS.
@@ -9274,10 +9274,10 @@ opt_for_portion_of_time_clause:
           {
             $$= false;
           }
-        | FOR_SYM PORTION OF_SYM ident system_time_expr FROM history_point TO_SYM history_point
+        | FOR_SYM PORTION OF_SYM ident FROM history_point TO_SYM history_point
           {
             $$= true;
-            Lex->period_conditions.init(SYSTEM_TIME_FROM_TO, $7, $9, $4);
+            Lex->period_conditions.init(SYSTEM_TIME_FROM_TO, $6, $8, $4);
           }
         ;
 
@@ -11794,9 +11794,9 @@ table_primary_ident:
             SELECT_LEX *sel= Select;
             sel->table_join_options= 0;
           }
-          table_ident opt_use_partition opt_for_portion_of_time_clause opt_for_system_time_clause opt_table_alias opt_key_definition
+          table_ident opt_use_partition opt_for_system_time_clause opt_table_alias opt_key_definition
           {
-            if (unlikely(!($$= Select->add_table_to_list(thd, $2, $6,
+            if (unlikely(!($$= Select->add_table_to_list(thd, $2, $5,
                                                          Select->get_table_join_options(),
                                                          YYPS->m_lock_type,
                                                          YYPS->m_mdl_type,
@@ -11807,8 +11807,6 @@ table_primary_ident:
             TABLE_LIST *tl= $$;
             Select->add_joined_table(tl);
             if ($4)
-              tl->period_conditions= Lex->period_conditions;
-            if ($5)
               tl->vers_conditions= Lex->vers_conditions;
           }
         ;
@@ -13473,17 +13471,18 @@ delete_part2:
         ;
 
 delete_single_table:
-          FROM table_ident opt_use_partition
+          FROM table_ident opt_for_portion_of_time_clause opt_use_partition
           {
             if (unlikely(!Select->
                          add_table_to_list(thd, $2, NULL, TL_OPTION_UPDATING,
                                            YYPS->m_lock_type,
                                            YYPS->m_mdl_type,
                                            NULL,
-                                           $3)))
+                                           $4)))
               MYSQL_YYABORT;
             YYPS->m_lock_type= TL_READ_DEFAULT;
             YYPS->m_mdl_type= MDL_SHARED_READ;
+            Lex->last_table()->period_conditions= Lex->period_conditions;
           }
         ;
 
