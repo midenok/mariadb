@@ -3150,8 +3150,9 @@ int handler::update_auto_increment()
     */
     if (thd->killed == KILL_BAD_DATA ||
         nr > table->next_number_field->get_max_int_value())
-      DBUG_RETURN(HA_ERR_AUTOINC_ERANGE);
-
+      result= HA_ERR_AUTOINC_ERANGE;
+    else
+    {
     /*
       field refused this value (overflow) and truncated it, use the result of
       the truncation (which is going to be inserted); however we try to
@@ -3160,9 +3161,10 @@ int handler::update_auto_increment()
       bother shifting the right bound (anyway any other value from this
       interval will cause a duplicate key).
     */
-    nr= prev_insert_id(table->next_number_field->val_int(), variables);
-    if (unlikely(table->next_number_field->store((longlong) nr, TRUE)))
-      nr= table->next_number_field->val_int();
+      nr= prev_insert_id(table->next_number_field->val_int(), variables);
+      if (unlikely(table->next_number_field->store((longlong) nr, TRUE)))
+        nr= table->next_number_field->val_int();
+    }
   }
   if (append)
   {
