@@ -7248,38 +7248,19 @@ bool LEX::vers_add_trt_query2(THD *thd)
     {
     case SYSTEM_TIME_AS_OF:
     case SYSTEM_TIME_BEFORE:
-      if (TR_table::add_subquery2(thd, trt, tl->vers_conditions.start, select_lex, subq_n))
+      if (vers_add_subquery2(thd, tl->vers_conditions.start, select_lex, subq_n))
         return true;
       break;
     case SYSTEM_TIME_FROM_TO:
     case SYSTEM_TIME_BETWEEN:
-      if (TR_table::add_subquery2(thd, trt, tl->vers_conditions.start, select_lex, subq_n, true))
+      if (vers_add_subquery2(thd, tl->vers_conditions.start, select_lex, subq_n, true))
         return true;
-      if (TR_table::add_subquery2(thd, trt, tl->vers_conditions.end, select_lex, subq_n))
+      if (vers_add_subquery2(thd, tl->vers_conditions.end, select_lex, subq_n))
         return true;
       break;
     default:;
     };
   }
-  return false;
-}
-
-
-bool LEX::vers_add_trt(THD* thd)
-{
-  Query_arena_stmt on_stmt_arena(thd);
-  TABLE_LIST *tl;
-  if (unlikely(!(tl= (TABLE_LIST *) thd->calloc(sizeof(TABLE_LIST)))))
-    return true;
-
-  tl->init_one_table(&MYSQL_SCHEMA_NAME, &TRANSACTION_REG_NAME,
-                     &TRANSACTION_REG_NAME, TL_READ);
-  tl->is_fqtn= true;
-  tl->is_alias= true;
-  tl->cacheable_table= true;
-  tl->select_lex= current_select;
-  add_to_query_tables(tl);
-  trt= tl;
   return false;
 }
 

@@ -2994,7 +2994,8 @@ class Open_tables_backup;
     When versioned table marks its records lifetime with transaction IDs,
     TRT is used to get their actual timestamps. */
 
-class TR_table: public TABLE_LIST
+class TR_table: public Sql_alloc,
+                public TABLE_LIST
 {
   THD *thd;
   Open_tables_backup *open_tables_backup;
@@ -3015,8 +3016,6 @@ public:
   bool setup_select();
   static
   bool add_subquery(THD* thd, Vers_history_point &p, SELECT_LEX *sl, uint &subq_n, bool backwards= false);
-  static
-  bool add_subquery2(THD* thd, TABLE_LIST *trtl, Vers_history_point &p, SELECT_LEX *sl, uint &subq_n, bool backwards= false);
 
   /**
      Opens a transaction_registry table.
