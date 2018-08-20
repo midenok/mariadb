@@ -3222,8 +3222,8 @@ public:
 
   bool vers_add_trt_query(THD *thd);
   bool vers_add_trt_query2(THD *thd);
-  TABLE_LIST *trt;
-  bool vers_add_trt(THD *thd);
+  bool vers_add_subquery2(THD* thd, Vers_history_point &p, SELECT_LEX *sl,
+                          uint &subq_n, bool backwards= false);
 
   TABLE_LIST *unlink_first_table(bool *link_to_local);
   void link_first_table_back(TABLE_LIST *first, bool link_to_local);

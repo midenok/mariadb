@@ -8664,22 +8664,38 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p,
   return false;
 }
 
-bool TR_table::add_subquery2(THD* thd, TABLE_LIST *trtl, Vers_history_point &p,
+bool LEX::vers_add_subquery2(THD* thd, Vers_history_point &p,
                             SELECT_LEX *cur_select, uint &subq_n,
                             bool backwards)
 {
-  LEX *lex= thd->lex;
+  LEX *lex= this;
+  Query_arena_stmt on_stmt_arena(thd);
+  TR_table *trtl= new (thd->mem_root) TR_table(thd);
+  if (unlikely(!trtl))
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+  trtl->is_fqtn= true;
+  trtl->is_alias= true;
+  trtl->cacheable_table= true;
+  trtl->select_lex= current_select;
+  add_to_query_tables(trtl);
+  if (unlikely(trtl->open()))
+  {
+    return true;
+  }
+
   if (!lex->expr_allows_subselect)
   {
     my_error(ER_VERS_TRT_SUBQUERY_FAILED, MYF(0));
     return true;
   }
 
-  Query_arena_stmt on_stmt_arena(thd); // FIXME: is it needed?
   lex->derived_tables|= DERIVED_SUBQUERY;
 
   LEX_context lex_ctx(lex, cur_select);
-  if (mysql_new_select(lex, 1, NULL))
+  if (unlikely(mysql_new_select(lex, 1, NULL)))
   {
     my_error(ER_OUT_OF_RESOURCES, MYF(0));
     return true;
@@ -8820,6 +8836,9 @@ bool TR_table::open()
   bool error= !open_log_table(thd, this, open_tables_backup);
   thd->temporary_tables= temporary_tables;
 
+  if (!error)
+    table->default_column_bitmaps();
+
   if (use_transaction_registry == MAYBE)
   {
     if (error)
@@ -8885,8 +8904,13 @@ bool TR_table::update(ulonglong start_id, ulonglong end_id)
 
 bool TR_table::query(ulonglong trx_id)
 {
-  if (!table && open())
-    return false;
+  if (!table)
+  {
+    if (open())
+      return false;
+    DBUG_ASSERT(table);
+    bitmap_set_all(table->read_set);
+  }
   SQL_SELECT_auto select;
   READ_RECORD info;
   int error;
@@ -8919,8 +8943,13 @@ bool TR_table::query(ulonglong trx_id)
 
 bool TR_table::query(MYSQL_TIME &commit_time, bool backwards)
 {
-  if (!table && open())
-    return false;
+  if (!table)
+  {
+    if (open())
+      return false;
+    DBUG_ASSERT(table);
+    bitmap_set_all(table->read_set);
+  }
   SQL_SELECT_auto select;
   READ_RECORD info;
   int error;
