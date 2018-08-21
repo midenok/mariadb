@@ -8837,7 +8837,11 @@ bool TR_table::open()
   thd->temporary_tables= temporary_tables;
 
   if (!error)
+  {
     table->default_column_bitmaps();
+    bitmap_set_all(table->read_set);
+    bitmap_set_all(table->write_set);
+  }
 
   if (use_transaction_registry == MAYBE)
   {
@@ -8903,13 +8907,8 @@ bool TR_table::update(ulonglong start_id, ulonglong end_id)
 
 bool TR_table::query(ulonglong trx_id)
 {
-  if (!table)
-  {
-    if (open())
-      return false;
-    DBUG_ASSERT(table);
-    bitmap_set_all(table->read_set);
-  }
+  if (!table && open())
+    return false;
   SQL_SELECT_auto select;
   READ_RECORD info;
   int error;
@@ -8942,13 +8941,8 @@ bool TR_table::query(ulonglong trx_id)
 
 bool TR_table::query(MYSQL_TIME &commit_time, bool backwards)
 {
-  if (!table)
-  {
-    if (open())
-      return false;
-    DBUG_ASSERT(table);
-    bitmap_set_all(table->read_set);
-  }
+  if (!table && open())
+    return false;
   SQL_SELECT_auto select;
   READ_RECORD info;
   int error;
