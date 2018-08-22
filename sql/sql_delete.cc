@@ -289,8 +289,7 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   ha_rows	deleted= 0;
   bool          reverse= FALSE;
   bool          has_triggers;
-  ORDER *order= (ORDER *) ((order_list && order_list->elements) ?
-                           order_list->first : NULL);
+  ORDER *order= order_list && order_list->elements ? order_list->first : NULL;
   SELECT_LEX   *select_lex= &thd->lex->select_lex;
   killed_state killed_status= NOT_KILLED;
   THD::enum_binlog_query_type query_type= THD::ROW_QUERY_TYPE;
@@ -299,7 +298,8 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   Explain_delete *explain;
   Delete_plan query_plan(thd->mem_root);
   Unique * deltempfile= NULL;
-  bool delete_record, delete_while_scanning;
+  bool delete_record= false;
+  bool delete_while_scanning;
   DBUG_ENTER("mysql_delete");
 
   query_plan.index= MAX_KEY;
@@ -340,7 +340,7 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
       table_list->on_expr= NULL;
     }
   }
-  if (table_list->period_conditions.name)
+  if (table_list->has_period())
   {
     if (table_list->is_view_or_derived())
     {
@@ -348,67 +348,12 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
       DBUG_RETURN(true);
     }
 
-    int err= 0;
-    vers_select_conds_t &period_conds= table_list->period_conditions;
-
-    err= select_lex->period_setup_conds(thd, table_list, conds);
+    int err= select_lex->period_setup_conds(thd, table_list, conds);
     if (err)
       DBUG_RETURN(true);
 
     conds= table_list->on_expr;
     table_list->on_expr= NULL;
-
-    List<Item> field_list, update_list, value_list;
-    ha_rows found= 0;
-    ha_rows updated= 0;
-
-    field_list.push_back(period_conds.field_start, thd->mem_root);
-    field_list.push_back(period_conds.field_end, thd->mem_root);
-    select_lex->item_list.push_back(period_conds.end.item, thd->mem_root);
-    select_lex->item_list.push_back(period_conds.field_end, thd->mem_root);
-
-    err= mysql_insert_select_prepare(thd);
-
-    select_insert *sel_result=
-            new (thd->mem_root) select_insert(thd, table_list, table_list->table,
-                                              &field_list, &update_list,
-                                              &value_list,
-                                              DUP_UPDATE, false);
-    if (err || !sel_result)
-      DBUG_RETURN(true);
-
-    // TODO investigate BATCH mode
-    sel_result->disable_my_ok_calls();
-    thd->lex->select_lex.where= period_conds.insert_cond;
-
-    DBUG_ASSERT(table_list->table);
-    table_list->table->use_all_columns();
-    err= handle_select(thd, thd->lex, sel_result, OPTION_SETUP_TABLES_DONE);
-    if (err)
-      DBUG_RETURN(true);
-    thd->lex->select_lex.where= conds;
-
-    field_list.empty();
-    select_lex->item_list.empty();
-    field_list.push_back(period_conds.field_end, thd->mem_root);
-    value_list.push_back(period_conds.start.item, thd->mem_root);
-
-    err= mysql_update_inner(thd, table_list, field_list, value_list,
-                            period_conds.lhs_cond, order_list->elements,
-                            order, limit, false, &found, &updated);
-    if (err)
-      DBUG_RETURN(true);
-
-    field_list.empty();
-    value_list.empty();
-    field_list.push_back(period_conds.field_start, thd->mem_root);
-    value_list.push_back(period_conds.end.item, thd->mem_root);
-
-    err= mysql_update_inner(thd, table_list, field_list, value_list,
-                            period_conds.rhs_cond, order_list->elements,
-                            order, limit, false, &found, &updated);
-    if (err)
-      DBUG_RETURN(true);
   }
 
   if (mysql_handle_list_of_derived(thd->lex, table_list, DT_MERGE_FOR_INSERT))
@@ -690,9 +635,10 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   */
 
   if ((table->file->ha_table_flags() & HA_CAN_DIRECT_UPDATE_AND_DELETE) &&
-      !has_triggers && !binlog_is_row && !with_select)
+      !has_triggers && !binlog_is_row && !with_select &&
+      !table_list->has_period())
   {
-    table->mark_columns_needed_for_delete();
+    table->mark_columns_needed_for_delete(false);
     if (!table->check_virtual_columns_marked_for_read())
     {
       DBUG_PRINT("info", ("Trying direct delete"));
@@ -760,7 +706,7 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   if (unlikely(init_ftfuncs(thd, select_lex, 1)))
     goto got_error;
 
-  table->mark_columns_needed_for_delete();
+  table->mark_columns_needed_for_delete(table_list->has_period());
 
   if ((table->file->ha_table_flags() & HA_CAN_FORCE_BULK_DELETE) &&
       !table->prepare_triggers_for_delete_stmt_or_event())
@@ -840,22 +786,31 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
         break;
       }
 
-      error= table->file->ha_delete_row(table->record[0]);
+      bool need_delete= true;
+
+      if (table_list->has_period() && !has_triggers)
+        error= table->update_portion_of_time(table_list->period_conditions,
+                                             &need_delete);
+
+      if (likely(!error) && need_delete)
+        error= table->file->ha_delete_row(table->record[0]);
+
       if (likely(!error))
       {
 	deleted++;
         if (!truncate_history && table->triggers &&
             table->triggers->process_triggers(thd, TRG_EVENT_DELETE,
                                               TRG_ACTION_AFTER, FALSE))
-        {
           error= 1;
+
+        if (likely(!error) && has_triggers && table_list->has_period())
+          error= table->insert_portion_of_time(table_list->period_conditions);
+
+        if (!--limit && using_limit)
+          error= -1;
+
+        if (error)
           break;
-        }
-	if (!--limit && using_limit)
-	{
-	  error= -1;
-	  break;
-	}
       }
       else
       {
@@ -1057,7 +1012,8 @@ int mysql_prepare_delete(THD *thd, TABLE_LIST *table_list,
     DBUG_RETURN(TRUE);
   }
 
-  if (unique_table(thd, table_list, table_list->next_global, 0))
+  if (table_list->has_period()
+      || unique_table(thd, table_list, table_list->next_global, 0))
     *delete_while_scanning= false;
 
   if (select_lex->inner_refs_list.elements &&
@@ -1207,7 +1163,7 @@ void multi_delete::prepare_to_read_rows()
   for (TABLE_LIST *walk= delete_tables; walk; walk= walk->next_local)
   {
     TABLE_LIST *tbl= walk->correspondent_table->find_table_for_update();
-    tbl->table->mark_columns_needed_for_delete();
+    tbl->table->mark_columns_needed_for_delete(false);
   }
 }
 

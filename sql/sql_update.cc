@@ -1192,7 +1192,6 @@ int mysql_update(THD *thd, TABLE_LIST *table_list, List<Item> &fields,
                  bool ignore, ha_rows *found_return, ha_rows *updated_return)
 {
   uint          table_count= 0;
-  TABLE		*table;
   TABLE_LIST *update_source_table;
 
   DBUG_ENTER("mysql_update");
@@ -1225,12 +1224,29 @@ int mysql_update(THD *thd, TABLE_LIST *table_list, List<Item> &fields,
   if (table_list->handle_derived(thd->lex, DT_PREPARE))
     DBUG_RETURN(1);
 
-  table= table_list->table;
-
   if (!table_list->single_table_updatable())
   {
     my_error(ER_NON_UPDATABLE_TABLE, MYF(0), table_list->alias.str, "UPDATE");
     DBUG_RETURN(1);
+  }
+
+  if (table_list->period_conditions.name)
+  {
+    if (table_list->is_view_or_derived())
+    {
+      my_error(ER_IT_IS_A_VIEW, MYF(0), table_list->table_name.str);
+      DBUG_RETURN(true);
+    }
+
+    int err= thd->lex->select_lex.period_setup_conds(thd, table_list, conds);
+    if (err)
+      DBUG_RETURN(true);
+
+    conds= table_list->on_expr;
+    table_list->on_expr= NULL;
+
+    if (err)
+      DBUG_RETURN(true);
   }
 
   DBUG_RETURN(mysql_update_inner(thd, table_list, fields, values, conds,

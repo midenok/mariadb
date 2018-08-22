@@ -577,6 +577,8 @@ struct TABLE_STATISTICS_CB
   bool histograms_are_read;   
 };
 
+extern const Lex_ident SYSTEM_TIME;
+
 /**
   This structure is shared between different table objects. There is one
   instance of table share per one table in the database.
@@ -786,12 +788,12 @@ struct TABLE_SHARE
   period_info_t vers;
   period_info_t period;
 
-  period_info_t *get_period(const char *period_name)
+  period_info_t *get_period(const Lex_ident &name)
   {
-    DBUG_ASSERT(period_name);
-    if (strcmp(period_name, "SYSTEM_TIME") == 0)
+    DBUG_ASSERT(name);
+    if (name.streq(SYSTEM_TIME))
       return &vers;
-    else if (strcmp(period.name.str, period_name) == 0)
+    else if (name.streq(period.name))
       return &period;
     return NULL;
   }
@@ -1083,6 +1085,8 @@ struct st_cond_statistic;
 typedef Bitmap<MAX_FIELDS> Field_map;
 
 class SplM_opt_info;
+
+struct vers_select_conds_t;
 
 struct TABLE
 {
@@ -1384,7 +1388,7 @@ public:
   void restore_column_maps_after_keyread(MY_BITMAP *backup);
   void mark_auto_increment_column(void);
   void mark_columns_needed_for_update(void);
-  void mark_columns_needed_for_delete(void);
+  void mark_columns_needed_for_delete(bool with_period);
   void mark_columns_needed_for_insert(void);
   void mark_columns_per_binlog_row_image(void);
   bool mark_virtual_col(Field *field);
@@ -1558,6 +1562,8 @@ public:
   ulonglong vers_start_id() const;
   ulonglong vers_end_id() const;
 
+  int update_portion_of_time(vers_select_conds_t &period_conds, bool *inside_period);
+  int insert_portion_of_time(vers_select_conds_t &period_conds);
   int delete_row();
   void vers_update_fields();
   void vers_update_end();
@@ -1868,9 +1874,6 @@ struct vers_select_conds_t
   Vers_history_point end;
   Lex_ident name;
 
-  Item *lhs_cond;
-  Item *rhs_cond;
-  Item *insert_cond;
   Item_field *field_start;
   Item_field *field_end;
 
@@ -2427,6 +2430,11 @@ struct TABLE_LIST
   /* System Versioning */
   vers_select_conds_t vers_conditions;
   vers_select_conds_t period_conditions;
+
+  bool has_period() const
+  {
+    return period_conditions.name;
+  }
 
   /**
      @brief

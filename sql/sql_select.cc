@@ -847,30 +847,15 @@ int SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables, Item *where)
   for (TABLE_LIST *table= tables; table; table= table->next_local)
   {
     vers_select_conds_t &conds= table->period_conditions;
+    if (!strcasecmp(conds.name.str, "SYSTEM_TIME"))
+    {
+      my_error(ER_PERIOD_SYSTEM_TIME_NOT_ALLOWED, MYF(0));
+      DBUG_RETURN(-1);
+    }
     if (period_update_condition(thd, table, this, conds, true))
       DBUG_RETURN(-1);
 
-    Item *row_start= conds.field_start;
-    Item *row_end=   conds.field_end;
-    Item *from_val=  conds.start.item;
-    Item *to_val=    conds.end.item;
-    Lt_creator &lt=  lt_creator;
-    Gt_creator &gt=  gt_creator;
-
-    // Also prepare search conditions for PORTION OF TIME case
-    conds.insert_cond= and_items(thd, lt.create(thd, row_start, from_val),
-                                      gt.create(thd, row_end,   to_val));
-    conds.lhs_cond=    and_items(thd, lt.create(thd, row_start, from_val),
-                                      gt.create(thd, row_end,   from_val));
-    conds.rhs_cond=    and_items(thd, lt.create(thd, row_start, to_val),
-                                      gt.create(thd, row_end,   to_val));
-
     table->on_expr= and_items(thd, where, table->on_expr);
-
-    where= and_items(thd, where, lt.create(thd, from_val, to_val));
-    conds.lhs_cond= and_items(thd, where, conds.lhs_cond);
-    conds.rhs_cond= and_items(thd, where, conds.rhs_cond);
-    conds.insert_cond= and_items(thd, where, conds.insert_cond);
   }
   DBUG_RETURN(0);
 }

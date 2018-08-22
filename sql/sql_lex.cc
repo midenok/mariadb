@@ -49,6 +49,8 @@ const LEX_CSTRING empty_clex_str= {"", 0};
 const LEX_CSTRING star_clex_str=  {"*", 1};
 const LEX_CSTRING param_clex_str= {"?", 1};
 
+const Lex_ident SYSTEM_TIME = { STRING_WITH_LEN("SYSTEM_TIME") };
+
 /**
   @note The order of the elements of this array must correspond to
   the order of elements in enum_binlog_stmt_unsafe.
@@ -3504,6 +3506,20 @@ void LEX::set_trg_event_type_for_tables()
   case DUP_ERROR:
   default:
     break;
+  }
+
+  if (period_conditions.name)
+  {
+    switch (sql_command)
+    {
+    case SQLCOM_DELETE:
+    case SQLCOM_UPDATE:
+    case SQLCOM_REPLACE:
+      new_trg_event_map |= static_cast<uint8>
+                             (1 << static_cast<int>(TRG_EVENT_INSERT));
+    default:
+      break;
+    }
   }
 
 

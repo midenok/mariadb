@@ -1,3 +1,6 @@
+source suite/period/engines.inc;
+source suite/period/log.inc;
+
 create or replace table t (id int, s date, e date, period for apptime(s,e));
 
 insert into t values(1, '1999-01-01', '2018-12-12');
@@ -6,8 +9,36 @@ insert into t values(1, '2017-01-01', '2019-01-01');
 insert into t values(2, '1998-01-01', '2018-12-12');
 insert into t values(3, '1997-01-01', '2015-01-01');
 insert into t values(4, '2016-01-01', '2020-01-01');
+
+create or replace table t1 (id int, s date, e date, period for apptime(s,e));
+insert t1 select * from t;
+
+create trigger tr2upd before update on t1 for each row call log('>UPD');
+create trigger tr1upd after  update on t1 for each row call log('<UPD');
+create trigger tr2del before delete on t1 for each row call log('>DEL');
+create trigger tr1del after  delete on t1 for each row call log('<DEL');
+create trigger tr1ins before insert on t1 for each row call log('<INS');
+create trigger tr2ins after  insert on t1 for each row call log('>INS');
+
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+delete from t1 for portion of APPTIME from '2000-01-01' to '2018-01-01';
 select * from t;
+select * from t1 order by id, s, e;
+select * from log_tbl;
 
 --error ER_PERIOD_NOT_FOUND
 delete from t for portion of othertime from '2000-01-01' to '2018-01-01';
+--error ER_PERIOD_SYSTEM_TIME_NOT_ALLOWED
+delete from t for portion of system_time from '2000-01-01' to '2018-01-01';
+
+create or replace table t (id int, str text, s date, e date,
+    period for apptime(s,e));
+
+insert into t values(1, 'data', '1999-01-01', '2018-12-12');
+insert into t values(1, 'other data', '1999-01-01', '2018-12-12');
+insert into t values(1, 'deleted', '2000-01-01', '2018-01-01');
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+show warnings;
+select * from t;
+
+create or replace database test;
