@@ -4914,12 +4914,7 @@ TABLE *open_ltable2(THD *thd, TABLE_LIST *table_list, thr_lock_type lock_type,
   bool error;
   DBUG_ENTER("open_ltable");
 
-  /* Ignore temporary tables as they have already been opened. */
-  if (table_list->table)
-    DBUG_RETURN(table_list->table);
-
-  /* should not be used in a prelocked_mode context, see NOTE above */
-  DBUG_ASSERT(thd->locked_tables_mode < LTM_PRELOCKED);
+  DBUG_ASSERT(!table_list->table);
 
   THD_STAGE_INFO(thd, stage_opening_tables);
   thd->current_tablenr= 0;

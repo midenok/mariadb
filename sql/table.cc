@@ -8877,7 +8877,8 @@ bool TR_table::open2()
                   MYSQL_OPEN_IGNORE_FLUSH |
                   MYSQL_LOCK_IGNORE_TIMEOUT |
                   MYSQL_LOCK_LOG_TABLE |
-                  MYSQL_LOCK_USE_MALLOC );
+                  MYSQL_LOCK_USE_MALLOC |
+                  MYSQL_OPEN_GET_NEW_TABLE );
     if ((table= open_ltable2(thd, this, this->lock_type, flags)))
     {
       DBUG_ASSERT(table->s->table_category == TABLE_CATEGORY_LOG);

@@ -6110,7 +6110,7 @@ int mysqld_main(int argc, char **argv)
       exit(0);
     }
   }
-  else if (TR_table::use_transaction_registry)
+  else if (TR_table::use_transaction_registry) // FIXME: remove it
   {
     THD *thd= new THD(0);
     if (!thd)
