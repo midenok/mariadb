@@ -1387,7 +1387,7 @@ public:
   void mark_columns_used_by_index_no_reset(uint index, MY_BITMAP *map);
   void restore_column_maps_after_keyread(MY_BITMAP *backup);
   void mark_auto_increment_column(void);
-  void mark_columns_needed_for_update(void);
+  void mark_columns_needed_for_update(bool with_period);
   void mark_columns_needed_for_delete(bool with_period);
   void mark_columns_needed_for_insert(void);
   void mark_columns_per_binlog_row_image(void);
@@ -1562,8 +1562,10 @@ public:
   ulonglong vers_start_id() const;
   ulonglong vers_end_id() const;
 
-  int update_portion_of_time(vers_select_conds_t &period_conds, bool *inside_period);
-  int insert_portion_of_time(vers_select_conds_t &period_conds);
+  int cut_fields_for_portion_of_time(const vers_select_conds_t &period_conds);
+  int update_portion_of_time(const vers_select_conds_t &period_conds,
+                             bool *inside_period);
+  int insert_portion_of_time(const vers_select_conds_t &period_conds);
   int delete_row();
   void vers_update_fields();
   void vers_update_end();

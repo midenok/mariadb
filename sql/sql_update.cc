@@ -365,6 +365,7 @@ int mysql_update_inner(THD *thd, TABLE_LIST *table_list, List<Item> &fields,
   bool will_batch = false;
   bool binlog_is_row= false;
   bool has_triggers= false;
+  bool has_period_triggers= false;
   int error= 0;
   SQL_SELECT *select= NULL;
   const bool safe_update= thd->variables.option_bits & OPTION_SAFE_UPDATES;
@@ -446,7 +447,7 @@ int mysql_update_inner(THD *thd, TABLE_LIST *table_list, List<Item> &fields,
   if (unlikely(init_ftfuncs(thd, select_lex, 1)))
     goto err;
 
-  table->mark_columns_needed_for_update();
+  table->mark_columns_needed_for_update(table_list->has_period());
 
   table->update_const_key_parts(conds);
   order= simple_remove_const(order, conds);
@@ -528,8 +529,16 @@ int mysql_update_inner(THD *thd, TABLE_LIST *table_list, List<Item> &fields,
 
   has_triggers= (table->triggers &&
                  (table->triggers->has_triggers(event, TRG_ACTION_BEFORE) ||
-                 table->triggers->has_triggers(event, TRG_ACTION_AFTER)));
+                  table->triggers->has_triggers(event, TRG_ACTION_AFTER)));
   DBUG_PRINT("info", ("has_triggers: %s", has_triggers ? "TRUE" : "FALSE"));
+
+  has_period_triggers= table->triggers &&
+                       (table->triggers->has_triggers(TRG_EVENT_INSERT,
+                                                      TRG_ACTION_BEFORE)
+                        || table->triggers->has_triggers(TRG_EVENT_INSERT,
+                                                         TRG_ACTION_AFTER)
+                        || has_triggers);
+
   binlog_is_row= thd->is_current_stmt_binlog_format_row();
   DBUG_PRINT("info", ("binlog_is_row: %s", binlog_is_row ? "TRUE" : "FALSE"));
 
@@ -819,12 +828,20 @@ update_begin:
 
       found++;
 
-      if (!can_compare_record || compare_record(table) ||
-          thd->lex->sql_command == SQLCOM_DELETE)
+      bool record_was_same= false;
+      bool need_update= !can_compare_record || compare_record(table) ||
+                        thd->lex->sql_command == SQLCOM_DELETE ||
+                        (table_list->has_period() && has_period_triggers);
+
+      if (need_update)
       {
         if (table->versioned(VERS_TIMESTAMP) &&
             thd->lex->sql_command == SQLCOM_DELETE)
           table->vers_update_end();
+
+        if (table_list->has_period())
+          table->cut_fields_for_portion_of_time(table_list->period_conditions);
+
         if (table->default_field && table->update_default_fields(1, ignore))
         {
           error= 1;
@@ -884,7 +901,9 @@ update_begin:
           error= table->file->ha_update_row(table->record[1],
                                             table->record[0]);
         }
-        if (unlikely(error == HA_ERR_RECORD_IS_THE_SAME))
+
+        record_was_same= error == HA_ERR_RECORD_IS_THE_SAME;
+        if (unlikely(record_was_same))
         {
           error= 0;
         }
@@ -931,6 +950,12 @@ update_begin:
       {
         error= 1;
         break;
+      }
+
+      if (need_update && !record_was_same && table_list->has_period())
+      {
+        restore_record(table, record[1]);
+        table->insert_portion_of_time(table_list->period_conditions);
       }
 
       if (!--limit && using_limit)
@@ -2002,7 +2027,7 @@ void multi_update::prepare_to_read_rows()
   */
 
   for (TABLE_LIST *tl= update_tables; tl; tl= tl->next_local)
-    tl->table->mark_columns_needed_for_update();
+    tl->table->mark_columns_needed_for_update(false);
 }
 
 

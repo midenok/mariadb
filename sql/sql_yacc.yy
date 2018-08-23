@@ -891,7 +891,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
   Currently there are 63 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 62
+%expect 63
 
 /*
    Comments for TOKENS.
@@ -11794,9 +11794,9 @@ table_primary_ident:
             SELECT_LEX *sel= Select;
             sel->table_join_options= 0;
           }
-          table_ident opt_use_partition opt_for_system_time_clause opt_table_alias opt_key_definition
+          table_ident opt_use_partition opt_for_portion_of_time_clause opt_for_system_time_clause opt_table_alias opt_key_definition
           {
-            if (unlikely(!($$= Select->add_table_to_list(thd, $2, $5,
+            if (unlikely(!($$= Select->add_table_to_list(thd, $2, $6,
                                                          Select->get_table_join_options(),
                                                          YYPS->m_lock_type,
                                                          YYPS->m_mdl_type,
@@ -11806,8 +11806,10 @@ table_primary_ident:
               MYSQL_YYABORT;
             TABLE_LIST *tl= $$;
             Select->add_joined_table(tl);
-            if ($4)
+            if ($5)
               tl->vers_conditions= Lex->vers_conditions;
+            if ($4)
+              tl->period_conditions= Lex->period_conditions;
           }
         ;
 
