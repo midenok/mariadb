@@ -3023,6 +3023,7 @@ public:
      @retval true on error, false otherwise.
    */
   bool open();
+  bool open2();
   ~TR_table();
   /**
      @retval current thd

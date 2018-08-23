@@ -44,6 +44,7 @@
 #include "sql_cte.h"
 #include "ha_sequence.h"
 #include "sql_show.h"
+#include "lock.h"
 
 /* For MySQL 5.7 virtual fields */
 #define MYSQL57_GENERATED_FIELD 128
@@ -8681,7 +8682,7 @@ bool LEX::vers_add_subquery2(THD* thd, Vers_history_point &p,
   trtl->cacheable_table= true;
   trtl->select_lex= current_select;
   add_to_query_tables(trtl);
-  if (unlikely(trtl->open()))
+  if (unlikely(trtl->open2()))
   {
     return true;
   }
@@ -8834,6 +8835,76 @@ bool TR_table::open()
 
   All_tmp_tables_list *temporary_tables= thd->temporary_tables;
   bool error= !open_log_table(thd, this, open_tables_backup);
+  thd->temporary_tables= temporary_tables;
+
+  if (!error)
+  {
+    table->default_column_bitmaps();
+    bitmap_set_all(table->read_set);
+    bitmap_set_all(table->write_set);
+  }
+
+  if (use_transaction_registry == MAYBE)
+  {
+    if (error)
+    {
+      use_transaction_registry= NO;
+      return error;
+    }
+    error= check();
+  }
+
+  use_transaction_registry= error ? NO : YES;
+
+  return error;
+}
+
+bool TR_table::open2()
+{
+  DBUG_ASSERT(!table);
+  open_tables_backup= new Open_tables_backup;
+  if (!open_tables_backup)
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+
+  bool error;
+  All_tmp_tables_list *temporary_tables= thd->temporary_tables;
+  {
+    const uint flags= ( MYSQL_OPEN_IGNORE_GLOBAL_READ_LOCK |
+                  MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY |
+                  MYSQL_OPEN_IGNORE_FLUSH |
+                  MYSQL_LOCK_IGNORE_TIMEOUT |
+                  MYSQL_LOCK_LOG_TABLE |
+                  MYSQL_LOCK_USE_MALLOC );
+    if ((table= open_ltable2(thd, this, this->lock_type, flags)))
+    {
+      DBUG_ASSERT(table->s->table_category == TABLE_CATEGORY_LOG);
+      DBUG_ASSERT(table->s->no_replicate);
+    }
+    error= !table;
+
+    if (table)
+    {
+      /* Save value that is changed in mysql_lock_tables() */
+      ulonglong save_utime_after_lock= thd->utime_after_lock;
+      MYSQL_LOCK *merged_lock;
+
+      thd->in_lock_tables= 1;
+      MYSQL_LOCK *lock= mysql_lock_tables(thd, &table, 1, flags);
+      thd->in_lock_tables= 0;
+      if (!lock || (merged_lock= mysql_lock_merge(thd->lock, lock)) == NULL)
+      {
+        if (!thd->killed)
+          my_error(ER_LOCK_DEADLOCK, MYF(0));
+        error= true;
+      }
+      else
+        thd->lock= merged_lock;
+      thd->utime_after_lock= save_utime_after_lock;
+    }
+  }
   thd->temporary_tables= temporary_tables;
 
   if (!error)
