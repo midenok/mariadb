@@ -68,6 +68,9 @@ enum find_item_error_report_type {REPORT_ALL_ERRORS, REPORT_EXCEPT_NOT_FOUND,
 uint get_table_def_key(const TABLE_LIST *table_list, const char **key);
 TABLE *open_ltable(THD *thd, TABLE_LIST *table_list, thr_lock_type update,
                    uint lock_flags);
+TABLE *open_ltable2(THD *thd, TABLE_LIST *table_list, thr_lock_type update,
+                   uint lock_flags);
+
 
 /* mysql_lock_tables() and open_table() flags bits */
 #define MYSQL_OPEN_IGNORE_GLOBAL_READ_LOCK      0x0001
