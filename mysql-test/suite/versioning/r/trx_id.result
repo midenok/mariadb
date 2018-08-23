@@ -215,14 +215,18 @@ Warnings:
 Note	1003	select `test`.`t1`.`x` AS `x` from `test`.`t1` FOR SYSTEM_TIME ALL where trt_trx_sees(`test`.`t1`.`sys_trx_end`,@`ts`) and trt_trx_sees_eq(@`ts`,`test`.`t1`.`sys_trx_start`)
 EXPLAIN EXTENDED SELECT x FROM t1 FOR SYSTEM_TIME AS OF TIMESTAMP @ts;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	1	100.00	Using where
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	1	100.00	
+1	PRIMARY	<derived2>	ALL	NULL	NULL	NULL	NULL	2	100.00	Using where; Using join buffer (flat, BNL join)
+2	DERIVED	transaction_registry	range	commit_timestamp	commit_timestamp	7	NULL	17	100.00	Using where; Using index
 Warnings:
-Note	1003	select `test`.`t1`.`x` AS `x` from `test`.`t1` FOR SYSTEM_TIME ALL where trt_trx_sees(`test`.`t1`.`sys_trx_end`,<cache>(trt_trx_id(@`ts`))) and trt_trx_sees_eq(<cache>(trt_trx_id(@`ts`)),`test`.`t1`.`sys_trx_start`)
+Note	1003	/* select#1 */ select `test`.`t1`.`x` AS `x` from `test`.`t1` FOR SYSTEM_TIME ALL join (/* select#2 */ select `mysql`.`transaction_registry`.`transaction_id` AS `transaction_id` from `mysql`.`transaction_registry` where `mysql`.`transaction_registry`.`commit_timestamp` <= @`ts` order by `mysql`.`transaction_registry`.`commit_timestamp` desc limit 1) `__trt_0` where trt_trx_sees(`test`.`t1`.`sys_trx_end`,`__trt_0`.`transaction_id`) and trt_trx_sees_eq(`__trt_0`.`transaction_id`,`test`.`t1`.`sys_trx_start`)
 EXPLAIN EXTENDED SELECT x FROM t1 FOR SYSTEM_TIME AS OF @ts;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	1	100.00	Using where
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	1	100.00	
+1	PRIMARY	<derived2>	ALL	NULL	NULL	NULL	NULL	2	100.00	Using where; Using join buffer (flat, BNL join)
+2	DERIVED	transaction_registry	range	commit_timestamp	commit_timestamp	7	NULL	17	100.00	Using where; Using index
 Warnings:
-Note	1003	select `test`.`t1`.`x` AS `x` from `test`.`t1` FOR SYSTEM_TIME ALL where trt_trx_sees(`test`.`t1`.`sys_trx_end`,<cache>(trt_trx_id(@`ts`))) and trt_trx_sees_eq(<cache>(trt_trx_id(@`ts`)),`test`.`t1`.`sys_trx_start`)
+Note	1003	/* select#1 */ select `test`.`t1`.`x` AS `x` from `test`.`t1` FOR SYSTEM_TIME ALL join (/* select#2 */ select `mysql`.`transaction_registry`.`transaction_id` AS `transaction_id` from `mysql`.`transaction_registry` where `mysql`.`transaction_registry`.`commit_timestamp` <= @`ts` order by `mysql`.`transaction_registry`.`commit_timestamp` desc limit 1) `__trt_0` where trt_trx_sees(`test`.`t1`.`sys_trx_end`,`__trt_0`.`transaction_id`) and trt_trx_sees_eq(`__trt_0`.`transaction_id`,`test`.`t1`.`sys_trx_start`)
 DROP TABLE t1;
 #
 # Testing AS OF with expressions of various kinds and data types
@@ -247,7 +251,7 @@ INSERT INTO t2 VALUES (1);
 # ROW is not supported
 #
 SELECT * FROM t1 FOR SYSTEM_TIME AS OF (1,1);
-ERROR HY000: Illegal parameter data type row for operation 'FOR SYSTEM_TIME'
+ERROR HY000: Illegal parameter data types timestamp and row for operation '<='
 SELECT * FROM t2 FOR SYSTEM_TIME AS OF (1,1);
 ERROR HY000: Illegal parameter data type row for operation 'FOR SYSTEM_TIME'
 #
