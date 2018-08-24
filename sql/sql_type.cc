@@ -5817,7 +5817,7 @@ bool Type_handler_general_purpose_int::
        Vers_history_point_resolve_unit(THD *thd,
                                        Vers_history_point *point) const
 {
-  return point->resolve_unit_trx_id(thd);
+  return false;
 }
 
 
@@ -5825,7 +5825,7 @@ bool Type_handler_bit::
        Vers_history_point_resolve_unit(THD *thd,
                                        Vers_history_point *point) const
 {
-  return point->resolve_unit_trx_id(thd);
+  return false;
 }
 
 
@@ -5833,7 +5833,7 @@ bool Type_handler_temporal_result::
        Vers_history_point_resolve_unit(THD *thd,
                                        Vers_history_point *point) const
 {
-  return point->resolve_unit_timestamp(thd);
+  return false;
 }
 
 
@@ -5841,7 +5841,7 @@ bool Type_handler_general_purpose_string::
        Vers_history_point_resolve_unit(THD *thd,
                                        Vers_history_point *point) const
 {
-  return point->resolve_unit_timestamp(thd);
+  return false;
 }
 
 /***************************************************************************/
