@@ -2405,6 +2405,7 @@ struct TABLE_LIST
 
   /* System Versioning */
   vers_select_conds_t vers_conditions;
+  vers_select_conds_t *find_vers_conditions();
 
   /**
      @brief

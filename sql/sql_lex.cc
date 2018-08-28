@@ -7200,32 +7200,63 @@ bool LEX::set_trigger_field(const LEX_CSTRING *name1, const LEX_CSTRING *name2,
 }
 
 
+vers_select_conds_t *TABLE_LIST::find_vers_conditions()
+{
+  if (vers_conditions.is_set())
+    return &vers_conditions;
+
+  DBUG_ASSERT(select_lex);
+  SELECT_LEX *outer_slex= select_lex->outer_select();
+  TABLE_LIST* outer_table= NULL;
+
+  if (outer_slex)
+  {
+    TABLE_LIST* derived= select_lex->master_unit()->derived;
+    // inner SELECT may not be a derived table (derived == NULL)
+    while (derived && outer_slex && !derived->vers_conditions.is_set())
+    {
+      derived= outer_slex->master_unit()->derived;
+      outer_slex= outer_slex->outer_select();
+    }
+    if (derived && outer_slex)
+    {
+      DBUG_ASSERT(derived->vers_conditions.is_set());
+      return &derived->vers_conditions;
+    }
+  }
+  return NULL;
+}
+
+
 bool LEX::vers_add_trt_query2(THD *thd)
 {
   uint subq_n= 0;
   for (TABLE_LIST *tl= query_tables; tl; tl= tl->next_global)
   {
-    if (!tl->vers_conditions.is_set() || tl->is_view_or_derived())
+    if (tl->is_view_or_derived())
+      continue;
+    vers_select_conds_t *vers_conditions= tl->find_vers_conditions();
+    if (!vers_conditions)
       continue;
     DBUG_ASSERT(tl->table);
     if (!tl->table->versioned(VERS_TRX_ID))
       continue;
     SELECT_LEX *select_lex= tl->select_lex;
-    switch (tl->vers_conditions.type)
+    switch (vers_conditions->type)
     {
     case SYSTEM_TIME_AS_OF:
     case SYSTEM_TIME_BEFORE:
-      if (tl->vers_conditions.start.unit != VERS_TRX_ID &&
-        vers_add_subquery2(thd, tl->vers_conditions.start, select_lex, subq_n))
+      if (vers_conditions->start.unit != VERS_TRX_ID &&
+        vers_add_subquery2(thd, vers_conditions->start, select_lex, subq_n))
         return true;
       break;
     case SYSTEM_TIME_FROM_TO:
     case SYSTEM_TIME_BETWEEN:
-      if (tl->vers_conditions.start.unit != VERS_TRX_ID &&
-        vers_add_subquery2(thd, tl->vers_conditions.start, select_lex, subq_n, true))
+      if (vers_conditions->start.unit != VERS_TRX_ID &&
+        vers_add_subquery2(thd, vers_conditions->start, select_lex, subq_n, true))
         return true;
-      if (tl->vers_conditions.end.unit != VERS_TRX_ID &&
-        vers_add_subquery2(thd, tl->vers_conditions.end, select_lex, subq_n))
+      if (vers_conditions->end.unit != VERS_TRX_ID &&
+        vers_add_subquery2(thd, vers_conditions->end, select_lex, subq_n))
         return true;
       break;
     default:;
