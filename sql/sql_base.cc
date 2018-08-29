@@ -7658,15 +7658,17 @@ bool setup_tables(THD *thd, Name_resolution_context *context,
     if (table_list->dont_resolve)
     {
       if (prev_tl)
-        prev_tl->next_name_resolution_table= table_list->next_name_resolution_table;
+        prev_tl->next_name_resolution_table= NULL;
       else
-      {
-        context->first_name_resolution_table= table_list->next_name_resolution_table;
-        continue;
-      }
+        context->first_name_resolution_table= NULL;
+      continue;
     }
+    if (prev_tl)
+      prev_tl->next_name_resolution_table= table_list;
+    else
+      context->first_name_resolution_table= table_list;
     prev_tl= table_list;
-  }
+}
 
   DBUG_RETURN(0);
 }
