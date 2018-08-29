@@ -3220,8 +3220,8 @@ public:
   }
   void set_trg_event_type_for_tables();
 
-  bool vers_add_trt_query2(THD *thd);
-  bool vers_add_subquery2(THD* thd, Vers_history_point &p, SELECT_LEX *sl,
+  bool vers_add_tr_queries(THD *thd);
+  bool vers_add_tr_subquery(THD* thd, Vers_history_point &p, SELECT_LEX *sl,
                           uint &subq_n, bool backwards= false);
 
   TABLE_LIST *unlink_first_table(bool *link_to_local);

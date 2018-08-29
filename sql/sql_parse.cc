@@ -6466,7 +6466,7 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
     if (TR_table::use_transaction_registry &&
         lex->sql_command == SQLCOM_SELECT &&
         thd->stmt_arena->is_conventional() &&
-        lex->vers_add_trt_query2(thd))
+        lex->vers_add_tr_queries(thd))
       return 1;
     if (lex->describe)
     {

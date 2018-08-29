@@ -7228,7 +7228,7 @@ vers_select_conds_t *TABLE_LIST::find_vers_conditions()
 }
 
 
-bool LEX::vers_add_trt_query2(THD *thd)
+bool LEX::vers_add_tr_queries(THD *thd)
 {
   uint subq_n= 0;
   for (TABLE_LIST *tl= query_tables; tl; tl= tl->next_global)
@@ -7247,16 +7247,16 @@ bool LEX::vers_add_trt_query2(THD *thd)
     case SYSTEM_TIME_AS_OF:
     case SYSTEM_TIME_BEFORE:
       if (vers_conditions->start.unit != VERS_TRX_ID &&
-        vers_add_subquery2(thd, vers_conditions->start, select_lex, subq_n))
+        vers_add_tr_subquery(thd, vers_conditions->start, select_lex, subq_n))
         return true;
       break;
     case SYSTEM_TIME_FROM_TO:
     case SYSTEM_TIME_BETWEEN:
       if (vers_conditions->start.unit != VERS_TRX_ID &&
-        vers_add_subquery2(thd, vers_conditions->start, select_lex, subq_n, true))
+        vers_add_tr_subquery(thd, vers_conditions->start, select_lex, subq_n, true))
         return true;
       if (vers_conditions->end.unit != VERS_TRX_ID &&
-        vers_add_subquery2(thd, vers_conditions->end, select_lex, subq_n))
+        vers_add_tr_subquery(thd, vers_conditions->end, select_lex, subq_n))
         return true;
       break;
     default:;

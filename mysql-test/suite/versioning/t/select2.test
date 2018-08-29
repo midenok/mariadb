@@ -35,9 +35,9 @@ if($MTR_COMBINATION_TRX_ID) {
 }
 
 select x, y from t1;
-select x as ASOF_x, y from t1 for system_time as of timestamp @t0;
-select x as FROMTO_x, y from t1 for system_time from '0-0-0 0:0:0' to timestamp @t1;
-select x as BETWAND_x, y from t1 for system_time between '0-0-0 0:0:0' and timestamp @t1;
+select x as ASOF_x, y from t1 for system_time as of timestamp @t0 as __tr_0;
+select x as FROMTO_x, y from t1 for system_time from '0-0-0 0:0:0' to timestamp @t1 as __tr_0;
+select x as BETWAND_x, y from t1 for system_time between '0-0-0 0:0:0' and timestamp @t1 as __tr_0;
 select x as ALL_x, y from t1 for system_time all;
 
 if($MTR_COMBINATION_TRX_ID) {

@@ -8665,7 +8665,7 @@ bool TR_table::add_subquery(THD* thd, Vers_history_point &p,
   return false;
 }
 
-bool LEX::vers_add_subquery2(THD* thd, Vers_history_point &p,
+bool LEX::vers_add_tr_subquery(THD* thd, Vers_history_point &p,
                             SELECT_LEX *cur_select, uint &subq_n,
                             bool backwards)
 {
@@ -8781,7 +8781,7 @@ bool LEX::vers_add_subquery2(THD* thd, Vers_history_point &p,
       my_error(ER_OUT_OF_RESOURCES, MYF(0));
       return true;
     }
-    static const LEX_CSTRING subq_prefix= {C_STRING_WITH_LEN("__trt_")};
+    static const LEX_CSTRING subq_prefix= {C_STRING_WITH_LEN("__tr_")};
     String *alias_str= newx String(subq_prefix.str, table_alias_charset);
     if (!alias_str)
     {
