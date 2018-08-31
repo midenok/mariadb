@@ -7362,7 +7362,8 @@ bool Table_scope_and_contents_source_st::check_fields(
   if (res)
     return true;
 
-  if (row_start->type_handler() != row_end->type_handler())
+  if (row_start->type_handler() != row_end->type_handler()
+      || row_start->length != row_end->length)
   {
     my_error(ER_PERIOD_TYPES_MISMATCH, MYF(0), period_info.name.str);
     res= true;

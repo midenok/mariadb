@@ -25,6 +25,9 @@ t	CREATE TABLE `t` (
 create or replace table t (id int primary key, s datetime, e date,
 period for mytime(s,e));
 ERROR HY000: PERIOD FOR mytime fields types mismatch
+create or replace table t (s timestamp(2), e timestamp(6),
+period for mytime(s,e));
+ERROR HY000: PERIOD FOR mytime fields types mismatch
 create or replace table t (id int primary key, s int, e date,
 period for mytime(s,e));
 ERROR 42000: Incorrect column specifier for column 's'
