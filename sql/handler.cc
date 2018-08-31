@@ -7326,6 +7326,24 @@ static bool check_period_field(const Create_field* f, const char* name,
     my_error(ER_WRONG_FIELD_SPEC, MYF(0), name);
     res= true;
   }
+  else if (f->vcol_info)
+  {
+    my_error(ER_PERIOD_FIELD_WRONG_ATTRIBUTES, MYF(0),
+             f->field_name.str, "VIRTUAL or GENERATED");
+    res= true;
+  }
+  else if (f->flags & EXPLICIT_NULL_FLAG)
+  {
+    my_error(ER_PERIOD_FIELD_WRONG_ATTRIBUTES, MYF(0),
+             f->field_name.str, "NULL");
+    res= true;
+  }
+  else if (f->flags & VERS_SYSTEM_FIELD)
+  {
+    my_error(ER_PERIOD_FIELD_WRONG_ATTRIBUTES, MYF(0), f->field_name.str,
+             f->flags & VERS_SYS_START_FLAG ? "ROW START" : "ROW END");
+    res= true;
+  }
 
   return res;
 }

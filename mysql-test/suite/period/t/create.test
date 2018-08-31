@@ -26,4 +26,28 @@ create or replace table t (id int primary key, s date, e date,
 create or replace temporary table t (mytime int, s date, e date,
     period for mytime(s,e));
 
+--error ER_PERIOD_FIELD_WRONG_ATTRIBUTES
+create or replace table t (id int primary key, s date NULL, e date,
+                           period for mytime(s,e));
+
+--error ER_PERIOD_FIELD_WRONG_ATTRIBUTES
+create or replace table t (id int primary key,
+                           s date,
+                           e date generated always as (s+1),
+                           period for mytime(s,e));
+
+--error ER_PERIOD_FIELD_WRONG_ATTRIBUTES
+create or replace table t (id int primary key,
+                           s date,
+                           e date as (s+1) VIRTUAL,
+                           period for mytime(s,e));
+
+--error ER_PERIOD_FIELD_WRONG_ATTRIBUTES
+create or replace table t (id int primary key, s timestamp(6), e timestamp(6),
+                           st timestamp(6) as row start,
+                           en timestamp(6) as row end,
+                           period for system_time (st, en),
+                           period for mytime(st,e)) with system versioning;
+
+
 create or replace database test;

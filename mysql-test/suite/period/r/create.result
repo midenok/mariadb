@@ -41,4 +41,23 @@ ERROR HY000: cannot specify more than one application-time period
 create or replace temporary table t (mytime int, s date, e date,
 period for mytime(s,e));
 ERROR HY000: Could not specify name `mytime` for field. It is already used by period.
+create or replace table t (id int primary key, s date NULL, e date,
+period for mytime(s,e));
+ERROR HY000: Period field `s` cannot be NULL
+create or replace table t (id int primary key,
+s date,
+e date generated always as (s+1),
+period for mytime(s,e));
+ERROR HY000: Period field `e` cannot be VIRTUAL or GENERATED
+create or replace table t (id int primary key,
+s date,
+e date as (s+1) VIRTUAL,
+period for mytime(s,e));
+ERROR HY000: Period field `e` cannot be VIRTUAL or GENERATED
+create or replace table t (id int primary key, s timestamp(6), e timestamp(6),
+st timestamp(6) as row start,
+en timestamp(6) as row end,
+period for system_time (st, en),
+period for mytime(st,e)) with system versioning;
+ERROR HY000: Period field `st` cannot be ROW START
 create or replace database test;

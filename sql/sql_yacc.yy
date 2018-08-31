@@ -7078,7 +7078,11 @@ opt_attribute_list:
         ;
 
 attribute:
-          NULL_SYM { Lex->last_field->flags&= ~ NOT_NULL_FLAG; }
+          NULL_SYM
+          {
+            Lex->last_field->flags&= ~ NOT_NULL_FLAG;
+            Lex->last_field->flags|= EXPLICIT_NULL_FLAG;
+          }
         | DEFAULT column_default_expr { Lex->last_field->default_value= $2; }
         | ON UPDATE_SYM NOW_SYM opt_default_time_precision
           {
