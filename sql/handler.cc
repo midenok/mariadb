@@ -7348,6 +7348,13 @@ bool Table_scope_and_contents_source_st::check_fields(
   {
     if (period.start.streq(f->field_name)) row_start= f;
     else if (period.end.streq(f->field_name)) row_end= f;
+
+    if (period_info.name.streq(f->field_name))
+    {
+      // TODO this stub should be removed by MDEV-16976
+      my_error(ER_PERIOD_NAME_IS_NOT_ALLOWED_FOR_FIELD, MYF(0), f->field_name.str);
+      return true;
+    }
   }
 
   res= check_period_field(row_start, period.start.str, period_info.name.str);

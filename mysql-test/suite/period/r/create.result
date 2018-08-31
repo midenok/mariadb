@@ -35,4 +35,7 @@ create or replace table t (id int primary key, s date, e date,
 period for mytime(s,e),
 period for mytime2(s,e));
 ERROR HY000: cannot specify more than one application-time period
+create or replace temporary table t (mytime int, s date, e date,
+period for mytime(s,e));
+ERROR HY000: Could not specify name `mytime` for field. It is already used by period.
 create or replace database test;

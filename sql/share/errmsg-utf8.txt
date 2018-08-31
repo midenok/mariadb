@@ -7931,3 +7931,6 @@ ER_PERIOD_TYPES_MISMATCH
 
 ER_PERIOD_MAX_COUNT_EXCEEDED
         eng "cannot specify more than one %s-time period"
+
+ER_PERIOD_NAME_IS_NOT_ALLOWED_FOR_FIELD
+        eng "Could not specify name `%s` for field. It is already used by period."

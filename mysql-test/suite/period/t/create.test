@@ -19,4 +19,8 @@ create or replace table t (id int primary key, s date, e date,
                            period for mytime(s,e),
                            period for mytime2(s,e));
 
+--error ER_PERIOD_NAME_IS_NOT_ALLOWED_FOR_FIELD
+create or replace temporary table t (mytime int, s date, e date,
+    period for mytime(s,e));
+
 create or replace database test;
