@@ -379,7 +379,6 @@ LEX_CUSTRING build_frm_image(THD *thd, const LEX_CSTRING *table,
     pos+= sizeof(uint16);
   }
 
-
   if (has_extra2_field_flags_)
     pos= extra2_write_field_properties(pos, create_fields);
 
@@ -471,7 +470,7 @@ LEX_CUSTRING build_frm_image(THD *thd, const LEX_CSTRING *table,
   }
 
   {
-    /* 
+    /*
       Restore all UCS2 intervals.
       HEX representation of them is not needed anymore.
     */
