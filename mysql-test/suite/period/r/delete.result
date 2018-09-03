@@ -68,6 +68,9 @@ log
 <DEL
 <INS
 >INS
+# multi-table DELETE is prohibited
+delete t, t1 from t for portion of apptime from '2000-01-01' to '2018-01-01', t1;
+ERROR HY000: PORTION OF TIME is not allowed here
 delete from t for portion of othertime from '2000-01-01' to '2018-01-01';
 ERROR HY000: PERIOD othertime is not found in table
 delete from t for portion of system_time from '2000-01-01' to '2018-01-01';

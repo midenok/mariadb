@@ -66,4 +66,11 @@ id	str	s	e
 1	data	2018-01-01	2018-12-12
 1	other data	1999-01-01	2000-01-01
 1	other data	2018-01-01	2018-12-12
+# multi-table UPDATE is prohibited
+create or replace table t1(x int);
+update t for portion of apptime from '2000-01-01' to '2018-01-01', t1
+set t.id= t.id + 5;
+ERROR HY000: PORTION OF TIME is not allowed here
+update t1 set x= (select id from t for portion of apptime from '2000-01-01' to '2018-01-01');
+ERROR HY000: PORTION OF TIME is not allowed here
 create or replace database test;

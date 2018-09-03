@@ -40,4 +40,13 @@ update t for portion of apptime from '2000-01-01' to '2018-01-01'
        set id= id + 5;
 select * from t;
 
+--echo # multi-table UPDATE is prohibited
+create or replace table t1(x int);
+--error ER_PORTION_OF_TIME_NOT_ALLOWED
+update t for portion of apptime from '2000-01-01' to '2018-01-01', t1
+       set t.id= t.id + 5;
+
+--error ER_PORTION_OF_TIME_NOT_ALLOWED
+update t1 set x= (select id from t for portion of apptime from '2000-01-01' to '2018-01-01');
+
 create or replace database test;

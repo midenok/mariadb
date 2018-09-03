@@ -7946,3 +7946,6 @@ ER_PERIOD_NOT_FOUND
 
 ER_PERIOD_SYSTEM_TIME_NOT_ALLOWED
         eng "PERIOD `SYSTEM_TIME` is not allowed here"
+
+ER_PORTION_OF_TIME_NOT_ALLOWED
+        eng "PORTION OF TIME is not allowed here"
