@@ -8,7 +8,7 @@ t	CREATE TABLE `t` (
   `e` date DEFAULT NULL,
   PRIMARY KEY (`id`),
   PERIOD FOR `mytime` (`s`, `e`),
-  CONSTRAINT `mytime` CHECK (`s` < `e`)
+  CONSTRAINT `CONSTRAINT_1` CHECK (`s` < `e`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
 create or replace table t (id int primary key, s timestamp(6), e timestamp(6),
 period for mytime(s,e));
@@ -20,7 +20,7 @@ t	CREATE TABLE `t` (
   `e` timestamp(6) NOT NULL DEFAULT '0000-00-00 00:00:00.000000',
   PRIMARY KEY (`id`),
   PERIOD FOR `mytime` (`s`, `e`),
-  CONSTRAINT `mytime` CHECK (`s` < `e`)
+  CONSTRAINT `CONSTRAINT_1` CHECK (`s` < `e`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
 create or replace table t (id int primary key, s datetime, e date,
 period for mytime(s,e));
@@ -60,4 +60,8 @@ en timestamp(6) as row end,
 period for system_time (st, en),
 period for mytime(st,e)) with system versioning;
 ERROR HY000: Period field `st` cannot be ROW START
+# Constraint with the same name is allowed.
+create or replace table t (x int, s date, e date,
+period for mytime(s, e),
+constraint mytime check (x > 1));
 create or replace database test;

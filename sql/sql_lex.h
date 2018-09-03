@@ -4098,7 +4098,7 @@ public:
   void add_key_to_list(LEX_CSTRING *field_name,
                        enum Key::Keytype type, bool check_exists);
   // Add a constraint as a part of CREATE TABLE or ALTER TABLE
-  bool add_constraint(LEX_CSTRING *name, Virtual_column_info *constr,
+  bool add_constraint(const LEX_CSTRING *name, Virtual_column_info *constr,
                       bool if_not_exists)
   {
     constr->name= *name;
@@ -4194,8 +4194,8 @@ public:
 
     Virtual_column_info *constr= new Virtual_column_info();
     constr->expr= lt_creator.create(thd, create_item_ident_nosp(thd, &start),
-                                   create_item_ident_nosp(thd, &end));
-    add_constraint(&name, constr, false);
+                                    create_item_ident_nosp(thd, &end));
+    add_constraint(&null_clex_str, constr, false);
   }
 
   sp_package *get_sp_package() const;

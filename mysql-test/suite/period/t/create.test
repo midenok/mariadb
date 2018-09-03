@@ -49,5 +49,11 @@ create or replace table t (id int primary key, s timestamp(6), e timestamp(6),
                            period for system_time (st, en),
                            period for mytime(st,e)) with system versioning;
 
+--echo # Constraint with the same name is allowed.
+create or replace table t (x int, s date, e date,
+                           period for mytime(s, e),
+                           constraint mytime check (x > 1));
+
+
 
 create or replace database test;
