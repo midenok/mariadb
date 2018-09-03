@@ -73,4 +73,48 @@ set t.id= t.id + 5;
 ERROR HY000: PORTION OF TIME is not allowed here
 update t1 set x= (select id from t for portion of apptime from '2000-01-01' to '2018-01-01');
 ERROR HY000: PORTION OF TIME is not allowed here
+# auto_inrement field is updated
+create or replace table t (id int primary key auto_increment, x int,
+s date, e date, period for apptime(s, e));
+insert into t values (default, 1, '1999-01-01', '2018-12-12');
+update t for portion of apptime from '2000-01-01' to '2018-01-01' set x= x + 5;
+select * from t;
+id	x	s	e
+1	6	2000-01-01	2018-01-01
+2	1	1999-01-01	2000-01-01
+3	1	2018-01-01	2018-12-12
+# generated columns are updated
+create or replace table t (x int, s date, e date,
+xs date as (s) stored, xe date as (e) stored,
+period for apptime(s, e));
+insert into t values(1, '1999-01-01', '2018-12-12', default, default);
+select * from t;
+x	s	e	xs	xe
+1	1999-01-01	2018-12-12	1999-01-01	2018-12-12
+update t for portion of apptime from '2000-01-01' to '2018-01-01' set x= x + 5;
+select *, xs=s and xe=e from t;
+x	s	e	xs	xe	xs=s and xe=e
+6	2000-01-01	2018-01-01	2000-01-01	2018-01-01	1
+1	1999-01-01	2000-01-01	1999-01-01	2000-01-01	1
+1	2018-01-01	2018-12-12	2018-01-01	2018-12-12	1
+# system-time columns are updated
+create or replace table t (x int, s date, e date,
+period for apptime(s, e)) with system versioning;
+set @@timestamp=3141592;
+insert into t values(1, '1999-01-01', '2018-12-12');
+insert into t values(2, '1999-01-01', '1999-12-12');
+select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
+x	s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
+1	1999-01-01	2018-12-12	3141592.000000	2147483647.999999
+2	1999-01-01	1999-12-12	3141592.000000	2147483647.999999
+set @@timestamp=314159265.358979;
+update t for portion of apptime from '2000-01-01' to '2018-01-01' set x= x + 5;
+select *, unix_timestamp(row_start),
+unix_timestamp(row_end) from t for system_time all;
+x	s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
+6	2000-01-01	2018-01-01	314159265.358979	2147483647.999999
+2	1999-01-01	1999-12-12	3141592.000000	2147483647.999999
+1	1999-01-01	2018-12-12	3141592.000000	314159265.358979
+1	1999-01-01	2000-01-01	314159265.358979	2147483647.999999
+1	2018-01-01	2018-12-12	314159265.358979	2147483647.999999
 create or replace database test;

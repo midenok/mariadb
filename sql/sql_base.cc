@@ -8160,6 +8160,7 @@ fill_record(THD *thd, TABLE *table_arg, List<Item> &fields, List<Item> &values,
   Item_field *field;
   Field *rfield;
   TABLE *table;
+  TABLE_LIST *table_list;
   bool only_unvers_fields= update && table_arg->versioned();
   bool save_abort_on_warning= thd->abort_on_warning;
   bool save_no_errors= thd->no_errors;
@@ -8242,6 +8243,11 @@ fill_record(THD *thd, TABLE *table_arg, List<Item> &fields, List<Item> &values,
   if (!update && table_arg->default_field &&
       table_arg->update_default_fields(0, ignore_errors))
     goto err;
+
+  table_list= thd->lex->query_tables;
+  if (update && table_list->has_period())
+    table_arg->cut_fields_for_portion_of_time(table_list->period_conditions);
+
   /* Update virtual fields */
   if (table_arg->vfield &&
       table_arg->update_virtual_fields(table_arg->file, VCOL_UPDATE_FOR_WRITE))
@@ -8371,13 +8377,13 @@ fill_record_n_invoke_before_triggers(THD *thd, TABLE *table,
                                      List<Item> &values, bool ignore_errors,
                                      enum trg_event_type event)
 {
-  int result;
   Table_triggers_list *triggers= table->triggers;
 
   bool update= event == TRG_EVENT_UPDATE ||
                (event == TRG_EVENT_DELETE && table->versioned(VERS_TIMESTAMP));
 
-  result= fill_record(thd, table, fields, values, ignore_errors, update);
+  int result= fill_record(thd, table, fields, values, ignore_errors, update);
+
 
   if (!result && triggers)
   {

@@ -908,9 +908,6 @@ update_begin:
             thd->lex->sql_command == SQLCOM_DELETE)
           table->vers_update_end();
 
-        if (table_list->has_period())
-          table->cut_fields_for_portion_of_time(table_list->period_conditions);
-
         if (table->default_field && table->update_default_fields(1, ignore))
         {
           error= 1;
@@ -1138,6 +1135,8 @@ update_end:
   delete select;
   select= NULL;
   THD_STAGE_INFO(thd, stage_end);
+  if (table_list->has_period())
+    table->file->ha_release_auto_increment();
   (void) table->file->extra(HA_EXTRA_NO_IGNORE_DUP_KEY);
 
   /*
