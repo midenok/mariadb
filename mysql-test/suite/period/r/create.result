@@ -64,4 +64,6 @@ ERROR HY000: Period field `st` cannot be ROW START
 create or replace table t (x int, s date, e date,
 period for mytime(s, e),
 constraint mytime check (x > 1));
+# Temporary table is allowed.
+create or replace temporary table t (s date, e date, period for mytime(s,e));
 create or replace database test;
