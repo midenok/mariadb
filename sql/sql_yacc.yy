@@ -13405,7 +13405,8 @@ delete_single_table:
               MYSQL_YYABORT;
             YYPS->m_lock_type= TL_READ_DEFAULT;
             YYPS->m_mdl_type= MDL_SHARED_READ;
-            Lex->last_table()->period_conditions= Lex->period_conditions;
+            if ($3)
+              Lex->last_table()->period_conditions= Lex->period_conditions;
           }
         ;
 

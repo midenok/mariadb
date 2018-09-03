@@ -84,8 +84,8 @@ delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
 
 --echo # same for trigger case
-create or replace table t (s date, e date,
-    period for apptime(s, e)) with system versioning;
+delete from t;
+delete history from t;
 set @@timestamp=3141592;
 insert into t values('1999-01-01', '2018-12-12');
 insert into t values('1999-01-01', '1999-12-12');

@@ -144,25 +144,25 @@ s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
 1999-01-01	2000-01-01	314159265.358979	2147483647.999999
 1999-01-01	1999-12-12	3141592.000000	2147483647.999999
 # same for trigger case
-create or replace table t (s date, e date,
-period for apptime(s, e)) with system versioning;
+delete from t;
+delete history from t;
 set @@timestamp=3141592;
 insert into t values('1999-01-01', '2018-12-12');
 insert into t values('1999-01-01', '1999-12-12');
 select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
 s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
-1999-01-01	2018-12-12	3141592.000000	2147483647.999999
 1999-01-01	1999-12-12	3141592.000000	2147483647.999999
+1999-01-01	2018-12-12	3141592.000000	2147483647.999999
 set @@timestamp=314159265.358979;
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
 s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
-1999-01-01	2000-01-01	314159265.358979	2147483647.999999
 1999-01-01	1999-12-12	3141592.000000	2147483647.999999
+1999-01-01	2000-01-01	314159265.358979	2147483647.999999
 select *, unix_timestamp(row_start),
 unix_timestamp(row_end) from t for system_time all;
 s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
-1999-01-01	2000-01-01	314159265.358979	2147483647.999999
-1999-01-01	1999-12-12	3141592.000000	2147483647.999999
 1999-01-01	2018-12-12	3141592.000000	314159265.358979
+1999-01-01	1999-12-12	3141592.000000	2147483647.999999
+1999-01-01	2000-01-01	314159265.358979	2147483647.999999
 create or replace database test;
