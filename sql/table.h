@@ -1552,7 +1552,8 @@ public:
   int cut_fields_for_portion_of_time(const vers_select_conds_t &period_conds);
   int update_portion_of_time(const vers_select_conds_t &period_conds,
                              bool *inside_period);
-  int insert_portion_of_time(const vers_select_conds_t &period_conds);
+  int insert_portion_of_time(const vers_select_conds_t &period_conds,
+                             ha_rows &rows_inserted);
   int delete_row();
   void vers_update_fields();
   void vers_update_end();

@@ -332,7 +332,7 @@ int mysql_update(THD *thd,
   query_plan.using_filesort= FALSE;
 
   // For System Versioning (may need to insert new fields to a table).
-  ha_rows updated_sys_ver= 0;
+  ha_rows rows_inserted= 0;
 
   DBUG_ENTER("mysql_update");
 
@@ -983,7 +983,7 @@ update_begin:
               restore_record(table, record[2]);
             }
             if (likely(!error))
-              updated_sys_ver++;
+              rows_inserted++;
           }
           if (likely(!error))
             updated++;
@@ -1019,7 +1019,8 @@ update_begin:
       if (need_update && !record_was_same && table_list->has_period())
       {
         restore_record(table, record[1]);
-        table->insert_portion_of_time(table_list->period_conditions);
+        table->insert_portion_of_time(table_list->period_conditions,
+                                      rows_inserted);
       }
 
       if (!--limit && using_limit)
@@ -1199,14 +1200,14 @@ update_end:
   if (likely(error < 0) && likely(!thd->lex->analyze_stmt))
   {
     char buff[MYSQL_ERRMSG_SIZE];
-    if (!table->versioned(VERS_TIMESTAMP))
+    if (!table->versioned(VERS_TIMESTAMP) && !table_list->has_period())
       my_snprintf(buff, sizeof(buff), ER_THD(thd, ER_UPDATE_INFO), (ulong) found,
                   (ulong) updated,
                   (ulong) thd->get_stmt_da()->current_statement_warn_count());
     else
       my_snprintf(buff, sizeof(buff),
                   ER_THD(thd, ER_UPDATE_INFO_WITH_SYSTEM_VERSIONING),
-                  (ulong) found, (ulong) updated, (ulong) updated_sys_ver,
+                  (ulong) found, (ulong) updated, (ulong) rows_inserted,
                   (ulong) thd->get_stmt_da()->current_statement_warn_count());
     my_ok(thd, (thd->client_capabilities & CLIENT_FOUND_ROWS) ? found : updated,
           id, buff);
