@@ -826,6 +826,8 @@ terminate_delete:
   }
   THD_STAGE_INFO(thd, stage_end);
   end_read_record(&info);
+  if (table_list->has_period())
+    table->file->ha_release_auto_increment();
   if (options & OPTION_QUICK)
     (void) table->file->extra(HA_EXTRA_NORMAL);
   ANALYZE_STOP_TRACKING(&explain->command_tracker);

@@ -41,4 +41,57 @@ delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 show warnings;
 select * from t;
 
+drop table t1;
+
+--echo # auto_inrement field is updated
+create or replace table t (id int primary key auto_increment, s date, e date,
+                           period for apptime(s, e));
+insert into t values (default, '1999-01-01', '2018-12-12');
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+select * from t;
+truncate t;
+--echo # same for trigger case
+insert into t values (default, '1999-01-01', '2018-12-12');
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+create trigger tr1ins before insert on t for each row call log('>INS');
+select * from t;
+
+--echo # generated columns are updated
+create or replace table t (s date, e date,
+                           xs date as (s) stored, xe date as (e) stored,
+                           period for apptime(s, e));
+insert into t values('1999-01-01', '2018-12-12', default, default);
+select * from t;
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+select * from t;
+truncate t;
+--echo # same for trigger case
+insert into t values('1999-01-01', '2018-12-12', default, default);
+create trigger tr1ins before insert on t for each row call log('>INS');
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+select * from t;
+
+
+--echo # system-time columns are updated
+create or replace table t (s date, e date,
+                           period for apptime(s, e)) with system versioning;
+set @@timestamp=3141592;
+insert into t values('1999-01-01', '2018-12-12');
+insert into t values('1999-01-01', '1999-12-12');
+select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
+set @@timestamp=314159265.358979;
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
+
+--echo # same for trigger case
+create or replace table t (s date, e date,
+    period for apptime(s, e)) with system versioning;
+set @@timestamp=3141592;
+insert into t values('1999-01-01', '2018-12-12');
+insert into t values('1999-01-01', '1999-12-12');
+select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
+set @@timestamp=314159265.358979;
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
+
 create or replace database test;

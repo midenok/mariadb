@@ -6428,10 +6428,7 @@ void TABLE::mark_columns_needed_for_delete(bool with_period)
 
   if (with_period)
   {
-    bitmap_set_bit(read_set, s->period.start_fieldno);
-    bitmap_set_bit(read_set, s->period.end_fieldno);
-    bitmap_set_bit(write_set, s->period.end_fieldno);
-    bitmap_set_bit(write_set, s->period.start_fieldno);
+    use_all_columns();
   }
 }
 
@@ -7834,12 +7831,35 @@ int TABLE::update_default_fields(bool update_command, bool ignore_errors)
   DBUG_RETURN(res);
 }
 
+static int table_update_generated_fields(TABLE *table)
+{
+  int res= 0;
+  if (table->found_next_number_field)
+  {
+    table->next_number_field= table->found_next_number_field;
+    res= table->found_next_number_field->set_default();
+    table->file->update_auto_increment();
+  }
+
+  if (table->default_field)
+    res= table->update_default_fields(0, false);
+
+  if (likely(!res) && table->vfield)
+    res= table->update_virtual_fields(table->file, VCOL_UPDATE_FOR_WRITE);
+  if (likely(!res) && table->versioned())
+    table->vers_update_fields();
+  return res;
+}
+
 static int period_make_insert(TABLE *table, Item *src, Field *dst)
 {
   THD *thd= table->in_use;
 
   store_record(table, record[1]);
   int res= src->save_in_field(dst, true);
+
+  if (likely(!res))
+    table_update_generated_fields(table);
 
   if (likely(!res) && table->triggers)
     res= table->triggers->process_triggers(thd, TRG_EVENT_INSERT, TRG_ACTION_BEFORE, true);
@@ -7873,6 +7893,9 @@ int TABLE::update_portion_of_time(vers_select_conds_t &period_conds,
   store_record(this, record[1]);
   if (likely(!res))
     res= src->save_in_field(field[dst_fieldno], true);
+
+  if (likely(!res))
+    res= table_update_generated_fields(this);
 
   if(likely(!res))
     res= file->ha_update_row(record[1], record[0]);
