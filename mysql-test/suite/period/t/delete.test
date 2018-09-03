@@ -94,4 +94,7 @@ set @@timestamp=314159265.358979;
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
 
+select *, unix_timestamp(row_start),
+          unix_timestamp(row_end) from t for system_time all;
+
 create or replace database test;

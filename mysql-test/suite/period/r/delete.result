@@ -143,7 +143,6 @@ select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
 s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
 1999-01-01	2000-01-01	314159265.358979	2147483647.999999
 1999-01-01	1999-12-12	3141592.000000	2147483647.999999
-2018-01-01	2018-12-12	314159265.358979	2147483647.999999
 # same for trigger case
 create or replace table t (s date, e date,
 period for apptime(s, e)) with system versioning;
@@ -160,5 +159,10 @@ select *, unix_timestamp(row_start), unix_timestamp(row_end) from t;
 s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
 1999-01-01	2000-01-01	314159265.358979	2147483647.999999
 1999-01-01	1999-12-12	3141592.000000	2147483647.999999
-2018-01-01	2018-12-12	314159265.358979	2147483647.999999
+select *, unix_timestamp(row_start),
+unix_timestamp(row_end) from t for system_time all;
+s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
+1999-01-01	2000-01-01	314159265.358979	2147483647.999999
+1999-01-01	1999-12-12	3141592.000000	2147483647.999999
+1999-01-01	2018-12-12	3141592.000000	314159265.358979
 create or replace database test;

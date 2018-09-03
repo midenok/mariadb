@@ -770,8 +770,11 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
       bool need_delete= true;
 
       if (table_list->has_period() && !has_triggers)
+      {
         error= table->update_portion_of_time(table_list->period_conditions,
                                              &need_delete);
+        need_delete= need_delete || table->versioned(VERS_TIMESTAMP);
+      }
 
       if (likely(!error) && need_delete)
         error= table->delete_row();
