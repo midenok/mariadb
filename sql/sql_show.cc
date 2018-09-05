@@ -2100,6 +2100,7 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
   KEY *key_info;
   TABLE *table= table_list->table;
   TABLE_SHARE *share= table->s;
+  TABLE_SHARE::period_info_t &period= share->period;
   sql_mode_t sql_mode= thd->variables.sql_mode;
   bool explicit_fields= false;
   bool foreign_db_mode=  sql_mode & (MODE_POSTGRESQL | MODE_ORACLE |
@@ -2389,12 +2390,12 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
     }
   }
 
-  if (table->s->period.name)
+  if (period.name)
   {
     append_period(thd, packet,
-                  table->s->period.start_field()->field_name,
-                  table->s->period.end_field()->field_name,
-                  table->s->period.name, true);
+                  period.start_field(share)->field_name,
+                  period.end_field(share)->field_name,
+                  period.name, true);
   }
 
 

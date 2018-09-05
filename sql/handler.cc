@@ -7095,10 +7095,10 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
     // copy info from existing table
     create_info->options|= HA_VERSIONED_TABLE;
 
-    DBUG_ASSERT(share->vers.start_field());
-    DBUG_ASSERT(share->vers.end_field());
-    Lex_ident start(share->vers.start_field()->field_name);
-    Lex_ident end(share->vers.end_field()->field_name);
+    DBUG_ASSERT(share->vers_start_field());
+    DBUG_ASSERT(share->vers_end_field());
+    Lex_ident start(share->vers_start_field()->field_name);
+    Lex_ident end(share->vers_end_field()->field_name);
     DBUG_ASSERT(start.str);
     DBUG_ASSERT(end.str);
 

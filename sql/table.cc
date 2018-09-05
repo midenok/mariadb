@@ -402,8 +402,6 @@ void init_tmp_table_share(THD *thd, TABLE_SHARE *share, const char *key,
   share->frm_version= 		 FRM_VER_CURRENT;
   share->not_usable_by_query_cache= 1;
   share->can_do_row_logging= 0;           // No row logging
-  share->vers.s=                 share;
-  share->period.s=               share;
 
   /*
     table_map_id is also used for MERGE tables to suppress repeated
@@ -1227,13 +1225,12 @@ static const Type_handler *old_frm_type_handler(uint pack_flag,
 }
 
 
-static bool init_period_from_extra2(TABLE_SHARE::period_info_t &period,
-                                    const uchar *data)
+bool TABLE_SHARE::init_period_from_extra2(period_info_t &period,
+                                          const uchar *data)
 {
   period.start_fieldno= uint2korr(data);
   period.end_fieldno= uint2korr(data + sizeof(uint16));
-  return period.start_fieldno >= period.s->fields
-         || period.end_fieldno >= period.s->fields;
+  return period.start_fieldno >= fields || period.end_fieldno >= fields;
 }
 
 /**
@@ -1781,7 +1778,6 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
   }
 
   /* Set system versioning information. */
-  vers.s= this;
   vers.name= Lex_ident(STRING_WITH_LEN("SYSTEM_TIME"));
   if (extra2.system_period == NULL)
   {
@@ -1803,7 +1799,6 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
 
   if (extra2.application_period.str)
   {
-    period.s= this;
     period.name.length= extra2.application_period.length - 2*sizeof(uint16);
     period.name.str= strmake_root(&mem_root,
                                   (char*)extra2.application_period.str,

@@ -769,27 +769,27 @@ struct TABLE_SHARE
 
   /**
     System versioning support.
-   */
-   struct period_info_t
-   {
-     TABLE_SHARE *s;
-     uint16 start_fieldno;
-     uint16 end_fieldno;
-     Lex_ident name;
-
-     Field *start_field()
-     {
-       return s->field[start_fieldno];
-     }
-     Field *end_field()
-     {
-       return s->field[end_fieldno];
-     }
-   };
+  */
+  struct period_info_t
+  {
+    uint16 start_fieldno;
+    uint16 end_fieldno;
+    Lex_ident name;
+    Field *start_field(TABLE_SHARE *s) const
+    {
+      return s->field[start_fieldno];
+    }
+    Field *end_field(TABLE_SHARE *s) const
+    {
+      return s->field[end_fieldno];
+    }
+  };
 
   vers_sys_type_t versioned;
   period_info_t vers;
   period_info_t period;
+
+  bool init_period_from_extra2(period_info_t &period, const uchar *data);
 
   period_info_t *get_period(const Lex_ident &name)
   {
@@ -800,6 +800,18 @@ struct TABLE_SHARE
       return &period;
     return NULL;
   }
+
+  Field *vers_start_field()
+  {
+    return field[vers.start_fieldno];
+  }
+
+  Field *vers_end_field()
+  {
+    return field[vers.end_fieldno];
+  }
+
+
   /**
     Cache the checked structure of this table.
 

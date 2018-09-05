@@ -720,16 +720,19 @@ void vers_select_conds_t::print(String *str, enum_query_type query_type) const
 int period_update_condition(THD *thd, TABLE_LIST *table, SELECT_LEX *select,
                             vers_select_conds_t &conds, bool timestamp)
 {
+  DBUG_ASSERT(table);
+  DBUG_ASSERT(table->table);
 #define newx new (thd->mem_root)
-  TABLE_SHARE::period_info_t *period = table->table->s->get_period(conds.name);
+  TABLE_SHARE *s= table->table->s;
+  TABLE_SHARE::period_info_t *period= s->get_period(conds.name);
 
   if (!period)
   {
     my_error(ER_PERIOD_NOT_FOUND, MYF(0), conds.name.str);
     return -1;
   }
-  const LEX_CSTRING &fstart= period->start_field()->field_name;
-  const LEX_CSTRING &fend= period->end_field()->field_name;
+  const LEX_CSTRING &fstart= period->start_field(s)->field_name;
+  const LEX_CSTRING &fend= period->end_field(s)->field_name;
 
   conds.field_start= newx Item_field(thd, &select->context,
                                      table->db.str, table->alias.str,
@@ -842,8 +845,10 @@ int SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables, Item *where)
 
   for (TABLE_LIST *table= tables; table; table= table->next_local)
   {
+    if (!table->table)
+      continue;
     vers_select_conds_t &conds= table->period_conditions;
-    if (!strcasecmp(conds.name.str, "SYSTEM_TIME"))
+    if (0 == strcasecmp(conds.name.str, "SYSTEM_TIME"))
     {
       my_error(ER_PERIOD_SYSTEM_TIME_NOT_ALLOWED, MYF(0));
       DBUG_RETURN(-1);
