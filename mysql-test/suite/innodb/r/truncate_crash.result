@@ -1,3 +1,4 @@
+FLUSH TABLES;
 CREATE TABLE t1 (a INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 SET a=1;
 connect  wait,localhost,root,,test;
