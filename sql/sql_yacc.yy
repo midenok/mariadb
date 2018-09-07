@@ -1034,6 +1034,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %token  PERCENT_RANK_SYM
 %token  PERCENTILE_CONT_SYM
 %token  PERCENTILE_DISC_SYM
+%token  PORTION
 %token  POSITION_SYM                  /* SQL-2003-N */
 %token  PRECISION                     /* SQL-2003-R */
 %token  PRIMARY_SYM                   /* SQL-2003-R */
@@ -1789,7 +1790,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
         opt_default_time_precision
         case_stmt_body opt_bin_mod opt_for_system_time_clause
         opt_if_exists_table_element opt_if_not_exists_table_element
-        opt_recursive opt_format_xid
+        opt_recursive opt_format_xid opt_for_portion_of_time_clause
 
 %type <object_ddl_options>
         create_or_replace
@@ -9284,6 +9285,17 @@ history_point:
             $$= Vers_history_point($1, $2);
           }
         ;
+opt_for_portion_of_time_clause:
+          /* empty */
+          {
+            $$= false;
+          }
+        | FOR_SYM PORTION OF_SYM ident FROM history_point TO_SYM history_point
+          {
+            $$= true;
+            Lex->period_conditions.init(SYSTEM_TIME_FROM_TO, $6, $8, $4);
+          }
+        ;
 
 opt_for_system_time_clause:
           /* empty */
@@ -11829,7 +11841,7 @@ use_partition:
             $$= $3;
           }
         ;
-  
+
 table_factor:
           table_primary_ident { $$= $1; }
         | table_primary_derived { $$= $1; }
@@ -12238,7 +12250,7 @@ opt_window_partition_clause:
 
 opt_window_order_clause:
           /* empty */ { }
-        | ORDER_SYM BY order_list { Select->order_list= *($3); } 
+        | ORDER_SYM BY order_list { Select->order_list= *($3); }
         ;
 
 opt_window_frame_clause:
@@ -12518,7 +12530,7 @@ delete_limit_clause:
         ;
 
 opt_order_limit_lock:
-          /* empty */ 
+          /* empty */
           { $$= NULL; }
         | order_or_limit
           {
@@ -12545,7 +12557,7 @@ query_expression_tail:
         ;
 
 opt_procedure_or_into:
-          /* empty */ 
+          /* empty */
         {
           $$.empty();
         }
@@ -13383,17 +13395,19 @@ delete_part2:
         ;
 
 delete_single_table:
-          FROM table_ident opt_use_partition
+          FROM table_ident opt_for_portion_of_time_clause opt_use_partition
           {
             if (unlikely(!Select->
                          add_table_to_list(thd, $2, NULL, TL_OPTION_UPDATING,
                                            YYPS->m_lock_type,
                                            YYPS->m_mdl_type,
                                            NULL,
-                                           $3)))
+                                           $4)))
               MYSQL_YYABORT;
             YYPS->m_lock_type= TL_READ_DEFAULT;
             YYPS->m_mdl_type= MDL_SHARED_READ;
+            if ($3)
+              Lex->last_table()->period_conditions= Lex->period_conditions;
           }
         ;
 
@@ -13402,7 +13416,7 @@ single_multi:
           opt_where_clause
           opt_order_clause
           delete_limit_clause
-          opt_select_expressions 
+          opt_select_expressions
           {
             if ($3)
               Select->order_list= *($3);
