@@ -768,21 +768,35 @@ struct TABLE_SHARE
   /**
     System versioning support.
    */
+   struct period_info_t
+   {
+     TABLE_SHARE *s;
+     uint16 start_fieldno;
+     uint16 end_fieldno;
+     Lex_ident name;
+
+     Field *start_field()
+     {
+       return s->field[start_fieldno];
+     }
+     Field *end_field()
+     {
+       return s->field[end_fieldno];
+     }
+   };
 
   vers_sys_type_t versioned;
-  uint16 row_start_field;
-  uint16 row_end_field;
+  period_info_t vers;
+  period_info_t period;
 
-  Field *vers_start_field()
+  period_info_t *get_period(const char *period_name)
   {
-    return field[row_start_field];
+    if (strcmp(period_name, "SYSTEM_TIME") == 0)
+      return &vers;
+    else if (strcmp(period.name.str, period_name) == 0)
+      return &period;
+    return NULL;
   }
-
-  Field *vers_end_field()
-  {
-    return field[row_end_field];
-  }
-
   /**
     Cache the checked structure of this table.
 
@@ -1518,13 +1532,13 @@ public:
   Field *vers_start_field() const
   {
     DBUG_ASSERT(s && s->versioned);
-    return field[s->row_start_field];
+    return field[s->vers.start_fieldno];
   }
 
   Field *vers_end_field() const
   {
     DBUG_ASSERT(s && s->versioned);
-    return field[s->row_end_field];
+    return field[s->vers.end_fieldno];
   }
 
   ulonglong vers_start_id() const;

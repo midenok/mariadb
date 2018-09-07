@@ -1,0 +1,22 @@
+create or replace table t (id int primary key, s date, e date,
+                           period for mytime(s,e));
+show create table t;
+create or replace table t (id int primary key, s timestamp(6), e timestamp(6),
+                           period for mytime(s,e));
+show create table t;
+
+--error ER_PERIOD_TYPES_MISMATCH
+create or replace table t (id int primary key, s datetime, e date,
+                           period for mytime(s,e));
+--error ER_WRONG_FIELD_SPEC
+create or replace table t (id int primary key, s int, e date,
+                           period for mytime(s,e));
+--error ER_PERIOD_FIELD_NOT_FOUND
+create or replace table t (id int primary key, s date, e date,
+                           period for mytime(s,x));
+--error ER_PERIOD_MAX_COUNT_EXCEEDED
+create or replace table t (id int primary key, s date, e date,
+                           period for mytime(s,e),
+                           period for mytime2(s,e));
+
+create or replace database test;

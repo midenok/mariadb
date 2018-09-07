@@ -295,7 +295,7 @@ handler *get_ha_partition(partition_info *part_info)
   }
   else
   {
-    my_error(ER_OUTOFMEMORY, MYF(ME_FATAL), 
+    my_error(ER_OUTOFMEMORY, MYF(ME_FATAL),
              static_cast<int>(sizeof(ha_partition)));
   }
   DBUG_RETURN(((handler*) partition));
@@ -6911,8 +6911,8 @@ bool Vers_parse_info::fix_implicit(THD *thd, Alter_info *alter_info)
 
   alter_info->flags|= ALTER_PARSER_ADD_COLUMN;
 
-  system_time= start_end_t(default_start, default_end);
-  as_row= system_time;
+  period= start_end_t(default_start, default_end);
+  as_row= period;
 
   if (vers_create_sys_field(thd, default_start, alter_info, VERS_SYS_START_FLAG) ||
       vers_create_sys_field(thd, default_end, alter_info, VERS_SYS_END_FLAG))
@@ -7095,15 +7095,15 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
     // copy info from existing table
     create_info->options|= HA_VERSIONED_TABLE;
 
-    DBUG_ASSERT(share->vers_start_field());
-    DBUG_ASSERT(share->vers_end_field());
-    Lex_ident start(share->vers_start_field()->field_name);
-    Lex_ident end(share->vers_end_field()->field_name);
+    DBUG_ASSERT(share->vers.start_field());
+    DBUG_ASSERT(share->vers.end_field());
+    Lex_ident start(share->vers.start_field()->field_name);
+    Lex_ident end(share->vers.end_field()->field_name);
     DBUG_ASSERT(start.str);
     DBUG_ASSERT(end.str);
 
     as_row= start_end_t(start, end);
-    system_time= as_row;
+    period= as_row;
 
     if (alter_info->create_list.elements)
     {
@@ -7189,7 +7189,7 @@ Vers_parse_info::fix_create_like(Alter_info &alter_info, HA_CREATE_INFO &create_
   }
 
   as_row= start_end_t(f_start->field_name, f_end->field_name);
-  system_time= as_row;
+  period= as_row;
 
   create_info.options|= HA_VERSIONED_TABLE;
   return false;
@@ -7214,14 +7214,14 @@ bool Vers_parse_info::check_conditions(const Lex_table_name &table_name,
     return true;
   }
 
-  if (!system_time.start || !system_time.end)
+  if (!period.start || !period.end)
   {
     my_error(ER_MISSING, MYF(0), table_name.str, "PERIOD FOR SYSTEM_TIME");
     return true;
   }
 
-  if (!as_row.start.streq(system_time.start) ||
-      !as_row.end.streq(system_time.end))
+  if (!as_row.start.streq(period.start) ||
+      !as_row.end.streq(period.end))
   {
     my_error(ER_VERS_PERIOD_COLUMNS, MYF(0), as_row.start.str, as_row.end.str);
     return true;
@@ -7310,4 +7310,61 @@ bool Vers_parse_info::check_sys_fields(const Lex_table_name &table_name,
   my_error(ER_MISSING, MYF(0), table_name.str, found_flag & VERS_SYS_START_FLAG ?
            "ROW END" : found_flag ? "ROW START" : "ROW START/END");
   return true;
+}
+
+static bool check_period_field(const Create_field* f, const char* name,
+                               const char* period_name)
+{
+  bool res= false;
+  if (!f)
+  {
+    my_error(ER_PERIOD_FIELD_NOT_FOUND, MYF(0), name, period_name);
+    res= true;
+  }
+  else if (f->type_handler()->mysql_timestamp_type() == MYSQL_TIMESTAMP_ERROR)
+  {
+    my_error(ER_WRONG_FIELD_SPEC, MYF(0), name);
+    res= true;
+  }
+
+  return res;
+}
+
+bool Table_scope_and_contents_source_st::check_fields(
+  THD *thd, Alter_info *alter_info, TABLE_LIST &create_table)
+{
+  bool res= vers_check_system_fields(thd, alter_info, create_table);
+  if (res)
+    return true;
+
+  if (!period_info.name)
+    return false;
+
+  Table_period_info::start_end_t &period= period_info.period;
+  const Create_field *row_start= NULL;
+  const Create_field *row_end= NULL;
+  List_iterator<Create_field> it(alter_info->create_list);
+  while (const Create_field *f= it++)
+  {
+    if (period.start.streq(f->field_name)) row_start= f;
+    else if (period.end.streq(f->field_name)) row_end= f;
+  }
+
+  res= check_period_field(row_start, period.start.str, period_info.name.str);
+  res= res || check_period_field(row_end, period.end.str, period_info.name.str);
+  if (res)
+    return true;
+
+  if (row_start->type_handler() != row_end->type_handler())
+  {
+    my_error(ER_PERIOD_TYPES_MISMATCH, MYF(0), period_info.name.str);
+    res= true;
+  }
+  else if (period_info.set_count > 1)
+  {
+    my_error(ER_PERIOD_MAX_COUNT_EXCEEDED, MYF(0), "application");
+    res= true;
+  }
+
+  return res;
 }
