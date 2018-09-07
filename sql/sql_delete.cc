@@ -299,6 +299,7 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   Unique * deltempfile= NULL;
   bool delete_record= false;
   bool delete_while_scanning;
+  bool portion_of_time_through_update;
   DBUG_ENTER("mysql_delete");
 
   query_plan.index= MAX_KEY;
@@ -744,6 +745,9 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
     delete_record= true;
   }
 
+  portion_of_time_through_update= !has_triggers
+                                  && !table->versioned(VERS_TIMESTAMP);
+
   THD_STAGE_INFO(thd, stage_updating);
   while (likely(!(error=info.read_record())) && likely(!thd->killed) &&
          likely(!thd->is_error()))
@@ -769,12 +773,9 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
 
       bool need_delete= true;
 
-      if (table_list->has_period() && !has_triggers)
-      {
+      if (table_list->has_period() && portion_of_time_through_update)
         error= table->update_portion_of_time(table_list->period_conditions,
                                              &need_delete);
-        need_delete= need_delete || table->versioned(VERS_TIMESTAMP);
-      }
 
       if (likely(!error) && need_delete)
         error= table->delete_row();
@@ -788,7 +789,8 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
           error= 1;
 
         ha_rows rows_inserted;
-        if (likely(!error) && has_triggers && table_list->has_period())
+        if (likely(!error) && table_list->has_period()
+                           && !portion_of_time_through_update)
           error= table->insert_portion_of_time(table_list->period_conditions,
                                                rows_inserted);
 
