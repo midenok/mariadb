@@ -1932,8 +1932,7 @@ trx_undo_page_report_rename(trx_t* trx, const dict_table_t* table,
 @param[in,out]	trx	transaction
 @param[in]	table	table that is being renamed
 @return	DB_SUCCESS or error code */
-dberr_t
-trx_undo_report_rename(trx_t* trx, const dict_table_t* table)
+dberr_t trx_undo_report_rename(trx_t* trx, const dict_table_t* table)
 {
 	ut_ad(!trx->read_only);
 	ut_ad(trx->id);
@@ -1987,6 +1986,14 @@ trx_undo_report_rename(trx_t* trx, const dict_table_t* table)
 		}
 
 		mtr.commit();
+
+		if (err == DB_SUCCESS && dict_table_is_file_per_table(table)) {
+			mutex_exit(&trx->undo_mutex);
+			/* Before renaming any files, we must make
+			the undo log record persistent. */
+			log_write_up_to(mtr.commit_lsn(), true);
+			return err;
+		}
 	}
 
 	mutex_exit(&trx->undo_mutex);
