@@ -7389,3 +7389,28 @@ bool Table_scope_and_contents_source_st::check_fields(
 
   return res;
 }
+
+bool
+Table_scope_and_contents_source_st::fix_create_fields(THD *thd,
+                                                      Alter_info *alter_info,
+                                                      const TABLE_LIST &create_table,
+                                                      bool create_select)
+{
+  if (vers_fix_system_fields(thd, alter_info, create_table, create_select))
+    return true;
+
+  if (!period_info.name)
+    return false;
+
+  Table_period_info::start_end_t &period= period_info.period;
+  List_iterator<Create_field> it(alter_info->create_list);
+  while (Create_field *f= it++)
+  {
+    if (period.start.streq(f->field_name) || period.end.streq(f->field_name))
+    {
+      if (!(f->flags & EXPLICIT_NULL_FLAG))
+        f->flags|= NOT_NULL_FLAG;
+    }
+  }
+  return false;
+}

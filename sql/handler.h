@@ -2070,6 +2070,9 @@ struct Table_scope_and_contents_source_st
   Vers_parse_info vers_info;
   Table_period_info period_info;
 
+  bool fix_create_fields(THD *thd, Alter_info *alter_info,
+                         const TABLE_LIST &create_table,
+                         bool create_select= false);
   bool check_fields(THD *thd, Alter_info *alter_info, TABLE_LIST &create_table);
 
   bool vers_fix_system_fields(THD *thd, Alter_info *alter_info,
