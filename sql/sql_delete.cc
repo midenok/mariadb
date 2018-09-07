@@ -276,20 +276,19 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
                   ulonglong options, select_result *result)
 {
   bool          will_batch= FALSE;
-  int		error, loc_error;
-  TABLE		*table;
-  SQL_SELECT	*select=0;
-  SORT_INFO	*file_sort= 0;
-  READ_RECORD	info;
+  int           error, loc_error;
+  TABLE         *table;
+  SQL_SELECT    *select=0;
+  SORT_INFO     *file_sort= 0;
+  READ_RECORD   info;
   bool          using_limit=limit != HA_POS_ERROR;
-  bool		transactional_table, safe_update, const_cond;
+  bool          transactional_table, safe_update, const_cond;
   bool          const_cond_result;
-  bool		return_error= 0;
-  ha_rows	deleted= 0;
+  bool          return_error= 0;
+  ha_rows       deleted= 0;
   bool          reverse= FALSE;
   bool          has_triggers;
-  ORDER *order= (ORDER *) ((order_list && order_list->elements) ?
-                           order_list->first : NULL);
+  ORDER *order= order_list && order_list->elements ? order_list->first : NULL;
   SELECT_LEX   *select_lex= thd->lex->first_select_lex();
   killed_state killed_status= NOT_KILLED;
   THD::enum_binlog_query_type query_type= THD::ROW_QUERY_TYPE;
@@ -298,7 +297,8 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   Explain_delete *explain;
   Delete_plan query_plan(thd->mem_root);
   Unique * deltempfile= NULL;
-  bool delete_record, delete_while_scanning;
+  bool delete_record= false;
+  bool delete_while_scanning;
   DBUG_ENTER("mysql_delete");
 
   query_plan.index= MAX_KEY;
@@ -310,6 +310,12 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
 
   THD_STAGE_INFO(thd, stage_init_update);
 
+  if (table_list->period_conditions.is_set() && table_list->vers_conditions.is_set())
+  {
+    my_error(ER_SYNTAX_ERROR, MYF(0));
+    DBUG_RETURN(true);
+  }
+
   bool truncate_history= table_list->vers_conditions.is_set();
   if (truncate_history)
   {
@@ -319,14 +325,28 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
       DBUG_RETURN(true);
     }
 
-    TABLE *table= table_list->table;
-    DBUG_ASSERT(table);
+    DBUG_ASSERT(table_list->table);
 
     DBUG_ASSERT(!conds || thd->stmt_arena->is_stmt_execute());
     if (select_lex->vers_setup_conds(thd, table_list))
       DBUG_RETURN(TRUE);
 
     DBUG_ASSERT(!conds);
+    conds= table_list->on_expr;
+    table_list->on_expr= NULL;
+  }
+  if (table_list->has_period())
+  {
+    if (table_list->is_view_or_derived())
+    {
+      my_error(ER_IT_IS_A_VIEW, MYF(0), table_list->table_name.str);
+      DBUG_RETURN(true);
+    }
+
+    int err= select_lex->period_setup_conds(thd, table_list, conds);
+    if (err)
+      DBUG_RETURN(true);
+
     conds= table_list->on_expr;
     table_list->on_expr= NULL;
   }
@@ -596,9 +616,10 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   */
 
   if ((table->file->ha_table_flags() & HA_CAN_DIRECT_UPDATE_AND_DELETE) &&
-      !has_triggers && !binlog_is_row && !with_select)
+      !has_triggers && !binlog_is_row && !with_select &&
+      !table_list->has_period())
   {
-    table->mark_columns_needed_for_delete();
+    table->mark_columns_needed_for_delete(false);
     if (!table->check_virtual_columns_marked_for_read())
     {
       DBUG_PRINT("info", ("Trying direct delete"));
@@ -666,7 +687,7 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   if (unlikely(init_ftfuncs(thd, select_lex, 1)))
     goto got_error;
 
-  table->mark_columns_needed_for_delete();
+  table->mark_columns_needed_for_delete(table_list->has_period());
 
   if ((table->file->ha_table_flags() & HA_CAN_FORCE_BULK_DELETE) &&
       !table->prepare_triggers_for_delete_stmt_or_event())
@@ -746,22 +767,31 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
         break;
       }
 
-      error= table->delete_row();
+      bool need_delete= true;
+
+      if (table_list->has_period() && !has_triggers)
+        error= table->update_portion_of_time(table_list->period_conditions,
+                                             &need_delete);
+
+      if (likely(!error) && need_delete)
+        error= table->delete_row();
+
       if (likely(!error))
       {
 	deleted++;
         if (!truncate_history && table->triggers &&
             table->triggers->process_triggers(thd, TRG_EVENT_DELETE,
                                               TRG_ACTION_AFTER, FALSE))
-        {
           error= 1;
+
+        if (likely(!error) && has_triggers && table_list->has_period())
+          error= table->insert_portion_of_time(table_list->period_conditions);
+
+        if (!--limit && using_limit)
+          error= -1;
+
+        if (error)
           break;
-        }
-	if (!--limit && using_limit)
-	{
-	  error= -1;
-	  break;
-	}
       }
       else
       {
@@ -965,7 +995,8 @@ int mysql_prepare_delete(THD *thd, TABLE_LIST *table_list,
     DBUG_RETURN(TRUE);
   }
 
-  if (unique_table(thd, table_list, table_list->next_global, 0))
+  if (table_list->has_period()
+      || unique_table(thd, table_list, table_list->next_global, 0))
     *delete_while_scanning= false;
 
   if (select_lex->inner_refs_list.elements &&
@@ -1117,7 +1148,7 @@ void multi_delete::prepare_to_read_rows()
   for (TABLE_LIST *walk= delete_tables; walk; walk= walk->next_local)
   {
     TABLE_LIST *tbl= walk->correspondent_table->find_table_for_update();
-    tbl->table->mark_columns_needed_for_delete();
+    tbl->table->mark_columns_needed_for_delete(false);
   }
 }
 
