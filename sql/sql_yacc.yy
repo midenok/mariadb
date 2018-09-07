@@ -6538,7 +6538,8 @@ period_for_system_time:
           }
         | PERIOD_SYM FOR_SYM ident '(' ident ',' ident ')'
           {
-            Lex->add_period($3, $5, $7);
+            if (Lex->add_period($3, $5, $7))
+              MYSQL_YYABORT;
           }
         ;
 

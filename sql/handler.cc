@@ -7386,11 +7386,6 @@ bool Table_scope_and_contents_source_st::check_fields(
     my_error(ER_PERIOD_TYPES_MISMATCH, MYF(0), period_info.name.str);
     res= true;
   }
-  else if (period_info.set_count > 1)
-  {
-    my_error(ER_PERIOD_MAX_COUNT_EXCEEDED, MYF(0), "application");
-    res= true;
-  }
 
   return res;
 }

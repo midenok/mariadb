@@ -4200,9 +4200,14 @@ public:
     return create_info.period_info;
   }
 
-  void add_period(Lex_ident name, Lex_ident_sys_st start, Lex_ident_sys_st end)
+  int add_period(Lex_ident name, Lex_ident_sys_st start, Lex_ident_sys_st end)
   {
     Table_period_info &info= get_table_period_info();
+    if (info.is_set())
+    {
+       my_error(ER_PERIOD_MAX_COUNT_EXCEEDED, MYF(0), "application");
+       return 1;
+    }
     info.set_period(start, end);
     info.name= name;
 
@@ -4210,6 +4215,7 @@ public:
     constr->expr= lt_creator.create(thd, create_item_ident_nosp(thd, &start),
                                     create_item_ident_nosp(thd, &end));
     add_constraint(&null_clex_str, constr, false);
+    return 0;
   }
 
   sp_package *get_sp_package() const;

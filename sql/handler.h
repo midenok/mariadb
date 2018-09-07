@@ -1907,11 +1907,9 @@ enum vers_sys_type_t
 
 struct Table_period_info
 {
-  Table_period_info():
-    set_count(0) {}
+  Table_period_info() {}
   Table_period_info(const char *name_arg, size_t size) :
-    name(name_arg, size),
-    set_count(0) {}
+    name(name_arg, size) {}
 
   Lex_ident name;
 
@@ -1926,10 +1924,14 @@ struct Table_period_info
   };
   start_end_t period;
 
-  int set_count;
+  bool is_set() const
+  {
+    DBUG_ASSERT(bool(period.start) == bool(period.end));
+    return period.start;
+  }
+
   void set_period(const Lex_ident& start, const Lex_ident& end)
   {
-    set_count++;
     period.start= start;
     period.end= end;
   }
