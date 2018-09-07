@@ -106,4 +106,37 @@ select *, unix_timestamp(row_start),
           unix_timestamp(row_end) from t for system_time all
                                   order by row_end, s, e;
 
+
+--echo # system versioning with transactions
+create or replace table t (s date, e date,
+    rs bigint(20) unsigned as row start invisible,
+    re bigint(20) unsigned as row end invisible,
+    period for apptime(s, e),
+    period for system_time(rs, re)) with system versioning engine=InnoDB;
+insert into t values('1999-01-01', '2018-12-12'),
+                    ('1999-01-01', '1999-12-12');
+
+select rs from t limit 1 into @ins_trx;
+select re from t limit 1 into @trx_max;
+select * from t;
+
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+select *, if(rs = @ins_trx, "OLD", "NEW"),
+          if(re = @trx_max, "CURRENT", "HISTORY") from t for system_time all;
+
+--echo # same for trigger case
+delete from t;
+delete history from t;
+insert into t values('1999-01-01', '2018-12-12'),
+                    ('1999-01-01', '1999-12-12');
+create trigger tr1ins before insert on t for each row call log('>INS');
+
+select rs from t limit 1 into @ins_trx;
+select * from t;
+
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+select *, if(rs = @ins_trx, "OLD", "NEW"),
+          if(re = @trx_max, "CURRENT", "HISTORY") from t for system_time all;
+
+
 create or replace database test;

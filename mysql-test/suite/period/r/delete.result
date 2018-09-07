@@ -175,4 +175,51 @@ s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
 1999-01-01	1999-12-12	3141592.000000	2147483647.999999
 1999-01-01	2000-01-01	314159265.358979	2147483647.999999
 2018-01-01	2018-12-12	314159265.358979	2147483647.999999
+# system versioning with transactions
+create or replace table t (s date, e date,
+rs bigint(20) unsigned as row start invisible,
+re bigint(20) unsigned as row end invisible,
+period for apptime(s, e),
+period for system_time(rs, re)) with system versioning engine=InnoDB;
+insert into t values('1999-01-01', '2018-12-12'),
+('1999-01-01', '1999-12-12');
+select rs from t limit 1 into @ins_trx;
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
+select re from t limit 1 into @trx_max;
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
+select * from t;
+s	e
+1999-01-01	2018-12-12
+1999-01-01	1999-12-12
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+select *, if(rs = @ins_trx, "OLD", "NEW"),
+if(re = @trx_max, "CURRENT", "HISTORY") from t for system_time all;
+s	e	if(rs = @ins_trx, "OLD", "NEW")	if(re = @trx_max, "CURRENT", "HISTORY")
+1999-01-01	2000-01-01	NEW	CURRENT
+1999-01-01	1999-12-12	OLD	CURRENT
+1999-01-01	2018-12-12	OLD	HISTORY
+2018-01-01	2018-12-12	NEW	CURRENT
+# same for trigger case
+delete from t;
+delete history from t;
+insert into t values('1999-01-01', '2018-12-12'),
+('1999-01-01', '1999-12-12');
+create trigger tr1ins before insert on t for each row call log('>INS');
+select rs from t limit 1 into @ins_trx;
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
+select * from t;
+s	e
+1999-01-01	2018-12-12
+1999-01-01	1999-12-12
+delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
+select *, if(rs = @ins_trx, "OLD", "NEW"),
+if(re = @trx_max, "CURRENT", "HISTORY") from t for system_time all;
+s	e	if(rs = @ins_trx, "OLD", "NEW")	if(re = @trx_max, "CURRENT", "HISTORY")
+1999-01-01	2000-01-01	NEW	CURRENT
+1999-01-01	1999-12-12	OLD	CURRENT
+1999-01-01	2018-12-12	OLD	HISTORY
+2018-01-01	2018-12-12	NEW	CURRENT
 create or replace database test;
