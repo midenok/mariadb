@@ -794,7 +794,7 @@ struct TABLE_SHARE
   period_info_t *get_period(const Lex_ident &name)
   {
     DBUG_ASSERT(name);
-    if (name.streq(SYSTEM_TIME))
+    if (name.streq("SYSTEM_TIME"))
       return &vers;
     else if (name.streq(period.name))
       return &period;

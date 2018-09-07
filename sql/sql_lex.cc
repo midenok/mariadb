@@ -49,7 +49,6 @@ const LEX_CSTRING empty_clex_str= {"", 0};
 const LEX_CSTRING star_clex_str=  {"*", 1};
 const LEX_CSTRING param_clex_str= {"?", 1};
 
-const Lex_ident SYSTEM_TIME(STRING_WITH_LEN("SYSTEM_TIME"));
 
 /**
   @note The order of the elements of this array must correspond to
