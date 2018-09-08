@@ -11,6 +11,8 @@ insert into t values(4, '2016-01-01', '2020-01-01');
 
 create or replace table t1 (id int, s date, e date, period for apptime(s,e));
 insert t1 select * from t;
+create or replace table t2 (id int, s date, e date, period for apptime(s,e));
+insert t2 select * from t;
 
 --let $trig_cols=id, s, e
 --let $trig_table=t1
@@ -20,6 +22,15 @@ delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 delete from t1 for portion of APPTIME from '2000-01-01' to '2018-01-01';
 select * from t;
 select * from t1 order by id, s, e;
+select * from log_tbl;
+
+--echo # INSERT trigger only also works
+--let $trig_cols=id, s, e
+--let $trig_table=t2
+--source suite/period/create_triggers.inc
+drop trigger tr1del_t2;
+drop trigger tr2del_t2;
+delete from t2 for portion of APPTIME from '2000-01-01' to '2018-01-01';
 select * from log_tbl;
 
 --echo # multi-table DELETE is prohibited

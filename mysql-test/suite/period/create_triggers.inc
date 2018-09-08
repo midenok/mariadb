@@ -22,18 +22,18 @@ let $new_trig_args= `select REGEXP_REPLACE('$trig_cols', '([[:word:]]+)',
                                            'new.\\\\\\\\1')`;
 let $new_trig_args= `select REPLACE('$new_trig_args', ',', ', ", ", ')`;
 
-eval create trigger tr1upd before update on $trig_table for each row
-  call log(CONCAT('>UPD: ', $old_trig_args, ' -> ', $new_trig_args));
-eval create trigger tr2upd after  update on $trig_table for each row
-  call log(CONCAT('<UPD: ', $old_trig_args, ' -> ', $new_trig_args));
-eval create trigger tr1del before delete on $trig_table for each row
-  call log(CONCAT('>DEL: ', $old_trig_args));
-eval create trigger tr2del after  delete on $trig_table for each row
-  call log(CONCAT('<DEL: ', $old_trig_args));
-eval create trigger tr1ins before insert on $trig_table for each row
-  call log(CONCAT('>INS: ', $new_trig_args));
-eval create trigger tr2ins after  insert on $trig_table for each row
-  call log(CONCAT('<INS: ', $new_trig_args));
+eval create trigger tr1upd_$trig_table before update on $trig_table
+  for each row call log(CONCAT('>UPD: ', $old_trig_args, ' -> ', $new_trig_args));
+eval create trigger tr2upd_$trig_table after  update on $trig_table
+  for each row call log(CONCAT('<UPD: ', $old_trig_args, ' -> ', $new_trig_args));
+eval create trigger tr1del_$trig_table before delete on $trig_table
+  for each row call log(CONCAT('>DEL: ', $old_trig_args));
+eval create trigger tr2del_$trig_table after  delete on $trig_table
+  for each row call log(CONCAT('<DEL: ', $old_trig_args));
+eval create trigger tr1ins_$trig_table before insert on $trig_table
+  for each row call log(CONCAT('>INS: ', $new_trig_args));
+eval create trigger tr2ins_$trig_table after  insert on $trig_table
+  for each row call log(CONCAT('<INS: ', $new_trig_args));
 
 
 let trig_cols= 0;

@@ -287,7 +287,8 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   bool          return_error= 0;
   ha_rows       deleted= 0;
   bool          reverse= FALSE;
-  bool          has_triggers;
+  bool          has_triggers= false;
+  bool          has_period_triggers= false;
   ORDER *order= order_list && order_list->elements ? order_list->first : NULL;
   SELECT_LEX   *select_lex= thd->lex->first_select_lex();
   killed_state killed_status= NOT_KILLED;
@@ -442,12 +443,16 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
       - there should be no delete triggers associated with the table.
   */
 
-  has_triggers= (table->triggers &&
-                 table->triggers->has_delete_triggers());
+  if (Table_triggers_list *trs= table->triggers)
+  {
+    has_triggers= trs->has_delete_triggers();
+    has_period_triggers= has_triggers
+                    || trs->has_triggers(TRG_EVENT_INSERT, TRG_ACTION_BEFORE)
+                    || trs->has_triggers(TRG_EVENT_INSERT, TRG_ACTION_AFTER);
+  }
   if (!with_select && !using_limit && const_cond_result &&
-      (!thd->is_current_stmt_binlog_format_row() &&
-       !has_triggers)
-      && !table->versioned(VERS_TIMESTAMP))
+      !thd->is_current_stmt_binlog_format_row() &&
+      !has_triggers && !table->versioned(VERS_TIMESTAMP))
   {
     /* Update the table->file->stats.records number */
     table->file->info(HA_STATUS_VARIABLE | HA_STATUS_NO_LOCK);
@@ -745,7 +750,7 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
     delete_record= true;
   }
 
-  portion_of_time_through_update= !has_triggers
+  portion_of_time_through_update= !has_period_triggers
                                   && !table->versioned(VERS_TIMESTAMP);
 
   THD_STAGE_INFO(thd, stage_updating);
