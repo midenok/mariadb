@@ -1,5 +1,4 @@
-source suite/period/engines.inc;
-source suite/period/log.inc;
+--source suite/period/engines.inc
 
 create or replace table t (id int, s date, e date, period for apptime(s,e));
 
@@ -13,12 +12,9 @@ insert into t values(4, '2016-01-01', '2020-01-01');
 create or replace table t1 (id int, s date, e date, period for apptime(s,e));
 insert t1 select * from t;
 
-create trigger tr2upd before update on t1 for each row call log('>UPD');
-create trigger tr1upd after  update on t1 for each row call log('<UPD');
-create trigger tr2del before delete on t1 for each row call log('>DEL');
-create trigger tr1del after  delete on t1 for each row call log('<DEL');
-create trigger tr1ins before insert on t1 for each row call log('<INS');
-create trigger tr2ins after  insert on t1 for each row call log('>INS');
+--let $trig_cols=id, s, e
+--let $trig_table=t1
+--source suite/period/create_triggers.inc
 
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 delete from t1 for portion of APPTIME from '2000-01-01' to '2018-01-01';
@@ -57,9 +53,12 @@ select * from t;
 truncate t;
 --echo # same for trigger case
 insert into t values (default, '1999-01-01', '2018-12-12');
+--let $trig_table=t
+--source suite/period/create_triggers.inc
+
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
-create trigger tr1ins before insert on t for each row call log('>INS');
 select * from t;
+select * from log_tbl;
 
 --echo # generated columns are updated
 create or replace table t (s date, e date,
@@ -72,9 +71,12 @@ select * from t;
 truncate t;
 --echo # same for trigger case
 insert into t values('1999-01-01', '2018-12-12', default, default);
-create trigger tr1ins before insert on t for each row call log('>INS');
+--let $trig_table=t
+--source suite/period/create_triggers.inc
+
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 select * from t;
+select * from log_tbl;
 
 
 --echo # system-time columns are updated
@@ -96,8 +98,10 @@ set @@timestamp=3141592;
 insert into t values('1999-01-01', '2018-12-12');
 insert into t values('1999-01-01', '1999-12-12');
 select *, unix_timestamp(row_start), unix_timestamp(row_end) from t order by e;
+--let $trig_table=t
+--source suite/period/create_triggers.inc
+
 set @@timestamp=314159265.358979;
-create trigger tr1ins before insert on t for each row call log('>INS');
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 select *, unix_timestamp(row_start),
           unix_timestamp(row_end) from t order by row_end, s, e;
@@ -105,7 +109,7 @@ select *, unix_timestamp(row_start),
 select *, unix_timestamp(row_start),
           unix_timestamp(row_end) from t for system_time all
                                   order by row_end, s, e;
-
+select * from log_tbl;
 
 --echo # system versioning with transactions
 create or replace table t (s date, e date,
@@ -129,7 +133,8 @@ delete from t;
 delete history from t;
 insert into t values('1999-01-01', '2018-12-12'),
                     ('1999-01-01', '1999-12-12');
-create trigger tr1ins before insert on t for each row call log('>INS');
+--let $trig_table=t
+--source suite/period/create_triggers.inc
 
 select rs from t limit 1 into @ins_trx;
 select * from t;
@@ -137,6 +142,7 @@ select * from t;
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 select *, if(rs = @ins_trx, "OLD", "NEW"),
           if(re = @trx_max, "CURRENT", "HISTORY") from t for system_time all;
+select * from log_tbl;
 
 
 create or replace database test;

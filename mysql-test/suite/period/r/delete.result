@@ -1,6 +1,3 @@
-create or replace table log_tbl(log varchar(4));
-create or replace procedure log(s varchar(4))
-insert into log_tbl values(s);
 create or replace table t (id int, s date, e date, period for apptime(s,e));
 insert into t values(1, '1999-01-01', '2018-12-12');
 insert into t values(1, '1999-01-01', '2017-01-01');
@@ -10,12 +7,6 @@ insert into t values(3, '1997-01-01', '2015-01-01');
 insert into t values(4, '2016-01-01', '2020-01-01');
 create or replace table t1 (id int, s date, e date, period for apptime(s,e));
 insert t1 select * from t;
-create trigger tr2upd before update on t1 for each row call log('>UPD');
-create trigger tr1upd after  update on t1 for each row call log('<UPD');
-create trigger tr2del before delete on t1 for each row call log('>DEL');
-create trigger tr1del after  delete on t1 for each row call log('<DEL');
-create trigger tr1ins before insert on t1 for each row call log('<INS');
-create trigger tr2ins after  insert on t1 for each row call log('>INS');
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 delete from t1 for portion of APPTIME from '2000-01-01' to '2018-01-01';
 select * from t;
@@ -40,34 +31,34 @@ id	s	e
 4	2018-01-01	2020-01-01
 select * from log_tbl;
 log
->DEL
-<DEL
-<INS
->INS
-<INS
->INS
->DEL
-<DEL
-<INS
->INS
->DEL
-<DEL
-<INS
->INS
->DEL
-<DEL
-<INS
->INS
-<INS
->INS
->DEL
-<DEL
-<INS
->INS
->DEL
-<DEL
-<INS
->INS
+>DEL: 1, 1999-01-01, 2018-12-12
+<DEL: 1, 1999-01-01, 2018-12-12
+>INS: 1, 1999-01-01, 2000-01-01
+<INS: 1, 1999-01-01, 2000-01-01
+>INS: 1, 2018-01-01, 2018-12-12
+<INS: 1, 2018-01-01, 2018-12-12
+>DEL: 1, 1999-01-01, 2017-01-01
+<DEL: 1, 1999-01-01, 2017-01-01
+>INS: 1, 1999-01-01, 2000-01-01
+<INS: 1, 1999-01-01, 2000-01-01
+>DEL: 1, 2017-01-01, 2019-01-01
+<DEL: 1, 2017-01-01, 2019-01-01
+>INS: 1, 2018-01-01, 2019-01-01
+<INS: 1, 2018-01-01, 2019-01-01
+>DEL: 2, 1998-01-01, 2018-12-12
+<DEL: 2, 1998-01-01, 2018-12-12
+>INS: 2, 1998-01-01, 2000-01-01
+<INS: 2, 1998-01-01, 2000-01-01
+>INS: 2, 2018-01-01, 2018-12-12
+<INS: 2, 2018-01-01, 2018-12-12
+>DEL: 3, 1997-01-01, 2015-01-01
+<DEL: 3, 1997-01-01, 2015-01-01
+>INS: 3, 1997-01-01, 2000-01-01
+<INS: 3, 1997-01-01, 2000-01-01
+>DEL: 4, 2016-01-01, 2020-01-01
+<DEL: 4, 2016-01-01, 2020-01-01
+>INS: 4, 2018-01-01, 2020-01-01
+<INS: 4, 2018-01-01, 2020-01-01
 # multi-table DELETE is prohibited
 delete t, t1 from t for portion of apptime from '2000-01-01' to '2018-01-01', t1;
 ERROR HY000: PORTION OF TIME is not allowed here
@@ -103,11 +94,18 @@ truncate t;
 # same for trigger case
 insert into t values (default, '1999-01-01', '2018-12-12');
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
-create trigger tr1ins before insert on t for each row call log('>INS');
 select * from t;
 id	s	e
 2	1999-01-01	2000-01-01
 3	2018-01-01	2018-12-12
+select * from log_tbl;
+log
+>DEL: 1999-01-01, 2018-12-12
+<DEL: 1999-01-01, 2018-12-12
+>INS: 1999-01-01, 2000-01-01
+<INS: 1999-01-01, 2000-01-01
+>INS: 2018-01-01, 2018-12-12
+<INS: 2018-01-01, 2018-12-12
 # generated columns are updated
 create or replace table t (s date, e date,
 xs date as (s) stored, xe date as (e) stored,
@@ -124,12 +122,19 @@ s	e	xs	xe
 truncate t;
 # same for trigger case
 insert into t values('1999-01-01', '2018-12-12', default, default);
-create trigger tr1ins before insert on t for each row call log('>INS');
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 select * from t;
 s	e	xs	xe
 1999-01-01	2000-01-01	1999-01-01	2000-01-01
 2018-01-01	2018-12-12	2018-01-01	2018-12-12
+select * from log_tbl;
+log
+>DEL: 1999-01-01, 2018-12-12
+<DEL: 1999-01-01, 2018-12-12
+>INS: 1999-01-01, 2000-01-01
+<INS: 1999-01-01, 2000-01-01
+>INS: 2018-01-01, 2018-12-12
+<INS: 2018-01-01, 2018-12-12
 # system-time columns are updated
 create or replace table t (s date, e date,
 period for apptime(s, e)) with system versioning;
@@ -159,7 +164,6 @@ s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
 1999-01-01	1999-12-12	3141592.000000	2147483647.999999
 1999-01-01	2018-12-12	3141592.000000	2147483647.999999
 set @@timestamp=314159265.358979;
-create trigger tr1ins before insert on t for each row call log('>INS');
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 select *, unix_timestamp(row_start),
 unix_timestamp(row_end) from t order by row_end, s, e;
@@ -175,6 +179,14 @@ s	e	unix_timestamp(row_start)	unix_timestamp(row_end)
 1999-01-01	1999-12-12	3141592.000000	2147483647.999999
 1999-01-01	2000-01-01	314159265.358979	2147483647.999999
 2018-01-01	2018-12-12	314159265.358979	2147483647.999999
+select * from log_tbl;
+log
+>DEL: 1999-01-01, 2018-12-12
+<DEL: 1999-01-01, 2018-12-12
+>INS: 1999-01-01, 2000-01-01
+<INS: 1999-01-01, 2000-01-01
+>INS: 2018-01-01, 2018-12-12
+<INS: 2018-01-01, 2018-12-12
 # system versioning with transactions
 create or replace table t (s date, e date,
 rs bigint(20) unsigned as row start invisible,
@@ -206,7 +218,6 @@ delete from t;
 delete history from t;
 insert into t values('1999-01-01', '2018-12-12'),
 ('1999-01-01', '1999-12-12');
-create trigger tr1ins before insert on t for each row call log('>INS');
 select rs from t limit 1 into @ins_trx;
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
@@ -218,8 +229,16 @@ delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 select *, if(rs = @ins_trx, "OLD", "NEW"),
 if(re = @trx_max, "CURRENT", "HISTORY") from t for system_time all;
 s	e	if(rs = @ins_trx, "OLD", "NEW")	if(re = @trx_max, "CURRENT", "HISTORY")
-1999-01-01	2000-01-01	NEW	CURRENT
-1999-01-01	1999-12-12	OLD	CURRENT
 1999-01-01	2018-12-12	OLD	HISTORY
+1999-01-01	1999-12-12	OLD	CURRENT
+1999-01-01	2000-01-01	NEW	CURRENT
 2018-01-01	2018-12-12	NEW	CURRENT
+select * from log_tbl;
+log
+>DEL: 1999-01-01, 2018-12-12
+<DEL: 1999-01-01, 2018-12-12
+>INS: 1999-01-01, 2000-01-01
+<INS: 1999-01-01, 2000-01-01
+>INS: 2018-01-01, 2018-12-12
+<INS: 2018-01-01, 2018-12-12
 create or replace database test;
