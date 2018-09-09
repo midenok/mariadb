@@ -7358,6 +7358,12 @@ bool Table_scope_and_contents_source_st::check_fields(
   if (!period_info.name)
     return false;
 
+  if (tmp_table())
+  {
+    my_error(ER_PERIOD_TEMPORARY_NOT_ALLOWED, MYF(0));
+    return true;
+  }
+
   Table_period_info::start_end_t &period= period_info.period;
   const Create_field *row_start= NULL;
   const Create_field *row_end= NULL;

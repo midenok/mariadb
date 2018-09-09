@@ -5,6 +5,9 @@ create or replace table t (id int primary key, s timestamp(6), e timestamp(6),
                            period for mytime(s,e));
 show create table t;
 
+--error ER_PERIOD_TEMPORARY_NOT_ALLOWED
+create or replace temporary table t (s date, e date, period for mytime(s,e));
+
 --error ER_PERIOD_TYPES_MISMATCH
 create or replace table t (id int primary key, s datetime, e date,
                            period for mytime(s,e));
@@ -23,7 +26,7 @@ create or replace table t (id int primary key, s date, e date,
                            period for mytime2(s,e));
 
 --error ER_PERIOD_NAME_IS_NOT_ALLOWED_FOR_FIELD
-create or replace temporary table t (mytime int, s date, e date,
+create or replace table t (mytime int, s date, e date,
     period for mytime(s,e));
 
 --error ER_PERIOD_FIELD_WRONG_ATTRIBUTES
@@ -53,8 +56,5 @@ create or replace table t (id int primary key, s timestamp(6), e timestamp(6),
 create or replace table t (x int, s date, e date,
                            period for mytime(s, e),
                            constraint mytime check (x > 1));
-
---echo # Temporary table is allowed.
-create or replace temporary table t (s date, e date, period for mytime(s,e));
 
 create or replace database test;

@@ -7923,6 +7923,8 @@ ER_KEY_DOESNT_SUPPORT
 ER_TRUNCATE_ILLEGAL_VERS
         eng "Cannot truncate a versioned table"
 
+ER_PERIOD_TEMPORARY_NOT_ALLOWED
+        eng "Temporary tables with application period not allowed"
 ER_PERIOD_FIELD_NOT_FOUND
         eng "Field %s in PERIOD FOR %s is not found in table"
 

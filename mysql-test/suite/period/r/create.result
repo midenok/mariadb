@@ -22,6 +22,8 @@ t	CREATE TABLE `t` (
   PERIOD FOR `mytime` (`s`, `e`),
   CONSTRAINT `CONSTRAINT_1` CHECK (`s` < `e`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
+create or replace temporary table t (s date, e date, period for mytime(s,e));
+ERROR HY000: Temporary tables with application period not allowed
 create or replace table t (id int primary key, s datetime, e date,
 period for mytime(s,e));
 ERROR HY000: PERIOD FOR mytime fields types mismatch
@@ -38,7 +40,7 @@ create or replace table t (id int primary key, s date, e date,
 period for mytime(s,e),
 period for mytime2(s,e));
 ERROR HY000: cannot specify more than one application-time period
-create or replace temporary table t (mytime int, s date, e date,
+create or replace table t (mytime int, s date, e date,
 period for mytime(s,e));
 ERROR HY000: Could not specify name `mytime` for field. It is already used by period.
 create or replace table t (id int primary key, s date NULL, e date,
@@ -64,6 +66,4 @@ ERROR HY000: Period field `st` cannot be ROW START
 create or replace table t (x int, s date, e date,
 period for mytime(s, e),
 constraint mytime check (x > 1));
-# Temporary table is allowed.
-create or replace temporary table t (s date, e date, period for mytime(s,e));
 create or replace database test;
