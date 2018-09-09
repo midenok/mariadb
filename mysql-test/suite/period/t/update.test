@@ -39,7 +39,10 @@ update t2 for portion of apptime from '2000-01-01' to '2018-01-01'
 select * from t2 order by id, s, e;
 select * from log_tbl;
 
---echo # Modifying period start/end fields is forbidden
+--echo # Modifying period start/end fields is forbidden.
+--echo # SQL17:
+--echo # Neither BSTARTCOL nor BENDCOL shall be an explicit <object column>
+--echo # contained in the <set clause list>.
 --error ER_PERIOD_COLUMNS_UPDATED
 update t for portion of apptime from '2000-01-01' to '2018-01-01'
        set id= id + 5, s=subdate(s, 5), e=adddate(e, 5);
@@ -73,6 +76,12 @@ update t for portion of apptime from '2000-01-01' to '2018-01-01', t1
 --error ER_PORTION_OF_TIME_NOT_ALLOWED
 update t1 set x= (select id from t for portion of apptime from '2000-01-01' to '2018-01-01');
 
+--echo # SQL17:
+--echo # Let FROMVAL be <point in time 1>. FROMVAL shall not generally contain a
+--echo # reference to a column of T or a <routine invocation>
+--echo # whose subject routine is an SQL-invoked routine that
+--echo # is possibly non-deterministic or that possibly modifies SQL-data.
+--echo # ...Same for <point in time 2> (TOVAL)
 --error ER_PERIOD_PORTION_OF_TIME_CONSTANT
 update t for portion of apptime from 5*(5+s) to 1 set t.id= t.id + 5;
 --error ER_PERIOD_PORTION_OF_TIME_CONSTANT
@@ -92,6 +101,7 @@ update t for portion of apptime from @s to g() set t.id= t.id + 5;
 
 --echo # success
 update t for portion of apptime from @s to h() set t.id= t.id + 5;
+--echo # select value is cached
 update t for portion of apptime from (select s from t2 limit 1) to h() set t.id= t.id + 5;
 
 --echo # auto_inrement field is updated
