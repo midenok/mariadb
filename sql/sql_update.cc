@@ -132,7 +132,8 @@ bool compare_record(const TABLE *table)
     FALSE Items are OK
 */
 
-static bool check_fields(THD *thd, List<Item> &items, bool update_view)
+static bool check_fields(THD *thd, TABLE_LIST *table, List<Item> &items,
+                         bool update_view)
 {
   Item *item;
   if (update_view)
@@ -175,6 +176,21 @@ static bool check_fields(THD *thd, List<Item> &items, bool update_view)
         return TRUE;
       }
       f->set_has_explicit_value();
+    }
+  }
+
+  if (thd->lex->sql_command == SQLCOM_UPDATE && table->has_period())
+  {
+    for (List_iterator_fast<Item> it(items); (item=it++);)
+    {
+      Lex_ident name(item->name);
+      vers_select_conds_t &period= table->period_conditions;
+      if (name.streq(period.field_start->name)
+          || name.streq(period.field_end->name))
+      {
+        my_error(ER_PERIOD_COLUMNS_UPDATED, MYF(0), name.str, period.name.str);
+        return true;
+      }
     }
   }
   return FALSE;
@@ -400,7 +416,7 @@ int mysql_update(THD *thd,
   if (setup_fields_with_no_wrap(thd, Ref_ptr_array(),
                                 fields, MARK_COLUMNS_WRITE, 0, 0))
     DBUG_RETURN(1);                     /* purecov: inspected */
-  if (check_fields(thd, fields, table_list->view))
+  if (check_fields(thd, table_list, fields, table_list->view))
   {
     DBUG_RETURN(1);
   }
@@ -1647,7 +1663,7 @@ int mysql_multi_update_prepare(THD *thd)
     }
   }
 
-  if (check_fields(thd, *fields, update_view))
+  if (check_fields(thd, table_list, *fields, update_view))
   {
     DBUG_RETURN(TRUE);
   }

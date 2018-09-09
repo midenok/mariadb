@@ -7954,3 +7954,6 @@ ER_PORTION_OF_TIME_NOT_ALLOWED
 
 ER_PERIOD_PORTION_OF_TIME_CONSTANT
         eng "Values in range FOR PORTION OF `%s` should be constant expressions"
+
+ER_PERIOD_COLUMNS_UPDATED
+        eng "Column `%s` used in period `%s` specified in update SET list"

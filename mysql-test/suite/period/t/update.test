@@ -39,13 +39,10 @@ update t2 for portion of apptime from '2000-01-01' to '2018-01-01'
 select * from t2 order by id, s, e;
 select * from log_tbl;
 
---echo # Modify period start/end fields
-truncate t;
-insert into t values(1, '1999-01-01', '2018-12-12');
-insert into t values(1, '1999-01-01', '2017-01-01');
+--echo # Modifying period start/end fields is forbidden
+--error ER_PERIOD_COLUMNS_UPDATED
 update t for portion of apptime from '2000-01-01' to '2018-01-01'
        set id= id + 5, s=subdate(s, 5), e=adddate(e, 5);
-select * from t;
 
 --echo # Precision timestamps
 create or replace table t (id int, s timestamp(5), e timestamp(5),
@@ -54,7 +51,7 @@ insert into t values(1, '1999-01-01', '2018-12-12');
 insert into t values(1, '1999-01-01', '2017-01-01');
 update t for portion of apptime from '2000-01-01 00:00:00.00015'
                                 to '2018-01-01 12:34:56.31415'
-         set s='1999-09-09 3:14:15.926535', id= id + 5;
+         set id= id + 5;
 select * from t;
 
 -- echo # Strings
