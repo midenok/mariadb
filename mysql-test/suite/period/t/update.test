@@ -77,4 +77,21 @@ update t for portion of apptime from '2000-01-01' to '2018-01-01' set x= x + 5;
 select *, unix_timestamp(row_start),
           unix_timestamp(row_end) from t for system_time all;
 
+--echo # system versioning with transactions
+create or replace table t (x int, s date, e date,
+    rs bigint(20) unsigned as row start invisible,
+    re bigint(20) unsigned as row end invisible,
+    period for apptime(s, e),
+    period for system_time(rs, re)) with system versioning engine=InnoDB;
+insert into t values(1, '1999-01-01', '2018-12-12'),
+                    (2, '1999-01-01', '1999-12-12');
+
+select rs into @ins_trx from t limit 1;
+select re into @trx_max from t limit 1;
+select * from t;
+
+update t for portion of apptime from '2000-01-01' to '2018-01-01' set x= x + 5;
+select *, if(rs = @ins_trx, "OLD", "NEW"),
+          if(re = @trx_max, "CURRENT", "HISTORY") from t for system_time all;
+
 create or replace database test;
