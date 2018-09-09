@@ -7414,6 +7414,7 @@ Table_scope_and_contents_source_st::fix_create_fields(THD *thd,
   {
     if (period.start.streq(f->field_name) || period.end.streq(f->field_name))
     {
+      f->period= &period_info;
       if (!(f->flags & EXPLICIT_NULL_FLAG))
         f->flags|= NOT_NULL_FLAG;
     }
