@@ -1323,6 +1323,17 @@ bool mysql_prepare_update(THD *thd, TABLE_LIST *table_list,
       setup_ftfuncs(select_lex))
     DBUG_RETURN(TRUE);
 
+  if (table_list->period_conditions.name)
+  {
+    if (!table_list->period_conditions.start.item->const_item()
+        || !table_list->period_conditions.end.item->const_item())
+    {
+      my_error(ER_PERIOD_PORTION_OF_TIME_CONSTANT, MYF(0),
+               table_list->period_conditions.name);
+      DBUG_RETURN(true);
+    }
+  }
+
   select_lex->fix_prepare_information(thd, conds, &fake_conds);
   DBUG_RETURN(FALSE);
 }

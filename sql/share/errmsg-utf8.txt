@@ -7951,3 +7951,6 @@ ER_PERIOD_SYSTEM_TIME_NOT_ALLOWED
 
 ER_PORTION_OF_TIME_NOT_ALLOWED
         eng "PORTION OF TIME is not allowed here"
+
+ER_PERIOD_PORTION_OF_TIME_CONSTANT
+        eng "Values in range FOR PORTION OF `%s` should be constant expressions"

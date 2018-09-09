@@ -165,6 +165,22 @@ set t.id= t.id + 5;
 ERROR HY000: PORTION OF TIME is not allowed here
 update t1 set x= (select id from t for portion of apptime from '2000-01-01' to '2018-01-01');
 ERROR HY000: PORTION OF TIME is not allowed here
+update t for portion of apptime from 5*(5+s) to 1 set t.id= t.id + 5;
+ERROR HY000: Values in range FOR PORTION OF `apptime` should be constant expressions
+update t for portion of apptime from 1 to e set t.id= t.id + 5;
+ERROR HY000: Values in range FOR PORTION OF `apptime` should be constant expressions
+set @s= '2000-01-01';
+set @e= '2018-01-01';
+create or replace function f() returns date return @e;
+create or replace function g() returns date not deterministic return @e;
+create or replace function h() returns date deterministic return @e;
+update t for portion of apptime from @s to f() set t.id= t.id + 5;
+ERROR HY000: Values in range FOR PORTION OF `apptime` should be constant expressions
+update t for portion of apptime from @s to g() set t.id= t.id + 5;
+ERROR HY000: Values in range FOR PORTION OF `apptime` should be constant expressions
+# success
+update t for portion of apptime from @s to h() set t.id= t.id + 5;
+update t for portion of apptime from (select s from t2 limit 1) to h() set t.id= t.id + 5;
 # auto_inrement field is updated
 create or replace table t (id int primary key auto_increment, x int,
 s date, e date, period for apptime(s, e));

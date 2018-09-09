@@ -76,6 +76,27 @@ update t for portion of apptime from '2000-01-01' to '2018-01-01', t1
 --error ER_PORTION_OF_TIME_NOT_ALLOWED
 update t1 set x= (select id from t for portion of apptime from '2000-01-01' to '2018-01-01');
 
+--error ER_PERIOD_PORTION_OF_TIME_CONSTANT
+update t for portion of apptime from 5*(5+s) to 1 set t.id= t.id + 5;
+--error ER_PERIOD_PORTION_OF_TIME_CONSTANT
+update t for portion of apptime from 1 to e set t.id= t.id + 5;
+
+set @s= '2000-01-01';
+set @e= '2018-01-01';
+
+create or replace function f() returns date return @e;
+create or replace function g() returns date not deterministic return @e;
+create or replace function h() returns date deterministic return @e;
+
+--error ER_PERIOD_PORTION_OF_TIME_CONSTANT
+update t for portion of apptime from @s to f() set t.id= t.id + 5;
+--error ER_PERIOD_PORTION_OF_TIME_CONSTANT
+update t for portion of apptime from @s to g() set t.id= t.id + 5;
+
+--echo # success
+update t for portion of apptime from @s to h() set t.id= t.id + 5;
+update t for portion of apptime from (select s from t2 limit 1) to h() set t.id= t.id + 5;
+
 --echo # auto_inrement field is updated
 create or replace table t (id int primary key auto_increment, x int,
                            s date, e date, period for apptime(s, e));
