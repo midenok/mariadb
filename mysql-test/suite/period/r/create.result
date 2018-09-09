@@ -22,8 +22,15 @@ t	CREATE TABLE `t` (
   PERIOD FOR `mytime` (`s`, `e`),
   CONSTRAINT `CONSTRAINT_1` CHECK (`s` < `e`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
+# SQL17 p. 832
+# 2) If a <table period definition> TPD is specified, then:
+# a) <table scope> shall not be specified.
 create or replace temporary table t (s date, e date, period for mytime(s,e));
 ERROR HY000: Temporary tables with application period not allowed
+# SQL17 p. 831
+# The <data type or domain name> contained in CD1 is either DATE or a
+# timestamp type and it is equivalent to the <data type or domain name>
+# contained in CD2.
 create or replace table t (id int primary key, s datetime, e date,
 period for mytime(s,e));
 ERROR HY000: PERIOD FOR mytime fields types mismatch
@@ -40,12 +47,21 @@ create or replace table t (id int primary key, s date, e date,
 period for mytime(s,e),
 period for mytime2(s,e));
 ERROR HY000: cannot specify more than one application-time period
+# SQL17 p. 831
+# No <column name> in any <column definition> shall be equivalent to PN.
 create or replace table t (mytime int, s date, e date,
 period for mytime(s,e));
 ERROR HY000: Could not specify name `mytime` for field. It is already used by period.
+# CD1 and CD2 both contain either an explicit or an implicit
+# <column constraint definition> that specifies
+# NOT NULL NOT DEFERRABLE ENFORCED.
 create or replace table t (id int primary key, s date NULL, e date,
 period for mytime(s,e));
 ERROR HY000: Period field `s` cannot be NULL
+# SQL17 p.832
+# Neither CD1 nor CD2 shall contain an <identity column specification>, a
+# <generation clause>, a <system time period start column specification>,
+#  or a <system time period end column specification>.
 create or replace table t (id int primary key,
 s date,
 e date generated always as (s+1),
@@ -62,7 +78,10 @@ en timestamp(6) as row end,
 period for system_time (st, en),
 period for mytime(st,e)) with system versioning;
 ERROR HY000: Period field `st` cannot be ROW START
-# Constraint with the same name is allowed.
+# SQL17 p.832
+# Let IDCN be an implementation-dependent <constraint name> that is not
+# equivalent to the <constraint name> of any table constraint descriptor
+# included in S.
 create or replace table t (x int, s date, e date,
 period for mytime(s, e),
 constraint mytime check (x > 1));
