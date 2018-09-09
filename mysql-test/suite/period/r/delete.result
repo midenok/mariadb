@@ -7,6 +7,8 @@ insert into t values(3, '1997-01-01', '2015-01-01');
 insert into t values(4, '2016-01-01', '2020-01-01');
 create or replace table t1 (id int, s date, e date, period for apptime(s,e));
 insert t1 select * from t;
+create or replace table t2 (id int, s date, e date, period for apptime(s,e));
+insert t2 select * from t;
 delete from t for portion of apptime from '2000-01-01' to '2018-01-01';
 delete from t1 for portion of APPTIME from '2000-01-01' to '2018-01-01';
 select * from t;
@@ -59,6 +61,28 @@ log
 <DEL: 4, 2016-01-01, 2020-01-01
 >INS: 4, 2018-01-01, 2020-01-01
 <INS: 4, 2018-01-01, 2020-01-01
+# INSERT trigger only also works
+drop trigger tr1del_t2;
+drop trigger tr2del_t2;
+delete from t2 for portion of APPTIME from '2000-01-01' to '2018-01-01';
+select * from log_tbl;
+log
+>INS: 1, 1999-01-01, 2000-01-01
+<INS: 1, 1999-01-01, 2000-01-01
+>INS: 1, 2018-01-01, 2018-12-12
+<INS: 1, 2018-01-01, 2018-12-12
+>INS: 1, 1999-01-01, 2000-01-01
+<INS: 1, 1999-01-01, 2000-01-01
+>INS: 1, 2018-01-01, 2019-01-01
+<INS: 1, 2018-01-01, 2019-01-01
+>INS: 2, 1998-01-01, 2000-01-01
+<INS: 2, 1998-01-01, 2000-01-01
+>INS: 2, 2018-01-01, 2018-12-12
+<INS: 2, 2018-01-01, 2018-12-12
+>INS: 3, 1997-01-01, 2000-01-01
+<INS: 3, 1997-01-01, 2000-01-01
+>INS: 4, 2018-01-01, 2020-01-01
+<INS: 4, 2018-01-01, 2020-01-01
 # multi-table DELETE is prohibited
 delete t, t1 from t for portion of apptime from '2000-01-01' to '2018-01-01', t1;
 ERROR HY000: PORTION OF TIME is not allowed here
@@ -81,6 +105,11 @@ id	str	s	e
 1	data	2018-01-01	2018-12-12
 1	other data	2018-01-01	2018-12-12
 drop table t1;
+# SQL17 Case 15.7-8.b.i
+# If the column descriptor that corresponds to the i-th field of BR
+# describes an identity column, a generated column, a system-time period
+# start column, or a system-time period end column, then let V i be
+# DEFAULT.
 # auto_inrement field is updated
 create or replace table t (id int primary key auto_increment, s date, e date,
 period for apptime(s, e));
