@@ -1,4 +1,5 @@
-source suite/period/engines.inc;
+source suite/versioning/engines.inc;
+source suite/versioning/common.inc;
 
 create or replace table t (id int, s date, e date, period for apptime(s,e));
 
