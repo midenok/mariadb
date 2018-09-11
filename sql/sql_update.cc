@@ -907,6 +907,9 @@ update_begin:
       explain->tracker.on_record_after_where();
       store_record(table,record[1]);
 
+      if (table_list->has_period())
+        table->cut_fields_for_portion_of_time(table_list->period_conditions);
+
       if (fill_record_n_invoke_before_triggers(thd, table, fields, values, 0,
                                                event))
         break; /* purecov: inspected */
