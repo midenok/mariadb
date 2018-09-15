@@ -82,6 +82,12 @@ for system_time as of timestamp @t0 as t;
 select RJ2_x1,y1,x2,y2 from (select t1.x as RJ2_x1, t1.y as y1, t2.x as x2, t2.y as y2 from t1 right join t2 on t1.x = t2.x)
 for system_time as of timestamp @t0 as t;
 
+prepare stmt from
+'select IJ2_x1,y1,x2,y2 from (select t1.x as IJ2_x1, t1.y as y1, t2.x as x2, t2.y as y2 from t1 inner join t2 on t1.x = t2.x)
+for system_time as of timestamp @t0 as t';
+execute stmt;
+drop prepare stmt;
+
 drop table t1;
 drop table t2;
 

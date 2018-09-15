@@ -4912,7 +4912,7 @@ TABLE *open_ltable2(THD *thd, TABLE_LIST *table_list, thr_lock_type lock_type,
   TABLE *table;
   Open_table_context ot_ctx(thd, lock_flags);
   bool error;
-  DBUG_ENTER("open_ltable");
+  DBUG_ENTER("open_ltable2");
 
   DBUG_ASSERT(!table_list->table);
 
@@ -5071,8 +5071,16 @@ bool open_normal_and_derived_tables(THD *thd, TABLE_LIST *tables, uint flags,
   MDL_savepoint mdl_savepoint= thd->mdl_context.mdl_savepoint();
   DBUG_ENTER("open_normal_and_derived_tables");
   DBUG_ASSERT(!thd->fill_derived_tables());
-  if (open_tables(thd, &tables, &counter, flags, &prelocking_strategy) ||
-      mysql_handle_derived(thd->lex, dt_phases))
+  if (open_tables(thd, &tables, &counter, flags, &prelocking_strategy))
+    goto end;
+
+  if (TR_table::use_transaction_registry &&
+      thd->lex->sql_command == SQLCOM_SELECT &&
+      thd->stmt_arena->is_stmt_prepare() &&
+      thd->lex->vers_add_tr_queries(thd))
+    return 1;
+
+  if (mysql_handle_derived(thd->lex, dt_phases))
     goto end;
 
   DBUG_RETURN(0);

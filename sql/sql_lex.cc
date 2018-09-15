@@ -7207,7 +7207,6 @@ vers_select_conds_t *TABLE_LIST::find_vers_conditions()
 
   DBUG_ASSERT(select_lex);
   SELECT_LEX *outer_slex= select_lex->outer_select();
-  TABLE_LIST* outer_table= NULL;
 
   if (outer_slex)
   {
@@ -7233,7 +7232,7 @@ bool LEX::vers_add_tr_queries(THD *thd)
   uint subq_n= 0;
   for (TABLE_LIST *tl= query_tables; tl; tl= tl->next_global)
   {
-    if (tl->is_view_or_derived())
+    if (tl->is_view_or_derived() || tl->derived)
       continue;
     vers_select_conds_t *vers_conditions= tl->find_vers_conditions();
     if (!vers_conditions)

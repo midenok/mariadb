@@ -8888,23 +8888,27 @@ bool TR_table::open2()
 
     if (table)
     {
-      /* Save value that is changed in mysql_lock_tables() */
-      ulonglong save_utime_after_lock= thd->utime_after_lock;
-      MYSQL_LOCK *merged_lock;
-
-      thd->in_lock_tables= 1;
-      MYSQL_LOCK *lock= mysql_lock_tables(thd, &table, 1, flags);
-      thd->in_lock_tables= 0;
-      if (!lock || (merged_lock= mysql_lock_merge(thd->lock, lock)) == NULL)
+      set_table_ref_id(table->s);
+      if (thd->lock)
       {
-        if (!thd->killed)
-          my_error(ER_LOCK_DEADLOCK, MYF(0));
-        error= true;
-      }
-      else
-        thd->lock= merged_lock;
-      thd->utime_after_lock= save_utime_after_lock;
-    }
+        /* Save value that is changed in mysql_lock_tables() */
+        ulonglong save_utime_after_lock= thd->utime_after_lock;
+        MYSQL_LOCK *merged_lock;
+
+        thd->in_lock_tables= 1;
+        MYSQL_LOCK *lock= mysql_lock_tables(thd, &table, 1, flags);
+        thd->in_lock_tables= 0;
+        if (!lock || (merged_lock= mysql_lock_merge(thd->lock, lock)) == NULL)
+        {
+          if (!thd->killed)
+            my_error(ER_LOCK_DEADLOCK, MYF(0));
+          error= true;
+        }
+        else
+          thd->lock= merged_lock;
+        thd->utime_after_lock= save_utime_after_lock;
+      } // if (thd->lock)
+    } // if (table)
   }
   thd->temporary_tables= temporary_tables;
 

@@ -1008,6 +1008,8 @@ public:
   { return state == STMT_PREPARED || state == STMT_EXECUTED; }
   inline bool is_conventional() const
   { return state == STMT_CONVENTIONAL_EXECUTION; }
+  inline bool is_conventional_or_first_stmt_execute() const
+  { return state <= (int)STMT_CONVENTIONAL_EXECUTION; }
 
   inline void* alloc(size_t size) { return alloc_root(mem_root,size); }
   inline void* calloc(size_t size)
