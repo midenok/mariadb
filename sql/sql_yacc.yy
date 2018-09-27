@@ -6945,13 +6945,6 @@ field_type_lob:
             Lex->charset=&my_charset_bin;
             $$.set(&type_handler_long_blob);
           }
-        | LONG_SYM VARBINARY
-          {
-            Lex->charset=&my_charset_bin;
-            $$.set(&type_handler_medium_blob);
-          }
-        | LONG_SYM varchar opt_binary
-          { $$.set(&type_handler_medium_blob); }
         | TINYTEXT opt_binary
           { $$.set(&type_handler_tiny_blob); }
         | TEXT_SYM opt_field_length opt_binary
