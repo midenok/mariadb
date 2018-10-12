@@ -4722,7 +4722,7 @@ end_with_restore_list:
       break;
 
     MYSQL_INSERT_START(thd->query());
-    res= mysql_insert(thd, all_tables, lex->field_list, lex->many_values,
+    res= mysql_insert(thd, all_tables, lex->field_list, lex->insert_cmd()->many_values,
 		      lex->update_list, lex->value_list,
                       lex->duplicates, lex->ignore);
     MYSQL_INSERT_DONE(res, (ulong) thd->get_row_count_func());

@@ -2783,6 +2783,42 @@ public:
 };
 
 
+/**
+  Sql_cmd_insert represents the INSERT statement.
+*/
+class Sql_cmd_insert : public Sql_cmd
+{
+  LEX *m_lex;
+public:
+  Sql_cmd_insert(LEX *lex) :
+    m_lex(lex)
+  {}
+
+  virtual ~Sql_cmd_insert()
+  {}
+
+  /**
+    Execute a INSERT statement at runtime.
+    @param thd the current thread.
+    @return false on success.
+  */
+  bool execute(THD *thd)
+  {
+    return false;
+  }
+
+  virtual enum_sql_command sql_command_code() const
+  {
+    return SQLCOM_INSERT;
+  }
+
+  // INSERT interface
+  List<List_item>     many_values;
+
+  void reset();
+};
+
+
 class Query_arena_memroot;
 /* The state of the lex parsing. This is saved in the THD struct */
 
@@ -2873,7 +2909,6 @@ struct LEX: public Query_tables_list
   List<LEX_USER>      users_list;
   List<LEX_COLUMN>    columns;
   List<Item>          *insert_list,field_list,value_list,update_list;
-  List<List_item>     many_values;
   List<set_var_base>  var_list;
   List<set_var_base>  stmt_var_list; //SET_STATEMENT values
   List<set_var_base>  old_var_list; // SET STATEMENT old values
@@ -3965,11 +4000,20 @@ public:
     return false;
   }
 
+  bool is_insert() const
+  {
+    return m_sql_cmd && (m_sql_cmd->sql_command_code() == SQLCOM_INSERT ||
+           m_sql_cmd->sql_command_code() == SQLCOM_INSERT_SELECT);
+  }
+  Sql_cmd_insert *insert_cmd()
+  {
+    DBUG_ASSERT(is_insert());
+    return static_cast<Sql_cmd_insert *>(m_sql_cmd);
+  }
   void tvc_start()
   {
-    field_list.empty();
-    many_values.empty();
-    insert_list= 0;
+    if (is_insert())
+      insert_cmd()->reset();
   }
   bool tvc_finalize();
   bool tvc_finalize_derived();
@@ -4238,6 +4282,15 @@ public:
     return m_free_list;
   }
 };
+
+
+inline
+void Sql_cmd_insert::reset()
+{
+  m_lex->field_list.empty();
+  many_values.empty();
+  m_lex->insert_list= 0;
+}
 
 
 extern void lex_init(void);

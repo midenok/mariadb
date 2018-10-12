@@ -3091,7 +3091,7 @@ void Query_tables_list::destroy_query_tables_list()
 
 LEX::LEX()
   : explain(NULL), result(0), arena_for_set_stmt(0), mem_root_for_set_stmt(0),
-    option_type(OPT_DEFAULT), context_analysis_only(0), sphead(0),
+    m_sql_cmd(NULL), option_type(OPT_DEFAULT), context_analysis_only(0), sphead(0),
     default_used(0), is_lex_started(0), limit_rows_examined_cnt(ULONGLONG_MAX)
 {
 
@@ -8169,11 +8169,11 @@ bool LEX::tvc_finalize()
   mysql_init_select(this);
   if (unlikely(!(current_select->tvc=
                new (thd->mem_root)
-               table_value_constr(many_values,
+               table_value_constr(insert_cmd()->many_values,
                                   current_select,
                                   current_select->options))))
     return true;
-  many_values.empty();
+  insert_cmd()->many_values.empty();
   return false;
 }
 

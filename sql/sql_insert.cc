@@ -2189,6 +2189,14 @@ public:
     mysql_mutex_unlock(&LOCK_thread_count);
     DBUG_VOID_RETURN;
   }
+  bool init()
+  {
+    THD *old_thd= thd_get_current_thd();
+    set_current_thd(&thd);
+    thd.lex->m_sql_cmd= new (thd.mem_root) Sql_cmd_insert(thd.lex);
+    set_current_thd(old_thd);
+    return unlikely(thd.lex->m_sql_cmd == NULL);
+  }
   ~Delayed_insert()
   {
     /* The following is not really needed, but just for safety */
@@ -2348,7 +2356,7 @@ bool delayed_get_table(THD *thd, MDL_request *grl_protection_request,
     */
     if (! (di= find_handler(thd, table_list)))
     {
-      if (!(di= new Delayed_insert(thd->lex->current_select)))
+      if (!(di= new Delayed_insert(thd->lex->current_select)) || di->init())
         goto end_create;
 
       /*

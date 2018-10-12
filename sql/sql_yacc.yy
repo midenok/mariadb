@@ -5978,6 +5978,9 @@ create_select_part2:
             lex->current_select->table_list.save_and_clear(&lex->save_list);
             mysql_init_select(lex);
             lex->current_select->parsing_place= SELECT_LIST;
+            lex->m_sql_cmd= new (thd->mem_root) Sql_cmd_insert(lex);
+            if (unlikely(Lex->m_sql_cmd == NULL))
+              MYSQL_YYABORT;
           }
           select_options select_item_list
           {
@@ -13153,6 +13156,9 @@ insert:
             lex->sql_command= SQLCOM_INSERT;
             lex->duplicates= DUP_ERROR; 
             mysql_init_select(lex);
+            lex->m_sql_cmd= new (thd->mem_root) Sql_cmd_insert(lex);
+            if (unlikely(Lex->m_sql_cmd == NULL))
+              MYSQL_YYABORT;
           }
           insert_lock_option
           opt_ignore insert2
@@ -13171,6 +13177,9 @@ replace:
             lex->sql_command = SQLCOM_REPLACE;
             lex->duplicates= DUP_REPLACE;
             mysql_init_select(lex);
+            lex->m_sql_cmd= new (thd->mem_root) Sql_cmd_insert(lex);
+            if (unlikely(Lex->m_sql_cmd == NULL))
+              MYSQL_YYABORT;
           }
           replace_lock_option insert2
           {
@@ -13222,7 +13231,7 @@ insert_table:
           {
             LEX *lex=Lex;
             lex->field_list.empty();
-            lex->many_values.empty();
+            lex->insert_cmd()->many_values.empty();
             lex->insert_list=0;
           };
 
@@ -13234,7 +13243,7 @@ insert_field_spec:
           {
             LEX *lex=Lex;
             if (unlikely(!(lex->insert_list= new (thd->mem_root) List_item)) ||
-                unlikely(lex->many_values.push_back(lex->insert_list,
+                unlikely(lex->insert_cmd()->many_values.push_back(lex->insert_list,
                          thd->mem_root)))
               MYSQL_YYABORT;
           }
@@ -13302,7 +13311,7 @@ no_braces:
           opt_values ')'
           {
             LEX *lex=Lex;
-            if (unlikely(lex->many_values.push_back(lex->insert_list,
+            if (unlikely(lex->insert_cmd()->many_values.push_back(lex->insert_list,
                                                     thd->mem_root)))
               MYSQL_YYABORT;
           }
@@ -13317,7 +13326,7 @@ no_braces_with_names:
           opt_values_with_names ')'
           {
             LEX *lex=Lex;
-            if (unlikely(lex->many_values.push_back(lex->insert_list,
+            if (unlikely(lex->insert_cmd()->many_values.push_back(lex->insert_list,
                                                     thd->mem_root)))
               MYSQL_YYABORT;
           }
