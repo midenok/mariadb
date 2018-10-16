@@ -4231,6 +4231,7 @@ public:
     trg_chistics= oldlex->trg_chistics;
     trg_table_fields.empty();
     sp_lex_in_use= false;
+//     m_sql_cmd= oldlex->m_sql_cmd;
   }
 };
 

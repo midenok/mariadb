@@ -13326,7 +13326,8 @@ no_braces_with_names:
           opt_values_with_names ')'
           {
             LEX *lex=Lex;
-            if (unlikely(lex->insert_cmd()->many_values.push_back(lex->insert_list,
+            if (lex->is_insert() &&
+              unlikely(lex->insert_cmd()->many_values.push_back(lex->insert_list,
                                                     thd->mem_root)))
               MYSQL_YYABORT;
           }
@@ -17613,6 +17614,10 @@ sp_tail:
           opt_if_not_exists sp_name
           {
             Lex->sql_command= SQLCOM_CREATE_PROCEDURE;
+            Lex->m_sql_cmd= new (thd->mem_root) Sql_cmd_insert(Lex);
+            if (unlikely(Lex->m_sql_cmd == NULL))
+              MYSQL_YYABORT;
+
             if (unlikely(!Lex->make_sp_head_no_recursive(thd, $1, $2,
                                                          &sp_handler_procedure)))
               MYSQL_YYABORT;
