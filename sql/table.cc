@@ -6481,6 +6481,17 @@ void TABLE::mark_columns_needed_for_update()
 
   mark_columns_per_binlog_row_image();
 
+  /*
+     For System Versioning we have to read all columns since we will store
+     a copy of previous row with modified row_end back to a table.
+  */
+  if (s->versioned)
+  {
+    use_all_columns();
+    file->column_bitmaps_signal();
+    DBUG_VOID_RETURN;
+  }
+
   if (triggers)
     triggers->mark_fields_used(TRG_EVENT_UPDATE);
   if (default_field)
@@ -6528,15 +6539,6 @@ void TABLE::mark_columns_needed_for_update()
       mark_columns_used_by_index_no_reset(s->primary_key, read_set);
       need_signal= true;
     }
-  }
-  /*
-     For System Versioning we have to read all columns since we will store
-     a copy of previous row with modified Sys_end column back to a table.
-  */
-  if (s->versioned)
-  {
-    // We will copy old columns to a new row.
-    use_all_columns();
   }
   if (check_constraints)
   {
