@@ -869,8 +869,6 @@ ha_innobase::check_if_supported_inplace_alter(
 {
 	DBUG_ENTER("check_if_supported_inplace_alter");
 
-	const bool need_rebuild = innobase_need_rebuild(ha_alter_info, table);
-
 	if (altered_table->versioned(VERS_TIMESTAMP)
 	    && (ha_alter_info->handler_flags & INNOBASE_ALTER_VERSIONED_REBUILD)) {
 		ha_alter_info->unsupported_reason =
@@ -1311,6 +1309,7 @@ next_column:
 	}
 
 	bool	fts_need_rebuild = false;
+	const bool need_rebuild = innobase_need_rebuild(ha_alter_info, table);
 
 	if (!online) {
 		/* We already determined that only a non-locking
