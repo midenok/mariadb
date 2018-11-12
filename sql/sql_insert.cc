@@ -1730,6 +1730,33 @@ int write_row_or_fetch_record(THD *thd, TABLE *table, COPY_INFO *info)
   return error ? error : write_error;
 }
 
+static uint check_warn_fatal_error(int error, THD *thd, TABLE *table,
+                                   const COPY_INFO *info, bool handle_dup_key)
+{
+  bool fatal_error= table->file->is_fatal_error(error, HA_CHECK_ALL);
+  bool dup_key_error= !table->file->is_fatal_error(error, HA_CHECK_DUP);
+
+  if (fatal_error)
+    return HA_CHECK_ALL;
+  if (handle_dup_key && dup_key_error)
+    return HA_CHECK_DUP;
+
+  /*
+    We come here when we had an ignorable error which is not a duplicate
+    key error. In this we ignore error if ignore flag is set, otherwise
+    report error as usual. We will not do any duplicate key processing.
+  */
+  if (info->ignore)
+  {
+    if (handle_dup_key || !(thd->variables.old_behavior &
+                            OLD_MODE_NO_DUP_KEY_WARNINGS_WITH_IGNORE))
+      table->file->print_error(error, MYF(ME_WARNING));
+    return 0;
+  }
+
+  return HA_CHECK_ALL;
+}
+
 /*
   Write a record to table with optional deleting of conflicting records,
   invoke proper triggers if needed.
@@ -1776,25 +1803,11 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
     if (!error)
       goto after_trg_n_copied_inc;
 
-    if (table->file->is_fatal_error(error, HA_CHECK_ALL))
+    uint error_type= check_warn_fatal_error(error, thd, table, info, true);
+    if (error_type == HA_CHECK_ALL)
       goto err;
-
-    bool is_duplicate_key_error=
-            table->file->is_fatal_error(error, HA_CHECK_ALL & ~HA_CHECK_DUP);
-    if (!is_duplicate_key_error)
-    {
-      /*
-        We come here when we had an ignorable error which is not a duplicate
-        key error. In this we ignore error if ignore flag is set, otherwise
-        report error as usual. We will not do any duplicate key processing.
-      */
-      if (info->ignore)
-      {
-        table->file->print_error(error, MYF(ME_WARNING));
-        goto ok_or_after_trg_err; /* Ignoring a not fatal error, return 0 */
-      }
-      goto err;
-    }
+    else if (error_type != HA_CHECK_DUP)
+      goto ok_or_after_trg_err;
 
     uint key_nr= table->file->get_dup_key(error);
     DBUG_ASSERT((int)key_nr >= 0);
@@ -1856,15 +1869,9 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
                                                       table->record[0])) &&
             error != HA_ERR_RECORD_IS_THE_SAME)
         {
-          if (info->ignore &&
-              !table->file->is_fatal_error(error, HA_CHECK_ALL))
-          {
-            if (!(thd->variables.old_behavior &
-                  OLD_MODE_NO_DUP_KEY_WARNINGS_WITH_IGNORE))
-              table->file->print_error(error, MYF(ME_WARNING));
-            goto ok_or_after_trg_err;
-          }
-          goto err;
+          if (check_warn_fatal_error(error, thd, table, info, false) == HA_CHECK_ALL)
+            goto err;
+          goto ok_or_after_trg_err;
         }
 
         if (error != HA_ERR_RECORD_IS_THE_SAME)
@@ -1923,13 +1930,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
       }
 
       if (table->file->overlap_ref)
-      {
         error= table->file->ha_index_next(table->record[1]);
-      }
-      else
-      {
-        goto ok_or_after_trg_err;
-      }
 
     } while (table->file->overlap_ref
              && error != HA_ERR_END_OF_FILE
@@ -1945,24 +1946,12 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
 
     while (unlikely(error= write_row_or_fetch_record(thd, table, info)))
     {
-      if (table->file->is_fatal_error(error, HA_CHECK_ALL))
+      uint error_type= check_warn_fatal_error(error, thd, table, info, true);
+      if (error_type == HA_CHECK_ALL)
         goto err;
-      bool is_duplicate_key_error=
-              table->file->is_fatal_error(error, HA_CHECK_ALL & ~HA_CHECK_DUP);
-      if (!is_duplicate_key_error)
-      {
-        /*
-          We come here when we had an ignorable error which is not a duplicate
-          key error. In this we ignore error if ignore flag is set, otherwise
-          report error as usual. We will not do any duplicate key processing.
-        */
-        if (info->ignore)
-        {
-          table->file->print_error(error, MYF(ME_WARNING));
-          goto ok_or_after_trg_err; /* Ignoring a not fatal error, return 0 */
-        }
-        goto err;
-      }
+      else if (error_type != HA_CHECK_DUP)
+        goto ok_or_after_trg_err;
+
       uint key_nr= table->file->get_dup_key(error);
       DBUG_ASSERT((int)key_nr >= 0);
       /*
@@ -1974,6 +1963,17 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
           key_nr == table->s->next_number_index &&
           table->file->insert_id_for_cur_row > 0)
         goto err;
+      /*
+        If we do more than one iteration of this loop, from the second one the
+        row will have an explicit value in the autoinc field, which was set at
+        the first call of handler::update_auto_increment(). So we must save
+        the autogenerated value to avoid thd->insert_id_for_cur_row to become
+        0.
+      */
+      if (table->file->insert_id_for_cur_row > 0)
+        insert_id_for_cur_row= table->file->insert_id_for_cur_row;
+      else
+        table->file->insert_id_for_cur_row= insert_id_for_cur_row;
 
       if (table->vfield)
       {
@@ -2096,12 +2096,8 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
   else if (unlikely((error=table->file->ha_write_row(table->record[0]))))
   {
     DEBUG_SYNC(thd, "write_row_noreplace");
-    if (!info->ignore ||
-        table->file->is_fatal_error(error, HA_CHECK_ALL))
+    if (check_warn_fatal_error(error, thd, table, info, false) == HA_CHECK_ALL)
       goto err;
-    if (!(thd->variables.old_behavior &
-          OLD_MODE_NO_DUP_KEY_WARNINGS_WITH_IGNORE))
-      table->file->print_error(error, MYF(ME_WARNING));
     table->file->restore_auto_increment(prev_insert_id);
     goto ok_or_after_trg_err;
   }
