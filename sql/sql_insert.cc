@@ -1672,27 +1672,12 @@ void setup_period_conds(THD *thd, TABLE *table,
   period_conds->end.item=    new(thd->mem_root) Item_field(thd, portion_end);
 }
 
-int write_row_or_fetch_record(THD *thd, TABLE *table, COPY_INFO *info)
+int fetch_dup_record(THD *thd, TABLE *table, uint key_nr)
 {
-  int write_error= table->file->ha_write_row(table->record[0]);
-  int error= 0;
-
-  if (likely(!write_error))
-    return 0;
-  if (table->file->is_fatal_error(write_error, HA_CHECK_ALL))
-    return write_error;
-  if (!table->file->is_fatal_error(write_error, HA_CHECK_ALL & ~HA_CHECK_DUP))
-    return write_error;
-
-  uint key_nr= table->file->get_dup_key(write_error);
-  if (unlikely((int) key_nr < 0))
-    return HA_ERR_INTERNAL_ERROR;         /* Database can't find key */
-
-  DEBUG_SYNC(thd, "write_row_replace");
-
   /* Read all columns for the row we are going to replace */
   table->use_all_columns();
 
+  int error= -1;
   if (table->file->ha_table_flags() & HA_DUPLICATE_POS
       && !table->file->overlap_ref)
   {
@@ -1727,7 +1712,67 @@ int write_row_or_fetch_record(THD *thd, TABLE *table, COPY_INFO *info)
                                           keypart_map,
                                           HA_READ_KEY_EXACT);
   }
-  return error ? error : write_error;
+  return error;
+}
+
+static bool check_warn_fatal_error(int error, THD *thd, TABLE *table,
+                                   const COPY_INFO *info, bool handle_dup_key)
+{
+  bool fatal_error= table->file->is_fatal_error(error, HA_CHECK_ALL);
+  bool dup_key_error= !table->file->is_fatal_error(error, HA_CHECK_DUP);
+
+  if (!fatal_error && (!handle_dup_key || !dup_key_error))
+  {
+    /*
+      We come here when we had an ignorable error which is not a duplicate
+      key error. In this we ignore error if ignore flag is set, otherwise
+      report error as usual. We will not do any duplicate key processing.
+    */
+    if (info->ignore)
+    {
+      if (!dup_key_error || !(thd->variables.old_behavior &
+                              OLD_MODE_NO_DUP_KEY_WARNINGS_WITH_IGNORE))
+        table->file->print_error(error, MYF(ME_WARNING));
+    }
+    fatal_error= !info->ignore;
+  }
+
+  return fatal_error;
+}
+
+int write_row_n_fire_triggers(THD *thd, TABLE *table, COPY_INFO *info,
+                              bool fire_before_trg,
+                              bool *print_error, bool *write_succeeded,
+                              bool *fatal_error)
+{
+  *print_error= false;
+  *write_succeeded= false;
+  *fatal_error= true;
+  int error= 0;
+  if (fire_before_trg && table->triggers)
+    error= table->triggers->process_triggers(thd, TRG_EVENT_INSERT,
+                                                  TRG_ACTION_BEFORE, TRUE);
+  if (error)
+    return error;
+
+  error= table->file->ha_write_row(table->record[0]);
+
+  *fatal_error= check_warn_fatal_error(error, thd, table, info,
+                                       info->handle_duplicates != DUP_ERROR);
+  *print_error= !*fatal_error;
+  if (error)
+    return error;
+  info->copied++;
+  thd->record_first_successful_insert_id_in_cur_stmt(table->file->insert_id_for_cur_row);
+
+  *print_error= false;
+  *write_succeeded= true;
+  *fatal_error= false;
+  if (table->triggers)
+    error= table->triggers->process_triggers(thd, TRG_EVENT_INSERT,
+                                                  TRG_ACTION_AFTER, TRUE);
+
+  return error;
 }
 
 static uint check_warn_fatal_error(int error, THD *thd, TABLE *table,
@@ -1786,35 +1831,60 @@ static uint check_warn_fatal_error(int error, THD *thd, TABLE *table,
 
 int write_record(THD *thd, TABLE *table,COPY_INFO *info)
 {
-  int error, trg_error= 0;
   MY_BITMAP *save_read_set, *save_write_set;
   ulonglong prev_insert_id= table->file->next_insert_id;
   ulonglong insert_id_for_cur_row= 0;
   ulonglong prev_insert_id_for_cur_row= 0;
+  bool fatal_error, write_succeeded, print_error;
   DBUG_ENTER("write_record");
 
   info->records++;
   save_read_set=  table->read_set;
   save_write_set= table->write_set;
 
+  int error= write_row_n_fire_triggers(thd, table, info, false, &print_error,
+                                       &fatal_error, &write_succeeded);
+
+  DEBUG_SYNC(thd, info->handle_duplicates == DUP_ERROR
+                  ? "write_row_noreplace"
+                  : "write_row_replace");
+
+  if (likely(!error || write_succeeded))
+  {
+    if (!table->file->has_transactions())
+      thd->transaction.stmt.modified_non_trans_table= TRUE;
+    DBUG_RETURN(0);
+  }
+
+  uint key_nr= table->file->get_dup_key(error);
+  if(likely(!fatal_error) && unlikely((int)key_nr < 0))
+  {
+    error= HA_ERR_FOUND_DUPP_KEY;
+    fatal_error= true;
+  }
+
+  if (unlikely(fatal_error))
+  {
+    if (print_error)
+    {
+      info->last_errno= error;
+      table->file->print_error(error, MYF(0));
+    }
+    table->file->restore_auto_increment(prev_insert_id);
+    DBUG_RETURN(1);
+  }
+
+  write_succeeded= false;
+  print_error= true;
+
   if (info->handle_duplicates == DUP_UPDATE)
   {
-    error= write_row_or_fetch_record(thd, table, info);
-    if (!error)
-      goto after_trg_n_copied_inc;
+    error= fetch_dup_record(thd, table, key_nr);
 
-    uint error_type= check_warn_fatal_error(error, thd, table, info, true);
-    if (error_type == HA_CHECK_ALL)
-      goto err;
-    else if (error_type != HA_CHECK_DUP)
-      goto ok_or_after_trg_err;
+    bool records_overlap= true;
 
-    uint key_nr= table->file->get_dup_key(error);
-    DBUG_ASSERT((int)key_nr >= 0);
-
-    do
+    while (!error && records_overlap)
     {
-      int res= 0;
       /*
         We don't check for other UNIQUE keys - the first row
         that matches, is updated. If update causes a conflict again,
@@ -1832,12 +1902,16 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
       */
       DBUG_ASSERT(info->update_fields->elements ==
                   info->update_values->elements);
-      if (fill_record_n_invoke_before_triggers(thd, table,
-                                               *info->update_fields,
-                                               *info->update_values,
-                                               info->ignore,
-                                               TRG_EVENT_UPDATE))
-        goto before_trg_err;
+      error= fill_record_n_invoke_before_triggers(thd, table,
+                                                  *info->update_fields,
+                                                  *info->update_values,
+                                                  info->ignore,
+                                                  TRG_EVENT_UPDATE);
+      if (error)
+      {
+        print_error= false;
+        break;
+      }
 
       bool different_records= (!records_are_comparable(table) ||
                                compare_record(table));
@@ -1850,16 +1924,19 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
       */
       if (different_records && table->default_field)
       {
-        if (table->update_default_fields(1, info->ignore))
-          goto err;
+        error= table->update_default_fields(1, info->ignore);
+        if (error)
+          break;
       }
 
       /* CHECK OPTION for VIEW ... ON DUPLICATE KEY UPDATE ... */
-      res= info->table_list->view_check_option(table->in_use, info->ignore);
-      if (res == VIEW_CHECK_SKIP)
-        goto ok_or_after_trg_err;
-      if (res == VIEW_CHECK_ERROR)
-        goto before_trg_err;
+      int res= info->table_list->view_check_option(table->in_use, info->ignore);
+      if (res)
+      {
+        error= res == VIEW_CHECK_ERROR;
+        print_error= false;
+        break;
+      }
 
       table->file->restore_auto_increment(prev_insert_id);
       info->touched++;
@@ -1869,10 +1946,10 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
                                                       table->record[0])) &&
             error != HA_ERR_RECORD_IS_THE_SAME)
         {
-          if (check_warn_fatal_error(error, thd, table, info, false) == HA_CHECK_ALL)
-            goto err;
-          goto ok_or_after_trg_err;
+          check_warn_fatal_error(error, thd, table, info, false);
+          break;
         }
+        write_succeeded= true;
 
         if (error != HA_ERR_RECORD_IS_THE_SAME)
         {
@@ -1882,21 +1959,17 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
             if (table->versioned(VERS_TIMESTAMP))
             {
               store_record(table, record[2]);
-              if ((error= vers_insert_history_row(table)))
-              {
-                info->last_errno= error;
-                table->file->print_error(error, MYF(0));
-                trg_error= 1;
-                restore_record(table, record[2]);
-                goto ok_or_after_trg_err;
-              }
+              error= vers_insert_history_row(table);
               restore_record(table, record[2]);
+              if (error)
+              {
+                print_error= true;
+                break;
+              }
             }
             info->copied++;
           }
         }
-        else
-          error= 0;
         /*
           If ON DUP KEY UPDATE updates a row instead of inserting
           one, it's like a regular UPDATE statement: it should not
@@ -1906,10 +1979,10 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
           THD::arg_of_last_insert_id_function.
         */
         prev_insert_id_for_cur_row= table->file->insert_id_for_cur_row;
-        insert_id_for_cur_row= table->file->insert_id_for_cur_row= 0;
-        trg_error= (table->triggers &&
-                    table->triggers->process_triggers(thd, TRG_EVENT_UPDATE,
-                                                      TRG_ACTION_AFTER, TRUE));
+        table->file->insert_id_for_cur_row= 0;
+        error= (table->triggers &&
+                table->triggers->process_triggers(thd, TRG_EVENT_UPDATE,
+                                                       TRG_ACTION_AFTER, TRUE));
         info->copied++;
       }
 
@@ -1932,11 +2005,13 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
       if (table->file->overlap_ref)
         error= table->file->ha_index_next(table->record[1]);
 
-    } while (table->file->overlap_ref
-             && error != HA_ERR_END_OF_FILE
-             && table->check_period_overlaps(&table->key_info[key_nr],
-                                             table->record[1],
-                                             table->insert_values));
+      records_overlap=
+              table->file->overlap_ref
+              && (error == HA_ERR_END_OF_FILE
+                  || table->check_period_overlaps(&table->key_info[key_nr],
+                                                  table->record[1],
+                                                  table->insert_values));
+    }
   }
   else if (info->handle_duplicates == DUP_REPLACE)
   {
@@ -1944,25 +2019,27 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
     if (table->file->overlap_ref)
       setup_period_conds(thd, table, &period_conds);
 
-    while (unlikely(error= write_row_or_fetch_record(thd, table, info)))
+    do
     {
-      uint error_type= check_warn_fatal_error(error, thd, table, info, true);
-      if (error_type == HA_CHECK_ALL)
-        goto err;
-      else if (error_type != HA_CHECK_DUP)
-        goto ok_or_after_trg_err;
+      error= fetch_dup_record(thd, table, key_nr);
+      if (error)
+      {
+        print_error= true;
+        break;
+      }
 
-      uint key_nr= table->file->get_dup_key(error);
-      DBUG_ASSERT((int)key_nr >= 0);
       /*
         Don't allow REPLACE to replace a row when a auto_increment column
-        was used.  This ensures that we don't get a problem when the
+        was used.  This ensures that we don't get a problem when theb
         whole range of the key has been used.
       */
       if (table->next_number_field &&
           key_nr == table->s->next_number_index &&
           table->file->insert_id_for_cur_row > 0)
-        goto err;
+      {
+        error= 1;
+        break;
+      }
       /*
         If we do more than one iteration of this loop, from the second one the
         row will have an explicit value in the autoinc field, which was set at
@@ -2004,74 +2081,59 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
       if (last_uniq_key(table, key_nr) &&
           !table->file->referenced_by_foreign_key() &&
           (!table->triggers || !table->triggers->has_delete_triggers()) &&
+          !table->versioned() &&
           !table->file->overlap_ref)
       {
-        if (table->versioned(VERS_TRX_ID))
-        {
-          bitmap_set_bit(table->write_set, table->vers_start_field()->field_index);
-          table->vers_start_field()->store(0, false);
-        }
         if (unlikely(error = table->file->ha_update_row(table->record[1],
                                                         table->record[0])) &&
             error != HA_ERR_RECORD_IS_THE_SAME)
-          goto err;
+          break;
         if (likely(!error))
-        {
           info->deleted++;
-          if (table->versioned(VERS_TIMESTAMP))
-          {
-            store_record(table, record[2]);
-            error = vers_insert_history_row(table);
-            restore_record(table, record[2]);
-            if (unlikely(error))
-              goto err;
-          }
-        } else
-          error = 0;   // error was HA_ERR_RECORD_IS_THE_SAME
         thd->record_first_successful_insert_id_in_cur_stmt(table->file->insert_id_for_cur_row);
         /*
           Since we pretend that we have done insert we should call
           its after triggers.
         */
-        goto after_trg_n_copied_inc;
+        write_succeeded= true;
+        error= 0;
       }
       else
       {
-        if (table->triggers &&
-            table->triggers->process_triggers(thd, TRG_EVENT_DELETE,
-                                              TRG_ACTION_BEFORE, TRUE))
-          goto before_trg_err;
-
-        if (!table->versioned(VERS_TIMESTAMP))
-          error = table->file->ha_delete_row(table->record[1]);
-        else
+        if (table->triggers)
+          error= table->triggers->process_triggers(thd, TRG_EVENT_DELETE,
+                                                        TRG_ACTION_BEFORE, TRUE);
+        if (error)
         {
-          store_record(table, record[2]);
-          restore_record(table, record[1]);
-          table->vers_update_end();
-          error = table->file->ha_update_row(table->record[1],
-                                             table->record[0]);
-          restore_record(table, record[2]);
+          fatal_error= true;
         }
+
+        store_record(table, record[2]);
+        restore_record(table, record[1]);
+        error= table->delete_row();
+        restore_record(table, record[2]);
         if (unlikely(error))
-          goto err;
+          break;
+
         if (!table->versioned(VERS_TIMESTAMP))
           info->deleted++;
         else
           info->updated++;
         if (!table->file->has_transactions())
           thd->transaction.stmt.modified_non_trans_table = TRUE;
-        if (table->triggers &&
-            table->triggers->process_triggers(thd, TRG_EVENT_DELETE,
-                                              TRG_ACTION_AFTER, TRUE))
+        if (table->triggers)
+          error= table->triggers->process_triggers(thd, TRG_EVENT_DELETE,
+                                                        TRG_ACTION_AFTER, TRUE);
+        if (error)
         {
-          trg_error = 1;
-          goto ok_or_after_trg_err;
+          fatal_error= true;
+          break;
         }
-        /* Let us attempt do write_row() once more */
       }
 
-    }
+      error= write_row_n_fire_triggers(thd, table, info, true, &print_error,
+                                       &write_succeeded, &fatal_error);
+    } while (unlikely(error && !fatal_error && !write_succeeded));
     
     /*
       If more than one iteration of the above while loop is done, from
@@ -2083,8 +2145,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
      */
     if (table->file->insert_id_for_cur_row == 0)
       table->file->insert_id_for_cur_row= insert_id_for_cur_row;
-      
-    thd->record_first_successful_insert_id_in_cur_stmt(table->file->insert_id_for_cur_row);
+
     /*
       Restore column maps if they where replaced during an duplicate key
       problem.
@@ -2093,43 +2154,26 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
         table->write_set != save_write_set)
       table->column_bitmaps_set(save_read_set, save_write_set);
   }
-  else if (unlikely((error=table->file->ha_write_row(table->record[0]))))
-  {
-    DEBUG_SYNC(thd, "write_row_noreplace");
-    if (check_warn_fatal_error(error, thd, table, info, false) == HA_CHECK_ALL)
-      goto err;
-    table->file->restore_auto_increment(prev_insert_id);
-    goto ok_or_after_trg_err;
-  }
 
-after_trg_n_copied_inc:
-  info->copied++;
-  thd->record_first_successful_insert_id_in_cur_stmt(table->file->insert_id_for_cur_row);
-  trg_error= (table->triggers &&
-              table->triggers->process_triggers(thd, TRG_EVENT_INSERT,
-                                                TRG_ACTION_AFTER, TRUE));
-
-ok_or_after_trg_err:
   if (table->file->inited != handler::NONE)
   {
-    error= table->file->ha_index_end();
-    trg_error = trg_error || error;
+    int index_err= table->file->ha_index_end();
+    if (!error)
+      error= index_err;
   }
 
-  if (!table->file->has_transactions())
+  if (write_succeeded && !table->file->has_transactions())
     thd->transaction.stmt.modified_non_trans_table= TRUE;
-  DBUG_RETURN(trg_error);
 
-err:
-  info->last_errno= error;
-  table->file->print_error(error,MYF(0));
+  if (error && print_error)
+  {
+    info->last_errno= error;
+    table->file->print_error(error, MYF(0));
+  }
 
-before_trg_err:
   table->file->restore_auto_increment(prev_insert_id);
   table->column_bitmaps_set(save_read_set, save_write_set);
-  if (table->file->inited != handler::NONE)
-    table->file->ha_index_end();
-  DBUG_RETURN(1);
+  DBUG_RETURN(bool(error));
 }
 
 
