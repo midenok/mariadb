@@ -1,0 +1,25 @@
+--source suite/versioning/engines.inc
+--source include/have_partition.inc
+--source include/master-slave.inc
+
+--echo # Case 3: fail to add history row from the past
+call mtr.add_suppression("Slave: .* Error_code: 4145");
+create or replace table t1 (pk int primary key, x int);
+insert into t1 values (1, 1);
+--sync_slave_with_master
+create or replace table t1 (pk int primary key, x int) with system versioning;
+insert into t1 values (1, 1);
+--connection master
+update t1 set x= 2 where pk = 1;
+
+--connection slave
+--let $slave_sql_errno= 4145
+--let $slave_skip_counter= 1
+--let $slave_timeout= 1
+--source include/wait_for_slave_sql_error_and_skip.inc
+
+--connection master
+drop database test;
+create database test;
+
+--source include/rpl_end.inc
