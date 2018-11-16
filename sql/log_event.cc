@@ -14076,10 +14076,8 @@ int Delete_rows_log_event::do_exec_row(rpl_group_info *rgi)
       m_table->mark_columns_per_binlog_row_image();
       if (m_vers_from_plain && m_table->versioned(VERS_TIMESTAMP))
       {
-        Field *end= m_table->vers_end_field();
-        bitmap_set_bit(m_table->write_set, end->field_index);
         store_record(m_table, record[1]);
-        end->set_time();
+        m_table->vers_update_end();
         error= m_table->file->ha_update_row(m_table->record[1],
                                             m_table->record[0]);
       }
@@ -14358,6 +14356,8 @@ Update_rows_log_event::do_exec_row(rpl_group_info *rgi)
   {
     store_record(m_table, record[2]);
     error= m_table->vers_insert_history_row();
+    if (unlikely(error == HA_ERR_FOUND_DUPP_KEY))
+      error= 0;
     restore_record(m_table, record[2]);
   }
   m_table->default_column_bitmaps();
