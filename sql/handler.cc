@@ -3842,9 +3842,6 @@ void handler::print_error(int error, myf errflag)
   case HA_ERR_TABLE_IN_FK_CHECK:
     textno= ER_TABLE_IN_FK_CHECK;
     break;
-  case HA_ERR_WRONG_HISTORY_ROW:
-    textno= ER_VERS_WRONG_HISTORY_ROW;
-    break;
   default:
     {
       /* The error was "unknown" to this function.
