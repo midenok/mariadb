@@ -153,46 +153,28 @@ select * from t1;
 
 --echo # Case 2: not versioned -> versioned replication
 create or replace table t1 (pk int primary key, x int);
---sync_slave_with_master
-alter table t1 add system versioning;
---connection master
-insert into t1 values (1, 1);
---sync_slave_with_master
-flush logs;
---connection master
-update t1 set x= 2 where pk = 1;
-update t1 set x= 3 where pk = 1;
---sync_slave_with_master
-select *, row_start, row_end from t1 for system_time all;
---let $datadir= `select @@datadir`
---let $f3= query_get_value(SHOW SLAVE STATUS, Relay_Log_File, 1)
---echo # Replaying binlog...
---exec $MYSQL_BINLOG $datadir/$f3| $MYSQL -S $SLAVE_MYSOCK test
---exec $MYSQL_BINLOG $datadir/$f3| $MYSQL -S $SLAVE_MYSOCK test
-select *, row_start, row_end from t1 for system_time all;
---connection master
-
---echo # Case 3: fail to add history row from the past
-create or replace table t1 (pk int primary key, x int);
 insert into t1 values (1, 1);
 --sync_slave_with_master
 create or replace table t1 (pk int primary key, x int) with system versioning;
 insert into t1 values (1, 1);
 flush logs;
-set @@secure_timestamp= YES;
 --connection master
 update t1 set x= 2 where pk = 1;
 update t1 set x= 3 where pk = 1;
 --sync_slave_with_master
-select *, row_start, row_end from t1 for system_time all;
+select * from t1 for system_time all order by row_end;
+
+set timestamp= unix_timestamp() + 10;
+create or replace table t1 (pk int primary key, x int) with system versioning;
+insert into t1 values (1, 1);
 --let $datadir= `select @@datadir`
---let $f3= query_get_value(SHOW SLAVE STATUS, Relay_Log_File, 1)
+--let $f= query_get_value(SHOW SLAVE STATUS, Relay_Log_File, 1)
+set timestamp= default;
 --echo # Replaying binlog...
---exec $MYSQL_BINLOG -v $datadir/$f3| $MYSQL -S $SLAVE_MYSOCK test
---exec $MYSQL_BINLOG -v $datadir/$f3| $MYSQL -S $SLAVE_MYSOCK test
-# --exec $MYSQL_BINLOG $datadir/$f3| $MYSQL -S $SLAVE_MYSOCK test
-select *, row_start, row_end from t1 for system_time all;
-select @@secure_timestamp;
+--replace_regex /\(Code .+\)/(Code ...)/ /from .*'/from '...' to '...'/
+--exec $MYSQL_BINLOG $datadir/$f| $MYSQL -S $SLAVE_MYSOCK --show-warnings test
+select * from t1;
+--connection master
 
 drop database test;
 create database test;
