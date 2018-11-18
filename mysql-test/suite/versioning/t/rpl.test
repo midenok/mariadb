@@ -171,8 +171,8 @@ insert into t1 values (1, 1);
 --let $f= query_get_value(SHOW SLAVE STATUS, Relay_Log_File, 1)
 set timestamp= default;
 --echo # Replaying binlog...
---replace_regex /\(Code .+\)/(Code ...)/ /from .*'/from '...' to '...'/
---exec $MYSQL_BINLOG $datadir/$f| $MYSQL -S $SLAVE_MYSOCK --show-warnings test
+--exec $MYSQL_BINLOG $datadir/$f| $MYSQL -S $SLAVE_MYSOCK test
+--exec $MYSQL_BINLOG $datadir/$f| $MYSQL -S $SLAVE_MYSOCK test
 select * from t1;
 --connection master
 

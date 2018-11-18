@@ -203,7 +203,6 @@ create or replace table t1 (pk int primary key, x int) with system versioning;
 insert into t1 values (1, 1);
 set timestamp= default;
 # Replaying binlog...
-Note (Code ...): History row start time changed for `test.t1` from '...' to '...'
 select * from t1;
 pk	x
 1	3
