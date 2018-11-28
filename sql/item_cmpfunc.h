@@ -1949,6 +1949,12 @@ public:
     alloc_comparators(thd, nvalues);
   }
 
+  ~Predicant_to_list_comparator()
+  {
+    if (m_comparators)
+      dealloc_root(m_comparators);
+  }
+
   uint comparator_count() const { return m_comparator_count; }
   const Type_handler *get_comparator_type_handler(uint i) const
   {

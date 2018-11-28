@@ -3855,6 +3855,7 @@ cmp_item_row::~cmp_item_row()
       if (comparators[i])
 	delete comparators[i];
     }
+    dealloc_root(comparators);
   }
   DBUG_VOID_RETURN;
 }

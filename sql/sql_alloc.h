@@ -50,4 +50,29 @@ public:
 #endif
   inline ~Sql_alloc() {}
 };
+
+template <class T> struct Mem_root_allocator
+{
+  typedef T value_type;
+  Mem_root_allocator(MEM_ROOT &mem_root) : mem_root(mem_root){};
+  template <class U> Mem_root_allocator(const Mem_root_allocator<U> &) {}
+  T *allocate(std::size_t n) { return alloc_root(&mem_root, n); }
+  void deallocate(T *p, std::size_t) { dealloc_root(p); }
+  const MEM_ROOT &get_mem_root() const { return mem_root; }
+
+private:
+  MEM_ROOT &mem_root;
+};
+template <class T, class U>
+bool operator==(const Mem_root_allocator<T> &lhs,
+                const Mem_root_allocator<U> &rhs)
+{
+  return &lhs.mem_root == &rhs.mem_root;
+}
+template <class T, class U>
+bool operator!=(const Mem_root_allocator<T> &lhs,
+                const Mem_root_allocator<U> &rhs)
+{
+  return &lhs.mem_root != &rhs.mem_root;
+}
 #endif /* SQL_ALLOC_INCLUDED */

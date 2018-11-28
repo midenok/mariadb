@@ -225,7 +225,7 @@ void *alloc_root(MEM_ROOT *mem_root, size_t length)
                     DBUG_SET("-d,simulate_out_of_memory");
                     DBUG_RETURN((void*) 0); /* purecov: inspected */
                   });
-  length= ALIGN_SIZE(length);
+  length= ALIGN_SIZE(length) + sizeof(size_t);
   if ((*(prev= &mem_root->free)) != NULL)
   {
     if ((*prev)->left < length &&
@@ -274,7 +274,10 @@ void *alloc_root(MEM_ROOT *mem_root, size_t length)
     mem_root->used= next;
     mem_root->first_block_usage= 0;
   }
-  TRASH_ALLOC(point, original_length);
+  TRASH_ALLOC(point, original_length + sizeof(size_t));
+  *((size_t *) point)= original_length;
+  MEM_NOACCESS(point, sizeof(size_t));
+  point+= sizeof(size_t);
   DBUG_PRINT("exit",("ptr: %p", point));
   DBUG_RETURN((void*) point);
 #endif
@@ -502,4 +505,12 @@ LEX_CSTRING safe_lexcstrdup_root(MEM_ROOT *root, const LEX_CSTRING str)
     res.str= (const char *)"";
   res.length= str.length;
   return res;
+}
+
+void dealloc_root(const void *p)
+{
+  size_t *ptr= (size_t *) p;
+  MEM_UNDEFINED(ptr, sizeof(size_t));
+  size_t length= *ptr;
+  MEM_NOACCESS(ptr, length + sizeof(size_t));
 }
