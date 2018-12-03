@@ -1,0 +1,27 @@
+create or replace table t (id int, s date, e date, period for p(s,e),
+                           primary key(id, p without overlaps));
+show create table t_cont;
+
+drop table t;
+show tables from test;
+
+# TODO
+create table t_cont(id int);
+--error ER_TABLE_EXISTS_ERROR
+create or replace table t (id int, s date, e date, period for p(s,e),
+                           primary key(id, p without overlaps));
+
+create or replace table t (id int, s date, e date, period for p(s,e),
+                           primary key(id, p without overlaps));
+lock table t write;
+--error ER_TABLE_NOT_LOCKED
+drop table t;
+unlock table t;
+drop table t;
+
+# TODO
+lock table t_cont write;
+--error ER_TABLE_NOT_LOCKED
+drop table t;
+unlock table t;
+drop table t;

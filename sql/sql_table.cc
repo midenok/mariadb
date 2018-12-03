@@ -2124,11 +2124,7 @@ bool mysql_rm_table(THD *thd,TABLE_LIST *tables, bool if_exists,
                                  false, drop_sequence, false, false);
   thd->pop_internal_handler();
 
-  if (unlikely(error))
-    DBUG_RETURN(TRUE);
-  my_ok(thd);
-  DBUG_RETURN(FALSE);
-
+  DBUG_RETURN(error != 0);
 }
 
 
@@ -5218,6 +5214,101 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   {
     result= 1;
     goto err;
+  }
+
+  if (create_info->period_info.unique_keys)
+  {
+    static const char postfix[]= "_cont";
+    size_t cont_name_len= create_info->alias.length + sizeof postfix;
+    auto cont_name= strmake_root(thd->mem_root, create_info->alias.str,
+                                 cont_name_len);
+    strcpy(cont_name + create_info->alias.length, postfix);
+    Table_specification_st cont_create_info {};
+    cont_create_info.table_charset    = create_info->table_charset;
+    cont_create_info.alias            = { cont_name, cont_name_len };
+    cont_create_info.db_type          = create_info->db_type;
+    cont_create_info.tabledef_version = create_info->tabledef_version;
+    cont_create_info.connect_string   = create_info->connect_string;
+    cont_create_info.password         = create_info->password;
+    cont_create_info.tablespace       = create_info->tablespace;
+    cont_create_info.data_file_name   = create_info->data_file_name;
+    cont_create_info.index_file_name  = create_info->index_file_name;
+    cont_create_info.table_options    = create_info->table_options;
+    cont_create_info.options          = create_info->options;
+    cont_create_info.db_type          = create_info->db_type;
+    cont_create_info.row_type         = create_info->row_type;
+    cont_create_info.transactional    = create_info->transactional;
+    cont_create_info.storage_media    = create_info->storage_media;
+    cont_create_info.option_list      = create_info->option_list;
+    cont_create_info.add(*create_info);
+
+    auto *mem_root = thd->mem_root;
+    Alter_info cont_alter_info {};
+    List_iterator<Create_field> cit(alter_info->create_list);
+    Create_field *prev= NULL;
+    while(Create_field *f = cit++)
+    {
+      List_iterator <Key> kit(alter_info->key_list);
+      while(Key* k= kit++)
+      {
+        if (!k->without_overlaps) continue;
+
+        List_iterator<Key_part_spec> kpit(k->columns);
+        while(auto *kp = kpit++)
+        {
+          if (f->field_name.streq(kp->field_name))
+          {
+            f= f->clone(mem_root);
+            f->flags&= ~NOT_NULL_FLAG;
+            f->flags|= NO_DEFAULT_VALUE_FLAG;
+            f->default_value= NULL;
+            f->offset= prev ? prev->offset + prev->pack_length : 0;
+            cont_alter_info.create_list.push_back(f, mem_root);
+            prev= f;
+          }
+        }
+      }
+    }
+    List_iterator <Key> kit(alter_info->key_list);
+
+    auto *idx_name= new(mem_root) Create_field();
+    idx_name->charset= system_charset_info;
+    idx_name->field_name= {STRING_WITH_LEN("sys_cont_idx")};
+    idx_name->set_handler(&type_handler_varchar);
+    idx_name->flags= NO_DEFAULT_VALUE_FLAG;
+    idx_name->offset= prev->offset + prev->pack_length;
+    idx_name->pack_flag= FIELDFLAG_NO_DEFAULT;
+    cont_alter_info.create_list.push_front(idx_name);
+    auto *idx_name_kp= new(mem_root) Key_part_spec(&idx_name->field_name, 0);
+
+    size_t max_name_len= 10;
+    while(Key* k= kit++)
+    {
+      if (k->without_overlaps)
+      {
+        k= k->clone(mem_root);
+        k->without_overlaps= false;
+
+        k->columns.push_front(idx_name_kp);
+        cont_alter_info.key_list.push_back(k, mem_root);
+        max_name_len= max_name_len > k->name.length
+                      ? max_name_len : k->name.length;
+      }
+    }
+    idx_name->char_length= max_name_len;
+    idx_name->length= idx_name->char_length;
+    idx_name->pack_length= idx_name->char_length + 1;
+    idx_name->key_length= idx_name->char_length;
+    idx_name_kp->length= idx_name->char_length;
+
+    bool cont_is_trans;
+    result= mysql_create_table_no_lock(thd, &create_table->db,
+                                       &cont_create_info.alias,
+                                       &cont_create_info, &cont_alter_info,
+                                       &cont_is_trans, create_table_mode,
+                                       create_table) != 0;
+    if (result)
+      goto err;
   }
 
   /*

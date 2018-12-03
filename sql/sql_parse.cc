@@ -5054,6 +5054,26 @@ end_with_restore_list:
     /* DDL and binlog write order are protected by metadata locks. */
     res= mysql_rm_table(thd, first_table, lex->if_exists(), lex->tmp_table(),
                         lex->table_type == TABLE_TYPE_SEQUENCE);
+    if (lex->table_type <= TABLE_TYPE_NORMAL && !lex->tmp_table() && !res)
+    {
+      for(TABLE_LIST *table= first_table; table; table= table->next_global)
+      {
+        static char cont_postfix[]= "_cont";
+        auto new_len= table->table_name.length + sizeof cont_postfix - 1;
+        auto *new_name= strmake_root(thd->mem_root, table->table_name.str,
+                                     new_len);
+        strcpy(new_name + table->table_name.length, cont_postfix);
+
+        table->table_name.str= new_name;
+        table->table_name.length= new_len;
+        table->mdl_request.init(MDL_key::TABLE, table->db.str, new_name,
+                                MDL_EXCLUSIVE, MDL_TRANSACTION);
+      }
+      res= mysql_rm_table(thd, first_table, true, false, false);
+    }
+
+    if (likely(!res))
+      my_ok(thd);
 
     /*
       When dropping temporary tables if @@session_track_state_change is ON
