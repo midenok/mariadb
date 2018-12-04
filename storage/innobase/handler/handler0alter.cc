@@ -1511,6 +1511,10 @@ instant_alter_column_possible(
 	if ((ha_alter_info->handler_flags
 	     & ALTER_COLUMN_NULLABLE)
 	    && ib_table.not_redundant()) {
+		for (const dict_index_t* index
+		     = UT_LIST_GET_FIRST(ib_table.indexes); index != NULL;
+		     index = UT_LIST_GET_NEXT(indexes, index)) {
+		}
 #if 0 // FIXME: remove this
 		return false;
 #else // FIXME: Rebuild the affected indexes, not the whole table!
