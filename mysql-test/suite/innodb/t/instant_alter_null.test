@@ -5,16 +5,6 @@ create table t (a int NOT NULL) engine=innodb row_format=   compressed;
 alter table t modify a int NULL, algorithm=instant;
 drop table t;
 
-create table t (a int NOT NULL) engine=innodb row_format=   dynamic;
---error ER_ALTER_OPERATION_NOT_SUPPORTED
-alter table t modify a int NULL, algorithm=instant;
-drop table t;
-
-create table t (a int NOT NULL) engine=innodb row_format=   compact;
---error ER_ALTER_OPERATION_NOT_SUPPORTED
-alter table t modify a int NULL, algorithm=instant;
-drop table t;
-
 create table t (
   id int primary key,
   a int NOT NULL default 0,
@@ -54,4 +44,48 @@ select * from t;
 
 check table t;
 
+drop table t;
+
+create table t (
+  a int,
+  b int not null,
+  c int,
+  index (a),
+  index (b),
+  index (c),
+  index abc (a, b, c)
+) engine=innodb;
+
+if (!$MTR_COMBINATION_REDUNDANT)
+{
+--disable_query_log
+--disable_result_log
+--error ER_ALTER_OPERATION_NOT_SUPPORTED
+alter table t drop index a, drop index c, modify b int, algorithm=instant;
+--error ER_ALTER_OPERATION_NOT_SUPPORTED
+alter table t drop index b, modify b int, algorithm=instant;
+--enable_query_log
+--enable_result_log
+}
+
+alter table t drop index a, drop index c, drop index abc, drop index b, modify b int, algorithm=instant;
+
+check table t;
+drop table t;
+
+create table t (
+  a int,
+  b int not null,
+  c int,
+  index (a),
+  index (b),
+  index (c),
+  index abc (a, b, c)
+) engine=innodb;
+
+insert into t values (1, 1, 1);
+alter table t modify b int, algorithm=inplace;
+update t set b= null;
+
+check table t;
 drop table t;
