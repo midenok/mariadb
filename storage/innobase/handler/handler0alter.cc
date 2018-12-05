@@ -83,7 +83,6 @@ static const alter_table_operations INNOBASE_ALTER_REBUILD
 	| ALTER_DROP_PK_INDEX
 	| ALTER_OPTIONS
 	/* ALTER_OPTIONS needs to check alter_options_need_rebuild() */
-	| ALTER_COLUMN_NULLABLE
 	| INNOBASE_DEFAULTS
 	| ALTER_STORED_COLUMN_ORDER
 	| ALTER_DROP_STORED_COLUMN
@@ -121,7 +120,8 @@ static const alter_table_operations INNOBASE_ALTER_NOCREATE
 /** Operations that InnoDB cares about and can perform without rebuild */
 static const alter_table_operations INNOBASE_ALTER_NOREBUILD
 	= INNOBASE_ONLINE_CREATE
-	| INNOBASE_ALTER_NOCREATE;
+	| INNOBASE_ALTER_NOCREATE
+	| ALTER_COLUMN_NULLABLE;
 
 /** Operations that can be performed instantly, without inplace_alter_table() */
 static const alter_table_operations INNOBASE_ALTER_INSTANT
@@ -1511,15 +1511,24 @@ instant_alter_column_possible(
 	if ((ha_alter_info->handler_flags
 	     & ALTER_COLUMN_NULLABLE)
 	    && ib_table.not_redundant()) {
-		for (const dict_index_t* index
-		     = UT_LIST_GET_FIRST(ib_table.indexes); index != NULL;
+		List_iterator_fast<Create_field> cf_it(
+			ha_alter_info->alter_info->create_list);
+		const dict_index_t* index = UT_LIST_GET_FIRST(ib_table.indexes);
+		for (index = UT_LIST_GET_NEXT(indexes, index); index != NULL;
 		     index = UT_LIST_GET_NEXT(indexes, index)) {
+			cf_it.rewind();
+			while (const Create_field* cf = cf_it++) {
+				Field *f = cf->field;
+				if (!(cf->altered && f && f->stored_in_db()
+					&& (f->flags & NOT_NULL_FLAG) && !(cf->flags & NOT_NULL_FLAG))) {
+					continue;
+				}
+				unsigned col_no = innodb_col_no(cf->field);
+				if (index->contains_col_or_prefix(col_no, false)) {
+					return false;
+				}
+			}
 		}
-#if 0 // FIXME: remove this
-		return false;
-#else // FIXME: Rebuild the affected indexes, not the whole table!
-		return ib_table.indexes.count == 1;
-#endif
 	}
 
 	return true;
