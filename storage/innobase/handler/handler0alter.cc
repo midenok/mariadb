@@ -1407,6 +1407,38 @@ check_v_col_in_order(
 	return(true);
 }
 
+class altered_nullable_index_iterator
+{
+	List_iterator_fast<Create_field> cf_it;
+	const dict_index_t* index;
+public:
+	altered_nullable_index_iterator(const Alter_inplace_info* ha_alter_info, const dict_table_t& table)
+	: cf_it(ha_alter_info->alter_info->create_list),
+	index(UT_LIST_GET_FIRST(table.indexes)) {
+		++(*this);
+	}
+	altered_nullable_index_iterator& operator++()
+	{
+		while ((index = UT_LIST_GET_NEXT(indexes, index))) {
+			cf_it.rewind();
+			while (const Create_field* cf = cf_it++) {
+				Field *f = cf->field;
+				if (!(cf->altered && f && f->stored_in_db()
+					&& (f->flags & NOT_NULL_FLAG) && !(cf->flags & NOT_NULL_FLAG))) {
+					continue;
+				}
+				unsigned col_no = innodb_col_no(cf->field);
+				if (index->contains_col_or_prefix(col_no, false)) {
+					return *this;
+				}
+			}
+		}
+		return *this;
+	}
+	const dict_index_t* operator* () { return index; }
+	operator bool () { return index; }
+};
+
 /** Determine if an instant operation is possible for altering columns.
 @param[in]	ib_table	InnoDB table definition
 @param[in]	ha_alter_info	the ALTER TABLE operation
@@ -1511,23 +1543,9 @@ instant_alter_column_possible(
 	if ((ha_alter_info->handler_flags
 	     & ALTER_COLUMN_NULLABLE)
 	    && ib_table.not_redundant()) {
-		List_iterator_fast<Create_field> cf_it(
-			ha_alter_info->alter_info->create_list);
-		const dict_index_t* index = UT_LIST_GET_FIRST(ib_table.indexes);
-		for (index = UT_LIST_GET_NEXT(indexes, index); index != NULL;
-		     index = UT_LIST_GET_NEXT(indexes, index)) {
-			cf_it.rewind();
-			while (const Create_field* cf = cf_it++) {
-				Field *f = cf->field;
-				if (!(cf->altered && f && f->stored_in_db()
-					&& (f->flags & NOT_NULL_FLAG) && !(cf->flags & NOT_NULL_FLAG))) {
-					continue;
-				}
-				unsigned col_no = innodb_col_no(cf->field);
-				if (index->contains_col_or_prefix(col_no, false)) {
-					return false;
-				}
-			}
+		altered_nullable_index_iterator it(ha_alter_info, ib_table);
+		if (it) {
+			return false;
 		}
 	}
 
