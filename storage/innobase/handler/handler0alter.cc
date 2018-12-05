@@ -1412,6 +1412,7 @@ class altered_nullable_index_iterator
 	List_iterator_fast<Create_field> cf_it;
 	const dict_index_t* index;
 public:
+	altered_nullable_index_iterator() : index(nullptr) {}
 	altered_nullable_index_iterator(const Alter_inplace_info* ha_alter_info, const dict_table_t& table)
 	: cf_it(ha_alter_info->alter_info->create_list),
 	index(UT_LIST_GET_FIRST(table.indexes)) {
@@ -1437,6 +1438,19 @@ public:
 	}
 	const dict_index_t* operator* () { return index; }
 	operator bool () { return index; }
+	static altered_nullable_index_iterator end()
+	{
+		return altered_nullable_index_iterator();
+	}
+};
+
+class process
+{
+public:
+	void operator() (const dict_index_t* index)
+	{
+		const dict_index_t* i = index;
+	}
 };
 
 /** Determine if an instant operation is possible for altering columns.
@@ -7962,6 +7976,9 @@ err_exit:
 					alt_opt.page_compressed,
 					alt_opt.page_compression_level);
 		}
+
+		altered_nullable_index_iterator it(ha_alter_info, *m_prebuilt->table);
+		std::for_each(it, it.end(), process());
 
 		DBUG_ASSERT(m_prebuilt->trx->dict_operation_lock_mode == 0);
 		if (ha_alter_info->handler_flags & ~(INNOBASE_INPLACE_IGNORE)) {
