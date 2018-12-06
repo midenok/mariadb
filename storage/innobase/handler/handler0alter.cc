@@ -1411,11 +1411,11 @@ check_v_col_in_order(
 class altered_nullable_index_iterator
 {
 	List_iterator_fast<Create_field> cf_it;
-	const dict_index_t* index;
+	dict_index_t* index;
 	altered_nullable_index_iterator() : index(nullptr) {}
 public:
 	typedef std::ptrdiff_t		difference_type;
-	typedef const dict_index_t*	value_type;
+	typedef dict_index_t*		       value_type;
 	typedef value_type*		pointer;
 	typedef value_type&		reference;
 	typedef size_t			size_type;
@@ -1495,7 +1495,7 @@ public:
 	{
 		return !(*this == rhs);
 	}
-	iterator_type end()
+	iterator_type end() const
 	{
 		return key_buffer_name_iterator(buf_end, 0);
 	}
@@ -1516,19 +1516,23 @@ public:
 @param[in]	ha_alter_info	the ALTER TABLE operation */
 static inline
 bool
-instant_alter_indexes_possible(const dict_table_t& ib_table, const Alter_inplace_info* ha_alter_info)
+instant_alter_indexes_possible(const dict_table_t& ib_table, Alter_inplace_info* ha_alter_info)
 {
 	altered_nullable_index_iterator it(ib_table, ha_alter_info);
 	key_buffer_name_iterator names(ha_alter_info->index_drop_buffer, ha_alter_info->index_drop_count);
 	auto it_pred
-		= [&names](decltype(*it) index)
+		= [&names, ha_alter_info](decltype(*it) index)
 		{
-			return names.end() != std::find_if(
+			bool in_drop_buf = names.end() != std::find_if(
 				names, names.end(),
 				[&index](decltype(*names) name)
 				{
 					return 0 == strcmp(index->name, name.str);
 				});
+			if (!in_drop_buf) {
+				++ha_alter_info->index_rebuild_count;
+			}
+			return in_drop_buf;
 		};
 	return std::all_of(it, it.end(), it_pred);
 }
@@ -7799,7 +7803,8 @@ found_fk:
 		drop_fk = NULL;
 	}
 
-	if (ha_alter_info->index_drop_count) {
+	if (ha_alter_info->index_drop_count
+	    || ha_alter_info->index_rebuild_count) {
 		dict_index_t*	drop_primary = NULL;
 
 		DBUG_ASSERT(ha_alter_info->handler_flags
@@ -7809,7 +7814,8 @@ found_fk:
 		/* Check which indexes to drop. */
 		drop_index = static_cast<dict_index_t**>(
 			mem_heap_alloc(
-				heap, (ha_alter_info->index_drop_count + 1)
+				heap, (ha_alter_info->index_drop_count
+				       + ha_alter_info->index_rebuild_count + 1)
 				* sizeof *drop_index));
 
 		for (uint i = 0; i < ha_alter_info->index_drop_count; i++) {
@@ -7835,6 +7841,12 @@ found_fk:
 				}
 			}
 		}
+
+		altered_nullable_index_iterator it(*indexed_table, ha_alter_info);
+		std::for_each(it, it.end(),
+			      [&drop_index, &n_drop_index](decltype(*it) index) {
+				      drop_index[n_drop_index++] = index;
+			      });
 
 		/* If all FULLTEXT indexes were removed, drop an
 		internal FTS_DOC_ID_INDEX as well, unless it exists in
