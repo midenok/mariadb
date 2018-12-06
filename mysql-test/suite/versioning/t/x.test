@@ -1,0 +1,11 @@
+--source include/have_innodb.inc
+set default_storage_engine=innodb;
+
+create or replace table t1 (a int, b int not null, c int, index (a), index (b), index (c), index abc (a, b, c));
+--error ER_ALTER_OPERATION_NOT_SUPPORTED_REASON
+alter table t1 drop index a, drop index c, modify b int, algorithm=instant;
+--error ER_ALTER_OPERATION_NOT_SUPPORTED_REASON
+alter table t1 drop index b, modify b int, algorithm=instant;
+alter table t1 drop index a, drop index c, drop index abc, drop index b, modify b int, algorithm=instant;
+
+drop table t1;

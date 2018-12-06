@@ -1520,17 +1520,17 @@ instant_alter_indexes_possible(const dict_table_t& ib_table, const Alter_inplace
 {
 	altered_nullable_index_iterator it(ib_table, ha_alter_info);
 	key_buffer_name_iterator names(ha_alter_info->index_drop_buffer, ha_alter_info->index_drop_count);
-	return
-		std::all_of(it, it.end(),
-			[&names](decltype(*it) index)
-			{
-				return names.end() != std::find_if(
-					names, names.end(),
-					[&index](decltype(*names) name)
-					{
-						return 0 == strcmp(index->name, name.str);
-					});
-			});
+	auto it_pred
+		= [&names](decltype(*it) index)
+		{
+			return names.end() != std::find_if(
+				names, names.end(),
+				[&index](decltype(*names) name)
+				{
+					return 0 == strcmp(index->name, name.str);
+				});
+		};
+	return std::all_of(it, it.end(), it_pred);
 }
 
 /** Determine if an instant operation is possible for altering columns.
