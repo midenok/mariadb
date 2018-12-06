@@ -1411,9 +1411,17 @@ class altered_nullable_index_iterator
 {
 	List_iterator_fast<Create_field> cf_it;
 	const dict_index_t* index;
-public:
 	altered_nullable_index_iterator() : index(nullptr) {}
-	altered_nullable_index_iterator(const Alter_inplace_info* ha_alter_info, const dict_table_t& table)
+public:
+	typedef std::ptrdiff_t		difference_type;
+	typedef const dict_index_t*	value_type;
+	typedef value_type*		pointer;
+	typedef value_type&		reference;
+	typedef size_t			size_type;
+	typedef std::forward_iterator_tag iterator_category;
+	typedef altered_nullable_index_iterator iterator_type;
+
+	altered_nullable_index_iterator(const dict_table_t& table, const Alter_inplace_info* ha_alter_info)
 	: cf_it(ha_alter_info->alter_info->create_list),
 	index(UT_LIST_GET_FIRST(table.indexes)) {
 		++(*this);
@@ -1436,22 +1444,89 @@ public:
 		}
 		return *this;
 	}
-	const dict_index_t* operator* () { return index; }
-	operator bool () { return index; }
-	static altered_nullable_index_iterator end()
+	value_type operator* () const { return index; }
+	operator bool () const { return index; }
+	bool operator==(const iterator_type& rhs) const
 	{
-		return altered_nullable_index_iterator();
+		return index == rhs.index;
+	}
+	bool operator!=(const iterator_type& rhs) const
+	{
+		return !(*this == rhs);
+	}
+	static iterator_type end()
+	{
+		return iterator_type();
 	}
 };
 
-class process
+class key_buffer_name_iterator
 {
+	KEY** key;
+	KEY** buf_end;
 public:
-	void operator() (const dict_index_t* index)
+	typedef std::ptrdiff_t		difference_type;
+	typedef LEX_CSTRING		value_type;
+	typedef value_type*		pointer;
+	typedef value_type&		reference;
+	typedef size_t			size_type;
+	typedef std::forward_iterator_tag iterator_category;
+	typedef key_buffer_name_iterator iterator_type;
+
+	key_buffer_name_iterator(KEY** buffer, uint count)
+	: key(buffer), buf_end(&buffer[count]) {}
+	key_buffer_name_iterator& operator++ ()
 	{
-		const dict_index_t* i = index;
+		++key;
+		return *this;
+	}
+	value_type operator* () const
+	{
+		return (*key)->name;
+	}
+	operator bool () const { return key == buf_end; }
+	bool operator==(const iterator_type& rhs) const
+	{
+		return key == rhs.key;
+	}
+	bool operator!=(const iterator_type& rhs) const
+	{
+		return !(*this == rhs);
+	}
+	iterator_type end()
+	{
+		return key_buffer_name_iterator(buf_end, 0);
 	}
 };
+
+// class process
+// {
+// public:
+// 	void operator() (const dict_index_t* index)
+// 	{
+// 		const dict_index_t* i = index;
+// 	}
+// };
+
+static inline
+bool
+index_rebuild_required(const dict_table_t& ib_table, const Alter_inplace_info* ha_alter_info)
+{
+	altered_nullable_index_iterator it(ib_table, ha_alter_info);
+	key_buffer_name_iterator names(ha_alter_info->index_drop_buffer, ha_alter_info->index_drop_count);
+	// Check if all affected indexes are already in DROP INDEX clause
+	return
+		std::all_of(it, it.end(),
+			[&names](decltype(*it) index)
+			{
+				return names.end() != std::find_if(
+					names, names.end(),
+					[&index](decltype(*names) name)
+					{
+						return 0 == strcmp(index->name, name.str);
+					});
+			});
+}
 
 /** Determine if an instant operation is possible for altering columns.
 @param[in]	ib_table	InnoDB table definition
@@ -1461,7 +1536,7 @@ static
 bool
 instant_alter_column_possible(
 	const dict_table_t&		ib_table,
-	const Alter_inplace_info*	ha_alter_info,
+	Alter_inplace_info*		ha_alter_info,
 	const TABLE*			table)
 {
 	if (!ib_table.supports_instant()) {
@@ -1557,8 +1632,8 @@ instant_alter_column_possible(
 	if ((ha_alter_info->handler_flags
 	     & ALTER_COLUMN_NULLABLE)
 	    && ib_table.not_redundant()) {
-		altered_nullable_index_iterator it(ha_alter_info, ib_table);
-		if (it) {
+		if (index_rebuild_required(ib_table, ha_alter_info)) {
+			ha_alter_info->handler_flags |= ALTER_ADD_NON_UNIQUE_NON_PRIM_INDEX | ALTER_DROP_NON_UNIQUE_NON_PRIM_INDEX;
 			return false;
 		}
 	}
@@ -7976,9 +8051,6 @@ err_exit:
 					alt_opt.page_compressed,
 					alt_opt.page_compression_level);
 		}
-
-		altered_nullable_index_iterator it(ha_alter_info, *m_prebuilt->table);
-		std::for_each(it, it.end(), process());
 
 		DBUG_ASSERT(m_prebuilt->trx->dict_operation_lock_mode == 0);
 		if (ha_alter_info->handler_flags & ~(INNOBASE_INPLACE_IGNORE)) {
