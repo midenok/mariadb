@@ -1407,6 +1407,7 @@ check_v_col_in_order(
 	return(true);
 }
 
+/** Iterate through table secondary indexes with altered-nullable columns. */
 class altered_nullable_index_iterator
 {
 	List_iterator_fast<Create_field> cf_it;
@@ -1460,6 +1461,7 @@ public:
 	}
 };
 
+/** Iterate through key_buffer names. */
 class key_buffer_name_iterator
 {
 	KEY** key;
@@ -1508,13 +1510,16 @@ public:
 // 	}
 // };
 
+
+/** Check if all nullable-affected table indexes are already in DROP INDEX clause.
+@param[in]	ib_table	InnoDB table definition
+@param[in]	ha_alter_info	the ALTER TABLE operation */
 static inline
 bool
-index_rebuild_required(const dict_table_t& ib_table, const Alter_inplace_info* ha_alter_info)
+instant_alter_indexes_possible(const dict_table_t& ib_table, const Alter_inplace_info* ha_alter_info)
 {
 	altered_nullable_index_iterator it(ib_table, ha_alter_info);
 	key_buffer_name_iterator names(ha_alter_info->index_drop_buffer, ha_alter_info->index_drop_count);
-	// Check if all affected indexes are already in DROP INDEX clause
 	return
 		std::all_of(it, it.end(),
 			[&names](decltype(*it) index)
@@ -1632,7 +1637,7 @@ instant_alter_column_possible(
 	if ((ha_alter_info->handler_flags
 	     & ALTER_COLUMN_NULLABLE)
 	    && ib_table.not_redundant()) {
-		if (index_rebuild_required(ib_table, ha_alter_info)) {
+		if (!instant_alter_indexes_possible(ib_table, ha_alter_info)) {
 			ha_alter_info->handler_flags |= ALTER_ADD_NON_UNIQUE_NON_PRIM_INDEX | ALTER_DROP_NON_UNIQUE_NON_PRIM_INDEX;
 			return false;
 		}
