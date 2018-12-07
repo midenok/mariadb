@@ -1407,29 +1407,59 @@ check_v_col_in_order(
 	return(true);
 }
 
-/** Iterate through table secondary indexes with altered-nullable columns. */
-class altered_nullable_index_iterator
+class index_iterator
 {
-	List_iterator_fast<Create_field> cf_it;
 	dict_index_t* index;
-	altered_nullable_index_iterator() : index(nullptr) {}
+protected:
+	index_iterator() : index(nullptr) {}
 public:
 	typedef std::ptrdiff_t		difference_type;
-	typedef dict_index_t*		       value_type;
+	typedef dict_index_t*		value_type;
 	typedef value_type*		pointer;
 	typedef value_type&		reference;
 	typedef size_t			size_type;
 	typedef std::forward_iterator_tag iterator_category;
+	typedef index_iterator iterator_type;
+	index_iterator(const dict_table_t& table) :
+	index(UT_LIST_GET_FIRST(table.indexes)) {}
+	iterator_type& operator++()
+	{
+		index = UT_LIST_GET_NEXT(indexes, index);
+		return *this;
+	}
+	value_type operator* () const { return index; }
+	bool operator==(const iterator_type& rhs) const
+	{
+		return index == rhs.index;
+	}
+	bool operator!=(const iterator_type& rhs) const
+	{
+		return !(*this == rhs);
+	}
+	static iterator_type end()
+	{
+		return iterator_type();
+	}
+};
+
+/** Iterate through table secondary indexes with altered-nullable columns. */
+class altered_nullable_index_iterator : public index_iterator
+{
+	List_iterator_fast<Create_field> create_it;
+protected:
+	altered_nullable_index_iterator() : index_iterator() {}
+public:
 	typedef altered_nullable_index_iterator iterator_type;
 
 	altered_nullable_index_iterator(const dict_table_t& table, const Alter_inplace_info* ha_alter_info)
-	: cf_it(ha_alter_info->alter_info->create_list),
-	index(UT_LIST_GET_FIRST(table.indexes)) {
-		++(*this);
-	}
-	altered_nullable_index_iterator& operator++()
+	: index_iterator(table),
+	create_it(ha_alter_info->alter_info->create_list) { ++(*this); }
+	iterator_type& operator++()
 	{
-		while ((index = UT_LIST_GET_NEXT(indexes, index))) {
+		index_iterator &it = static_cast<index_iterator &>(*this);
+		List_iterator_fast<Create_field> &cf_it = create_it;
+		++it;
+		it = std::find_if(it, it.end(), [&cf_it](decltype(*it) index) {
 			cf_it.rewind();
 			while (const Create_field* cf = cf_it++) {
 				Field *f = cf->field;
@@ -1439,17 +1469,17 @@ public:
 				}
 				unsigned col_no = innodb_col_no(cf->field);
 				if (index->contains_col_or_prefix(col_no, false)) {
-					return *this;
+					return true;
 				}
 			}
-		}
+			return false;
+		});
 		return *this;
 	}
-	value_type operator* () const { return index; }
-	operator bool () const { return index; }
 	bool operator==(const iterator_type& rhs) const
 	{
-		return index == rhs.index;
+		return static_cast<const index_iterator &>(*this)
+			== static_cast<const index_iterator &>(rhs);
 	}
 	bool operator!=(const iterator_type& rhs) const
 	{
