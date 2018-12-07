@@ -7869,6 +7869,7 @@ found_fk:
 
 		for(index_iterator it(*indexed_table, true); *it; ++it) {
 			if ((*it)->to_be_rebuilt) {
+				ut_ad(!(*it)->is_primary());
 				drop_index[n_drop_index++] = *it;
 			}
 		}
