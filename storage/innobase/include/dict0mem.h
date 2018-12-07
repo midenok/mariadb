@@ -975,6 +975,7 @@ struct dict_index_t {
 	unsigned	to_be_dropped:1;
 				/*!< TRUE if the index is to be dropped;
 				protected by dict_operation_lock */
+	unsigned	to_be_rebuilt:1;
 	unsigned	online_status:2;
 				/*!< enum online_index_status.
 				Transitions from ONLINE_INDEX_COMPLETE (to

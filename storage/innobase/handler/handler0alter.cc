@@ -1420,8 +1420,12 @@ public:
 	typedef size_t			size_type;
 	typedef std::forward_iterator_tag iterator_category;
 	typedef index_iterator iterator_type;
-	index_iterator(const dict_table_t& table) :
-	index(UT_LIST_GET_FIRST(table.indexes)) {}
+	index_iterator(const dict_table_t& table, bool secondary = false) :
+	index(UT_LIST_GET_FIRST(table.indexes)) {
+		if (secondary) {
+			++(*this);
+		}
+	}
 	iterator_type& operator++()
 	{
 		index = UT_LIST_GET_NEXT(indexes, index);
@@ -1531,16 +1535,6 @@ public:
 	}
 };
 
-// class process
-// {
-// public:
-// 	void operator() (const dict_index_t* index)
-// 	{
-// 		const dict_index_t* i = index;
-// 	}
-// };
-
-
 /** Check if all nullable-affected table indexes are already in DROP INDEX clause.
 @param[in]	ib_table	InnoDB table definition
 @param[in]	ha_alter_info	the ALTER TABLE operation */
@@ -1561,6 +1555,7 @@ instant_alter_indexes_possible(const dict_table_t& ib_table, Alter_inplace_info*
 				});
 			if (!in_drop_buf) {
 				++ha_alter_info->index_rebuild_count;
+				index->to_be_rebuilt = true;
 			}
 			return in_drop_buf;
 		};
@@ -7872,11 +7867,11 @@ found_fk:
 			}
 		}
 
-		altered_nullable_index_iterator it(*indexed_table, ha_alter_info);
-		std::for_each(it, it.end(),
-			      [&drop_index, &n_drop_index](decltype(*it) index) {
-				      drop_index[n_drop_index++] = index;
-			      });
+		for(index_iterator it(*indexed_table, true); *it; ++it) {
+			if ((*it)->to_be_rebuilt) {
+				drop_index[n_drop_index++] = *it;
+			}
+		}
 
 		/* If all FULLTEXT indexes were removed, drop an
 		internal FTS_DOC_ID_INDEX as well, unless it exists in
