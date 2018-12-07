@@ -1531,35 +1531,38 @@ public:
 	}
 };
 
-/** Iterate through key_buffer names. */
-class key_buffer_name_iterator
+/** Iterate through array of known size. */
+template <class element_t>
+class array_iterator
 {
-	KEY** key;
-	KEY** buf_end;
+	element_t* array;
+	element_t* array_end;
 public:
 	typedef std::ptrdiff_t		difference_type;
-	typedef LEX_CSTRING		value_type;
+	typedef element_t		value_type;
 	typedef value_type*		pointer;
 	typedef value_type&		reference;
 	typedef size_t			size_type;
 	typedef std::forward_iterator_tag iterator_category;
-	typedef key_buffer_name_iterator iterator_type;
+	typedef array_iterator iterator_type;
 
-	key_buffer_name_iterator(KEY** buffer, uint count)
-	: key(buffer), buf_end(&buffer[count]) {}
-	key_buffer_name_iterator& operator++ ()
+	array_iterator(element_t* buffer, uint count)
+	: array(buffer), array_end(&buffer[count]) {}
+	array_iterator& operator++ ()
 	{
-		++key;
+		ut_ad(array < array_end);
+		++array;
 		return *this;
 	}
 	value_type operator* () const
 	{
-		return (*key)->name;
+		ut_ad(array < array_end);
+		return *array;
 	}
-	operator bool () const { return key == buf_end; }
+	operator bool () const { return array == array_end; }
 	bool operator==(const iterator_type& rhs) const
 	{
-		return key == rhs.key;
+		return array == rhs.array;
 	}
 	bool operator!=(const iterator_type& rhs) const
 	{
@@ -1567,7 +1570,7 @@ public:
 	}
 	iterator_type end() const
 	{
-		return key_buffer_name_iterator(buf_end, 0);
+		return array_iterator(array_end, 0);
 	}
 };
 
@@ -1579,15 +1582,15 @@ bool
 instant_alter_indexes_possible(const dict_table_t& ib_table, Alter_inplace_info* ha_alter_info)
 {
 	altered_nullable_index_iterator it(ib_table, ha_alter_info);
-	key_buffer_name_iterator names(ha_alter_info->index_drop_buffer, ha_alter_info->index_drop_count);
+	array_iterator<KEY *> keys(ha_alter_info->index_drop_buffer, ha_alter_info->index_drop_count);
 	auto it_pred
-		= [&names, ha_alter_info](decltype(*it) index)
+		= [&keys, ha_alter_info](decltype(*it) index)
 		{
-			bool in_drop_buf = names.end() != std::find_if(
-				names, names.end(),
-				[&index](decltype(*names) name)
+			bool in_drop_buf = keys.end() != std::find_if(
+				keys, keys.end(),
+				[&index](decltype(*keys) key)
 				{
-					return 0 == strcmp(index->name, name.str);
+					return 0 == strcmp(index->name, key->name.str);
 				});
 			if (!in_drop_buf) {
 				++ha_alter_info->index_rebuild_count;
@@ -3931,6 +3934,15 @@ created_clustered:
 			}
 
 			indexdef++;
+		}
+
+		if (ha_alter_info->index_rebuild_count) {
+			for(index_iterator it(*old_table, true); *it; ++it) {
+				if (!(*it)->to_be_rebuilt) {
+					continue;
+				}
+				//check_if_keyname_exists((*it)->name, table->key_info, 1);
+			}
 		}
 	}
 
