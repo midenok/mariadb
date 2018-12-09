@@ -1583,22 +1583,25 @@ instant_alter_indexes_possible(const dict_table_t& ib_table, Alter_inplace_info*
 {
 	altered_nullable_index_iterator it(ib_table, ha_alter_info);
 	array_iterator<KEY *> keys(ha_alter_info->index_drop_buffer, ha_alter_info->index_drop_count);
-	auto it_pred
-		= [&keys, ha_alter_info](decltype(*it) index)
-		{
-			bool in_drop_buf = keys.end() != std::find_if(
-				keys, keys.end(),
-				[&index](decltype(*keys) key)
-				{
-					return 0 == strcmp(index->name, key->name.str);
-				});
-			if (!in_drop_buf) {
-				++ha_alter_info->index_rebuild_count;
-				index->to_be_rebuilt = true;
-			}
-			return in_drop_buf;
-		};
-	return std::all_of(it, it.end(), it_pred);
+	bool all_in_drop_buf = true;
+	for(; *it; ++it)
+	{
+		dict_index_t *index = *it;
+		bool in_drop_buf = keys.end() != std::find_if(
+			keys, keys.end(),
+			[&index](decltype(*keys) key)
+			{
+				return 0 == strcmp(index->name, key->name.str);
+			});
+		if (!in_drop_buf) {
+			++ha_alter_info->index_rebuild_count;
+			index->to_be_rebuilt = true;
+			all_in_drop_buf = false;
+		} else {
+			index->to_be_rebuilt = false;
+		}
+	};
+	return all_in_drop_buf;
 }
 
 /** Determine if an instant operation is possible for altering columns.
@@ -3938,10 +3941,25 @@ created_clustered:
 
 		if (ha_alter_info->index_rebuild_count) {
 			for(index_iterator it(*old_table, true); *it; ++it) {
-				if (!(*it)->to_be_rebuilt) {
+				dict_index_t *index = *it;
+				if (!index->to_be_rebuilt) {
 					continue;
 				}
-				//check_if_keyname_exists((*it)->name, table->key_info, 1);
+				for (uint i = 0; i < ha_alter_info->key_count; ++i) {
+					if (strcmp(index->name, key_info[i].name.str)) {
+						continue;
+					}
+					innobase_create_index_def(
+						altered_table, key_info, i,
+						false, false, indexdef, heap);
+					n_add++;
+
+					if (indexdef->ind_type & DICT_FTS) {
+						n_fts_add++;
+					}
+					indexdef++;
+					break;
+				}
 			}
 		}
 	}
