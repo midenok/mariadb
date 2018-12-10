@@ -647,7 +647,7 @@ public:
   TABLE *table;                                 // Pointer for table
   TABLE *orig_table;                            // Pointer to original table
   const char * const *table_name;               // Pointer to alias in TABLE
-  LEX_CSTRING field_name;
+  Lex_ident field_name;
   LEX_CSTRING comment;
   /** reference to the list of options or NULL */
   engine_option_value *option_list;
