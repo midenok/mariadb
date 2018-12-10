@@ -83,6 +83,7 @@ static const alter_table_operations INNOBASE_ALTER_REBUILD
 	| ALTER_DROP_PK_INDEX
 	| ALTER_OPTIONS
 	/* ALTER_OPTIONS needs to check alter_options_need_rebuild() */
+	| ALTER_COLUMN_NULLABLE
 	| INNOBASE_DEFAULTS
 	| ALTER_STORED_COLUMN_ORDER
 	| ALTER_DROP_STORED_COLUMN
@@ -120,8 +121,7 @@ static const alter_table_operations INNOBASE_ALTER_NOCREATE
 /** Operations that InnoDB cares about and can perform without rebuild */
 static const alter_table_operations INNOBASE_ALTER_NOREBUILD
 	= INNOBASE_ONLINE_CREATE
-	| INNOBASE_ALTER_NOCREATE
-	| ALTER_COLUMN_NULLABLE;
+	| INNOBASE_ALTER_NOCREATE;
 
 /** Operations that can be performed instantly, without inplace_alter_table() */
 static const alter_table_operations INNOBASE_ALTER_INSTANT
