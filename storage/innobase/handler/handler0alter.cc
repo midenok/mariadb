@@ -7992,7 +7992,8 @@ check_if_can_drop_indexes:
 			for (uint i = 0; i < n_drop_index; i++) {
 				dict_index_t*	index = drop_index[i];
 
-				if (innobase_check_foreign_key_index(
+				if (!index->to_be_rebuilt
+				    && innobase_check_foreign_key_index(
 						ha_alter_info, index,
 						indexed_table, col_names,
 						m_prebuilt->trx, drop_fk, n_drop_fk)) {
