@@ -1574,16 +1574,39 @@ public:
 	}
 };
 
+static MY_ATTRIBUTE((nonnull(1,2,3,5), warn_unused_result))
+bool
+innobase_check_foreign_key_index(
+/*=============================*/
+	Alter_inplace_info*	ha_alter_info,	/*!< in: Structure describing
+						changes to be done by ALTER
+						TABLE */
+	dict_index_t*		index,		/*!< in: index to check */
+	dict_table_t*		indexed_table,	/*!< in: table that owns the
+						foreign keys */
+	const char**		col_names,	/*!< in: column names, or NULL
+						for indexed_table->col_names */
+	trx_t*			trx,		/*!< in/out: transaction */
+	dict_foreign_t**	drop_fk,	/*!< in: Foreign key constraints
+						to drop */
+	ulint			n_drop_fk);	/*!< in: Number of foreign keys
+						to drop */
+
 /** Check if all nullable-affected table indexes are already in DROP INDEX clause.
 @param[in]	ib_table	InnoDB table definition
 @param[in]	ha_alter_info	the ALTER TABLE operation */
 static inline
 bool
-instant_alter_indexes_possible(const dict_table_t& ib_table, Alter_inplace_info* ha_alter_info)
+instant_alter_indexes_possible(const dict_table_t& ib_table, Alter_inplace_info* ha_alter_info, row_prebuilt_t *prebuilt)
 {
 	altered_nullable_index_iterator it(ib_table, ha_alter_info);
 	array_iterator<KEY *> keys(ha_alter_info->index_drop_buffer, ha_alter_info->index_drop_count);
 	bool all_in_drop_buf = true;
+	bool free_mutex = false;
+	if (!mutex_own(&dict_sys->mutex)) {
+		mutex_enter(&dict_sys->mutex);
+		free_mutex = true;
+	}
 	for(; *it; ++it)
 	{
 		dict_index_t *index = *it;
@@ -1594,26 +1617,45 @@ instant_alter_indexes_possible(const dict_table_t& ib_table, Alter_inplace_info*
 				return 0 == strcmp(index->name, key->name.str);
 			});
 		if (!in_drop_buf) {
-			++ha_alter_info->index_rebuild_count;
-			index->to_be_rebuilt = true;
-			all_in_drop_buf = false;
+			if (innobase_check_foreign_key_index(
+				ha_alter_info, index, const_cast<dict_table_t *>(&ib_table), NULL,
+				prebuilt->trx, NULL, 0)) {
+				if (free_mutex) {
+					mutex_exit(&dict_sys->mutex);
+				}
+				ha_alter_info->index_rebuild_count = 0;
+				return false;
+			} else {
+				++ha_alter_info->index_rebuild_count;
+				index->to_be_rebuilt = true;
+				all_in_drop_buf = false;
+			}
 		} else {
 			index->to_be_rebuilt = false;
 		}
 	};
-	return all_in_drop_buf;
+	if (free_mutex) {
+		mutex_exit(&dict_sys->mutex);
+	}
+	if (all_in_drop_buf) {
+		return true;
+	}
+	ha_alter_info->handler_flags |= ALTER_ADD_NON_UNIQUE_NON_PRIM_INDEX | ALTER_DROP_NON_UNIQUE_NON_PRIM_INDEX;
+	return false;
 }
 
 /** Determine if an instant operation is possible for altering columns.
 @param[in]	ib_table	InnoDB table definition
 @param[in]	ha_alter_info	the ALTER TABLE operation
-@param[in]	table		table definition before ALTER TABLE */
+@param[in]	table		table definition before ALTER TABLE
+@param[in]	prebuilt	prebuilt/cached data structures */
 static
 bool
 instant_alter_column_possible(
-	const dict_table_t&		ib_table,
+	const dict_table_t&             ib_table,
 	Alter_inplace_info*		ha_alter_info,
-	const TABLE*			table)
+	const TABLE*			table,
+	row_prebuilt_t*			prebuilt)
 {
 	if (!ib_table.supports_instant()) {
 		return false;
@@ -1708,10 +1750,7 @@ instant_alter_column_possible(
 	if ((ha_alter_info->handler_flags
 	     & ALTER_COLUMN_NULLABLE)
 	    && ib_table.not_redundant()) {
-		if (!instant_alter_indexes_possible(ib_table, ha_alter_info)) {
-			ha_alter_info->handler_flags |= ALTER_ADD_NON_UNIQUE_NON_PRIM_INDEX | ALTER_DROP_NON_UNIQUE_NON_PRIM_INDEX;
-			return false;
-		}
+		return instant_alter_indexes_possible(ib_table, ha_alter_info, prebuilt);
 	}
 
 	return true;
@@ -2022,7 +2061,7 @@ ha_innobase::check_if_supported_inplace_alter(
 	}
 
 	const bool supports_instant = instant_alter_column_possible(
-		*m_prebuilt->table, ha_alter_info, table);
+		*m_prebuilt->table, ha_alter_info, table, m_prebuilt);
 	bool	add_drop_v_cols = false;
 
 	/* If there is add or drop virtual columns, we will support operations
@@ -6139,6 +6178,7 @@ while preparing ALTER TABLE.
 @param fts_doc_id_col The column number of FTS_DOC_ID
 @param add_fts_doc_id Flag: add column FTS_DOC_ID?
 @param add_fts_doc_id_idx Flag: add index FTS_DOC_ID_INDEX (FTS_DOC_ID)?
+@param prebuilt prebuilt/cached data structures
 
 @retval true Failure
 @retval false Success
@@ -6155,7 +6195,8 @@ prepare_inplace_alter_table_dict(
 	ulint			flags2,
 	ulint			fts_doc_id_col,
 	bool			add_fts_doc_id,
-	bool			add_fts_doc_id_idx)
+	bool			add_fts_doc_id_idx,
+	row_prebuilt_t*		prebuilt)
 {
 	bool			dict_locked	= false;
 	ulint*			add_key_nums;	/* MySQL key numbers */
@@ -6603,7 +6644,7 @@ new_clustered_failed:
 	}
 
 	if (ctx->need_rebuild() && instant_alter_column_possible(
-		    *user_table, ha_alter_info, old_table)
+		    *user_table, ha_alter_info, old_table, prebuilt)
 #if 1 // MDEV-17459: adjust fts_fetch_doc_from_rec() and friends; remove this
 		&& !innobase_fulltext_exist(altered_table)
 #endif
@@ -8291,7 +8332,7 @@ found_col:
 			    table_share->table_name.str,
 			    info.flags(), info.flags2(),
 			    fts_doc_col_no, add_fts_doc_id,
-			    add_fts_doc_id_idx));
+			    add_fts_doc_id_idx, m_prebuilt));
 }
 
 /** Check that the column is part of a virtual index(index contains
