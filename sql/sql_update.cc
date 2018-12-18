@@ -1351,6 +1351,8 @@ bool mysql_prepare_update(THD *thd, TABLE_LIST *table_list,
       DBUG_RETURN(true);
     }
   }
+  if (table_list->cont)
+    table_list->cont->table->use_all_columns();
 
   select_lex->fix_prepare_information(thd, conds, &fake_conds);
   DBUG_RETURN(FALSE);

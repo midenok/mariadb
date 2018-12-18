@@ -3119,6 +3119,7 @@ public:
 protected:
   int cont_write_row(const uchar *buf);
   int cont_delete_row(const uchar *buf);
+  int cont_update_row(const uchar *from, const uchar *to);
 public:
   /** PRIMARY KEY WITHOUT OVERLAPS check is done globally */
   int ha_check_overlaps(const uchar *old_data, const uchar* new_data);

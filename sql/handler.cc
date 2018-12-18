@@ -6297,6 +6297,9 @@ int handler::ha_update_row(const uchar *old_data, const uchar *new_data)
                       { error= update_row(old_data, new_data);})
 
   MYSQL_UPDATE_ROW_DONE(error);
+
+  if (likely(!error))
+    error= cont_update_row(old_data, new_data);
   if (likely(!error) && !row_already_logged)
   {
     rows_changed++;
@@ -6873,6 +6876,14 @@ int handler::cont_delete_row(const uchar *buf)
       return error;
   }
   return 0;
+}
+
+int handler::cont_update_row(const uchar *from, const uchar *to)
+{
+  int error= cont_delete_row(from);
+  if (!error)
+    error= cont_write_row(to);
+  return error;
 }
 
 #ifdef WITH_WSREP

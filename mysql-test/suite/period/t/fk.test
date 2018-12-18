@@ -36,12 +36,18 @@ insert into tt values(1, '2000-01-07', '2000-01-08');
 select * from tt_cont;
 insert into tt values(1, '2000-01-02', '2000-01-03');
 select * from tt_cont;
-delete from tt where s = '2000-01-07';
+
+update tt set s= '2000-01-08', e= '2000-01-09' where s = '2000-01-02';
 select * from tt_cont;
-delete from tt where s = '2000-01-02';
+update tt set e= '2000-01-03' where s = '2000-01-01';
 select * from tt_cont;
-insert into tt values(1, '2000-01-02', '2000-01-03');
+
+delete from tt where s = '2000-01-08';
+select * from tt_cont;
+delete from tt where s = '2000-01-03';
+select * from tt_cont;
+insert into tt values(1, '2000-01-03', '2000-01-07');
 delete from tt where s = '2000-01-01';
 select * from tt_cont;
-delete from tt where s <= '2000-01-03';
+delete from tt;
 select * from tt_cont;
