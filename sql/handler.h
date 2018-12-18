@@ -3118,6 +3118,7 @@ public:
   Table_flags ha_table_flags() const { return cached_table_flags; }
 protected:
   int cont_write_row(const uchar *buf);
+  int cont_delete_row(const uchar *buf);
 public:
   /** PRIMARY KEY WITHOUT OVERLAPS check is done globally */
   int ha_check_overlaps(const uchar *old_data, const uchar* new_data);

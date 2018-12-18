@@ -6456,6 +6456,8 @@ void TABLE::mark_columns_needed_for_delete(bool with_period)
   {
     use_all_columns();
   }
+  if (cont)
+    cont->use_all_columns();
 }
 
 

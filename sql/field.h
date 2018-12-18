@@ -4962,6 +4962,13 @@ int convert_null_to_field_value_or_error(Field *field);
 bool check_expression(Virtual_column_info *vcol, LEX_CSTRING *name,
                       enum_vcol_info_type type);
 
+static inline Field **begin(Field **f){ return f; }
+static inline Field **end(Field **f){ return NULL; }
+
+static inline Field *begin(Field *f){ return f; }
+static inline Field
+*end(Field *f){ return NULL; }
+
 /*
   The following are for the interface with the .frm file
 */

@@ -6353,6 +6353,8 @@ int handler::ha_delete_row(const uchar *buf)
     { error= delete_row(buf);})
   MYSQL_DELETE_ROW_DONE(error);
   if (likely(!error))
+    error= cont_delete_row(buf);
+  if (likely(!error))
   {
     rows_changed++;
     error= binlog_log_row(table, buf, 0, log_func);
@@ -6786,6 +6788,87 @@ int handler::cont_write_row(const uchar *buf)
     else
       error= cont->file->ha_write_row(record[2]);
 
+    if (error)
+      return error;
+  }
+  return 0;
+}
+
+int handler::cont_delete_row(const uchar *buf)
+{
+  if (!table->cont) return 0;
+  auto cont= table->cont;
+  auto *record= cont->record;
+  for (uint k= 0; k < cont->s->keys; k++)
+  {
+    auto &key= cont->key_info[k];
+    auto key_parts= key.user_defined_key_parts;
+
+    uint start_fieldnr= key_parts - 2;
+    uint end_fieldnr=   key_parts - 1;
+
+    cont->field[0]->store(key.name, system_charset_info);
+    period_copy_record_to_cont(table, buf);
+    key_copy(record[1], record[0], &key, 0);
+
+    int error= cont->file->ha_index_init(k, 0);
+    if (error)
+      return error;
+
+    bool key_found= false;
+    for (int run= 0; !key_found && run < 2; run++)
+    {
+      error= period_get_next_neighbour(key, cont->file, record[1], record[1],
+                                       run == 0);
+      if (error && error != HA_ERR_KEY_NOT_FOUND)
+      {
+        cont->file->ha_index_end();
+        return error;
+      }
+      key_found= !error && period_keys_match(key, record[0], record[1]);
+    }
+    DBUG_ASSERT(key_found);
+    error= cont->file->ha_index_end();
+    if (error)
+      return error;
+
+    auto &period_start= *key.key_part[start_fieldnr].field;
+    auto &period_end=   *key.key_part[end_fieldnr].field;
+
+    int start_cmp= period_start.cmp(period_start.ptr,
+                                    period_start.ptr_in_record(record[1]));
+    int end_cmp= period_end.cmp(period_end.ptr,
+                                period_end.ptr_in_record(record[1]));
+
+    if (start_cmp == 0 && end_cmp == 0)
+    {
+      return cont->file->ha_delete_row(record[0]);
+    }
+
+    DBUG_ASSERT(start_cmp >= 0 && end_cmp <= 0);
+    auto raw_len= period_start.pack_length();
+
+    if (start_cmp != 0 && end_cmp != 0)
+    {
+      memcpy(record[2], record[1], cont->s->reclength);
+      memcpy(period_start.ptr - record[0] + record[2], period_end.ptr, raw_len);
+    }
+
+    if (start_cmp == 0)
+    {
+      memcpy(period_start.ptr, period_end.ptr, raw_len);
+      memcpy(period_end.ptr, period_end.ptr_in_record(record[1]), raw_len);
+    }
+    else
+    {
+      memcpy(period_end.ptr, period_start.ptr, raw_len);
+      memcpy(period_start.ptr, period_start.ptr_in_record(record[1]), raw_len);
+    }
+
+    error= cont->file->ha_update_row(record[1], record[0]);
+
+    if (!error && start_cmp != 0 && end_cmp != 0)
+      error= cont->file->ha_write_row(record[2]);
     if (error)
       return error;
   }
