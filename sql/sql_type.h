@@ -476,7 +476,7 @@ public:
   Sec9 &round(uint dec);
   Sec9 &round(uint dec, time_round_mode_t mode)
   {
-    return mode == TIME_FRAC_TRUNCATE  ? trunc(dec) : round(dec);
+    return mode == time_round_mode_t(TIME_FRAC_TRUNCATE)  ? trunc(dec) : round(dec);
   }
 };
 
