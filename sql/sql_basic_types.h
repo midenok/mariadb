@@ -23,15 +23,26 @@
 typedef ulonglong sql_mode_t;
 typedef int64 query_id_t;
 
-static constexpr ulonglong
-  TIME_CONV_NONE              (0U),
-  TIME_FUZZY_DATES            (1U),
-  TIME_TIME_ONLY              (4U),
-  TIME_INTERVAL_hhmmssff      (8U),
-  TIME_INTERVAL_DAY           (16U),
-  TIME_NO_ZERO_IN_DATE        (1UL << 23),
-  TIME_NO_ZERO_DATE           (1UL << 24),
-  TIME_INVALID_DATES          (1UL << 25);
+
+/*
+  Use FRAC_NONE when the value needs no rounding nor truncation,
+  because it is already known not to haveany fractional digits outside
+  of the requested precision.
+*/
+
+enum date_modes {
+  TIME_CONV_NONE              = 0U,
+  TIME_FRAC_NONE              = 0U,
+  TIME_FUZZY_DATES            = 1U,
+  TIME_TIME_ONLY              = 4U,
+  TIME_INTERVAL_hhmmssff      = 8U,
+  TIME_INTERVAL_DAY           = 16U,
+  TIME_FRAC_TRUNCATE          = 32U,
+  TIME_FRAC_ROUND             = 64U,
+  TIME_NO_ZERO_IN_DATE        = 1UL << 23,
+  TIME_NO_ZERO_DATE           = 1UL << 24,
+  TIME_INVALID_DATES          = 1UL << 25
+};
 
 
 static constexpr ulonglong
@@ -48,17 +59,6 @@ static constexpr ulonglong
                                TIME_INVALID_DATES);
 
 /*
-  Use FRAC_NONE when the value needs no rounding nor truncation,
-  because it is already known not to haveany fractional digits outside
-  of the requested precision.
-*/
-static constexpr ulonglong
-  TIME_FRAC_NONE              (0),
-  TIME_FRAC_TRUNCATE          (RANGE0_LAST << 1),
-  TIME_FRAC_ROUND             (RANGE0_LAST << 2);
-
-
-/*
   "fuzzydate" with strict data type control.
   Used as a parameter to get_date() and represents a mixture of:
   - data type conversion flags
@@ -70,23 +70,13 @@ class date_mode_t
 protected:
   friend class date_conv_mode_t;
   friend class time_round_mode_t;
-  ulonglong m_mode;
-public:
+  date_modes m_mode;
 
-//   enum date_modes {
-//     TIME_CONV_NONE              = 0U,
-//     TIME_FUZZY_DATES            = 1U,
-//     TIME_TIME_ONLY              = 4U,
-//     TIME_INTERVAL_hhmmssff      = 8U,
-//     TIME_INTERVAL_DAY           = 16U,
-//     TIME_NO_ZERO_IN_DATE        = 1UL << 23,
-//     TIME_NO_ZERO_DATE           = 1UL << 24,
-//     TIME_INVALID_DATES          = 1UL << 25
-//   };
+public:
 
   // Constructors
   date_mode_t(ulonglong fuzzydate)
-   :m_mode(fuzzydate)
+   :m_mode(date_modes(fuzzydate))
   { }
 
   // Conversion operators
@@ -127,13 +117,13 @@ public:
   // Dyadic bitwise assignment operators
   date_mode_t &operator&=(const date_mode_t other)
   {
-    m_mode&= other.m_mode;
+    m_mode= date_modes(m_mode & other.m_mode);
     return *this;
   }
 
   date_mode_t &operator|=(const date_mode_t other)
   {
-    m_mode|= other.m_mode;
+    m_mode= date_modes(m_mode | other.m_mode);
     return *this;
   }
 };
@@ -198,7 +188,6 @@ public:
     return m_mode;
   }
 };
-
 
 inline
 date_mode_t operator| (ulonglong mode, date_mode_t b)

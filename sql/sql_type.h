@@ -1819,9 +1819,6 @@ public:
     explicit Options(THD *thd)
      :Temporal_with_date::Options(sql_mode_for_dates(thd), TIME_FRAC_TRUNCATE)
     { }
-    explicit Options(date_mode_t fuzzydate)
-     :Temporal_with_date::Options(fuzzydate)
-    { }
   };
 public:
   Date(Item *item, date_mode_t fuzzydate)

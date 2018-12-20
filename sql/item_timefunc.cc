@@ -442,7 +442,7 @@ static bool extract_date_time(THD *thd, DATE_TIME_FORMAT *format,
     goto err;
 
   int was_cut;
-  if (check_date(l_time, fuzzydate | date_conv_mode_t(TIME_INVALID_DATES), &was_cut))
+  if (check_date(l_time, fuzzydate | TIME_INVALID_DATES, &was_cut))
     goto err;
 
   if (val != val_end)
@@ -2452,7 +2452,7 @@ bool Item_time_typecast::get_date(THD *thd, MYSQL_TIME *to, date_mode_t mode)
 
 bool Item_date_typecast::get_date(THD *thd, MYSQL_TIME *ltime, date_mode_t fuzzydate)
 {
-  date_mode_t tmp= (fuzzydate | date_mode_t(sql_mode_for_dates(thd))) & ~TIME_TIME_ONLY;
+  date_mode_t tmp= (fuzzydate | sql_mode_for_dates(thd)) & ~TIME_TIME_ONLY;
   // Force truncation
   Date *d= new(ltime) Date(thd, args[0], Date::Options(date_conv_mode_t(tmp)));
   return (null_value= !d->is_valid_date());
@@ -2461,7 +2461,7 @@ bool Item_date_typecast::get_date(THD *thd, MYSQL_TIME *ltime, date_mode_t fuzzy
 
 bool Item_datetime_typecast::get_date(THD *thd, MYSQL_TIME *ltime, date_mode_t fuzzydate)
 {
-  date_mode_t tmp= (fuzzydate | date_mode_t(sql_mode_for_dates(thd))) & ~TIME_TIME_ONLY;
+  date_mode_t tmp= (fuzzydate | sql_mode_for_dates(thd)) & ~TIME_TIME_ONLY;
   // Force rounding if the current sql_mode says so
   Datetime::Options opt(date_conv_mode_t(tmp), thd);
   Datetime *dt= new(ltime) Datetime(thd, args[0], opt,
