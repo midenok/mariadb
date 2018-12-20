@@ -1503,7 +1503,7 @@ public:
       The first argument is known to be of the DATE data type (not DATETIME).
       We don't need rounding here.
     */
-    Date d(thd, item->arguments()[0], TIME_CONV_NONE);
+    Date d(thd, item->arguments()[0], date_conv_mode_t(TIME_CONV_NONE));
     if (!d.is_valid_date() ||
          d.check_date_with_warn(thd, TIME_NO_ZERO_DATE | TIME_NO_ZERO_IN_DATE))
       return (item->null_value= true);

@@ -444,7 +444,7 @@ void Field::do_field_datetime(Copy_field *copy)
 
 void Field::do_field_date(Copy_field *copy)
 {
-  return do_field_temporal(copy, Date::Options(TIME_CONV_NONE));
+  return do_field_temporal(copy, Date::Options(date_conv_mode_t(TIME_CONV_NONE)));
 }
 
 

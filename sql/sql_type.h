@@ -1668,12 +1668,12 @@ public:
   Time &round(uint dec, time_round_mode_t mode, int *warn)
   {
     switch (mode.mode()) {
-    case time_round_mode_t::FRAC_NONE:
+    case TIME_FRAC_NONE:
       DBUG_ASSERT(fraction_remainder(dec) == 0);
       return trunc(dec);
-    case time_round_mode_t::FRAC_TRUNCATE:
+    case TIME_FRAC_TRUNCATE:
       return trunc(dec);
-    case time_round_mode_t::FRAC_ROUND:
+    case TIME_FRAC_ROUND:
       return round(dec, warn);
     }
     return *this;
@@ -2230,12 +2230,12 @@ public:
   Datetime &round(THD *thd, uint dec, time_round_mode_t mode, int *warn)
   {
     switch (mode.mode()) {
-    case time_round_mode_t::FRAC_NONE:
+    case TIME_FRAC_NONE:
       DBUG_ASSERT(fraction_remainder(dec) == 0);
       return trunc(dec);
-    case time_round_mode_t::FRAC_TRUNCATE:
+    case TIME_FRAC_TRUNCATE:
       return trunc(dec);
-    case time_round_mode_t::FRAC_ROUND:
+    case TIME_FRAC_ROUND:
       return round(thd, dec, warn);
     }
     return *this;
@@ -2343,12 +2343,12 @@ public:
   Timestamp &round(uint dec, time_round_mode_t mode, int *warn)
   {
     switch (mode.mode()) {
-    case time_round_mode_t::FRAC_NONE:
+    case TIME_FRAC_NONE:
       DBUG_ASSERT(fraction_remainder(dec) == 0);
       return trunc(dec);
-    case time_round_mode_t::FRAC_TRUNCATE:
+    case TIME_FRAC_TRUNCATE:
       return trunc(dec);
-    case time_round_mode_t::FRAC_ROUND:
+    case TIME_FRAC_ROUND:
       return round(dec, warn);
     }
     return *this;

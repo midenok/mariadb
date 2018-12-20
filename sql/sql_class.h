@@ -4965,9 +4965,9 @@ inline date_conv_mode_t sql_mode_for_dates(THD *thd)
                 time_round_mode_t::KNOWN_MODES) == 0,
                 "date_conv_mode_t and time_round_mode_t must use different "
                 "bit values");
-  static_assert(MODE_NO_ZERO_DATE    == date_mode_t::NO_ZERO_DATE &&
-                MODE_NO_ZERO_IN_DATE == date_mode_t::NO_ZERO_IN_DATE &&
-                MODE_INVALID_DATES   == date_mode_t::INVALID_DATES,
+  static_assert(MODE_NO_ZERO_DATE    == TIME_NO_ZERO_DATE &&
+                MODE_NO_ZERO_IN_DATE == TIME_NO_ZERO_IN_DATE &&
+                MODE_INVALID_DATES   == TIME_INVALID_DATES,
                 "sql_mode_t and date_mode_t values must be equal");
   return date_conv_mode_t(thd->variables.sql_mode &
           (MODE_NO_ZERO_DATE | MODE_NO_ZERO_IN_DATE | MODE_INVALID_DATES));

@@ -173,13 +173,6 @@ check_date(const MYSQL_TIME *ltime, date_conv_mode_t flags, int *was_cut)
 }
 bool check_date_with_warn(THD *thd, const MYSQL_TIME *ltime,
                           date_conv_mode_t fuzzy_date, timestamp_type ts_type);
-static inline bool
-check_date_with_warn(THD *thd, const MYSQL_TIME *ltime,
-                          date_mode_t fuzzydate, timestamp_type ts_type)
-{
-  return check_date_with_warn(thd, ltime, date_conv_mode_t(fuzzydate), ts_type);
-}
-
 bool adjust_time_range_with_warn(THD *thd, MYSQL_TIME *ltime, uint dec);
 
 longlong pack_time(const MYSQL_TIME *my_time);
