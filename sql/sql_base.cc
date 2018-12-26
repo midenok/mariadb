@@ -5074,12 +5074,6 @@ bool open_normal_and_derived_tables(THD *thd, TABLE_LIST *tables, uint flags,
   if (open_tables(thd, &tables, &counter, flags, &prelocking_strategy))
     goto end;
 
-  if (TR_table::use_transaction_registry &&
-      thd->lex->sql_command == SQLCOM_SELECT &&
-      thd->stmt_arena->is_stmt_prepare() &&
-      thd->lex->vers_add_tr_queries(thd))
-    return 1;
-
   if (mysql_handle_derived(thd->lex, dt_phases))
     goto end;
 

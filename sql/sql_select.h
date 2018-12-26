@@ -1781,6 +1781,7 @@ private:
   bool add_having_as_table_cond(JOIN_TAB *tab);
   bool make_aggr_tables_info();
   bool add_fields_for_current_rowid(JOIN_TAB *cur, List<Item> *fields);
+  bool vers_add_tr_queries(THD *thd);
 };
 
 enum enum_with_bush_roots { WITH_BUSH_ROOTS, WITHOUT_BUSH_ROOTS};

@@ -991,6 +991,9 @@ JOIN::prepare(TABLE_LIST *tables_init,
   join_list= &select_lex->top_join_list;
   union_part= unit_arg->is_unit_op();
 
+  if (TR_table::use_transaction_registry && vers_add_tr_queries(thd))
+    DBUG_RETURN(-1);
+
   // simple check that we got usable conds
   dbug_print_item(conds);
 

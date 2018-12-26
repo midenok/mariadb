@@ -3220,7 +3220,6 @@ public:
   }
   void set_trg_event_type_for_tables();
 
-  bool vers_add_tr_queries(THD *thd);
   bool vers_add_tr_subquery(THD* thd, Vers_history_point &p, SELECT_LEX *sl,
                           uint &subq_n, bool backwards= false);
 
