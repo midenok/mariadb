@@ -1819,6 +1819,8 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
       goto err;
 
     const uchar *key_pos= field_pos + 2 * sizeof(uint16);
+    period.is_cont= uint2korr(key_pos);
+    key_pos+= sizeof(uint16);
     period.unique_keys= uint2korr(key_pos);
     for (uint k= 0; k < period.unique_keys; k++)
     {
@@ -1828,7 +1830,7 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
     }
 
     if (period.name.length + period.constr_name.length
-          + (period.unique_keys + 5) * sizeof(uint16)
+          + (period.unique_keys + 6) * sizeof(uint16)
         != extra2.application_period.length)
       goto err;
   }
@@ -3209,7 +3211,7 @@ enum open_frm_error open_table_from_share(THD *thd, TABLE_SHARE *share,
   if (prgflag & (READ_ALL + EXTRA_RECORD))
   {
     records++;
-    if (share->versioned)
+    if (share->versioned || share->period.unique_keys || share->period.is_cont)
       records++;
   }
 

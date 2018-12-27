@@ -6041,6 +6041,20 @@ find_field_in_table_ref(THD *thd, TABLE_LIST *table_list,
             bitmap_set_bit(table->read_set, field_to_set->field_index);
           else
             bitmap_set_bit(table->write_set, field_to_set->field_index);
+
+          if (table->cont)
+          {
+            for (auto f: table->s->field)
+            {
+              if (f->field_name.streq(field_to_set->field_name))
+              {
+                auto ws= thd->column_usage == MARK_COLUMNS_READ
+                         ? table->cont->read_set : table->cont->write_set;
+                bitmap_set_bit(ws, f->field_index);
+                break;
+              }
+            }
+          }
         }
       }
   }

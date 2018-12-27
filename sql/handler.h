@@ -1909,7 +1909,7 @@ enum vers_sys_type_t
 struct Table_period_info: Sql_alloc
 {
   Table_period_info(const char *name_arg, size_t size) :
-    name(name_arg, size), unique_keys(0),
+    name(name_arg, size), is_cont(false), unique_keys(0),
     start_fieldno(~0U), end_fieldno(~0U) {}
   Table_period_info(): Table_period_info(NULL, 0) {}
 
@@ -1925,6 +1925,7 @@ struct Table_period_info: Sql_alloc
     Lex_ident end;
   };
   start_end_t period;
+  bool is_cont;
   uint unique_keys;
 
   uint start_fieldno;
@@ -3115,6 +3116,9 @@ public:
     The cached_table_flags is set at ha_open and ha_external_lock
   */
   Table_flags ha_table_flags() const { return cached_table_flags; }
+protected:
+  int cont_write_row(const uchar *buf);
+public:
   /** PRIMARY KEY WITHOUT OVERLAPS check is done globally */
   int ha_check_overlaps(const uchar *old_data, const uchar* new_data);
   /**

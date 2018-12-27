@@ -28,3 +28,11 @@ lock table t_cont write;
 drop table t;
 unlock table t;
 drop table t;
+
+create or replace table tt(x int, s date, e date, period for p(s,e), primary key(x, p without overlaps));
+insert into tt values(1, '2000-01-01', '2000-01-02');
+insert into tt values(1, '2000-01-03', '2000-01-07');
+insert into tt values(1, '2000-01-07', '2000-01-08');
+select * from tt_cont;
+insert into tt values(1, '2000-01-02', '2000-01-03');
+select * from tt_cont;

@@ -238,6 +238,8 @@ static int check_insert_fields(THD *thd, TABLE_LIST *table_list,
       Thus we set all bits in the write set.
     */
     bitmap_set_all(table->write_set);
+    if (table->cont)
+      bitmap_set_all(table->cont->write_set);
   }
   else
   {						// Part field list

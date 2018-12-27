@@ -6255,8 +6255,11 @@ int handler::ha_write_row(uchar *buf)
 
   TABLE_IO_WAIT(tracker, m_psi, PSI_TABLE_WRITE_ROW, MAX_KEY, 0,
                       { error= write_row(buf); })
-
   MYSQL_INSERT_ROW_DONE(error);
+
+  if ((error= cont_write_row(buf)))
+    goto end;
+
   if (likely(!error) && !row_already_logged)
   {
     rows_changed++;
@@ -6512,6 +6515,42 @@ void handler::set_lock_type(enum thr_lock_type lock)
   table->reginfo.lock_type= lock;
 }
 
+static
+int period_get_next_neighbour(const KEY &key, handler *handler,
+                              uchar *record_buf, const uchar *key_buf,
+                              bool first)
+{
+  int error= 0;
+  if (first)
+  {
+    auto key_map= key_part_map((1 << key.user_defined_key_parts) - 1);
+    error= handler->ha_index_read_map(record_buf, key_buf, key_map,
+                                      HA_READ_KEY_OR_PREV);
+  }
+  else
+  {
+    error= handler->ha_index_next(record_buf);
+    if (error == HA_ERR_END_OF_FILE)
+      error= HA_ERR_KEY_NOT_FOUND;
+  }
+
+  return error;
+}
+
+static
+bool period_keys_match(const KEY &key_info, const uchar *lhs, const uchar *rhs)
+{
+  uint period_key_part_nr= key_info.user_defined_key_parts - 2;
+  int cmp_res= 0;
+  for (uint part_nr= 0; !cmp_res && part_nr < period_key_part_nr; part_nr++)
+  {
+    Field *f= key_info.key_part[part_nr].field;
+    cmp_res= f->cmp(f->ptr_in_record(lhs),
+                    f->ptr_in_record(rhs));
+  }
+  return cmp_res == 0;
+}
+
 int handler::ha_check_overlaps(const uchar *old_data, const uchar* new_data)
 {
   DBUG_ASSERT(new_data);
@@ -6565,21 +6604,11 @@ int handler::ha_check_overlaps(const uchar *old_data, const uchar* new_data)
 
     for (int run= 0; run < 2; run++)
     {
-      if (run == 0)
-      {
-        error = handler->ha_index_read_map(record_buffer,
-                                           check_overlaps_buffer,
-                                           key_part_map((1 << key_parts) - 1),
-                                           HA_READ_KEY_OR_PREV);
-        if (error == HA_ERR_KEY_NOT_FOUND)
-          continue;
-      }
-      else
-      {
-        error = handler->ha_index_next(record_buffer);
-        if (error == HA_ERR_END_OF_FILE)
-          continue;
-      }
+      error= period_get_next_neighbour(*key_info, handler,
+                                       record_buffer, check_overlaps_buffer,
+                                       run == 0);
+      if (error == HA_ERR_KEY_NOT_FOUND)
+        continue;
 
       if (error)
       {
@@ -6597,17 +6626,10 @@ int handler::ha_check_overlaps(const uchar *old_data, const uchar* new_data)
         continue;
       }
 
-      uint period_key_part_nr= key_parts - 2;
-      int cmp_res= 0;
-      for (uint part_nr= 0; !cmp_res && part_nr < period_key_part_nr; part_nr++)
-      {
-        Field *f= key_info->key_part[part_nr].field;
-        cmp_res= f->cmp(f->ptr_in_record(new_data),
-                        f->ptr_in_record(record_buffer));
-      }
-      if (cmp_res)
+      if(!period_keys_match(*key_info, new_data, record_buffer))
         continue; /* key is different => no overlaps */
 
+      uint period_key_part_nr= key_parts - 2;
       int period_cmp[2][2]= {/* l1 > l2, l1 > r2, r1 > l2, r1 > r2 */};
       for (int i= 0; i < 2; i++)
       {
@@ -6629,6 +6651,141 @@ int handler::ha_check_overlaps(const uchar *old_data, const uchar* new_data)
       }
     }
     error= handler->ha_index_end();
+    if (error)
+      return error;
+  }
+  return 0;
+}
+
+static
+void period_copy_record_to_cont(TABLE *table, const uchar *buf)
+{
+  // table and table->cont fields have same ordering,
+  // so we can process them in one run
+  for (uint i= 0, ci= 1; i < table->s->fields; i++)
+  {
+    const auto &f= *table->field[i];
+    auto &cont_f= *table->cont->field[ci];
+    if (!f.field_name.streq(cont_f.field_name))
+      continue;
+
+    if (f.is_null_in_record(buf))
+    {
+      DBUG_ASSERT(cont_f.maybe_null());
+      cont_f.set_null();
+    }
+    else
+    {
+      memcpy(cont_f.ptr, f.ptr_in_record(buf), cont_f.pack_length());
+    }
+
+    ci++;
+  }
+}
+
+int handler::cont_write_row(const uchar *buf)
+{
+  if (!table->cont) return 0;
+  auto cont= table->cont;
+  auto *record= cont->record;
+  auto close_idx_and_ret = [cont](int error) -> int
+  {
+    cont->file->ha_index_end();
+    return error;
+  };
+
+  for (uint k= 0; k < cont->s->keys; k++)
+  {
+    auto &key= cont->key_info[k];
+    auto key_parts= key.user_defined_key_parts;
+
+    uint start_fieldnr= key_parts - 2;
+    uint end_fieldnr=   key_parts - 1;
+
+    cont->field[0]->store(key.name, system_charset_info);
+    period_copy_record_to_cont(table, buf);
+    key_copy(record[1], record[0], &key, 0);
+    /* cont->record[0] -- record to update to
+     * cont->record[1] -- a storage for neighbour, to update from
+     * cont->record[2] -- an original record, stored if no neighbours found
+     */
+    store_record(cont, record[2]);
+
+    int neighbours_found= 0;
+
+    int error= cont->file->ha_index_init(k, 0);
+    if (error)
+      return error;
+
+    for (int run= 0; run < 2; run++)
+    {
+      error= period_get_next_neighbour(key, cont->file, record[1],
+                                       record[1], run == 0);
+
+      if (error && error != HA_ERR_KEY_NOT_FOUND)
+        return close_idx_and_ret(error);
+
+      if (error == HA_ERR_KEY_NOT_FOUND
+          || !period_keys_match(key, record[0], record[1]))
+      {
+        if (run == 1 && neighbours_found)
+        {
+          // no neighbour to the right. get back to the left one for update.
+          error= cont->file->ha_index_prev(record[1]);
+          if (error)
+            return error;
+        }
+        continue;
+      }
+
+      auto &lhs= *key.key_part[start_fieldnr + run].field;
+      auto &rhs= *key.key_part[end_fieldnr   - run].field;
+      if (lhs.cmp(rhs.ptr_in_record(record[1]),
+                  lhs.ptr_in_record(record[2])) == 0)
+      {
+        neighbours_found++;
+
+        auto *value_from= rhs.ptr_in_record(record[2]);
+        auto *value_to= rhs.ptr;
+
+        if (neighbours_found == 1)
+        {
+          restore_record(cont, record[1]);
+        }
+        else
+        {
+          /* Here we come back to left neighbour and update its end field
+           * with the end field value of to be deleted record
+           */
+          value_to=lhs.ptr;
+          value_from=lhs.ptr_in_record(record[1]);
+        }
+
+        memcpy(value_to, value_from, lhs.pack_length());
+
+        // both neighbours exist => concat them into single field
+        if (neighbours_found == 2)
+        {
+          error= cont->file->ha_delete_row(record[1]);
+          if (error)
+            return close_idx_and_ret(error);
+          error= cont->file->ha_index_prev(record[1]);
+          DBUG_ASSERT(error != HA_ERR_END_OF_FILE);
+          if (error)
+            return close_idx_and_ret(error);
+        }
+      }
+    }
+
+    error= cont->file->ha_index_end();
+    if (error)
+      return error;
+
+    if (neighbours_found)
+      error= cont->file->ha_update_row(record[1], record[0]);
+    else
+      error= cont->file->ha_write_row(record[2]);
+
     if (error)
       return error;
   }

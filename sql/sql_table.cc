@@ -5242,6 +5242,10 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
     cont_create_info.transactional    = create_info->transactional;
     cont_create_info.storage_media    = create_info->storage_media;
     cont_create_info.option_list      = create_info->option_list;
+    cont_create_info.period_constr    = create_info->period_constr;
+    cont_create_info.period_info      = create_info->period_info;
+    cont_create_info.period_info.unique_keys= 0;
+    cont_create_info.period_info.is_cont= true;
     cont_create_info.add(*create_info);
 
     auto *mem_root = thd->mem_root;

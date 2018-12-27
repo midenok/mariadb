@@ -774,6 +774,7 @@ struct TABLE_SHARE
     uint16 end_fieldno;
     Lex_ident name;
     Lex_ident constr_name;
+    bool is_cont;
     uint unique_keys;
     Field *start_field(TABLE_SHARE *s) const
     {

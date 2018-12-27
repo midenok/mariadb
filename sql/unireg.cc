@@ -182,7 +182,7 @@ LEX_CUSTRING build_frm_image(THD *thd, const LEX_CSTRING *table,
                           ? create_info->period_info.name.length
                             + create_info->period_constr->name.length
                             + create_info->period_info.unique_keys * sizeof(uint16)
-                            + 5 * sizeof(uint16)
+                            + 6 * sizeof(uint16)
                           : 0;
   uchar fileinfo[FRM_HEADER_SIZE],forminfo[FRM_FORMINFO_SIZE];
   const partition_info *part_info= IF_PARTITIONING(thd->work_part_info, 0);
@@ -375,6 +375,8 @@ LEX_CUSTRING build_frm_image(THD *thd, const LEX_CSTRING *table,
     pos+= sizeof(uint16);
     int2store(pos, get_fieldno_by_name(create_info, create_fields,
                                        create_info->period_info.period.end));
+    pos+= sizeof(uint16);
+    int2store(pos, create_info->period_info.is_cont);
     pos+= sizeof(uint16);
     int2store(pos, create_info->period_info.unique_keys);
     pos+= sizeof(uint16);
