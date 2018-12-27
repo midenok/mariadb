@@ -4143,8 +4143,6 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
     check_duplicate_key(thd, key, key_info, &alter_info->key_list);
 
     key_info->without_overlaps= key->without_overlaps;
-    if (key->without_overlaps)
-      create_info->period_info.unique_keys++;
 
     key_info++;
   }
@@ -5178,8 +5176,12 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   uint save_thd_create_info_options= thd->lex->create_info.options;
   thd->lex->create_info.options|= create_info->options;
 
+  uint flags= 0;
+  if (create_info->period_info.unique_keys)
+    flags|= MYSQL_OPEN_CREATE_CONT_TABLE;
+
   /* Open or obtain an exclusive metadata lock on table being created  */
-  result= open_and_lock_tables(thd, *create_info, create_table, FALSE, 0);
+  result= open_and_lock_tables(thd, *create_info, create_table, FALSE, flags);
 
   thd->lex->create_info.options= save_thd_create_info_options;
 
@@ -5219,7 +5221,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   if (create_info->period_info.unique_keys)
   {
     static const char postfix[]= "_cont";
-    size_t cont_name_len= create_info->alias.length + sizeof postfix;
+    size_t cont_name_len= create_info->alias.length + sizeof postfix - 1;
     auto cont_name= strmake_root(thd->mem_root, create_info->alias.str,
                                  cont_name_len);
     strcpy(cont_name + create_info->alias.length, postfix);

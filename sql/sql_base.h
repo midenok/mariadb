@@ -117,6 +117,11 @@ TABLE *open_ltable(THD *thd, TABLE_LIST *table_list, thr_lock_type update,
    Don't try to  auto-repair table
 */
 #define MYSQL_OPEN_IGNORE_REPAIR                0x10000
+/**
+ * We are creating a table with unique period index;
+ * also open continuation table
+ */
+#define MYSQL_OPEN_CREATE_CONT_TABLE            0x20000
 
 /** Please refer to the internals manual. */
 #define MYSQL_OPEN_REOPEN  (MYSQL_OPEN_IGNORE_FLUSH |\

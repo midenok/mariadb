@@ -1378,6 +1378,9 @@ public:
   SplM_opt_info *spl_opt_info;
   key_map keys_usable_for_splitting;
 
+  /* Continuity table for tables with unique application period indexes */
+  TABLE *cont;
+
   void init(THD *thd, TABLE_LIST *tl);
   bool fill_item_list(List<Item> *item_list) const;
   void reset_item_list(List<Item> *item_list, uint skip) const;
@@ -2425,6 +2428,7 @@ struct TABLE_LIST
   /* System Versioning */
   vers_select_conds_t vers_conditions;
   vers_select_conds_t period_conditions;
+  TABLE_LIST *cont;
 
   bool has_period() const
   {

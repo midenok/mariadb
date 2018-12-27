@@ -5,6 +5,9 @@ show create table t_cont;
 drop table t;
 show tables from test;
 
+insert into t values(1, '2000-01-01', '2000-01-02');
+select * from t;
+
 # TODO
 create table t_cont(id int);
 --error ER_TABLE_EXISTS_ERROR

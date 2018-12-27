@@ -7656,6 +7656,7 @@ key_list:
           {
             Lex->last_key->without_overlaps= true;
             Lex->last_key->period= $3;
+            Lex->create_info.period_info.unique_keys++;
           }
         | key_part order_dir
           {

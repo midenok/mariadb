@@ -64,6 +64,8 @@
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
 
+#include <initializer_list>
+
 bool
 No_such_table_error_handler::handle_condition(THD *,
                                               uint sql_errno,
@@ -4019,6 +4021,9 @@ bool open_tables(THD *thd, const DDL_options_st &options,
   TABLE_LIST **table_to_open;
   Sroutine_hash_entry **sroutine_to_open;
   TABLE_LIST *tables;
+  TABLE_LIST *cont_table= NULL;
+  TABLE_LIST *last= NULL;
+  TABLE_LIST *last_next= thd->lex->first_not_own_table();
   Open_table_context ot_ctx(thd, flags);
   bool error= FALSE;
   bool some_routine_modifies_data= FALSE;
@@ -4086,20 +4091,56 @@ restart:
     }
     else
     {
-      TABLE_LIST *table;
-      if (lock_table_names(thd, options, *start,
-                           thd->lex->first_not_own_table(),
+      // we also lock possible continuity tables by name, and then restore the list
+      for (auto table= *start; table && table != last_next && !table->cont;
+           table= table->next_global)
+      {
+        last= table;
+
+        if (table->mdl_request.type != MDL_SHARED_WRITE
+            && table->mdl_request.type != MDL_EXCLUSIVE)
+          continue;
+
+        static char cont_postfix[]= "_cont";
+        auto new_len= table->table_name.length + sizeof cont_postfix - 1;
+        auto *new_name= strmake_root(thd->mem_root, table->table_name.str,
+                                     new_len);
+        strcpy(new_name + table->table_name.length, cont_postfix);
+
+        auto *t= (TABLE_LIST*)thd->alloc(sizeof(TABLE_LIST));
+        *t= *table;
+        t->next_global= cont_table;
+        cont_table= t;
+        table->cont= t;
+
+        t->table_name.str= new_name;
+        t->table_name.length= new_len;
+        t->mdl_request.init(MDL_key::TABLE, table->db.str, new_name,
+                            table->mdl_request.type,
+                            table->mdl_request.duration);
+      }
+      if (last)
+      {
+        DBUG_ASSERT(last_next == last->next_global);
+        last->next_global= cont_table;
+      }
+
+      if (lock_table_names(thd, options, *start, last,
                            ot_ctx.get_timeout(), flags))
       {
+        if (last)
+          last->next_global= last_next;
         error= TRUE;
         goto error;
       }
-      for (table= *start; table && table != thd->lex->first_not_own_table();
-           table= table->next_global)
+
+      for (auto table= *start; table != last_next; table= table->next_global)
       {
         if (table->mdl_request.type >= MDL_SHARED_UPGRADABLE)
           table->mdl_request.ticket= NULL;
       }
+      if (last)
+        last->next_global= last_next;
     }
   }
 
@@ -4121,6 +4162,25 @@ restart:
       error= open_and_process_table(thd, thd->lex, tables, counter,
                                     flags, prelocking_strategy,
                                     has_prelocking_list, &ot_ctx);
+
+      if (unlikely(error) || ((tables->table == NULL
+                               || tables->table->s->period.unique_keys == 0)
+                              && (flags & MYSQL_OPEN_CREATE_CONT_TABLE) == 0))
+      {
+        tables->cont= NULL;
+      }
+
+      if (tables->cont)
+      {
+        DBUG_ASSERT(!thd->locked_tables_mode);
+        DBUG_ASSERT(tables->mdl_request.type == MDL_SHARED_WRITE
+                    || tables->mdl_request.type == MDL_EXCLUSIVE);
+        error= open_and_process_table(thd, thd->lex, tables->cont, counter,
+                                      flags, prelocking_strategy,
+                                      has_prelocking_list, &ot_ctx);
+        if (likely(!error) && tables->table)
+          tables->table->cont= tables->cont->table;
+      }
 
       if (unlikely(error))
       {
@@ -4245,34 +4305,35 @@ restart:
   */
   for (tables= *start; tables; tables= tables->next_global)
   {
-    TABLE *tbl= tables->table;
-
-    if (!tbl)
-      continue;
-
-    /* Schema tables may not have a TABLE object here. */
-    if (tbl->file->ha_table_flags() & HA_CAN_MULTISTEP_MERGE)
+    for(auto *tbl: {tables->table, tables->cont ? tables->cont->table : NULL})
     {
-      /* MERGE tables need to access parent and child TABLE_LISTs. */
-      DBUG_ASSERT(tbl->pos_in_table_list == tables);
-      if (tbl->file->extra(HA_EXTRA_ATTACH_CHILDREN))
+      if (!tbl)
+        continue;
+
+      /* Schema tables may not have a TABLE object here. */
+      if (tbl->file->ha_table_flags() & HA_CAN_MULTISTEP_MERGE)
       {
-        error= TRUE;
-        goto error;
+        /* MERGE tables need to access parent and child TABLE_LISTs. */
+        DBUG_ASSERT(tbl->pos_in_table_list == tables);
+        if (tbl->file->extra(HA_EXTRA_ATTACH_CHILDREN))
+        {
+          error= TRUE;
+          goto error;
+        }
       }
-    }
 
-    /* Set appropriate TABLE::lock_type. */
-    if (tbl && tables->lock_type != TL_UNLOCK && !thd->locked_tables_mode)
-    {
-      if (tables->lock_type == TL_WRITE_DEFAULT)
-        tbl->reginfo.lock_type= thd->update_lock_default;
-      else if (tables->lock_type == TL_READ_DEFAULT)
-          tbl->reginfo.lock_type=
-            read_lock_type_for_table(thd, thd->lex, tables,
-                                     some_routine_modifies_data);
-      else
-        tbl->reginfo.lock_type= tables->lock_type;
+      /* Set appropriate TABLE::lock_type. */
+      if (tbl && tables->lock_type != TL_UNLOCK && !thd->locked_tables_mode)
+      {
+        if (tables->lock_type == TL_WRITE_DEFAULT)
+          tbl->reginfo.lock_type= thd->update_lock_default;
+        else if (tables->lock_type == TL_READ_DEFAULT)
+            tbl->reginfo.lock_type=
+              read_lock_type_for_table(thd, thd->lex, tables,
+                                       some_routine_modifies_data);
+        else
+          tbl->reginfo.lock_type= tables->lock_type;
+      }
     }
   }
 
@@ -5253,7 +5314,11 @@ bool lock_tables(THD *thd, TABLE_LIST *tables, uint count,
     for (table= tables; table; table= table->next_global)
     {
       if (!table->placeholder())
-	*(ptr++)= table->table;
+      {
+        *(ptr++)= table->table;
+        if (table->cont)
+          *(ptr++)= table->cont->table;
+      }
     }
 
     DEBUG_SYNC(thd, "before_lock_tables_takes_lock");
