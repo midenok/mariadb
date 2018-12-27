@@ -1,56 +1,59 @@
 create or replace table t (id int, s date, e date, period for p(s,e),
-                           primary key(id, p without overlaps));
+primary key(id, p without overlaps));
 show create table t_cont;
-
+Table	Create Table
+t_cont	CREATE TABLE `t_cont` (
+  `sys_cont_idx` varchar(10) CHARACTER SET utf8 NOT NULL,
+  `id` int(11) NOT NULL,
+  `s` date NOT NULL,
+  `e` date NOT NULL,
+  PERIOD FOR `p` (`s`, `e`),
+  PRIMARY KEY (`sys_cont_idx`,`id`,`s`,`e`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
 insert into t values(1, '2000-01-01', '2000-01-02');
 select * from t;
-
+id	s	e
+1	2000-01-01	2000-01-02
 drop table t;
 show tables from test;
-
-
-## TODO
-#create table t_cont(id int);
-#--error ER_TABLE_EXISTS_ERROR
-#create or replace table t (id int, s date, e date, period for p(s,e),
-#                           primary key(id, p without overlaps));
-
-#create or replace table t (id int, s date, e date, period for p(s,e),
-#                           primary key(id, p without overlaps));
-#lock table t write;
-#--error ER_TABLE_NOT_LOCKED
-#drop table t;
-#unlock tables;
-#drop table t;
-
-## TODO
-#lock table t_cont write;
-#--error ER_TABLE_NOT_LOCKED
-#drop table t;
-#unlock tables;
-#drop table t;
-
+Tables_in_test
 create or replace table tt(x int, s date, e date, period for p(s,e), primary key(x, p without overlaps));
 insert into tt values(1, '2000-01-01', '2000-01-02');
 insert into tt values(1, '2000-01-03', '2000-01-07');
 insert into tt values(1, '2000-01-07', '2000-01-08');
 select * from tt_cont;
+sys_cont_idx	x	s	e
+PRIMARY	1	2000-01-01	2000-01-02
+PRIMARY	1	2000-01-03	2000-01-08
 insert into tt values(1, '2000-01-02', '2000-01-03');
 select * from tt_cont;
-
+sys_cont_idx	x	s	e
+PRIMARY	1	2000-01-01	2000-01-08
 update tt set s= '2000-01-08', e= '2000-01-09' where s = '2000-01-02';
 select * from tt_cont;
+sys_cont_idx	x	s	e
+PRIMARY	1	2000-01-01	2000-01-02
+PRIMARY	1	2000-01-03	2000-01-09
 update tt set e= '2000-01-03' where s = '2000-01-01';
 select * from tt_cont;
-
+sys_cont_idx	x	s	e
+PRIMARY	1	2000-01-01	2000-01-09
 delete from tt where s = '2000-01-08';
 select * from tt_cont;
+sys_cont_idx	x	s	e
+PRIMARY	1	2000-01-01	2000-01-08
 delete from tt where s = '2000-01-03';
 select * from tt_cont;
+sys_cont_idx	x	s	e
+PRIMARY	1	2000-01-01	2000-01-03
+PRIMARY	1	2000-01-07	2000-01-08
 insert into tt values(1, '2000-01-03', '2000-01-07');
 delete from tt where s = '2000-01-01';
 select * from tt_cont;
+sys_cont_idx	x	s	e
+PRIMARY	1	2000-01-03	2000-01-08
 delete from tt;
 select * from tt_cont;
-
+sys_cont_idx	x	s	e
+PRIMARY	1	2000-01-03	2000-01-08
 drop table tt;
