@@ -474,10 +474,11 @@ dtype_get_fixed_size_low(
 		/* fall through */
 	case DATA_CHAR:
 	case DATA_FIXBINARY:
-	case DATA_INT:
 	case DATA_FLOAT:
 	case DATA_DOUBLE:
 		return(len);
+	case DATA_INT:
+		return(comp ? len : 0);;
 	case DATA_MYSQL:
 		if (prtype & DATA_BINARY_TYPE) {
 			return(len);
