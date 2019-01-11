@@ -5460,6 +5460,9 @@ dict_index_t::instant_metadata(const dtuple_t& row, mem_heap_t* heap) const
 		}
 
 		if (!field->prefix_len) {
+			if (field->fixed_len == 0) {
+				dfield_set_len(dfield, 0);
+			}
 			continue;
 		}
 
