@@ -472,13 +472,13 @@ dtype_get_fixed_size_low(
 		}
 #endif /* UNIV_DEBUG */
 		/* fall through */
-	case DATA_CHAR:
 	case DATA_FIXBINARY:
 	case DATA_FLOAT:
 	case DATA_DOUBLE:
 		return(len);
+	case DATA_CHAR:
 	case DATA_INT:
-		return(comp ? len : 0);;
+		return(comp ? len : 0);
 	case DATA_MYSQL:
 		if (prtype & DATA_BINARY_TYPE) {
 			return(len);
