@@ -460,8 +460,6 @@ unreadable:
 	if ((info_bits & ~REC_INFO_DELETED_FLAG) != REC_INFO_MIN_REC_FLAG
 	    || (comp && rec_get_status(rec) != REC_STATUS_INSTANT)) {
 incompatible:
-		ib::error() << "Table " << index->table->name
-			<< " contains unrecognizable instant ALTER metadata";
 		index->table->corrupted = true;
 		return DB_CORRUPTION;
 	}
@@ -494,6 +492,9 @@ incompatible:
 			+ (DATA_TRX_ID_LEN + DATA_ROLL_PTR_LEN);
 
 		if (mach_read_from_4(ptr + BTR_EXTERN_LEN)) {
+			ib::error() << "Table " << index->table->name
+				<< " BTR_EXTERN_LEN";
+
 			goto incompatible;
 		}
 
@@ -503,6 +504,8 @@ incompatible:
 		    != FIL_PAGE_DATA
 		    || mach_read_from_4(ptr + BTR_EXTERN_SPACE_ID)
 		    != space->id) {
+			ib::error() << "Table " << index->table->name
+				<< " BTR_EXTERN_OFFSET";
 			goto incompatible;
 		}
 
@@ -518,6 +521,9 @@ incompatible:
 		    || mach_read_from_4(&block->frame[FIL_PAGE_DATA
 						      + BTR_BLOB_HDR_PART_LEN])
 		    != len) {
+			ib::error() << "Table " << index->table->name
+				<< " BTR_BLOB_HDR_PART_LEN";
+
 			goto incompatible;
 		}
 
@@ -528,6 +534,9 @@ incompatible:
 		       - BTR_EXTERN_LEN;
 		     b < end; ) {
 			if (*b++) {
+				ib::error() << "Table " << index->table->name
+					<< " srv_page_size";
+
 				goto incompatible;
 			}
 		}
@@ -535,6 +544,9 @@ incompatible:
 		if (index->table->deserialise_columns(
 			    &block->frame[FIL_PAGE_DATA + BTR_BLOB_HDR_SIZE],
 			    len)) {
+			ib::error() << "Table " << index->table->name
+				<< " deserialise_columns";
+
 			goto incompatible;
 		}
 
@@ -548,6 +560,9 @@ incompatible:
 	if (rec_offs_any_default(offsets)) {
 inconsistent:
 		mem_heap_free(heap);
+		ib::error() << "Table " << index->table->name
+			<< " mem_heap_free";
+
 		goto incompatible;
 	}
 
