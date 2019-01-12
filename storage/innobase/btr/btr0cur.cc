@@ -479,12 +479,29 @@ incompatible:
 		any dropped or reordered columns. */
 		ulint trx_id_offset = index->trx_id_offset;
 		if (!trx_id_offset) {
-			/* The PRIMARY KEY contains variable-length columns.
-			For the metadata record, variable-length columns are
-			always written with zero length. The DB_TRX_ID will
-			start right after any fixed-length columns. */
-			for (uint i = index->n_uniq; i--; ) {
-				trx_id_offset += index->fields[i].fixed_len;
+			if (dict_table_is_comp(index->table)) {
+				/* The PRIMARY KEY contains variable-length columns.
+				For the metadata record, variable-length columns are
+				always written with zero length. The DB_TRX_ID will
+				start right after any fixed-length columns. */
+				for (uint i = index->n_uniq; i--; ) {
+					trx_id_offset += index->fields[i].fixed_len;
+				}
+			} else {
+				/* TODO: this also should work for COMPACT, but
+				   several assertions fail in rec_get_offsets()
+				   for innodb.instant_drop
+				*/
+				ulint* offsets = NULL;
+				mem_heap_t* heap = NULL;
+				ulint len;
+				offsets = rec_get_offsets(rec, index, offsets,
+							true,
+							rec_get_n_fields_old(rec),
+							&heap);
+				trx_id_offset = rec_get_nth_field_offs(offsets,
+								index->db_trx_id(),
+								&len);
 			}
 		}
 
