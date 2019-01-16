@@ -689,8 +689,23 @@ public:
 	except for is_nullable() and is_versioned().
 	@param[in]	other	column to compare to
 	@return	whether the columns have the same format */
-	bool same_format(const dict_col_t& other) const
+	bool same_format(const dict_col_t& other, bool redundant = false) const
 	{
+		CHARSET_INFO* cs1;
+		CHARSET_INFO* cs2;
+		if (redundant) {
+			if (dtype_is_non_binary_string_type(mtype, prtype)
+				&& dtype_is_non_binary_string_type(other.mtype, other.prtype)) {
+				uint cs_num1 = (uint) dtype_get_charset_coll(prtype);
+				uint cs_num2 = (uint) dtype_get_charset_coll(other.prtype);
+
+				cs1 = get_charset(cs_num1, MYF(MY_WME));
+				cs2 = get_charset(cs_num2, MYF(MY_WME));
+
+				return my_charset_same(cs1, cs2);
+			}
+			return true;
+		}
 		return mtype == other.mtype
 			&& len >= other.len
 			&& mbminlen == other.mbminlen
