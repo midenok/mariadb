@@ -84,7 +84,8 @@ static const alter_table_operations INNOBASE_ALTER_REBUILD
 	| ALTER_OPTIONS
 	/* ALTER_OPTIONS needs to check alter_options_need_rebuild() */
 	| ALTER_COLUMN_NULLABLE
-	| ALTER_COLUMN_EQUAL_PACK_LENGTH2
+	| ALTER_COLUMN_NAME
+	| ALTER_COLUMN_EQUAL_PACK_LENGTH
 	| INNOBASE_DEFAULTS
 	| ALTER_STORED_COLUMN_ORDER
 	| ALTER_DROP_STORED_COLUMN
@@ -127,13 +128,11 @@ static const alter_table_operations INNOBASE_ALTER_NOREBUILD
 /** Operations that can be performed instantly, without inplace_alter_table() */
 static const alter_table_operations INNOBASE_ALTER_INSTANT
 	= ALTER_VIRTUAL_COLUMN_ORDER
-	| ALTER_COLUMN_NAME
 #ifdef MYSQL_RENAME_INDEX
 	| ALTER_RENAME_INDEX
 #endif
 	| ALTER_ADD_VIRTUAL_COLUMN
 	| INNOBASE_FOREIGN_OPERATIONS
-	| ALTER_COLUMN_EQUAL_PACK_LENGTH
 	| ALTER_COLUMN_UNVERSIONED
 	| ALTER_DROP_VIRTUAL_COLUMN;
 
@@ -265,11 +264,8 @@ inline void dict_table_t::prepare_instant(const dict_table_t& old,
 		Therefore columns must have been added at the end,
 		or modified instantly in place. */
 		DBUG_ASSERT(index.n_fields >= oindex.n_fields);
-		DBUG_ASSERT(index.n_fields > oindex.n_fields
-			    || !not_redundant());
 #ifndef DBUG_OFF
 		if (index.n_fields == oindex.n_fields) {
-			ut_ad(!not_redundant());
 			for (unsigned i = index.n_fields; i--; ) {
 				ut_ad(index.fields[i].col->same_format(
 						*oindex.fields[i].col,
@@ -524,14 +520,25 @@ inline bool dict_table_t::instant_column(const dict_table_t& table,
 		    || persistent_autoinc == table.persistent_autoinc);
 	ut_ad(mutex_own(&dict_sys->mutex));
 
-	{
-		const char* end = table.col_names;
-		for (unsigned i = table.n_cols; i--; ) end += strlen(end) + 1;
+	const char* new_col_names = static_cast<char*>(
+		mem_heap_alloc(heap, table.n_cols * MAX_FIELD_NAME));
+	const char* new_col_names_it = new_col_names;
 
-		col_names = static_cast<char*>(
-			mem_heap_dup(heap, table.col_names,
-				     ulint(end - table.col_names)));
+	for (ulint i = 0; i < ulint(table.n_cols); i++) {
+		dict_col_t& c = table.cols[i];
+		const char* name;
+
+		if (const dict_col_t* o = find(cols, col_map, n_cols, i)) {
+			name = o->name(*this);
+		} else {
+			name = c.name(table);
+		}
+		size_t size = strlen(name) + 1;
+		memcpy((void *) new_col_names_it, name, size);
+		new_col_names_it += size;
 	}
+	col_names = new_col_names;
+
 	const dict_col_t* const old_cols = cols;
 	cols = static_cast<dict_col_t*>(mem_heap_dup(heap, table.cols,
 						     table.n_cols
@@ -1525,7 +1532,8 @@ instant_alter_column_possible(
 		| ALTER_DROP_STORED_COLUMN
 		| ALTER_STORED_COLUMN_ORDER
 		| ALTER_COLUMN_NULLABLE
-		| ALTER_COLUMN_EQUAL_PACK_LENGTH2;
+		| ALTER_COLUMN_NAME
+		| ALTER_COLUMN_EQUAL_PACK_LENGTH;
 
 	if (!(ha_alter_info->handler_flags & avoid_rebuild)) {
 		alter_table_operations flags = ha_alter_info->handler_flags
@@ -1566,7 +1574,8 @@ instant_alter_column_possible(
 	       & ~ALTER_STORED_COLUMN_ORDER
 	       & ~ALTER_ADD_STORED_BASE_COLUMN
 	       & ~ALTER_COLUMN_NULLABLE
-	       & ~ALTER_COLUMN_EQUAL_PACK_LENGTH2
+	       & ~ALTER_COLUMN_NAME
+	       & ~ALTER_COLUMN_EQUAL_PACK_LENGTH
 	       & ~ALTER_OPTIONS)) {
 		return false;
 	}
@@ -4991,7 +5000,7 @@ static bool innobase_insert_sys_virtual(
 	return false;
 }
 
-/** Insert a record to the SYS_COLUMNS dictionary table.
+/** Insert or update a record in the SYS_COLUMNS dictionary table.
 @param[in]	table_id	table id
 @param[in]	pos		position of the column
 @param[in]	field_name	field name
@@ -5002,7 +5011,7 @@ static bool innobase_insert_sys_virtual(
 @param[in]	update		whether to update instead of inserting
 @retval	false	on success
 @retval	true	on failure (my_error() will have been called) */
-static bool innodb_insert_sys_columns(
+static bool innodb_update_sys_columns(
 	table_id_t	table_id,
 	ulint		pos,
 	const char*	field_name,
@@ -5071,7 +5080,7 @@ static bool innobase_add_one_virtual(
 	ulint		pos = dict_create_v_col_pos(vcol->v_pos,
 						    vcol->m_col.ind);
 
-	if (innodb_insert_sys_columns(table->id, pos, col_name,
+	if (innodb_update_sys_columns(table->id, pos, col_name,
 				      vcol->m_col.mtype, vcol->m_col.prtype,
 				      vcol->m_col.len, vcol->num_base, trx)) {
 		return true;
@@ -5559,8 +5568,6 @@ static bool innobase_instant_try(
 		DBUG_ASSERT(!col->is_virtual());
 		DBUG_ASSERT(!col->is_dropped());
 		DBUG_ASSERT(col->mtype != DATA_SYS);
-		DBUG_ASSERT(!strcmp((*af)->field_name.str,
-				    dict_table_get_col_name(user_table, i)));
 		DBUG_ASSERT(old || col->is_added());
 
 		if (col->is_added()) {
@@ -5609,9 +5616,12 @@ static bool innobase_instant_try(
 		ut_ad(!old || col->same_format(
 			*old, !user_table->not_redundant()));
 		if (update
-		    && old->prtype == d->type.prtype) {
+		    && old->prtype == d->type.prtype
+		    && old->len == d->type.len
+		    && !strcmp((*af)->field_name.str,
+			       dict_table_get_col_name(user_table, i))) {
 			/* The record is already present in SYS_COLUMNS. */
-		} else if (innodb_insert_sys_columns(user_table->id, i,
+		} else if (innodb_update_sys_columns(user_table->id, i,
 						     (*af)->field_name.str,
 						     d->type.mtype,
 						     d->type.prtype,
@@ -9025,228 +9035,6 @@ processed_field:
 	return(false);
 }
 
-/** Enlarge a column in the data dictionary tables.
-@param user_table InnoDB table that was being altered
-@param trx data dictionary transaction
-@param table_name Table name in MySQL
-@param nth_col 0-based index of the column
-@param new_len new column length, in bytes
-@param is_v if it's a virtual column
-@retval true Failure
-@retval false Success */
-static MY_ATTRIBUTE((nonnull, warn_unused_result))
-bool
-innobase_enlarge_column_try(
-/*========================*/
-	const dict_table_t*	user_table,
-	trx_t*			trx,
-	const char*		table_name,
-	ulint			nth_col,
-	ulint			new_len,
-	bool			is_v)
-{
-	pars_info_t*	info;
-	dberr_t		error;
-#ifdef UNIV_DEBUG
-	dict_col_t*	col;
-#endif /* UNIV_DEBUG */
-	dict_v_col_t*	v_col;
-	ulint		pos;
-
-	DBUG_ENTER("innobase_enlarge_column_try");
-
-	DBUG_ASSERT(trx_get_dict_operation(trx) == TRX_DICT_OP_INDEX);
-	ut_ad(trx->dict_operation_lock_mode == RW_X_LATCH);
-	ut_ad(mutex_own(&dict_sys->mutex));
-	ut_ad(rw_lock_own(dict_operation_lock, RW_LOCK_X));
-
-	if (is_v) {
-		v_col = dict_table_get_nth_v_col(user_table, nth_col);
-		pos = dict_create_v_col_pos(v_col->v_pos, v_col->m_col.ind);
-#ifdef UNIV_DEBUG
-		col = &v_col->m_col;
-#endif /* UNIV_DEBUG */
-	} else {
-#ifdef UNIV_DEBUG
-		col = dict_table_get_nth_col(user_table, nth_col);
-#endif /* UNIV_DEBUG */
-		pos = nth_col;
-	}
-
-#ifdef UNIV_DEBUG
-	ut_ad(col->len < new_len);
-	switch (col->mtype) {
-	case DATA_FIXBINARY:
-	case DATA_CHAR:
-	case DATA_MYSQL:
-		/* NOTE: we could allow this when !(prtype & DATA_BINARY_TYPE)
-		and ROW_FORMAT is not REDUNDANT and mbminlen<mbmaxlen.
-		That is, we treat a UTF-8 CHAR(n) column somewhat like
-		a VARCHAR. */
-		if (user_table->not_redundant()) {
-			ut_error;
-		}
-	case DATA_BINARY:
-	case DATA_VARCHAR:
-	case DATA_VARMYSQL:
-	case DATA_DECIMAL:
-	case DATA_BLOB:
-		break;
-	default:
-		ut_error;
-	}
-#endif /* UNIV_DEBUG */
-	info = pars_info_create();
-
-	pars_info_add_ull_literal(info, "tableid", user_table->id);
-	pars_info_add_int4_literal(info, "nth", pos);
-	pars_info_add_int4_literal(info, "new", new_len);
-
-	trx->op_info = "resizing column in SYS_COLUMNS";
-
-	error = que_eval_sql(
-		info,
-		"PROCEDURE RESIZE_SYS_COLUMNS_PROC () IS\n"
-		"BEGIN\n"
-		"UPDATE SYS_COLUMNS SET LEN=:new\n"
-		"WHERE TABLE_ID=:tableid AND POS=:nth;\n"
-		"END;\n",
-		FALSE, trx);
-
-	DBUG_EXECUTE_IF("ib_resize_column_error",
-			error = DB_OUT_OF_FILE_SPACE;);
-
-	trx->op_info = "";
-	trx->error_state = DB_SUCCESS;
-
-	if (error != DB_SUCCESS) {
-		my_error_innodb(error, table_name, 0);
-		DBUG_RETURN(true);
-	}
-
-	DBUG_RETURN(false);
-}
-
-/** Enlarge columns in the data dictionary tables.
-@param ha_alter_info Data used during in-place alter.
-@param table the TABLE
-@param user_table InnoDB table that was being altered
-@param trx data dictionary transaction
-@param table_name Table name in MySQL
-@retval true Failure
-@retval false Success */
-static MY_ATTRIBUTE((nonnull, warn_unused_result))
-bool
-innobase_enlarge_columns_try(
-/*=========================*/
-	Alter_inplace_info*	ha_alter_info,
-	const TABLE*		table,
-	const dict_table_t*	user_table,
-	trx_t*			trx,
-	const char*		table_name)
-{
-	List_iterator_fast<Create_field> cf_it(
-		ha_alter_info->alter_info->create_list);
-	ulint	i = 0;
-	ulint	num_v = 0;
-	bool	is_v;
-
-	for (Field** fp = table->field; *fp; fp++, i++) {
-		ulint	idx;
-
-		if (innobase_is_v_fld(*fp)) {
-			is_v = true;
-			idx = num_v;
-			num_v++;
-		} else {
-			idx = i - num_v;
-			is_v = false;
-		}
-
-		cf_it.rewind();
-		while (Create_field* cf = cf_it++) {
-			if (cf->field == *fp) {
-				if ((*fp)->is_equal(cf)
-				    == IS_EQUAL_PACK_LENGTH
-				    && innobase_enlarge_column_try(
-					    user_table, trx, table_name,
-					    idx, static_cast<ulint>(cf->length), is_v)) {
-					return(true);
-				}
-
-				break;
-			}
-		}
-	}
-
-	return(false);
-}
-
-/** Rename or enlarge columns in the data dictionary cache
-as part of commit_cache_norebuild().
-@param ha_alter_info Data used during in-place alter.
-@param table the TABLE
-@param user_table InnoDB table that was being altered */
-static MY_ATTRIBUTE((nonnull))
-void
-innobase_rename_or_enlarge_columns_cache(
-/*=====================================*/
-	Alter_inplace_info*	ha_alter_info,
-	const TABLE*		table,
-	dict_table_t*		user_table)
-{
-	if (!(ha_alter_info->handler_flags
-	      & (ALTER_COLUMN_EQUAL_PACK_LENGTH
-		 | ALTER_COLUMN_NAME))) {
-		return;
-	}
-
-	List_iterator_fast<Create_field> cf_it(
-		ha_alter_info->alter_info->create_list);
-	uint	i = 0;
-	ulint	num_v = 0;
-
-	for (Field** fp = table->field; *fp; fp++, i++) {
-		bool	is_virtual = innobase_is_v_fld(*fp);
-
-		cf_it.rewind();
-		while (Create_field* cf = cf_it++) {
-			if (cf->field != *fp) {
-				continue;
-			}
-
-			ulint	col_n = is_virtual ? num_v : i - num_v;
-
-			if ((*fp)->is_equal(cf) == IS_EQUAL_PACK_LENGTH) {
-				dict_col_t *col = is_virtual ?
-					&dict_table_get_nth_v_col(
-						user_table, col_n)->m_col
-					: dict_table_get_nth_col(
-						user_table, col_n);
-				col->len = cf->length;
-				if (col->len > 255
-				    && (col->prtype & DATA_MYSQL_TRUE_VARCHAR)
-				    == DATA_MYSQL_TRUE_VARCHAR) {
-					col->prtype |= DATA_LONG_TRUE_VARCHAR;
-				}
-			}
-
-			if ((*fp)->flags & FIELD_IS_RENAMED) {
-				dict_mem_table_col_rename(
-					user_table, col_n,
-					cf->field->field_name.str,
-					cf->field_name.str, is_virtual);
-			}
-
-			break;
-		}
-
-		if (is_virtual) {
-			num_v++;
-		}
-	}
-}
-
 /** Set the auto-increment value of the table on commit.
 @param ha_alter_info Data used during in-place alter
 @param ctx In-place ALTER TABLE context
@@ -10141,20 +9929,6 @@ commit_try_norebuild(
 		}
 	}
 
-	if ((ha_alter_info->handler_flags
-	     & ALTER_COLUMN_NAME)
-	    && innobase_rename_columns_try(ha_alter_info, ctx, old_table,
-					   trx, table_name)) {
-		DBUG_RETURN(true);
-	}
-
-	if ((ha_alter_info->handler_flags
-	     & ALTER_COLUMN_EQUAL_PACK_LENGTH)
-	    && innobase_enlarge_columns_try(ha_alter_info, old_table,
-					    ctx->old_table, trx, table_name)) {
-		DBUG_RETURN(true);
-	}
-
 #ifdef MYSQL_RENAME_INDEX
 	if ((ha_alter_info->handler_flags
 	     & ALTER_RENAME_INDEX)
@@ -10350,10 +10124,7 @@ commit_cache_norebuild(
 		trx_commit_for_mysql(trx);
 	}
 
-	if (!ctx->is_instant()) {
-		innobase_rename_or_enlarge_columns_cache(
-			ha_alter_info, table, ctx->new_table);
-	} else {
+	if (ctx->is_instant()) {
 		ut_ad(ctx->col_map);
 
 		if (fts_t* fts = ctx->new_table->fts) {
