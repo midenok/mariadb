@@ -1769,6 +1769,16 @@ struct dict_table_t {
 				    const ulint* col_map,
 				    unsigned& first_alter_pos);
 
+	inline const char* instant_build_col_names(
+		const dict_table_t& table, const ulint* col_map,
+		const dict_col_t* cols, unsigned n_cols,
+		const dict_col_t* table_cols, unsigned table_n_cols);
+
+	inline const char* instant_build_col_names2(
+		const dict_table_t& table, const ulint* col_map,
+		const dict_v_col_t* cols, unsigned n_cols,
+		const dict_v_col_t* table_cols, unsigned table_n_cols);
+
 	/** Adjust table metadata for instant ADD/DROP/reorder COLUMN,
 	unsigned -> bigger signed.
 	@param[in]	table	table on which prepare_instant() was invoked

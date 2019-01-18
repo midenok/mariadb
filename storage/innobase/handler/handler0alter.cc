@@ -501,6 +501,66 @@ inline void dict_index_t::instant_add_field(const dict_index_t& instant)
 	ut_ad(n_dropped == instant.table->n_dropped());
 }
 
+inline const char* dict_table_t::instant_build_col_names(
+	const dict_table_t& table, const ulint* col_map,
+	const dict_col_t* cols, unsigned n_cols,
+	const dict_col_t* table_cols, unsigned table_n_cols)
+{
+	const char* new_col_names = static_cast<char*>(
+		mem_heap_alloc(heap, table_n_cols * MAX_FIELD_NAME));
+	const char* new_col_names_it = new_col_names;
+
+	for (ulint i = 0; i < ulint(table_n_cols); i++) {
+		const dict_col_t& c = table_cols[i];
+		const char* name;
+
+		if (const dict_col_t* o = find(cols, col_map, n_cols, i)) {
+			name = o->name(*this);
+		} else {
+			name = c.name(table);
+		}
+		size_t size = strlen(name) + 1;
+		memcpy((void *) new_col_names_it, name, size);
+		new_col_names_it += size;
+	}
+	return new_col_names;
+}
+
+static ulint find_old_col_no2(const ulint* col_map, ulint pos, ulint n)
+{
+	do {
+		if (!n)
+			return ULINT_UNDEFINED;
+	} while (col_map[--n] != pos);
+	return n;
+}
+
+inline const char* dict_table_t::instant_build_col_names2(
+	const dict_table_t& table, const ulint* col_map,
+	const dict_v_col_t* cols, unsigned n_cols,
+	const dict_v_col_t* table_cols, unsigned table_n_cols)
+{
+	const char* new_col_names = static_cast<char*>(
+		mem_heap_alloc(heap, table_n_cols * MAX_FIELD_NAME));
+	const char* new_col_names_it = new_col_names;
+
+	for (ulint i = 0; i < ulint(table_n_cols); i++) {
+		const char* name;
+
+		ulint old_i = find_old_col_no2(col_map, i, n_cols);
+
+		if (old_i != ULINT_UNDEFINED) {
+			name = cols[old_i].m_col.name(*this);
+		} else {
+			name = table_cols[i].m_col.name(table);
+		}
+		size_t size = strlen(name) + 1;
+		memcpy((void *) new_col_names_it, name, size);
+		new_col_names_it += size;
+	}
+	return new_col_names;
+}
+
 /** Adjust table metadata for instant ADD/DROP/reorder COLUMN.
 @param[in]	table	altered table (with dropped columns)
 @param[in]	col_map	mapping from cols[] and v_cols[] to table
@@ -520,24 +580,8 @@ inline bool dict_table_t::instant_column(const dict_table_t& table,
 		    || persistent_autoinc == table.persistent_autoinc);
 	ut_ad(mutex_own(&dict_sys->mutex));
 
-	const char* new_col_names = static_cast<char*>(
-		mem_heap_alloc(heap, table.n_cols * MAX_FIELD_NAME));
-	const char* new_col_names_it = new_col_names;
-
-	for (ulint i = 0; i < ulint(table.n_cols); i++) {
-		dict_col_t& c = table.cols[i];
-		const char* name;
-
-		if (const dict_col_t* o = find(cols, col_map, n_cols, i)) {
-			name = o->name(*this);
-		} else {
-			name = c.name(table);
-		}
-		size_t size = strlen(name) + 1;
-		memcpy((void *) new_col_names_it, name, size);
-		new_col_names_it += size;
-	}
-	col_names = new_col_names;
+	col_names = instant_build_col_names(table, col_map, cols, n_cols,
+					    table.cols, table.n_cols);
 
 	const dict_col_t* const old_cols = cols;
 	cols = static_cast<dict_col_t*>(mem_heap_dup(heap, table.cols,
@@ -591,14 +635,11 @@ inline bool dict_table_t::instant_column(const dict_table_t& table,
 
 	const dict_v_col_t* const old_v_cols = v_cols;
 
-	if (const char* end = table.v_col_names) {
-		for (unsigned i = table.n_v_cols; i--; ) {
-			end += strlen(end) + 1;
-		}
+	if (table.v_col_names) {
+		v_col_names = instant_build_col_names2(
+			table, col_map + n_cols, v_cols, n_v_cols,
+			table.v_cols, table.n_v_cols);
 
-		v_col_names = static_cast<char*>(
-			mem_heap_dup(heap, table.v_col_names,
-				     ulint(end - table.v_col_names)));
 		v_cols = static_cast<dict_v_col_t*>(
 			mem_heap_dup(heap, table.v_cols,
 				     table.n_v_cols * sizeof *v_cols));
