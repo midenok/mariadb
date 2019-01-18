@@ -5493,6 +5493,26 @@ dict_index_t::instant_metadata(const dtuple_t& row, mem_heap_t* heap) const
 	return entry;
 }
 
+inline ulint find_old_col_no2(const ulint* col_map, ulint pos, ulint n)
+{
+       do {
+               if (!n)
+                       return ULINT_UNDEFINED;
+       } while (col_map[--n] != pos);
+       return n;
+}
+
+inline const char* old_col_name(const char *s, size_t col_nr)
+{
+	if (s) {
+		for (size_t i = 0; i < col_nr; i++) {
+			s += strlen(s) + 1;
+		}
+	}
+	return(s);
+}
+
+
 /** Insert or update SYS_COLUMNS and the hidden metadata record
 for instant ALTER TABLE.
 @param[in]	ha_alter_info	ALTER TABLE context
@@ -5549,9 +5569,39 @@ static bool innobase_instant_try(
 					  ctx->first_alter_pos - 1, trx)) {
 		return true;
 	}
-	for (uint i = 0; af < end; af++) {
+	for (uint i = 0, v_i = 0; af < end; af++) {
+		const char *new_name = (*af)->field_name.str;
 		if (!(*af)->stored_in_db()) {
 			ut_d(cf_it++);
+			ulint old_v_i = find_old_col_no2(
+				ctx->col_map + ctx->old_n_cols, v_i,
+				user_table->n_v_cols);
+
+			if (old_v_i != ULINT_UNDEFINED) {
+				const dict_v_col_t* old_v
+					= &user_table->v_cols[old_v_i];
+				const dict_v_col_t* new_v
+					= &ctx->instant_table->v_cols[v_i];
+				const dict_col_t& old_c = old_v->m_col;
+				const dict_col_t& c = new_v->m_col;
+
+				ulint pos = dict_create_v_col_pos(
+					old_v->v_pos, old_c.ind);
+				const char* old_name = old_col_name(
+					ctx->old_v_col_names, old_v_i);
+
+				if (old_c.prtype != c.prtype
+				    || old_c.len != c.len
+				    || 0 != strcmp(new_name, old_name)) {
+					if (innodb_update_sys_columns(
+						user_table->id, pos, new_name,
+						c.mtype, c.prtype, c.len,
+						old_v->num_base, trx, true)) {
+						return true;
+					}
+				}
+			}
+			v_i++;
 			continue;
 		}
 
@@ -5618,8 +5668,9 @@ static bool innobase_instant_try(
 		if (update
 		    && old->prtype == d->type.prtype
 		    && old->len == d->type.len
-		    && !strcmp((*af)->field_name.str,
-			       dict_table_get_col_name(user_table, i))) {
+		    && 0 == strcmp(
+			new_name,
+			old_col_name(ctx->old_col_names, old->ind))) {
 			/* The record is already present in SYS_COLUMNS. */
 		} else if (innodb_update_sys_columns(user_table->id, i,
 						     (*af)->field_name.str,
@@ -5800,7 +5851,6 @@ empty_table:
 		index->clear_instant_alter();
 		goto func_exit;
 	} else if (!user_table->is_instant()) {
-		ut_ad(!user_table->not_redundant());
 		goto func_exit;
 	}
 

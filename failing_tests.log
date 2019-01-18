@@ -1,0 +1,287 @@
+Logging: /home/midenok/src/mariadb/10.4/src/mysql-test/mysql-test-run.pl  --force --max-test-fail=0 --suite-timeout=1440 --mysqld=--silent-startup --tail-lines=0 --skip-test-list=/home/midenok/src/mariadb/10.4/tests_exclude --fast --reorder --parallel=4 innodb.innodb-alter-debug main.alter_table_online innodb.innodb-alter innodb.innodb-index-online-fk innodb.innodb-wl5980-alter innodb.innodb-autoinc-44030 innodb.innodb_bug21704 maria.maria main.alter_table
+vardir: /home/midenok/src/mariadb/10.4/build/mysql-test/var
+Checking leftover processes...
+Removing old var directory...
+Creating var directory '/home/midenok/src/mariadb/10.4/build/mysql-test/var'...
+Checking supported features...
+MariaDB Version 10.4.2-MariaDB-debug
+ - SSL connections supported
+ - binaries are debug compiled
+Collecting tests...
+Installing system database...
+
+==============================================================================
+
+TEST                                  WORKER RESULT   TIME (ms) or COMMENT
+--------------------------------------------------------------------------
+
+worker[2] Using MTR_BUILD_THREAD 300, with reserved ports 16000..16019
+worker[1] Using MTR_BUILD_THREAD 301, with reserved ports 16020..16039
+worker[3] Using MTR_BUILD_THREAD 302, with reserved ports 16040..16059
+worker[4] Using MTR_BUILD_THREAD 303, with reserved ports 16060..16079
+innodb.innodb-alter-debug '16k,innodb'   w1 [ fail ]
+        Test ended at 2019-01-18 10:27:25
+
+CURRENT_TEST: innodb.innodb-alter-debug
+mysqltest: At line 27: query 'ALTER TABLE ① CHANGE c2 š INT' succeeded - should have failed with errno 1114...
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/1/log/innodb.innodb-alter-debug-16k,innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb-alter-debug-16k,innodb/'
+innodb.innodb-alter-debug '32k,innodb'   w4 [ fail ]
+        Test ended at 2019-01-18 10:27:25
+
+CURRENT_TEST: innodb.innodb-alter-debug
+mysqltest: At line 27: query 'ALTER TABLE ① CHANGE c2 š INT' succeeded - should have failed with errno 1114...
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/4/log/innodb.innodb-alter-debug-32k,innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb-alter-debug-32k,innodb/'
+innodb.innodb-alter-debug '64k,innodb'   w2 [ fail ]
+        Test ended at 2019-01-18 10:27:25
+
+CURRENT_TEST: innodb.innodb-alter-debug
+mysqltest: At line 27: query 'ALTER TABLE ① CHANGE c2 š INT' succeeded - should have failed with errno 1114...
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/2/log/innodb.innodb-alter-debug-64k,innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb-alter-debug-64k,innodb/'
+innodb.innodb-alter-debug '4k,innodb'    w3 [ fail ]
+        Test ended at 2019-01-18 10:27:25
+
+CURRENT_TEST: innodb.innodb-alter-debug
+mysqltest: At line 27: query 'ALTER TABLE ① CHANGE c2 š INT' succeeded - should have failed with errno 1114...
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/3/log/innodb.innodb-alter-debug-4k,innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb-alter-debug-4k,innodb/'
+main.alter_table_online 'innodb'         w4 [ fail ]
+        Test ended at 2019-01-18 10:27:25
+
+CURRENT_TEST: main.alter_table_online
+mysqltest: At line 15: query 'alter online table t1 change b new_name int' failed: 1845: LOCK=NONE is not supported for this operation. Try LOCK=SHARED
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/4/log/main.alter_table_online-innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/main.alter_table_online-innodb/'
+innodb.innodb-alter 'innodb'             w2 [ fail ]
+        Test ended at 2019-01-18 10:27:29
+
+CURRENT_TEST: innodb.innodb-alter
+mysqltest: At line 295: query 'ALTER TABLE t1o ADD FULLTEXT INDEX(ct), CHANGE c1 FTS_DOC_ID INT,
+ALGORITHM=INPLACE' failed with wrong errno 1846: 'ALGORITHM=INPLACE is not supported. Reason: InnoDB presently supports one FULLTEXT index creation at a time. Try ALGORITHM=COPY', instead of 1166...
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/2/log/innodb.innodb-alter-innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb-alter-innodb/'
+innodb.innodb-index-online-fk 'innodb'   w3 [ fail ]
+        Test ended at 2019-01-18 10:27:29
+
+CURRENT_TEST: innodb.innodb-index-online-fk
+--- /home/midenok/src/mariadb/10.4/src/mysql-test/suite/innodb/r/innodb-index-online-fk.result	2018-10-18 13:19:24.813168431 +0300
++++ /home/midenok/src/mariadb/10.4/src/mysql-test/suite/innodb/r/innodb-index-online-fk.reject	2019-01-18 10:27:29.486524171 +0300
+@@ -286,6 +286,8 @@
+ ADD CONSTRAINT fk_1 FOREIGN KEY (a3) REFERENCES parent(b)
+ ON DELETE SET NULL ON UPDATE CASCADE,
+ ALGORITHM = INPLACE;
++Warnings:
++Warning	1088	InnoDB: Could not add foreign key constraints.
+ DROP TABLE child;
+ DROP TABLE parent;
+ CREATE TABLE parent (a INT PRIMARY KEY, b INT NOT NULL) ENGINE = InnoDB;
+
+mysqltest: Result length mismatch
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/3/log/innodb.innodb-index-online-fk-innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb-index-online-fk-innodb/'
+innodb.innodb-autoinc-44030 'innodb'     w4 [ fail ]
+        Test ended at 2019-01-18 10:27:29
+
+CURRENT_TEST: innodb.innodb-autoinc-44030
+mysqltest: At line 19: query 'SHOW CREATE TABLE t1' failed: 1932: Table 'test.t1' doesn't exist in engine
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/4/log/innodb.innodb-autoinc-44030-innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb-autoinc-44030-innodb/'
+***Warnings generated in error logs during shutdown after running tests: innodb.innodb-autoinc-44030
+
+2019-01-18 10:27:29 3 [ERROR] InnoDB: No matching column for `c1` in index `PRIMARY` of table `test`.`t1`
+2019-01-18 10:27:29 1 [ERROR] InnoDB: No matching column for `c1` in index `PRIMARY` of table `test`.`t1`
+2019-01-18 10:27:29 8 [ERROR] InnoDB: No matching column for `c1` in index `PRIMARY` of table `test`.`t1`
+
+innodb.innodb-alter-debug '8k,innodb'    w1 [ fail ]
+        Test ended at 2019-01-18 10:27:29
+
+CURRENT_TEST: innodb.innodb-alter-debug
+mysqltest: At line 27: query 'ALTER TABLE ① CHANGE c2 š INT' succeeded - should have failed with errno 1114...
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/1/log/innodb.innodb-alter-debug-8k,innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb-alter-debug-8k,innodb/'
+innodb.innodb_bug21704 'innodb'          w4 [ fail ]
+        Test ended at 2019-01-18 10:27:30
+
+CURRENT_TEST: innodb.innodb_bug21704
+--- /home/midenok/src/mariadb/10.4/src/mysql-test/suite/innodb/r/innodb_bug21704.result	2017-11-14 13:19:47.831391033 +0300
++++ /home/midenok/src/mariadb/10.4/src/mysql-test/suite/innodb/r/innodb_bug21704.reject	2019-01-18 10:27:30.558524138 +0300
+@@ -64,7 +64,7 @@
+   `z` int(11) NOT NULL,
+   `c` int(11) DEFAULT NULL,
+   PRIMARY KEY (`z`),
+-  CONSTRAINT `fk1` FOREIGN KEY (`z`) REFERENCES `t1` (`e`)
++  CONSTRAINT `fk1` FOREIGN KEY (`a`) REFERENCES `t1` (`a`)
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPACT
+ SHOW CREATE TABLE t3;
+ Table	Create Table
+@@ -74,7 +74,7 @@
+   `d` int(11) DEFAULT NULL,
+   PRIMARY KEY (`f`),
+   KEY `b` (`g`),
+-  CONSTRAINT `fk2` FOREIGN KEY (`g`) REFERENCES `t3` (`f`)
++  CONSTRAINT `fk2` FOREIGN KEY (`b`) REFERENCES `t3` (`a`)
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=COMPACT
+ SELECT f.*, c.*
+ FROM INFORMATION_SCHEMA.INNODB_SYS_FOREIGN_COLS c
+@@ -82,8 +82,8 @@
+ ON c.ID=f.ID
+ WHERE FOR_NAME LIKE 'test/t%';
+ ID	FOR_NAME	REF_NAME	N_COLS	TYPE	ID	FOR_COL_NAME	REF_COL_NAME	POS
+-test/fk1	test/t2	test/t1	1	0	test/fk1	z	e	0
+-test/fk2	test/t3	test/t3	1	0	test/fk2	g	f	0
++test/fk1	test/t2	test/t1	1	0	test/fk1	a	a	0
++test/fk2	test/t3	test/t3	1	0	test/fk2	b	a	0
+ DROP TABLE t3;
+ DROP TABLE t2;
+ DROP TABLE t1;
+
+mysqltest: Result content mismatch
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/4/log/innodb.innodb_bug21704-innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb_bug21704-innodb/'
+innodb.innodb-wl5980-alter 'innodb'      w2 [ fail ]
+        Test ended at 2019-01-18 10:27:31
+
+CURRENT_TEST: innodb.innodb-wl5980-alter
+mysqltest: At line 397: query 'ALTER TABLE t1n CHANGE c1 Fts_DOC_ID INT, ALGORITHM=INPLACE' failed with wrong errno 1846: 'ALGORITHM=INPLACE is not supported. Reason: InnoDB presently supports one FULLTEXT index creation at a time. Try ALGORITHM=COPY', instead of 1166...
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/2/log/innodb.innodb-wl5980-alter-innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/innodb.innodb-wl5980-alter-innodb/'
+maria.maria                              w3 [ fail ]
+        Test ended at 2019-01-18 10:27:34
+
+CURRENT_TEST: maria.maria
+/home/midenok/src/mariadb/10.4/build/storage/maria/aria_chk: Got error 'Can't find file' when trying to use aria control file './aria_log_control'
+--- /home/midenok/src/mariadb/10.4/src/mysql-test/suite/maria/maria.result	2019-01-15 19:12:45.301828416 +0300
++++ /home/midenok/src/mariadb/10.4/src/mysql-test/suite/maria/maria.reject	2019-01-18 10:27:34.338524022 +0300
+@@ -2675,8 +2675,8 @@
+ CREATE TABLE t1 (id int, c varchar(10)) engine=aria;
+ INSERT INTO t1 VALUES (1,"1");
+ ALTER TABLE t1 CHANGE c d varchar(10);
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 1
++info: Records: 1  Duplicates: 0  Warnings: 0
+ drop table t1;
+ create table t1 (s1 int);
+ insert into t1 values (1);
+
+mysqltest: Result content mismatch
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/3/log/maria.maria/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/maria.maria/'
+main.alter_table 'innodb'                w4 [ fail ]
+        Test ended at 2019-01-18 10:27:45
+
+CURRENT_TEST: main.alter_table
+--- /home/midenok/src/mariadb/10.4/src/mysql-test/main/alter_table.result	2019-01-15 19:12:45.137828421 +0300
++++ /home/midenok/src/mariadb/10.4/src/mysql-test/main/alter_table.reject	2019-01-18 10:27:45.050523692 +0300
+@@ -1104,39 +1104,39 @@
+ CREATE TABLE t1 (id int, c int) character set latin1;
+ INSERT INTO t1 VALUES (1,1);
+ ALTER TABLE t1 CHANGE c d int;
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 1
++info: Records: 1  Duplicates: 0  Warnings: 0
+ ALTER TABLE t1 CHANGE d c int;
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 1
++info: Records: 1  Duplicates: 0  Warnings: 0
+ ALTER TABLE t1 MODIFY c VARCHAR(10);
+ affected rows: 1
+ info: Records: 1  Duplicates: 0  Warnings: 0
+ ALTER TABLE t1 CHANGE c d varchar(10);
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 1
++info: Records: 1  Duplicates: 0  Warnings: 0
+ ALTER TABLE t1 CHANGE d c varchar(10);
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 1
++info: Records: 1  Duplicates: 0  Warnings: 0
+ DROP TABLE t1;
+ DROP TABLE IF EXISTS t1;
+ CREATE TABLE t1 (id int, c int) character set utf8;
+ INSERT INTO t1 VALUES (1,1);
+ ALTER TABLE t1 CHANGE c d int;
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 1
++info: Records: 1  Duplicates: 0  Warnings: 0
+ ALTER TABLE t1 CHANGE d c int;
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 1
++info: Records: 1  Duplicates: 0  Warnings: 0
+ ALTER TABLE t1 MODIFY c VARCHAR(10);
+ affected rows: 1
+ info: Records: 1  Duplicates: 0  Warnings: 0
+ ALTER TABLE t1 CHANGE c d varchar(10);
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 1
++info: Records: 1  Duplicates: 0  Warnings: 0
+ ALTER TABLE t1 CHANGE d c varchar(10);
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 1
++info: Records: 1  Duplicates: 0  Warnings: 0
+ DROP TABLE t1;
+ create table t1(f1 int not null, f2 int not null, key  (f1), key (f2));
+ select index_length into @unpaked_keys_size from
+@@ -1252,8 +1252,8 @@
+ INSERT INTO t1 VALUES (NULL, NULL), ("2009-10-09 11:46:19", 2);
+ this should affect no rows as there is no real change
+ ALTER TABLE t1 CHANGE COLUMN f1 f1_no_real_change TIMESTAMP NULL DEFAULT NULL;
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 2
++info: Records: 2  Duplicates: 0  Warnings: 0
+ DROP TABLE t1;
+ #
+ # Bug #31145: ALTER TABLE DROP COLUMN, ADD COLUMN crashes (linux) 
+@@ -1326,8 +1326,8 @@
+ # The below ALTER should not copy table and so no rows should
+ # be shown as affected.
+ ALTER TABLE t1 CHANGE a id INT;
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 2
++info: Records: 2  Duplicates: 0  Warnings: 0
+ DROP TABLE t1;
+ #
+ # Bug#11754461 CANNOT ALTER TABLE WHEN KEY PREFIX TOO LONG
+@@ -1916,8 +1916,8 @@
+ affected rows: 0
+ info: Records: 0  Duplicates: 0  Warnings: 0
+ ALTER TABLE tm1 CHANGE COLUMN f g INT;
+-affected rows: 0
+-info: Records: 0  Duplicates: 0  Warnings: 0
++affected rows: 2
++info: Records: 2  Duplicates: 0  Warnings: 0
+ ALTER TABLE ti1 CHANGE COLUMN g h VARCHAR(20);
+ affected rows: 2
+ info: Records: 2  Duplicates: 0  Warnings: 0
+
+mysqltest: Result content mismatch
+
+ - saving '/home/midenok/src/mariadb/10.4/build/mysql-test/var/4/log/main.alter_table-innodb/' to '/home/midenok/src/mariadb/10.4/build/mysql-test/var/log/main.alter_table-innodb/'
+--------------------------------------------------------------------------
+The servers were restarted 9 times
+Spent 0.000 of 28 seconds executing testcases
+
+Completed: Failed 13/13 tests, 0.00% were successful.
+
+Failing test(s): innodb.innodb-alter-debug main.alter_table_online innodb.innodb-alter innodb.innodb-index-online-fk innodb.innodb-autoinc-44030 innodb.innodb_bug21704 innodb.innodb-wl5980-alter maria.maria main.alter_table
+
+The log files in var/log may give you some hint of what went wrong.
+
+If you want to report this error, please read first the documentation
+at http://dev.mysql.com/doc/mysql/en/mysql-test-suite.html
+
+Errors/warnings were found in logfiles during server shutdown after running the
+following sequence(s) of tests:
+    innodb.innodb-autoinc-44030
+mysql-test-run: *** ERROR: there were failing test cases
