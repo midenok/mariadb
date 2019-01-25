@@ -9845,7 +9845,9 @@ bool mysql_alter_table(THD *thd, const LEX_CSTRING *new_db,
         goto err_new_table_cleanup;
     }
   }
-  new_table->s->orig_table_name= table->s->table_name.str;
+  if (table->s->table_name.str)
+    new_table->s->orig_table_name= (const char *)
+      thd->strdup(table->s->table_name.str);
 
   /*
     Note: In case of MERGE table, we do not attach children. We do not

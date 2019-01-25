@@ -621,3 +621,12 @@ TRUNCATE TABLE t1;
 UNLOCK TABLES;
 
 DROP TABLE t1, t2;
+
+--echo #
+--echo # MDEV-18083 ASAN heap-use-after-free in Field::set_warning_truncated_wrong_value upon inserting into temporary table
+--echo #
+create or replace temporary table tmp (a int);
+alter table tmp add column f text;
+--error ER_TRUNCATED_WRONG_VALUE_FOR_FIELD
+insert into tmp values ('x','foo');
+drop table tmp;

@@ -572,3 +572,11 @@ LOCK TABLES t2 WRITE;
 TRUNCATE TABLE t1;
 UNLOCK TABLES;
 DROP TABLE t1, t2;
+#
+# MDEV-18083 ASAN heap-use-after-free in Field::set_warning_truncated_wrong_value upon inserting into temporary table
+#
+create or replace temporary table tmp (a int);
+alter table tmp add column f text;
+insert into tmp values ('x','foo');
+ERROR 22007: Incorrect integer value: 'x' for column `test`.`tmp`.`a` at row 1
+drop table tmp;
