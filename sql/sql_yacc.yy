@@ -798,10 +798,10 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %parse-param { THD *thd }
 %lex-param { THD *thd }
 /*
-  Currently there are 48 shift/reduce conflicts.
+  Currently there are 49 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 48
+%expect 49
 
 /*
    Comments for TOKENS.
@@ -917,6 +917,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %token  FOREIGN                       /* SQL-2003-R */
 %token  FOR_SYM                       /* SQL-2003-R */
 %token  FOR_SYSTEM_TIME_SYM           /* INTERNAL */
+%token  FOR_UPDATE_SYM                /* INTERNAL */
 %token  FROM
 %token  FULLTEXT_SYM
 %token  GE
@@ -1809,7 +1810,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
         ev_alter_on_schedule_completion opt_ev_rename_to opt_ev_sql_stmt
         optional_flush_tables_arguments
         opt_time_precision kill_type kill_option int_num
-        opt_default_time_precision
+        opt_default_time_precision opt_for_period_clause
         case_stmt_body opt_bin_mod opt_for_system_time_clause
         opt_if_exists_table_element opt_if_not_exists_table_element
         opt_recursive opt_format_xid opt_for_portion_of_time_clause
@@ -9482,6 +9483,41 @@ opt_for_system_time_clause:
           }
         ;
 
+opt_for_period_clause:
+          /* empty */
+          {
+            $$= false;
+          }
+        | FOR_SYM ident period_select_expr
+          {
+            $$= true;
+          }
+        ;
+
+period_select_expr:
+          AS OF_SYM bit_expr
+          {
+            Lex->vers_conditions.init(SYSTEM_TIME_AS_OF,
+                                      Vers_history_point(VERS_TIMESTAMP, $3));
+          }
+        | ALL
+          {
+            Lex->vers_conditions.init(SYSTEM_TIME_ALL);
+          }
+        | FROM bit_expr TO_SYM bit_expr
+          {
+            Lex->vers_conditions.init(SYSTEM_TIME_FROM_TO,
+                                      Vers_history_point(VERS_TIMESTAMP, $2),
+                                      Vers_history_point(VERS_TIMESTAMP, $4));
+          }
+        | BETWEEN_SYM bit_expr AND_SYM bit_expr
+          {
+            Lex->vers_conditions.init(SYSTEM_TIME_BETWEEN,
+                                      Vers_history_point(VERS_TIMESTAMP, $2),
+                                      Vers_history_point(VERS_TIMESTAMP, $4));
+          }
+        ;
+
 system_time_expr:
           AS OF_SYM history_point
           {
@@ -9530,9 +9566,9 @@ select_option:
 
 
 select_lock_type:
-          FOR_SYM UPDATE_SYM opt_lock_wait_timeout_new
+          FOR_UPDATE_SYM opt_lock_wait_timeout_new
           {
-            $$= $3;
+            $$= $2;
             $$.defined_lock= TRUE;
             $$.update_lock= TRUE;
           }
@@ -12155,11 +12191,11 @@ join_table_parens:
 
 table_primary_ident:
           table_ident opt_use_partition opt_for_system_time_clause
-          opt_table_alias_clause opt_key_definition
+          opt_for_period_clause opt_table_alias_clause opt_key_definition
           {
             SELECT_LEX *sel= Select;
             sel->table_join_options= 0;
-            if (!($$= Select->add_table_to_list(thd, $1, $4,
+            if (!($$= Select->add_table_to_list(thd, $1, $5,
                                                 Select->get_table_join_options(),
                                                 YYPS->m_lock_type,
                                                 YYPS->m_mdl_type,
@@ -12169,6 +12205,8 @@ table_primary_ident:
             TABLE_LIST *tl= $$;
             if ($3)
               tl->vers_conditions= Lex->vers_conditions;
+            if ($4)
+              tl->period_conditions= Lex->period_conditions;
           }
         ;
 

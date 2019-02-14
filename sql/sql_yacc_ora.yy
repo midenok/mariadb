@@ -412,6 +412,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %token  FOREIGN                       /* SQL-2003-R */
 %token  FOR_SYM                       /* SQL-2003-R */
 %token  FOR_SYSTEM_TIME_SYM           /* INTERNAL */
+%token  FOR_UPDATE_SYM                /* INTERNAL */
 %token  FROM
 %token  FULLTEXT_SYM
 %token  GE
@@ -9523,9 +9524,9 @@ select_option:
 
 
 select_lock_type:
-          FOR_SYM UPDATE_SYM opt_lock_wait_timeout_new
+          FOR_UPDATE_SYM opt_lock_wait_timeout_new
           {
-            $$= $3;
+            $$= $2;
             $$.defined_lock= TRUE;
             $$.update_lock= TRUE;
           }

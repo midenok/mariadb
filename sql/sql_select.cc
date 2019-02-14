@@ -884,11 +884,15 @@ Item* SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables, Item *where)
   if (skip_setup_conds(thd))
     DBUG_RETURN(NULL);
 
-  DBUG_ASSERT(!tables->next_local && tables->table);
-
   Item *result= NULL;
   for (TABLE_LIST *table= tables; table; table= table->next_local)
   {
+    if (table->is_view_or_derived())
+    {
+      my_error(ER_IT_IS_A_VIEW, MYF(0), table->table_name.str);
+      DBUG_RETURN(NULL);
+    }
+
     if (!table->table)
       continue;
     vers_select_conds_t &conds= table->period_conditions;

@@ -1376,6 +1376,8 @@ int Lex_input_stream::lex_token(YYSTYPE *yylval, THD *thd)
     switch(token) {
     case SYSTEM_TIME_SYM:
       return FOR_SYSTEM_TIME_SYM;
+    case UPDATE_SYM:
+      return FOR_UPDATE_SYM;
     default:
       /*
         Save the token following 'FOR_SYM'
