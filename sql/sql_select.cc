@@ -903,8 +903,9 @@ Item* SELECT_LEX::period_setup_conds(THD *thd, TABLE_LIST *tables, Item *where)
     }
 
     conds.period= &table->table->s->period;
-    result= and_items(thd, result,
-                      period_get_condition(thd, table, this, &conds, true));
+    Item *period_conds= period_get_condition(thd, table, this, &conds, true);
+    result= and_items(thd, result, period_conds);
+    table->on_expr= and_items(thd, table->on_expr, period_conds);
   }
   DBUG_RETURN(and_items(thd, where, result));
 }
@@ -1122,6 +1123,10 @@ JOIN::prepare(TABLE_LIST *tables_init,
   /* System Versioning: handle FOR SYSTEM_TIME clause. */
   if (select_lex->vers_setup_conds(thd, tables_list) < 0)
     DBUG_RETURN(-1);
+
+  if (select_lex->period_setup_conds(thd, tables_list, NULL) == NULL)
+    DBUG_RETURN(-1);
+
 
   /*
     TRUE if the SELECT list mixes elements with and without grouping,

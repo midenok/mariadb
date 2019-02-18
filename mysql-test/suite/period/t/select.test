@@ -1,0 +1,7 @@
+create or replace table t(x int, s date, e date, period for p(s, e));
+
+insert into t values (1, '1992-01-01', '1999-12-29'),
+                     (2, '1992-01-01', '1999-12-30'),
+                     (3, '1992-01-01', '1999-12-31');
+
+select * from t for p as of '1999-12-30';

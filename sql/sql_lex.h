@@ -3323,6 +3323,8 @@ public:
   /* System Versioning */
   vers_select_conds_t vers_conditions;
   vers_select_conds_t period_conditions;
+  /** Application-time period name, passed into period_conditions.init() */
+  Lex_ident period_name;
 
   inline void free_set_stmt_mem_root()
   {

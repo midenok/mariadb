@@ -9488,7 +9488,8 @@ opt_for_period_clause:
           {
             $$= false;
           }
-        | FOR_SYM ident period_select_expr
+        | FOR_SYM ident { Lex->period_name= $2; }
+          period_select_expr
           {
             $$= true;
           }
@@ -9497,24 +9498,28 @@ opt_for_period_clause:
 period_select_expr:
           AS OF_SYM bit_expr
           {
-            Lex->vers_conditions.init(SYSTEM_TIME_AS_OF,
-                                      Vers_history_point(VERS_TIMESTAMP, $3));
+            Lex->period_conditions.init(SYSTEM_TIME_AS_OF,
+                                        Vers_history_point(VERS_TIMESTAMP, $3),
+                                        Vers_history_point(),
+                                        Lex->period_name);
           }
         | ALL
           {
-            Lex->vers_conditions.init(SYSTEM_TIME_ALL);
+            Lex->period_conditions.init(SYSTEM_TIME_ALL);
           }
         | FROM bit_expr TO_SYM bit_expr
           {
-            Lex->vers_conditions.init(SYSTEM_TIME_FROM_TO,
-                                      Vers_history_point(VERS_TIMESTAMP, $2),
-                                      Vers_history_point(VERS_TIMESTAMP, $4));
+            Lex->period_conditions.init(SYSTEM_TIME_FROM_TO,
+                                        Vers_history_point(VERS_TIMESTAMP, $2),
+                                        Vers_history_point(VERS_TIMESTAMP, $4),
+                                        Lex->period_name);
           }
         | BETWEEN_SYM bit_expr AND_SYM bit_expr
           {
-            Lex->vers_conditions.init(SYSTEM_TIME_BETWEEN,
-                                      Vers_history_point(VERS_TIMESTAMP, $2),
-                                      Vers_history_point(VERS_TIMESTAMP, $4));
+            Lex->period_conditions.init(SYSTEM_TIME_BETWEEN,
+                                        Vers_history_point(VERS_TIMESTAMP, $2),
+                                        Vers_history_point(VERS_TIMESTAMP, $4),
+                                        Lex->period_name);
           }
         ;
 
