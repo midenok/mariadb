@@ -241,6 +241,25 @@ B2	salary
 1	2500
 drop table t1;
 drop table t2;
+# Multi-table UPDATE
+create or replace table t1 (
+x int,
+sys_trx_start SYS_DATATYPE as row start invisible,
+sys_trx_end SYS_DATATYPE as row end invisible,
+period for system_time (sys_trx_start, sys_trx_end))
+with system versioning;
+create or replace table t2 like t1;
+insert into t1 values (1);
+insert into t2 values (2);
+set @t0= now(6);
+update t1, t2 set t1.x=11, t2.x=22;
+select * from t1, t2;
+x	x
+11	22
+select * from t1 for system_time as of @t0, t2 for system_time as of @t0;
+x	x
+1	2
+drop tables t1, t2;
 #
 # MDEV-15458 Segfault in heap_scan() upon UPDATE after ADD SYSTEM VERSIONING
 #

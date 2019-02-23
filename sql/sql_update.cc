@@ -290,14 +290,16 @@ static void prepare_record_for_error_message(int error, TABLE *table)
 
 int mysql_update(THD *thd,
                  TABLE_LIST *table_list,
-                 List<Item> &fields,
-		 List<Item> &values,
-                 COND *conds,
-                 uint order_num, ORDER *order,
+                 SELECT_LEX *select_lex,
+                 List<Item> &values,
 		 ha_rows limit,
 		 enum enum_duplicates handle_duplicates, bool ignore,
                  ha_rows *found_return, ha_rows *updated_return)
 {
+  List<Item> &fields= select_lex->item_list;
+  uint order_num= select_lex->order_list.elements;
+  ORDER *order= select_lex->order_list.first;
+
   bool		using_limit= limit != HA_POS_ERROR;
   bool          safe_update= thd->variables.option_bits & OPTION_SAFE_UPDATES;
   bool          used_key_is_modified= FALSE, transactional_table;
@@ -318,7 +320,6 @@ int mysql_update(THD *thd,
   SQL_SELECT	*select= NULL;
   SORT_INFO     *file_sort= 0;
   READ_RECORD	info;
-  SELECT_LEX    *select_lex= thd->lex->first_select_lex();
   ulonglong     id;
   List<Item> all_fields;
   killed_state killed_status= NOT_KILLED;
@@ -338,6 +339,11 @@ int mysql_update(THD *thd,
   create_explain_query(thd->lex, thd->mem_root);
   if (open_tables(thd, &table_list, &table_count, 0))
     DBUG_RETURN(1);
+
+  if (select_lex->vers_setup_conds(thd, table_list))
+    DBUG_RETURN(1);
+
+  COND *conds= select_lex->where;
 
   /* Prepare views so they are handled correctly */
   if (mysql_handle_derived(thd->lex, DT_INIT))
@@ -867,11 +873,6 @@ update_begin:
   THD_STAGE_INFO(thd, stage_updating);
   while (!(error=info.read_record()) && !thd->killed)
   {
-    if (table->versioned() && !table->vers_end_field()->is_max())
-    {
-      continue;
-    }
-
     explain->tracker.on_record_read();
     thd->inc_examined_row_count(1);
     if (!select || select->skip_record(thd) > 0)
@@ -1759,6 +1760,9 @@ bool mysql_multi_update(THD *thd,
   thd->abort_on_warning= !ignore && thd->is_strict_mode();
   List<Item> total_list;
 
+  if (select_lex->vers_setup_conds(thd, table_list))
+    DBUG_RETURN(1);
+
   res= mysql_select(thd,
                     table_list, select_lex->with_wild, total_list, conds,
                     select_lex->order_list.elements, select_lex->order_list.first,
@@ -2317,11 +2321,6 @@ int multi_update::send_data(List<Item> &not_used_values)
     */
     if (table->status & (STATUS_NULL_ROW | STATUS_UPDATED))
       continue;
-
-    if (table->versioned() && !table->vers_end_field()->is_max())
-    {
-      continue;
-    }
 
     if (table == table_to_update)
     {
