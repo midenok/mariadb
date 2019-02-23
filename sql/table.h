@@ -1848,6 +1848,7 @@ struct vers_select_conds_t
 {
   vers_system_time_t type;
   bool used:1;
+  bool delete_history:1;
   Vers_history_point start;
   Vers_history_point end;
 
@@ -1855,6 +1856,7 @@ struct vers_select_conds_t
   {
     type= SYSTEM_TIME_UNSPECIFIED;
     used= false;
+    delete_history= false;
     start.empty();
     end.empty();
   }
@@ -1865,6 +1867,8 @@ struct vers_select_conds_t
   {
     type= _type;
     used= false;
+    delete_history= (type == SYSTEM_TIME_HISTORY ||
+      type == SYSTEM_TIME_BEFORE);
     start= _start;
     end= _end;
   }
