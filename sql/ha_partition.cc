@@ -7415,6 +7415,55 @@ int ha_partition::handle_unordered_scan_next_partition(uchar * buf)
 }
 
 
+void ha_partition::store_rec(uchar *rec_buf_ptr)
+{
+  for (Field **fld= table->field; *fld; fld++)
+  {
+    if ((*fld)->flags & BLOB_FLAG)
+    {
+      Field_blob *blob= static_cast<Field_blob *>(*fld);
+      if (!blob->value.ptr()) {
+        uchar **data= (uchar **) blob->get_ptr();
+        if (data)
+          *data= NULL;
+      }
+    }
+  }
+  memcpy(rec_buf_ptr, table->record[0], m_rec_length);
+  for (Field **fld= table->field; *fld; fld++)
+  {
+    if ((*fld)->flags & BLOB_FLAG)
+    {
+      Field_blob *blob= static_cast<Field_blob *>(*fld);
+      if (blob->value.ptr()) {
+        if (blob->get_ptr())
+          blob->value.release();
+      }
+    }
+  }
+}
+
+void ha_partition::restore_rec(uchar *dst, uchar *rec_buf_ptr)
+{
+  memcpy(dst, rec_buf_ptr, m_rec_length);
+  const my_ptrdiff_t diff= dst - table->record[0];
+  for (Field **fld= table->field; *fld; fld++)
+  {
+    if (diff)
+      (*fld)->move_field_offset(diff);
+    if ((*fld)->flags & BLOB_FLAG)
+    {
+      Field_blob *blob= static_cast<Field_blob *>(*fld);
+      uchar **data= (uchar **) blob->get_ptr();
+      if (data && *data)
+        blob->set_value(*data);
+    }
+    if (diff)
+      (*fld)->move_field_offset(0 - diff);
+  }
+}
+
+
 /**
   Common routine to start index scan with ordered results.
 
@@ -7523,7 +7572,7 @@ int ha_partition::handle_ordered_index_scan(uchar *buf, bool reverse_order)
       error= file->read_range_first(m_start_key.key? &m_start_key: NULL,
                                     end_range, eq_range, TRUE);
       if (likely(!error))
-        memcpy(rec_buf_ptr, table->record[0], m_rec_length);
+        store_rec(rec_buf_ptr);
       reverse_order= FALSE;
       break;
     }
@@ -7541,7 +7590,7 @@ int ha_partition::handle_ordered_index_scan(uchar *buf, bool reverse_order)
       }
       if (likely(!error))
       {
-        memcpy(rec_buf_ptr, table->record[0], m_rec_length);
+        store_rec(rec_buf_ptr);
         reverse_order= FALSE;
         m_stock_range_seq[i]= (((PARTITION_KEY_MULTI_RANGE *)
                                 m_range_info[i])->id);
@@ -7669,7 +7718,7 @@ void ha_partition::return_top_record(uchar *buf)
   DBUG_PRINT("enter", ("partition this: %p", this));
 
   part_id= uint2korr(key_buffer);
-  memcpy(buf, rec_buffer, m_rec_length);
+  restore_rec(buf, rec_buffer);
   m_last_part= part_id;
   DBUG_PRINT("info", ("partition m_last_part: %u", m_last_part));
   m_top_entry= part_id;
@@ -7814,7 +7863,7 @@ int ha_partition::handle_ordered_next(uchar *buf, bool is_next_same)
   if (m_index_scan_type == partition_read_range)
   {
     error= file->read_range_next();
-    memcpy(rec_buf, table->record[0], m_rec_length);
+    store_rec(rec_buf);
   }
   else if (m_index_scan_type == partition_read_multi_range)
   {
@@ -7850,7 +7899,7 @@ int ha_partition::handle_ordered_next(uchar *buf, bool is_next_same)
                            m_range_info[part_id])->id));
       DBUG_PRINT("info", ("m_mrr_range_current->id: %u",
                           m_mrr_range_current->id));
-      memcpy(rec_buf, table->record[0], m_rec_length);
+      store_rec(rec_buf);
       if (((PARTITION_KEY_MULTI_RANGE *) m_range_info[part_id])->id !=
           m_mrr_range_current->id)
       {

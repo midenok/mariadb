@@ -1506,5 +1506,9 @@ public:
 
   friend int cmp_key_rowid_part_id(void *ptr, uchar *ref1, uchar *ref2);
   friend int cmp_key_part_id(void *key_p, uchar *ref1, uchar *ref2);
+
+private:
+  void store_rec(uchar *rec_buf_ptr);
+  void restore_rec(uchar *dst, uchar *rec_buf_ptr);
 };
 #endif /* HA_PARTITION_INCLUDED */

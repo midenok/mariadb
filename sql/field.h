@@ -3747,6 +3747,7 @@ protected:
   /**
     The 'value'-object is a cache fronting the storage engine.
   */
+public:
   String value;
   /**
      Cache for blob values when reading a row with a virtual blob
