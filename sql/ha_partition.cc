@@ -7417,28 +7417,14 @@ int ha_partition::handle_unordered_scan_next_partition(uchar * buf)
 
 void ha_partition::store_rec(uchar *rec_buf_ptr)
 {
-  for (Field **fld= table->field; *fld; fld++)
-  {
-    if ((*fld)->flags & BLOB_FLAG)
-    {
-      Field_blob *blob= static_cast<Field_blob *>(*fld);
-      if (!blob->value.ptr()) {
-        uchar **data= (uchar **) blob->get_ptr();
-        if (data)
-          *data= NULL;
-      }
-    }
-  }
   memcpy(rec_buf_ptr, table->record[0], m_rec_length);
   for (Field **fld= table->field; *fld; fld++)
   {
     if ((*fld)->flags & BLOB_FLAG)
     {
       Field_blob *blob= static_cast<Field_blob *>(*fld);
-      if (blob->value.ptr()) {
-        if (blob->get_ptr())
+      if (blob->value.is_alloced())
           blob->value.release();
-      }
     }
   }
 }
@@ -7454,14 +7440,27 @@ void ha_partition::restore_rec(uchar *dst, uchar *rec_buf_ptr)
     if ((*fld)->flags & BLOB_FLAG)
     {
       Field_blob *blob= static_cast<Field_blob *>(*fld);
-      uchar **data= (uchar **) blob->get_ptr();
-      if (data && *data)
-        blob->set_value(*data);
+      uchar *data= blob->get_ptr();
+      uint32 length= blob->get_length();
+      if (data)
+        blob->value.reset((char*) data, length, length, &my_charset_bin);
     }
     if (diff)
       (*fld)->move_field_offset(0 - diff);
   }
 }
+
+#if 0
+void ha_partition::store_rec(uchar *rec_buf_ptr)
+{
+  memcpy(rec_buf_ptr, table->record[0], m_rec_length);
+}
+
+void ha_partition::restore_rec(uchar *dst, uchar *rec_buf_ptr)
+{
+  memcpy(dst, rec_buf_ptr, m_rec_length);
+}
+#endif
 
 
 /**
