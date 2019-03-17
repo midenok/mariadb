@@ -7459,6 +7459,8 @@ void ha_partition::store_rec(uchar *rec_buf_ptr)
 void ha_partition::restore_rec(uchar *dst, uchar *rec_buf_ptr)
 {
   memcpy(dst, rec_buf_ptr, m_rec_length);
+  if (table->vfield && dst == table->record[0])
+    table->update_virtual_fields(this, VCOL_UPDATE_FOR_READ);
 }
 
 
