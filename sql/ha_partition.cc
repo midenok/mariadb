@@ -7414,7 +7414,7 @@ int ha_partition::handle_unordered_scan_next_partition(uchar * buf)
   DBUG_RETURN(saved_error);
 }
 
-
+#if 0
 void ha_partition::store_rec(uchar *rec_buf_ptr)
 {
   memcpy(rec_buf_ptr, table->record[0], m_rec_length);
@@ -7449,8 +7449,8 @@ void ha_partition::restore_rec(uchar *dst, uchar *rec_buf_ptr)
       (*fld)->move_field_offset(0 - diff);
   }
 }
+#endif
 
-#if 0
 void ha_partition::store_rec(uchar *rec_buf_ptr)
 {
   memcpy(rec_buf_ptr, table->record[0], m_rec_length);
@@ -7460,7 +7460,6 @@ void ha_partition::restore_rec(uchar *dst, uchar *rec_buf_ptr)
 {
   memcpy(dst, rec_buf_ptr, m_rec_length);
 }
-#endif
 
 
 /**

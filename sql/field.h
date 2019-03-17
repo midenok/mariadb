@@ -3831,14 +3831,7 @@ public:
       return do_copy_blob;
     return get_identical_copy_func();
   }
-  int  store_field(Field *from)
-  {                                             // Be sure the value is stored
-    from->val_str(&value);
-    if (table->copy_blobs ||
-        (!value.is_alloced() && from->is_varchar_and_in_write_set()))
-      value.copy();
-    return store(value.ptr(), value.length(), from->charset());
-  }
+  int  store_field(Field *from);
   bool memcpy_field_possible(const Field *from) const
   {
     return Field_str::memcpy_field_possible(from) &&

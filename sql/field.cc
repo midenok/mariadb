@@ -10567,6 +10567,15 @@ uint pack_length_to_packflag(uint type)
   return 0;					// This shouldn't happen
 }
 
+int Field_blob::store_field(Field* from)
+{                                             // Be sure the value is stored
+  from->val_str(&value);
+  if (table->copy_blobs ||
+      (!value.is_alloced() && from->is_varchar_and_in_write_set()))
+    value.copy();
+  return store(value.ptr(), value.length(), from->charset());
+}
+
 
 uint Column_definition_attributes::pack_flag_to_pack_length() const
 {
