@@ -156,7 +156,9 @@ create or replace table t1 (pk int primary key, x int);
 insert into t1 values (1, 1);
 --sync_slave_with_master
 create or replace table t1 (pk int primary key, x int) with system versioning;
+set timestamp= unix_timestamp('2000-01-01 00:00');
 insert into t1 values (1, 1);
+set timestamp= default;
 flush logs;
 --connection master
 update t1 set x= 2 where pk = 1;
@@ -164,12 +166,12 @@ update t1 set x= 3 where pk = 1;
 --sync_slave_with_master
 select * from t1 for system_time all order by row_end;
 
-set timestamp= unix_timestamp() + 10;
 create or replace table t1 (pk int primary key, x int) with system versioning;
+set timestamp= unix_timestamp('2000-01-01 00:00');
 insert into t1 values (1, 1);
+set timestamp= default;
 --let $datadir= `select @@datadir`
 --let $f= query_get_value(SHOW SLAVE STATUS, Relay_Log_File, 1)
-set timestamp= default;
 --echo # Replaying binlog...
 --exec $MYSQL_BINLOG $datadir/$f| $MYSQL -P $SLAVE_MYPORT -S $SLAVE_MYSOCK test
 --exec $MYSQL_BINLOG $datadir/$f| $MYSQL -P $SLAVE_MYPORT -S $SLAVE_MYSOCK test
@@ -178,13 +180,14 @@ select * from t1;
 
 --echo # Case 3: not versioned -> versioned replication, DELETE
 create or replace table t1 (pk int primary key, x int);
+--let $t1= `select @@timestamp`
 insert into t1 values (1, 1);
 --sync_slave_with_master
-set timestamp= unix_timestamp() + 10;
 create or replace table t1 (pk int primary key, x int) with system versioning;
+set timestamp= unix_timestamp('2000-01-01 00:00');
 insert into t1 values (1, 1);
-flush logs;
 set timestamp= default;
+flush logs;
 --connection master
 delete from t1;
 --sync_slave_with_master
