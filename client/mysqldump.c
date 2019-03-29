@@ -90,6 +90,19 @@
 /* Max length GTID position that we will output. */
 #define MAX_GTID_LENGTH 1024
 
+enum {
+  NOT_VERSIONED= 0,
+  VERS_NORMAL= 1,
+  VERS_HIDDEN= 2
+};
+
+struct Table_info
+{
+  uint versioned;
+  uint row_start_no;
+  uint row_end_no;
+};
+
 static void add_load_option(DYNAMIC_STRING *str, const char *option,
                              const char *option_value);
 static ulong find_set(TYPELIB *, const char *, size_t, char **, uint *);
@@ -2721,10 +2734,10 @@ static inline my_bool general_log_or_slow_log_tables(const char *db,
 */
 
 static uint get_table_structure(char *table, char *db, char *table_type,
-                                char *ignore_flag)
+                                char *ignore_flag, struct Table_info *table_info)
 {
   my_bool    init=0, delayed, write_data, complete_insert;
-  my_ulonglong num_fields;
+  my_ulonglong num_fields= 0;
   char       *result_table, *opt_quoted_table;
   const char *insert_option;
   char	     name_buff[NAME_LEN+3],table_buff[NAME_LEN*2+3];
@@ -2744,6 +2757,12 @@ static uint get_table_structure(char *table, char *db, char *table_type,
   my_bool    is_log_table;
   MYSQL_RES  *result;
   MYSQL_ROW  row;
+  uint       *versioned= NULL;
+  if (table_info)
+  {
+    versioned= &table_info->versioned;
+    *versioned= NOT_VERSIONED;
+  }
   DBUG_ENTER("get_table_structure");
   DBUG_PRINT("enter", ("db: %s  table: %s", db, table));
 
@@ -2796,23 +2815,23 @@ static uint get_table_structure(char *table, char *db, char *table_type,
 
   if (!opt_xml && !mysql_query_with_error_report(mysql, 0, query_buff))
   {
+    char buff[20+FN_REFLEN];
+    my_snprintf(buff, sizeof(buff), "show create table %s", result_table);
+
+    if (switch_character_set_results(mysql, "binary") ||
+        mysql_query_with_error_report(mysql, &result, buff) ||
+        switch_character_set_results(mysql, default_charset))
+    {
+      my_free(order_by);
+      order_by= 0;
+      DBUG_RETURN(0);
+    }
+
     /* using SHOW CREATE statement */
     if (!opt_no_create_info)
     {
       /* Make an sql-file, if path was given iow. option -T was given */
-      char buff[20+FN_REFLEN];
       MYSQL_FIELD *field;
-
-      my_snprintf(buff, sizeof(buff), "show create table %s", result_table);
-
-      if (switch_character_set_results(mysql, "binary") ||
-          mysql_query_with_error_report(mysql, &result, buff) ||
-          switch_character_set_results(mysql, default_charset))
-      {
-        my_free(order_by);
-        order_by= 0;
-        DBUG_RETURN(0);
-      }
 
       if (path)
       {
@@ -3000,8 +3019,19 @@ static uint get_table_structure(char *table, char *db, char *table_type,
       }
 
       check_io(sql_file);
-      mysql_free_result(result);
     }
+    else
+    {
+      row= mysql_fetch_row(result);
+    }
+    if (versioned && strstr(row[1], "WITH SYSTEM VERSIONING"))
+    {
+      if (strstr(row[1], "GENERATED ALWAYS AS ROW START"))
+        *versioned= VERS_NORMAL;
+      else
+        *versioned= VERS_HIDDEN;
+    }
+    mysql_free_result(result);
     my_snprintf(query_buff, sizeof(query_buff), "show fields from %s",
                 result_table);
     if (mysql_query_with_error_report(mysql, &result, query_buff))
@@ -3011,10 +3041,21 @@ static uint get_table_structure(char *table, char *db, char *table_type,
       DBUG_RETURN(0);
     }
 
-    while ((row= mysql_fetch_row(result)))
+    int i= 0;
+    for (; (row= mysql_fetch_row(result)); ++i)
     {
-      if (strlen(row[SHOW_EXTRA]) && strstr(row[SHOW_EXTRA],"INVISIBLE"))
-        complete_insert= 1;
+      if (strlen(row[SHOW_EXTRA]))
+      {
+        if (strstr(row[SHOW_EXTRA],"INVISIBLE"))
+          complete_insert= 1;
+        if (versioned && *versioned == VERS_NORMAL)
+        {
+          if (strstr(row[SHOW_EXTRA], "ROW START"))
+            table_info->row_start_no= i;
+          else if (strstr(row[SHOW_EXTRA], "ROW END"))
+            table_info->row_end_no= i;
+        }
+      }
       if (init)
       {
         dynstr_append_checked(&select_field_names, ", ");
@@ -3022,6 +3063,31 @@ static uint get_table_structure(char *table, char *db, char *table_type,
       init=1;
       dynstr_append_checked(&select_field_names,
               quote_name(row[SHOW_FIELDNAME], name_buff, 0));
+    }
+    if (versioned && *versioned == VERS_HIDDEN)
+    {
+      if (init)
+      {
+        dynstr_append_checked(&select_field_names, ", ");
+      }
+      dynstr_append_checked(&select_field_names,
+              quote_name("row_start", name_buff, 0));
+      table_info->row_start_no= i;
+      num_fields++;
+    }
+    else if (versioned && *versioned == VERS_NORMAL)
+    {
+      if (table_info->row_start_no == UINT_MAX)
+        fprintf(stderr, "%s: No ROW START column in system-versioned %s\n",
+                my_progname_short, result_table);
+      if (table_info->row_end_no == UINT_MAX)
+      {
+        fprintf(stderr, "%s: No ROW END column in system-versioned %s\n",
+                my_progname_short, result_table);
+        DBUG_RETURN(0);
+      }
+      if (table_info->row_start_no == UINT_MAX)
+        DBUG_RETURN(0);
     }
     init=0;
     /*
@@ -3046,18 +3112,19 @@ static uint get_table_structure(char *table, char *db, char *table_type,
       else
       {
         dynstr_append_checked(&insert_pat, " VALUES ");
-        if (!extended_insert)
+        if (!extended_insert || (versioned && *versioned))
           dynstr_append_checked(&insert_pat, "(");
       }
     }
 
     if (complete_insert)
       dynstr_append_checked(&insert_pat, select_field_names.str);
-    num_fields= mysql_num_rows(result);
+    num_fields+= mysql_num_rows(result);
     mysql_free_result(result);
   }
   else
   {
+    // FIXME: handle this branch
     verbose_msg("%s: Warning: Can't set SQL_QUOTE_SHOW_CREATE option (%s)\n",
                 my_progname_short, mysql_error(mysql));
 
@@ -3105,7 +3172,7 @@ static uint get_table_structure(char *table, char *db, char *table_type,
       else
       {
         dynstr_append_checked(&insert_pat, " VALUES ");
-        if (!extended_insert)
+        if (!extended_insert || (versioned && *versioned))
           dynstr_append_checked(&insert_pat, "(");
       }
     }
@@ -3170,7 +3237,7 @@ static uint get_table_structure(char *table, char *db, char *table_type,
         check_io(sql_file);
       }
     }
-    num_fields= mysql_num_rows(result);
+    num_fields+= mysql_num_rows(result);
     mysql_free_result(result);
     if (!opt_no_create_info)
     {
@@ -3301,7 +3368,7 @@ continue_xml:
   if (complete_insert)
   {
     dynstr_append_checked(&insert_pat, ") VALUES ");
-    if (!extended_insert)
+    if (!extended_insert || (versioned && *versioned))
       dynstr_append_checked(&insert_pat, "(");
   }
   if (sql_file != md_result_file)
@@ -3681,6 +3748,7 @@ static void dump_table(char *table, char *db)
   ulong         rownr, row_break;
   uint num_fields;
   size_t total_length, init_length;
+  struct Table_info ti= {NOT_VERSIONED, UINT_MAX, UINT_MAX};
 
   MYSQL_RES     *res;
   MYSQL_FIELD   *field;
@@ -3691,7 +3759,7 @@ static void dump_table(char *table, char *db)
     Make sure you get the create table info before the following check for
     --no-data flag below. Otherwise, the create table info won't be printed.
   */
-  num_fields= get_table_structure(table, db, table_type, &ignore_flag);
+  num_fields= get_table_structure(table, db, table_type, &ignore_flag, &ti);
 
   /*
     The "table" could be a view.  If so, we don't do anything here.
@@ -3891,7 +3959,7 @@ static void dump_table(char *table, char *db)
     if (opt_xml)
       print_xml_tag(md_result_file, "\t", "\n", "table_data", "name=", table,
               NullS);
-    else if (opt_dump_date)
+    else if (opt_dump_date && !ti.versioned)
     {
       char time_str[20];
       get_date(time_str, GETDATE_DATE_TIME | (opt_tz_utc ? GETDATE_GMT : 0), 0);
@@ -3908,8 +3976,13 @@ static void dump_table(char *table, char *db)
       uint i;
       ulong *lengths= mysql_fetch_lengths(res);
       rownr++;
-      if (!extended_insert && !opt_xml)
+      if ((!extended_insert || ti.versioned) && !opt_xml)
       {
+        if (ti.versioned && opt_dump_date)
+        {
+          DBUG_ASSERT(ti.row_start_no < num_fields);
+          fprintf(md_result_file, "/*!100340 SET TIMESTAMP=UNIX_TIMESTAMP('%s') */;\n", row[ti.row_start_no]);
+        }
         fputs(insert_pat.str,md_result_file);
         check_io(md_result_file);
       }
@@ -3923,6 +3996,8 @@ static void dump_table(char *table, char *db)
 
       for (i= 0; i < mysql_num_fields(res); i++)
       {
+        if (ti.versioned == VERS_HIDDEN && i == ti.row_start_no)
+          continue;
         int is_blob;
         ulong length= lengths[i];
 
@@ -3946,7 +4021,7 @@ static void dump_table(char *table, char *db)
                    field->type == MYSQL_TYPE_MEDIUM_BLOB ||
                    field->type == MYSQL_TYPE_TINY_BLOB ||
                    field->type == MYSQL_TYPE_GEOMETRY)) ? 1 : 0;
-        if (extended_insert && !opt_xml)
+        if (extended_insert && !opt_xml && !ti.versioned)
         {
           if (i == 0)
             dynstr_set_checked(&extended_row,"(");
@@ -4023,7 +4098,7 @@ static void dump_table(char *table, char *db)
             fputc(',', md_result_file);
             check_io(md_result_file);
           }
-          if (row[i])
+          if (row[i] && i != ti.row_start_no && i != ti.row_end_no)
           {
             if (!(field->flags & NUM_FLAG))
             {
@@ -4097,7 +4172,7 @@ static void dump_table(char *table, char *db)
         check_io(md_result_file);
       }
 
-      if (extended_insert)
+      if (extended_insert && !ti.versioned)
       {
         size_t row_length;
         dynstr_append_checked(&extended_row,")");
@@ -4130,7 +4205,7 @@ static void dump_table(char *table, char *db)
     /* XML - close table tag and supress regular output */
     if (opt_xml)
         fputs("\t</table_data>\n", md_result_file);
-    else if (extended_insert && row_break)
+    else if (extended_insert && row_break && !ti.versioned)
       fputs(";\n", md_result_file);             /* If not empty table */
     fflush(md_result_file);
     check_io(md_result_file);
@@ -4804,21 +4879,21 @@ static int dump_all_tables_in_db(char *database)
     if (general_log_table_exists)
     {
       if (!get_table_structure((char *) "general_log",
-                               database, table_type, &ignore_flag) )
+                               database, table_type, &ignore_flag, NULL) )
         verbose_msg("-- Warning: get_table_structure() failed with some internal "
                     "error for 'general_log' table\n");
     }
     if (slow_log_table_exists)
     {
       if (!get_table_structure((char *) "slow_log",
-                               database, table_type, &ignore_flag) )
+                               database, table_type, &ignore_flag, NULL) )
         verbose_msg("-- Warning: get_table_structure() failed with some internal "
                     "error for 'slow_log' table\n");
     }
     if (transaction_registry_table_exists)
     {
       if (!get_table_structure((char *) "transaction_registry",
-                               database, table_type, &ignore_flag) )
+                               database, table_type, &ignore_flag, NULL) )
         verbose_msg("-- Warning: get_table_structure() failed with some internal "
                     "error for 'transaction_registry' table\n");
     }
