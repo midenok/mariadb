@@ -3891,6 +3891,12 @@ static void dump_table(char *table, char *db)
     if (opt_xml)
       print_xml_tag(md_result_file, "\t", "\n", "table_data", "name=", table,
               NullS);
+    else if (opt_dump_date)
+    {
+      char time_str[20];
+      get_date(time_str, GETDATE_DATE_TIME | (opt_tz_utc ? GETDATE_GMT : 0), 0);
+      fprintf(md_result_file, "/*!100340 SET TIMESTAMP=UNIX_TIMESTAMP('%s') */;\n", time_str);
+    }
     if (opt_autocommit)
     {
       fprintf(md_result_file, "set autocommit=0;\n");
