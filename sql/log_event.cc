@@ -3693,6 +3693,10 @@ void free_table_map_log_event(Table_map_log_event *event)
   delete event;
 }
 
+static
+bool describe_event(IO_CACHE* file, PRINT_EVENT_INFO* print_event_info,
+                    Rows_log_event *ev);
+
 /**
   Encode the event, optionally per 'do_print_encoded' arg store the
   result into the argument cache; optionally per event_info's
@@ -3855,57 +3859,27 @@ bool Log_event::print_base64(IO_CACHE* file,
       break;
     }
 
-    if (ev)
+    if (print_event_info->inside_binlog && print_event_info->verbose)
     {
-      bool error= 0;
-
-#ifdef WHEN_FLASHBACK_REVIEW_READY
-      ev->need_flashback_review= need_flashback_review;
+      if (ev)
+        print_event_info->verbose_events.append(ev);
+    }
+    else
+    {
       if (print_event_info->verbose)
       {
-        if (ev->print_verbose(file, print_event_info))
-          goto err;
-      }
-      else
-      {
-        IO_CACHE tmp_cache;
-
-        if (open_cached_file(&tmp_cache, NULL, NULL, 0,
-                              MYF(MY_WME | MY_NABP)))
+        Dynamic_array<Rows_log_event *> &evs= print_event_info->verbose_events;
+        for (size_t i= 0; i < evs.elements(); ++i)
         {
-          delete ev;
-          goto err;
+          if (unlikely(describe_event(file, print_event_info, evs.at(i))))
+          {
+            evs.clear();
+            goto err;
+          }
         }
-
-        error= ev->print_verbose(&tmp_cache, print_event_info);
-        close_cached_file(&tmp_cache);
-        if (unlikely(error))
-        {
-          delete ev;
-          goto err;
-        }
+        evs.clear();
       }
-#else
-      if (print_event_info->verbose)
-      {
-        /*
-          Verbose event printout can't start before encoded data
-          got enquoted. This is done at this point though multi-row
-          statement remain vulnerable.
-          TODO: fix MDEV-10362 to remove this workaround.
-        */
-        if (print_event_info->base64_output_mode !=
-            BASE64_OUTPUT_DECODE_ROWS)
-          my_b_printf(file, "'%s\n", print_event_info->delimiter);
-        error= ev->print_verbose(file, print_event_info);
-      }
-      else
-      {
-        ev->count_row_events(print_event_info);
-      }
-#endif
-      delete ev;
-      if (unlikely(error))
+      if (ev && unlikely(describe_event(file, print_event_info, ev)))
         goto err;
     }
   }
@@ -3913,6 +3887,62 @@ bool Log_event::print_base64(IO_CACHE* file,
 
 err:
   DBUG_RETURN(1);
+}
+
+
+static
+bool describe_event(IO_CACHE* file, PRINT_EVENT_INFO* print_event_info,
+                    Rows_log_event *ev)
+{
+  bool error= 0;
+
+#ifdef WHEN_FLASHBACK_REVIEW_READY
+  ev->need_flashback_review= need_flashback_review;
+  if (print_event_info->verbose)
+  {
+    if (ev->print_verbose(file, print_event_info))
+      goto err;
+  }
+  else
+  {
+    IO_CACHE tmp_cache;
+
+    if (open_cached_file(&tmp_cache, NULL, NULL, 0,
+                          MYF(MY_WME | MY_NABP)))
+    {
+      delete ev;
+      goto err;
+    }
+
+    error= ev->print_verbose(&tmp_cache, print_event_info);
+    close_cached_file(&tmp_cache);
+    if (unlikely(error))
+    {
+      delete ev;
+      goto err;
+    }
+  }
+#else
+  if (print_event_info->verbose)
+  {
+    /*
+      Verbose event printout can't start before encoded data
+      got enquoted. This is done at this point though multi-row
+      statement remain vulnerable.
+      TODO: fix MDEV-10362 to remove this workaround.
+    */
+    if (print_event_info->base64_output_mode !=
+        BASE64_OUTPUT_DECODE_ROWS)
+      my_b_printf(file, "'%s\n", print_event_info->delimiter);
+    error= ev->print_verbose(file, print_event_info);
+  }
+  else
+  {
+    ev->count_row_events(print_event_info);
+  }
+#endif
+  delete ev;
+  return error;
 }
 
 
@@ -6033,13 +6063,19 @@ bool Start_log_event_v3::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
     bool do_print_encoded=
       print_event_info->base64_output_mode != BASE64_OUTPUT_DECODE_ROWS;
     if (do_print_encoded)
+    {
       my_b_printf(&cache, "BINLOG '\n");
+      print_event_info->inside_binlog= true;
+    }
 
     if (print_base64(&cache, print_event_info, do_print_encoded))
       goto err;
 
     if (do_print_encoded)
+    {
       my_b_printf(&cache, "'%s\n", print_event_info->delimiter);
+      print_event_info->inside_binlog= false;
+    }
 
     print_event_info->printed_fd_event= TRUE;
   }
@@ -14972,6 +15008,7 @@ st_print_event_info::st_print_event_info()
   short_form= false;
   skip_replication= 0;
   printed_fd_event=FALSE;
+  inside_binlog= false;
   file= 0;
   base64_output_mode=BASE64_OUTPUT_UNSPEC;
   open_cached_file(&head_cache, NULL, NULL, 0, flags);
