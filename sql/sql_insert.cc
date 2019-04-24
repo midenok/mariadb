@@ -1636,25 +1636,41 @@ static int last_uniq_key(TABLE *table,uint keynr)
  sets Sys_end to now() and calls ha_write_row() .
 */
 
-int vers_insert_history_row(TABLE *table)
+int TABLE::vers_insert_history_row()
 {
-  DBUG_ASSERT(table->versioned(VERS_TIMESTAMP));
-  restore_record(table,record[1]);
+  DBUG_ASSERT(versioned(VERS_TIMESTAMP));
+  restore_record(this, record[1]);
 
   // Set Sys_end to now()
-  table->vers_update_end();
+  vers_update_end();
 
-  Field *row_start= table->vers_start_field();
-  Field *row_end= table->vers_end_field();
-  if (row_start->cmp(row_start->ptr, row_end->ptr) >= 0)
+  Field *row_start= vers_start_field();
+  Field *row_end= vers_end_field();
+  int cmp_res= row_start->cmp(row_start->ptr, row_end->ptr);
+  if (cmp_res == 0 || (cmp_res > 0 && in_use->is_binlog()))
+  {
+    DBUG_EXECUTE("vers", vers_print("History insert", " SKIPPED!\n"););
     return 0;
+  }
+  if (cmp_res > 0) {
+    DBUG_EXECUTE("vers", vers_print("History insert", " WRONG!\n"););
+    String start, end;
+    vers_start_field()->val_str(&start);
+    vers_end_field()->val_str(&end);
+    push_warning_printf(in_use, Sql_condition::WARN_LEVEL_WARN,
+                        ER_WARN_HISTORY_ROW_START_TIME,
+                        ER_THD(in_use, ER_WARN_HISTORY_ROW_START_TIME),
+                        s->db.str, s->table_name.str, start.c_ptr(), end.c_ptr());
+    return ER_BAD_TABLE_ERROR;
+  }
 
+  DBUG_EXECUTE("vers", vers_print("History insert"););
   int res;
-  if ((res= table->file->extra(HA_EXTRA_REMEMBER_POS)))
+  if ((res= file->extra(HA_EXTRA_REMEMBER_POS)))
     return res;
-  if ((res= table->file->ha_write_row(table->record[0])))
+  if ((res= file->ha_write_row(record[0])))
     return res;
-  return table->file->extra(HA_EXTRA_RESTORE_POS);
+  return file->extra(HA_EXTRA_RESTORE_POS);
 }
 
 /*
@@ -1866,7 +1882,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
               if (table->versioned(VERS_TIMESTAMP))
               {
                 store_record(table, record[2]);
-                if ((error= vers_insert_history_row(table)))
+                if ((error= table->vers_insert_history_row()))
                 {
                   info->last_errno= error;
                   table->file->print_error(error, MYF(0));
@@ -1952,7 +1968,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
             if (table->versioned(VERS_TIMESTAMP))
             {
               store_record(table, record[2]);
-              error= vers_insert_history_row(table);
+              error= table->vers_insert_history_row();
               restore_record(table, record[2]);
               if (unlikely(error))
                 goto err;
