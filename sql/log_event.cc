@@ -4204,7 +4204,7 @@ bool Query_log_event::write()
     }
   }
 
-  if (thd && thd->query_start_sec_part_used)
+  if ((thd && thd->query_start_sec_part_used) || opt_bin_log_send_microseconds)
   {
     *start++= Q_HRNOW;
     get_time();
@@ -4764,6 +4764,7 @@ Query_log_event::Query_log_event(const char* buf, uint event_len,
       CHECK_SPACE(pos, end, 3);
       when_sec_part= uint3korr(pos);
       pos+= 3;
+      DBUG_PRINT("time", ("Got microseconds: %lu", when_sec_part));
       break;
     }
     default:
@@ -10815,6 +10816,21 @@ Rows_log_event::Rows_log_event(THD *thd_arg, TABLE *tbl_arg, ulong tid,
   DBUG_ASSERT((tbl_arg && tbl_arg->s && tid != ~0UL) ||
               (!tbl_arg && !cols && tid == ~0UL));
 
+  if (is_v2_event() && opt_bin_log_send_microseconds) {
+    /* Copy Extra data from thd into new event */
+    const uint8 extra_data_len = EXTRA_ROW_INFO_HDR_BYTES + EXTRA_ROW_INFO_MICROSECONDS_BYTES;
+    assert(extra_data_len >= EXTRA_ROW_INFO_HDR_BYTES);
+
+    m_extra_row_data =
+        (uchar *)my_malloc(extra_data_len, MYF(MY_WME));
+
+    if (likely(m_extra_row_data != NULL)) {
+      m_extra_row_data[EXTRA_ROW_INFO_LEN_OFFSET]= extra_data_len;
+      m_extra_row_data[EXTRA_ROW_INFO_FORMAT_OFFSET]= ERIF_OPEN1;
+      int3store(&m_extra_row_data[EXTRA_ROW_INFO_MICROSECONDS_OFFSET], when_sec_part);
+    }
+  }
+
   if (thd_arg->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS)
     set_flags(NO_FOREIGN_KEY_CHECKS_F);
   if (thd_arg->variables.option_bits & OPTION_RELAXED_UNIQUE_CHECKS)
@@ -11072,9 +11088,7 @@ int Rows_log_event::get_data_size()
                   m_rows_cur - m_rows_buf););
 
   int data_size= 0;
-  Log_event_type type = get_type_code();
-  bool is_v2_event= LOG_EVENT_IS_ROW_V2(type);
-  if (is_v2_event)
+  if (is_v2_event())
   {
     data_size= ROWS_HEADER_LEN_V2 +
       (m_extra_row_data ?
@@ -11499,6 +11513,13 @@ int Rows_log_event::do_apply_event(rpl_group_info *rgi)
       which tested replicate-* rules).
     */
 
+    if (m_extra_row_data &&
+        m_extra_row_data[EXTRA_ROW_INFO_FORMAT_OFFSET] == ERIF_OPEN1)
+    {
+      when_sec_part= uint3korr(&m_extra_row_data[EXTRA_ROW_INFO_MICROSECONDS_OFFSET]);
+      DBUG_PRINT("time", ("Got microseconds: %lu", when_sec_part));
+    }
+
     /*
       It's not needed to set_time() but
       1) it continues the property that "Time" in SHOW PROCESSLIST shows how
@@ -11860,7 +11881,36 @@ bool Rows_log_event::write_data_header()
                   });
   int6store(buf + RW_MAPID_OFFSET, m_table_id);
   int2store(buf + RW_FLAGS_OFFSET, m_flags);
-  return write_data(buf, ROWS_HEADER_LEN);
+  int rc = 0;
+  if (is_v2_event()) {
+    /*
+       v2 event, with variable header portion.
+       Determine length of variable header payload
+    */
+    uint16 vhlen = 2;
+    uint16 vhpayloadlen = 0;
+    uint16 extra_data_len = 0;
+    if (m_extra_row_data) {
+      extra_data_len = m_extra_row_data[EXTRA_ROW_INFO_LEN_OFFSET];
+      vhpayloadlen = RW_V_TAG_LEN + extra_data_len;
+    }
+
+    /* Var-size header len includes len itself */
+    int2store(buf + RW_VHLEN_OFFSET, vhlen + vhpayloadlen);
+    rc = write_data(buf, ROWS_HEADER_LEN_V2);
+
+    /* Write var-sized payload, if any */
+    if ((vhpayloadlen > 0) && (rc == 0)) {
+      /* Add tag and extra row info */
+      uchar type_code = RW_V_EXTRAINFO_TAG;
+      rc = write_data(&type_code, RW_V_TAG_LEN);
+      if (rc == 0)
+        rc = write_data(m_extra_row_data, extra_data_len);
+    }
+  } else {
+    rc = write_data(buf, ROWS_HEADER_LEN);
+  }
+  return (rc != 0);
 }
 
 bool Rows_log_event::write_data_body()
@@ -13134,7 +13184,9 @@ Write_rows_log_event::Write_rows_log_event(THD *thd_arg, TABLE *tbl_arg,
                                            ulong tid_arg,
                                            bool is_transactional)
   :Rows_log_event(thd_arg, tbl_arg, tid_arg, tbl_arg->rpl_write_set,
-                  is_transactional, WRITE_ROWS_EVENT_V1)
+                  is_transactional,
+                  opt_bin_log_send_microseconds ? WRITE_ROWS_EVENT
+                                                : WRITE_ROWS_EVENT_V1)
 {
 }
 
@@ -13145,7 +13197,8 @@ Write_rows_compressed_log_event::Write_rows_compressed_log_event(
                                            bool is_transactional)
   : Write_rows_log_event(thd_arg, tbl_arg, tid_arg, is_transactional)
 {
-  m_type = WRITE_ROWS_COMPRESSED_EVENT_V1;
+  m_type = opt_bin_log_send_microseconds ? WRITE_ROWS_COMPRESSED_EVENT
+                                         : WRITE_ROWS_COMPRESSED_EVENT_V1;
 }
 
 bool Write_rows_compressed_log_event::write()
@@ -13391,7 +13444,7 @@ is_duplicate_key_error(int errcode)
 
 int
 Rows_log_event::write_row(rpl_group_info *rgi,
-                          const bool overwrite)
+                          bool overwrite)
 {
   DBUG_ENTER("write_row");
   DBUG_ASSERT(m_table != NULL && thd != NULL);
@@ -13402,6 +13455,7 @@ Rows_log_event::write_row(rpl_group_info *rgi,
   const bool invoke_triggers=
     slave_run_triggers_for_rbr && !master_had_triggers && table->triggers;
   auto_afree_ptr<char> key(NULL);
+  bool vers_ignore_dup= false;
 
   prepare_record(table, m_width, true);
 
@@ -13452,13 +13506,29 @@ Rows_log_event::write_row(rpl_group_info *rgi,
   }
 
   // Handle INSERT.
-  if (table->versioned(VERS_TIMESTAMP))
+  if (table->versioned())
   {
-    ulong sec_part;
-    bitmap_set_bit(table->read_set, table->vers_start_field()->field_index);
-    // Check whether a row came from unversioned table and fix vers fields.
-    if (table->vers_start_field()->get_timestamp(&sec_part) == 0 && sec_part == 0)
-      table->vers_update_fields();
+    if (table->versioned(VERS_TIMESTAMP))
+    {
+      // Set vers fields when replicating from not system-versioned table.
+      ulong sec_part;
+      bitmap_set_bit(table->read_set, table->vers_start_field()->field_index);
+      // Check whether a row came from unversioned table and fix vers fields.
+      if (table->vers_start_field()->get_timestamp(&sec_part) == 0 && sec_part == 0)
+        table->vers_update_fields();
+      else
+        goto ignore_historical_row;
+    }
+    else
+    {
+ignore_historical_row:
+      bitmap_set_bit(table->read_set, table->vers_end_field()->field_index);
+      if (!overwrite && !table->vers_end_field()->is_max())
+      {
+        vers_ignore_dup= true;
+        overwrite= true;
+      }
+    }
   }
 
   /* 
@@ -13488,6 +13558,11 @@ Rows_log_event::write_row(rpl_group_info *rgi,
       */
       table->file->print_error(error, MYF(0));
       DBUG_RETURN(error);
+    }
+    if (vers_ignore_dup)
+    {
+      error= 0;
+      break;
     }
     /*
        We need to retrieve the old row into record[1] to be able to
@@ -14264,7 +14339,8 @@ end:
 Delete_rows_log_event::Delete_rows_log_event(THD *thd_arg, TABLE *tbl_arg,
                                              ulong tid, bool is_transactional)
   : Rows_log_event(thd_arg, tbl_arg, tid, tbl_arg->read_set, is_transactional,
-                   DELETE_ROWS_EVENT_V1)
+                   opt_bin_log_send_microseconds ? DELETE_ROWS_EVENT
+                                                 : DELETE_ROWS_EVENT_V1)
 {
 }
 
@@ -14274,7 +14350,8 @@ Delete_rows_compressed_log_event::Delete_rows_compressed_log_event(
                                            bool is_transactional)
   : Delete_rows_log_event(thd_arg, tbl_arg, tid_arg, is_transactional)
 {
-  m_type= DELETE_ROWS_COMPRESSED_EVENT_V1;
+  m_type= opt_bin_log_send_microseconds ? DELETE_ROWS_COMPRESSED_EVENT
+                                        : DELETE_ROWS_COMPRESSED_EVENT_V1;
 }
 
 bool Delete_rows_compressed_log_event::write()
@@ -14380,10 +14457,8 @@ int Delete_rows_log_event::do_exec_row(rpl_group_info *rgi)
       m_table->mark_columns_per_binlog_row_image();
       if (m_vers_from_plain && m_table->versioned(VERS_TIMESTAMP))
       {
-        Field *end= m_table->vers_end_field();
-        bitmap_set_bit(m_table->write_set, end->field_index);
         store_record(m_table, record[1]);
-        end->set_time();
+        m_table->vers_update_end();
         error= m_table->file->ha_update_row(m_table->record[1],
                                             m_table->record[0]);
       }
@@ -14460,7 +14535,8 @@ Update_rows_log_event::Update_rows_log_event(THD *thd_arg, TABLE *tbl_arg,
                                              ulong tid,
                                              bool is_transactional)
 : Rows_log_event(thd_arg, tbl_arg, tid, tbl_arg->read_set, is_transactional,
-                 UPDATE_ROWS_EVENT_V1)
+                 opt_bin_log_send_microseconds ? UPDATE_ROWS_EVENT
+                                               : UPDATE_ROWS_EVENT_V1)
 {
   init(tbl_arg->rpl_write_set);
 }
@@ -14470,7 +14546,8 @@ Update_rows_compressed_log_event::Update_rows_compressed_log_event(THD *thd_arg,
                                                                    bool is_transactional)
 : Update_rows_log_event(thd_arg, tbl_arg, tid, is_transactional)
 {
-  m_type = UPDATE_ROWS_COMPRESSED_EVENT_V1;
+  m_type = opt_bin_log_send_microseconds ? UPDATE_ROWS_COMPRESSED_EVENT
+                                         : UPDATE_ROWS_COMPRESSED_EVENT_V1;
 }
 
 bool Update_rows_compressed_log_event::write()
@@ -14661,7 +14738,9 @@ Update_rows_log_event::do_exec_row(rpl_group_info *rgi)
   if (m_vers_from_plain && m_table->versioned(VERS_TIMESTAMP))
   {
     store_record(m_table, record[2]);
-    error= vers_insert_history_row(m_table);
+    error= m_table->vers_insert_history_row();
+    if (unlikely(error == HA_ERR_FOUND_DUPP_KEY))
+      error= 0;
     restore_record(m_table, record[2]);
   }
   m_table->default_column_bitmaps();

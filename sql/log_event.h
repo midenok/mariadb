@@ -4468,6 +4468,7 @@ public:
   void update_flags() { int2store(temp_buf + m_flags_pos, m_flags); }
 
   Log_event_type get_type_code() { return m_type; } /* Specific type (_V1 etc) */
+  bool is_v2_event() const { return LOG_EVENT_IS_ROW_V2(m_type); }
   enum_logged_status logged_status() { return LOGGED_ROW_EVENT; }
   virtual Log_event_type get_general_type_code() = 0; /* General rows op type, no version */
 
@@ -4655,7 +4656,7 @@ protected:
 
   int find_key(); // Find a best key to use in find_row()
   int find_row(rpl_group_info *);
-  int write_row(rpl_group_info *, const bool);
+  int write_row(rpl_group_info *, bool);
   int update_sequence();
 
   // Unpack the current row into m_table->record[0], but with
