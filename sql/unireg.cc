@@ -777,7 +777,7 @@ static bool pack_header(THD *thd, uchar *forminfo,
 	int_parts+=field->interval->count+1;
       }
     }
-    if (f_maybe_null(field->pack_flag))
+    if (f_maybe_null(field->pack_flag) && field->stored_in_db())
       null_fields++;
     if (field->check_constraint)
       create_info->field_check_constraints++;
