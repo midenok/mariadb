@@ -124,4 +124,13 @@ EOF
 --exec $MYSQLD_BOOTSTRAP_CMD --default-time-zone=Europe/Moscow < $MYSQLTEST_VARDIR/tmp/bootstrap_9969.sql >> $MYSQLTEST_VARDIR/tmp/bootstrap.log 2>&1
 --remove_file $MYSQLTEST_VARDIR/tmp/bootstrap_9969.sql
 
+#
+# MDEV-19349 mysql_install_db: segfault at tmp_file_prefix check
+#
+--write_file $MYSQLTEST_VARDIR/tmp/1
+use test;
+EOF
+--exec $MYSQLD_BOOTSTRAP_CMD < $MYSQLTEST_VARDIR/tmp/1 >> $MYSQLTEST_VARDIR/tmp/bootstrap.log 2>&1
+--remove_file $MYSQLTEST_VARDIR/tmp/1
+
 --source include/start_mysqld.inc
