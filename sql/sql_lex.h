@@ -3679,11 +3679,7 @@ public:
 
   void init_last_field(Column_definition *field, const LEX_CSTRING *name,
                        const CHARSET_INFO *cs);
-  bool last_field_generated_always_as_row_start_or_end(Lex_ident *p,
-                                                       const char *type,
-                                                       uint flags);
-  bool last_field_generated_always_as_row_start();
-  bool last_field_generated_always_as_row_end();
+  bool vers_init_sys_field(Lex_ident *p, const char *type, uint flags);
   bool set_bincmp(CHARSET_INFO *cs, bool bin);
 
   bool new_sp_instr_stmt(THD *, const LEX_CSTRING &prefix,

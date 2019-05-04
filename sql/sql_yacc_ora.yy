@@ -6710,12 +6710,14 @@ field_def:
           vcol_opt_specifier vcol_opt_attribute
         | opt_generated_always AS ROW_SYM START_SYM opt_asrow_attribute
           {
-            if (Lex->last_field_generated_always_as_row_start())
+            if (Lex->vers_init_sys_field(Lex->vers_get_info()->as_row.start,
+                                         "START", VERS_SYS_START_FLAG))
               MYSQL_YYABORT;
           }
         | opt_generated_always AS ROW_SYM END opt_asrow_attribute
           {
-            if (Lex->last_field_generated_always_as_row_end())
+            if (Lex->vers_init_sys_field(Lex->vers_get_info()->as_row.end,
+                                         "END", VERS_SYS_END_FLAG))
               MYSQL_YYABORT;
           }
         ;
