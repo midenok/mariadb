@@ -641,8 +641,7 @@ THD::THD(my_thread_id id, bool is_wsrep_applier, bool skip_global_sys_var_lock)
    m_stmt_da(&main_da),
    tdc_hash_pins(0),
    xid_hash_pins(0),
-   m_tmp_tables_locked(false),
-   modify_history_warned(false)
+   m_tmp_tables_locked(false)
 #ifdef HAVE_REPLICATION
    ,
    current_linfo(0),
@@ -3861,7 +3860,6 @@ void THD::end_statement()
   lex_end(lex);
   delete lex->result;
   lex->result= 0;
-  modify_history_warned= false;
   /* Note that free_list is freed in cleanup_after_query() */
 
   /*
@@ -7179,29 +7177,28 @@ bool THD::vers_modify_history()
 {
   if (!variables.vers_modify_history)
     return false;
-  enum_sql_command c= lex->sql_command;
-  if (c != SQLCOM_UPDATE && c != SQLCOM_INSERT && c != SQLCOM_INSERT_SELECT &&
-      c != SQLCOM_UPDATE_MULTI && c != SQLCOM_REPLACE)
-    return false;
-  if (opt_secure_timestamp >= SECTIME_REPL)
-  {
-    if (!modify_history_warned)
-    {
-      push_warning_printf(this, Sql_condition::WARN_LEVEL_WARN,
-                          WARN_VERS_MODIFY_HISTORY,
-                          ER_THD(this, WARN_VERS_MODIFY_HISTORY));
-      modify_history_warned= true;
-    }
-    return false;
-  }
-  if (opt_secure_timestamp == SECTIME_SUPER &&
-      !(security_ctx->master_access & SUPER_ACL))
-  {
-    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
-    return false;
-  }
-  return true;
+  // enforced by vers_check_modify_history()
+  DBUG_ASSERT(opt_secure_timestamp < SECTIME_REPL);
 
+  const enum_sql_command c= lex->sql_command;
+  const bool super= security_ctx->master_access & SUPER_ACL;
+
+  if (c == SQLCOM_INSERT || c == SQLCOM_INSERT_SELECT)
+  {
+    if (opt_secure_timestamp == SECTIME_SUPER && !super)
+    {
+      my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
+      return false;
+    }
+    return true;
+  }
+
+  if (c == SQLCOM_UPDATE || c == SQLCOM_UPDATE_MULTI || c == SQLCOM_REPLACE)
+  {
+    return super;
+  }
+
+  return false;
 }
 
 MYSQL_TIME THD::query_start_TIME()

@@ -144,7 +144,7 @@ SET @@global.system_versioning_asof= DEFAULT;
 #
 # MDEV-16546 System versioning setting to allow history modification
 #
-set system_versioning_modify_history= on;
+set system_versioning_modify_history= ON;
 create or replace table t (
 a int primary key,
 row_start SYS_DATATYPE as row start invisible,
@@ -216,27 +216,51 @@ a	check_row(row_start, row_end)
 4	ERROR: row_end == row_start
 5	ERROR: row_end == row_start
 ## Honor secure_timestamp option
-# restart: --secure-timestamp=YES --system-versioning-modify-history=on
-insert into t (a, row_start, row_end) values (6, @s3, @e3);
-ERROR HY000: The value specified for generated column 'row_start' in table 't' has been ignored
-show warnings;
-Level	Code	Message
-Warning	4164	Modifying history is prohibited, set `secure_timestamp` to NO or SUPER
-Error	1906	The value specified for generated column 'row_start' in table 't' has been ignored
-Error	1906	The value specified for generated column 'row_end' in table 't' has been ignored
-# restart: --secure-timestamp=REPLICATION --system-versioning-modify-history=on
-insert into t (a, row_start, row_end) values (7, @s3, @e3);
-ERROR HY000: The value specified for generated column 'row_start' in table 't' has been ignored
-show warnings;
-Level	Code	Message
-Warning	4164	Modifying history is prohibited, set `secure_timestamp` to NO or SUPER
-Error	1906	The value specified for generated column 'row_start' in table 't' has been ignored
-Error	1906	The value specified for generated column 'row_end' in table 't' has been ignored
-# restart: --secure-timestamp=SUPER --system-versioning-modify-history=on
-insert into t (a, row_start, row_end) values (8, @s3, @e3);
+### Check prohibition from command-line (see mysqld_option_err.test for explanations)
+### Check prohibition from SQL
+# restart: --secure-timestamp=YES
+select @@secure_timestamp;
+@@secure_timestamp
+YES
+set system_versioning_modify_history= ON;
+ERROR HY000: Modifying history is prohibited, set `secure_timestamp` to NO or SUPER
+# restart: --secure-timestamp=REPLICATION
+select @@secure_timestamp;
+@@secure_timestamp
+REPLICATION
+set system_versioning_modify_history= ON;
+ERROR HY000: Modifying history is prohibited, set `secure_timestamp` to NO or SUPER
+### Check --secure-timestamp=SUPER
+# restart: --secure-timestamp=SUPER --system-versioning-modify-history=ON
+#### Non-root is not good
 create user nobody;
-use test;
-insert into t (a, row_start, row_end) values (9, @s3, @e3);
+connect  non_root, localhost, nobody,,;
+insert into t (a, row_start, row_end) values (6, @s3, @e3);
 ERROR 42000: Access denied; you need (at least one of) the SUPER privilege(s) for this operation
+show warnings;
+Level	Code	Message
+Error	1227	Access denied; you need (at least one of) the SUPER privilege(s) for this operation
+Error	1227	Access denied; you need (at least one of) the SUPER privilege(s) for this operation
+insert into t (a) values (7);
+update t set row_end= @e3 where a = 7;
+ERROR HY000: The value specified for generated column 'row_end' in table 't' has been ignored
+show warnings;
+Level	Code	Message
+Error	1906	The value specified for generated column 'row_end' in table 't' has been ignored
+#### Root is good
+connection default;
+insert into t (a, row_start, row_end) values (6, @s3, @e3);
+update t set row_start= @s3, row_end= @e3 where a = 7;
+### Check --secure-timestamp=NO
+# restart: --secure-timestamp=NO --system-versioning-modify-history=ON
+insert into t (a, row_start, row_end) values (8, @s3, @e3);
+insert into t (a) values (9);
+update t set row_start= @s3, row_end= @e3 where a = 9;
+delete from t where row_end= @e3 and a = 8;
+connect  non_root2, localhost, nobody,,;
+insert into t (a, row_start, row_end) values (10, @s3, @e3);
+insert into t (a) values (11);
+update t set row_start= @s3, row_end= @e3 where a = 11;
+ERROR HY000: The value specified for generated column 'row_start' in table 't' has been ignored
 drop database test;
 create database test;

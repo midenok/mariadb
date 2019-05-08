@@ -4814,7 +4814,6 @@ public:
 private:
   /* Whether a lock has been acquired? */
   bool m_tmp_tables_locked;
-  bool modify_history_warned;
 
   bool has_temporary_tables();
   uint create_tmp_table_def_key(char *key, const char *db,
