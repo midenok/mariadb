@@ -1386,12 +1386,6 @@ bool mysql_prepare_update(THD *thd, TABLE_LIST *table_list,
       setup_ftfuncs(select_lex))
     DBUG_RETURN(TRUE);
 
-  if (*conds && !table_list->table->vers_write)
-  {
-    Item_transformer remove_vers_conds= &Item::vers_remove_conds_transformer;
-    *conds= (*conds)->transform(thd, remove_vers_conds, NULL);
-  }
-
   select_lex->fix_prepare_information(thd, conds, &fake_conds);
   DBUG_RETURN(FALSE);
 }

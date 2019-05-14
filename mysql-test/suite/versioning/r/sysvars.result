@@ -215,6 +215,28 @@ a	check_row(row_start, row_end)
 3	HISTORICAL ROW
 4	ERROR: row_end == row_start
 5	ERROR: row_end == row_start
+## DELETE
+delete from t where a = 1 or row_end = @e2;
+select *, check_row(row_start, row_end) from t for system_time all order by a;
+a	check_row(row_start, row_end)
+3	HISTORICAL ROW
+4	ERROR: row_end == row_start
+5	ERROR: row_end == row_start
+delete from t2 where row_end < row_start;
+select *, check_row(row_start, row_end) from t2 for system_time all order by a;
+a	check_row(row_start, row_end)
+1	ERROR: row_end == row_start
+3	HISTORICAL ROW
+4	ERROR: row_end == row_start
+5	ERROR: row_end == row_start
+## Multi-DELETE
+delete t, t2 from t join t2 where t.row_end = t2.row_end and t.a < 5 and t2.a < 5;
+select *, check_row(row_start, row_end) from t for system_time all order by a;
+a	check_row(row_start, row_end)
+5	ERROR: row_end == row_start
+select *, check_row(row_start, row_end) from t2 for system_time all order by a;
+a	check_row(row_start, row_end)
+5	ERROR: row_end == row_start
 ## Honor secure_timestamp option
 ### Check prohibition from command-line (see mysqld_option_err.test for explanations)
 ### Check prohibition from SQL

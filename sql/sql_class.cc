@@ -7179,11 +7179,12 @@ bool THD::vers_modify_history()
     return false;
   // enforced by vers_check_modify_history()
   DBUG_ASSERT(opt_secure_timestamp < SECTIME_REPL);
-
-  const enum_sql_command c= lex->sql_command;
   const bool super= security_ctx->master_access & SUPER_ACL;
 
-  if (c == SQLCOM_INSERT || c == SQLCOM_INSERT_SELECT)
+  switch (lex->sql_command)
+  {
+  case SQLCOM_INSERT:
+  case SQLCOM_INSERT_SELECT:
   {
     if (opt_secure_timestamp == SECTIME_SUPER && !super)
     {
@@ -7192,10 +7193,13 @@ bool THD::vers_modify_history()
     }
     return true;
   }
-
-  if (c == SQLCOM_UPDATE || c == SQLCOM_UPDATE_MULTI || c == SQLCOM_REPLACE)
-  {
+  case SQLCOM_UPDATE:
+  case SQLCOM_UPDATE_MULTI:
+  case SQLCOM_REPLACE:
+  case SQLCOM_DELETE:
+  case SQLCOM_DELETE_MULTI:
     return super;
+  default:;
   }
 
   return false;

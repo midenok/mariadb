@@ -146,6 +146,16 @@ select *, check_row(row_start, row_end) from t2 for system_time all order by a;
 --echo ## REPLACE
 replace t (a, row_start, row_end) values (1, @s3, @e1), (2, @e2, @e2);
 select *, check_row(row_start, row_end) from t for system_time all order by a;
+--echo ## DELETE
+delete from t where a = 1 or row_end = @e2;
+select *, check_row(row_start, row_end) from t for system_time all order by a;
+delete from t2 where row_end < row_start;
+select *, check_row(row_start, row_end) from t2 for system_time all order by a;
+--echo ## Multi-DELETE
+delete t, t2 from t join t2 where t.row_end = t2.row_end and t.a < 5 and t2.a < 5;
+select *, check_row(row_start, row_end) from t for system_time all order by a;
+select *, check_row(row_start, row_end) from t2 for system_time all order by a;
+
 
 --echo ## Honor secure_timestamp option
 --echo ### Check prohibition from command-line (see mysqld_option_err.test for explanations)

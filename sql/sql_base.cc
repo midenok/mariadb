@@ -8245,6 +8245,12 @@ bool setup_on_expr(THD *thd, TABLE_LIST *table, bool is_update)
           return TRUE;
         thd->change_item_tree(&table->check_option, view->check_option);
       }
+      if (table->table && table->table->versioned() &&
+          !table->table->vers_write && table->on_expr)
+      {
+        table->on_expr= table->on_expr->transform(
+          thd, &Item::vers_remove_conds_transformer, NULL);
+      }
     }
   }
   return FALSE;
@@ -8320,6 +8326,8 @@ int setup_conds(THD *thd, TABLE_LIST *tables, List<TABLE_LIST> &leaves,
     (*conds)->mark_as_condition_AND_part(NO_JOIN_NEST);
     if ((*conds)->fix_fields_if_needed_for_bool(thd, conds))
       goto err_no_arena;
+
+    *conds= (*conds)->transform(thd, &Item::vers_remove_conds_transformer, NULL);
   }
 
   /*
