@@ -7939,3 +7939,5 @@ ER_VERS_NO_PERIOD
         eng "No 'PERIOD FOR SYSTEM_TIME' in system-versioned %`s"
 ER_WARN_HISTORY_ROW_START_TIME
         eng "Table `%s.%s` history row start '%s' is later than row end '%s'"
+ER_VERS_MODIFY_HISTORY
+        eng "Modifying history is prohibited, set `secure_timestamp` to NO or SUPER"
