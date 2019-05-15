@@ -600,9 +600,21 @@ typedef bool (Item::*Item_processor) (void *arg);
 
 */
 typedef bool (Item::*Item_analyzer) (uchar **argp);
-typedef Item* (Item::*Item_transformer) (THD *thd, uchar *arg);
+typedef Item* (Item::*Item_transformer_func) (THD *thd, uchar *arg);
 typedef void (*Cond_traverser) (const Item *item, void *arg);
 typedef bool (Item::*Pushdown_checker) (uchar *arg);
+
+class Item_transformer
+{
+  Item_transformer_func func;
+public:
+  Item_transformer(Item_transformer_func arg) : func(arg) {}
+  Item* operator()(Item *item, THD *thd, uchar *arg) {
+    return (item->*func)(thd, arg);
+  }
+  inline bool is_permanent();
+  bool validate(THD *thd);
+};
 
 struct st_cond_statistic;
 
@@ -1821,7 +1833,7 @@ public:
                         Item_transformer transformer, uchar *arg_t)
   {
     if ((this->*analyzer) (arg_p))
-      return ((this->*transformer) (thd, arg_t));
+      return transformer(this, thd, arg_t);
     return 0;
   }
 
@@ -7179,5 +7191,11 @@ inline void TABLE::use_all_stored_columns()
     for (; *vf; vf++)
       bitmap_clear_bit(read_set, (*vf)->field_index);
 }
+
+inline bool Item_transformer::is_permanent()
+{
+  return func == &Item::vers_remove_conds_transformer;
+}
+
 
 #endif /* SQL_ITEM_INCLUDED */

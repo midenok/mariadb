@@ -492,10 +492,9 @@ bool Item_args::transform_args(THD *thd, Item_transformer transformer, uchar *ar
 
 Item *Item_func::transform(THD *thd, Item_transformer transformer, uchar *argument)
 {
-  DBUG_ASSERT(!thd->stmt_arena->is_stmt_prepare());
   if (transform_args(thd, transformer, argument))
     return 0;
-  return (this->*transformer)(thd, argument);
+  return transformer(this, thd, argument);
 }
 
 
@@ -546,7 +545,7 @@ Item *Item_func::compile(THD *thd, Item_analyzer analyzer, uchar **arg_p,
         thd->change_item_tree(arg, new_item);
     }
   }
-  return (this->*transformer)(thd, arg_t);
+  return transformer(this, thd, arg_t);
 }
 
 

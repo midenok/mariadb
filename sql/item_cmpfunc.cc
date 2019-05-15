@@ -1684,7 +1684,7 @@ Item *Item_in_optimizer::transform(THD *thd, Item_transformer transformer,
   Item *new_item;
 
   DBUG_ASSERT(fixed);
-  DBUG_ASSERT(!thd->stmt_arena->is_stmt_prepare());
+  DBUG_ASSERT(transformer.validate());
   DBUG_ASSERT(arg_count == 2);
 
   /* Transform the left IN operand. */
@@ -1729,7 +1729,7 @@ Item *Item_in_optimizer::transform(THD *thd, Item_transformer transformer,
     Item_in_subselect *in_arg= (Item_in_subselect*)args[1];
     thd->change_item_tree(&in_arg->left_expr, args[0]);
   }
-  return (this->*transformer)(thd, argument);
+  return transformer(this, thd, argument);
 }
 
 

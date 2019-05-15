@@ -153,7 +153,7 @@ Item *Item_row::transform(THD *thd, Item_transformer transformer, uchar *arg)
 
   if (transform_args(thd, transformer, arg))
     return 0;
-  return (this->*transformer)(thd, arg);
+  return transformer(this, thd, arg);
 }
 
 void Item_row::bring_value()

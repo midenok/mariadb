@@ -546,9 +546,9 @@ bool Item::cleanup_processor(void *arg)
 
 Item* Item::transform(THD *thd, Item_transformer transformer, uchar *arg)
 {
-  DBUG_ASSERT(!thd->stmt_arena->is_stmt_prepare());
+  DBUG_ASSERT(transformer.validate());
 
-  return (this->*transformer)(thd, arg);
+  return transformer(this, thd, arg);
 }
 
 
@@ -7931,7 +7931,7 @@ void Item_ref::cleanup()
 
 Item* Item_ref::transform(THD *thd, Item_transformer transformer, uchar *arg)
 {
-  DBUG_ASSERT(!thd->stmt_arena->is_stmt_prepare());
+  DBUG_ASSERT(transformer.validate());
   DBUG_ASSERT((*ref) != NULL);
 
   /* Transform the object we are referencing. */
@@ -7949,7 +7949,7 @@ Item* Item_ref::transform(THD *thd, Item_transformer transformer, uchar *arg)
     thd->change_item_tree(ref, new_item);
 
   /* Transform the item ref object. */
-  return (this->*transformer)(thd, arg);
+  return transformer(this, thd, arg);
 }
 
 
@@ -7993,7 +7993,7 @@ Item* Item_ref::compile(THD *thd, Item_analyzer analyzer, uchar **arg_p,
   }
 
   /* Transform this Item object. */
-  return (this->*transformer)(thd, arg_t);
+  return transformer(this, thd, arg_t);
 }
 
 
@@ -9257,7 +9257,7 @@ table_map Item_default_value::used_tables() const
 Item *Item_default_value::transform(THD *thd, Item_transformer transformer,
                                     uchar *args)
 {
-  DBUG_ASSERT(!thd->stmt_arena->is_stmt_prepare());
+  DBUG_ASSERT(transformer.validate());
 
   /*
     If the value of arg is NULL, then this object represents a constant,
@@ -9278,7 +9278,7 @@ Item *Item_default_value::transform(THD *thd, Item_transformer transformer,
   */
   if (arg != new_item)
     thd->change_item_tree(&arg, new_item);
-  return (this->*transformer)(thd, args);
+  return transformer(this, thd, args);
 }
 
 void Item_ignore_value::print(String *str, enum_query_type query_type)
@@ -10283,6 +10283,12 @@ void dummy_error_processor(THD *thd, void *data)
 void view_error_processor(THD *thd, void *data)
 {
   ((TABLE_LIST *)data)->hide_view_error(thd);
+}
+
+
+bool Item_transformer::validate(THD* thd)
+{
+  return is_permanent() || !thd->stmt_arena->is_stmt_prepare();
 }
 
 
