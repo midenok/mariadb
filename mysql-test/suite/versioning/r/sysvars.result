@@ -259,16 +259,9 @@ create user nobody;
 connect  non_root, localhost, nobody,,;
 insert into t (a, row_start, row_end) values (6, @s3, @e3);
 ERROR 42000: Access denied; you need (at least one of) the SUPER privilege(s) for this operation
-show warnings;
-Level	Code	Message
-Error	1227	Access denied; you need (at least one of) the SUPER privilege(s) for this operation
-Error	1227	Access denied; you need (at least one of) the SUPER privilege(s) for this operation
 insert into t (a) values (7);
 update t set row_end= @e3 where a = 7;
-ERROR HY000: The value specified for generated column 'row_end' in table 't' has been ignored
-show warnings;
-Level	Code	Message
-Error	1906	The value specified for generated column 'row_end' in table 't' has been ignored
+Got one of the listed errors
 #### Root is good
 connection default;
 insert into t (a, row_start, row_end) values (6, @s3, @e3);
@@ -283,6 +276,6 @@ connect  non_root2, localhost, nobody,,;
 insert into t (a, row_start, row_end) values (10, @s3, @e3);
 insert into t (a) values (11);
 update t set row_start= @s3, row_end= @e3 where a = 11;
-ERROR HY000: The value specified for generated column 'row_start' in table 't' has been ignored
+Got one of the listed errors
 drop database test;
 create database test;

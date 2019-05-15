@@ -1,3 +1,9 @@
+if ($MTR_COMBINATION_IMPLICIT) {
+  if ($MTR_COMBINATION_TRX_ID) {
+    --skip Incompatible combinations
+  }
+}
+
 create table t (a int) with system versioning;
 insert into t values (1);
 update t set a= 2;
@@ -104,7 +110,7 @@ SET @@global.system_versioning_asof= DEFAULT;
 --echo #
 --source suite/versioning/engines.inc
 --source suite/versioning/common.inc
---source suite/versioning/t/sysvars.inc
+--source suite/versioning/t/sysvars_data.inc
 set system_versioning_modify_history= ON;
 
 --replace_result $sys_datatype_expl SYS_DATATYPE
@@ -114,6 +120,13 @@ eval create or replace table t (
   row_end $sys_datatype_expl as row end invisible,
   period for system_time (row_start, row_end)
 ) with system versioning;
+
+if ($MTR_COMBINATION_IMPLICIT) {
+--disable_query_log
+  create or replace table t (a int primary key) with system versioning;
+--enable_query_log
+}
+
 
 insert into t values (1);
 update t set a= 2;
@@ -187,17 +200,15 @@ set system_versioning_modify_history= ON;
 --echo #### Non-root is not good
 create user nobody;
 connect (non_root, localhost, nobody,,);
---source suite/versioning/t/sysvars.inc
+--source suite/versioning/t/sysvars_data.inc
 --error ER_SPECIFIC_ACCESS_DENIED_ERROR
 insert into t (a, row_start, row_end) values (6, @s3, @e3);
-show warnings;
 insert into t (a) values (7);
---error ER_WARNING_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN
+--error ER_WARNING_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN, ER_BAD_FIELD_ERROR
 update t set row_end= @e3 where a = 7;
-show warnings;
 --echo #### Root is good
 connection default;
---source suite/versioning/t/sysvars.inc
+--source suite/versioning/t/sysvars_data.inc
 insert into t (a, row_start, row_end) values (6, @s3, @e3);
 update t set row_start= @s3, row_end= @e3 where a = 7;
 # select a, row_start, row_end from t for system_time all where a >= 6 order by a;
@@ -205,7 +216,7 @@ update t set row_start= @s3, row_end= @e3 where a = 7;
 --echo ### Check --secure-timestamp=NO
 --let $restart_parameters= --secure-timestamp=NO --system-versioning-modify-history=ON
 --source include/restart_mysqld.inc
---source suite/versioning/t/sysvars.inc
+--source suite/versioning/t/sysvars_data.inc
 insert into t (a, row_start, row_end) values (8, @s3, @e3);
 insert into t (a) values (9);
 update t set row_start= @s3, row_end= @e3 where a = 9;
@@ -214,10 +225,10 @@ delete from t where row_end= @e3 and a = 8;
 # select a, row_start, row_end from t for system_time all where a >= 8 order by a;
 
 connect (non_root2, localhost, nobody,,);
---source suite/versioning/t/sysvars.inc
+--source suite/versioning/t/sysvars_data.inc
 insert into t (a, row_start, row_end) values (10, @s3, @e3);
 insert into t (a) values (11);
---error ER_WARNING_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN
+--error ER_WARNING_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN, ER_BAD_FIELD_ERROR
 update t set row_start= @s3, row_end= @e3 where a = 11;
 # select a, row_start, row_end from t for system_time all where a = 10 order by a;
 
