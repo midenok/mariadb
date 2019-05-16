@@ -7177,6 +7177,9 @@ bool THD::vers_modify_history()
 {
   if (!variables.vers_modify_history)
     return false;
+  // Item::transform() doesn't support permanent transformation
+  if (stmt_arena->is_stmt_prepare())
+    return false;
   // enforced by vers_check_modify_history()
   DBUG_ASSERT(opt_secure_timestamp < SECTIME_REPL);
   const bool super= security_ctx->master_access & SUPER_ACL;

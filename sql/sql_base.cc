@@ -8327,7 +8327,8 @@ int setup_conds(THD *thd, TABLE_LIST *tables, List<TABLE_LIST> &leaves,
     if ((*conds)->fix_fields_if_needed_for_bool(thd, conds))
       goto err_no_arena;
 
-    *conds= (*conds)->transform(thd, &Item::vers_remove_conds_transformer, NULL);
+    if (!thd->stmt_arena->is_stmt_prepare())
+      *conds= (*conds)->transform(thd, &Item::vers_remove_conds_transformer, NULL);
   }
 
   /*
