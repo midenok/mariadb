@@ -1039,7 +1039,7 @@ update_begin:
         {
           if (has_vers_fields && table->versioned())
           {
-            if (table->versioned(VERS_TIMESTAMP))
+            if (table->versioned_write(VERS_TIMESTAMP))
             {
               store_record(table, record[2]);
               table->mark_columns_per_binlog_row_image();
@@ -2521,7 +2521,7 @@ int multi_update::send_data(List<Item> &not_used_values)
           }
           else if (has_vers_fields && table->versioned())
           {
-            if (table->versioned(VERS_TIMESTAMP))
+            if (table->versioned_write(VERS_TIMESTAMP))
             {
               store_record(table, record[2]);
               if (table->vers_insert_history_row())
@@ -2827,7 +2827,7 @@ int multi_update::do_updates()
 
           if (has_vers_fields && table->versioned())
           {
-            if (table->versioned(VERS_TIMESTAMP))
+            if (table->versioned_write(VERS_TIMESTAMP))
             {
               store_record(table, record[2]);
               if ((local_error= table->vers_insert_history_row()))

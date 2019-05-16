@@ -1639,9 +1639,6 @@ static int last_uniq_key(TABLE *table,uint keynr)
 int TABLE::vers_insert_history_row()
 {
   DBUG_ASSERT(versioned(VERS_TIMESTAMP));
-  if (!vers_write)
-    return 0;
-
   restore_record(this, record[1]);
 
   // Set Sys_end to now()
@@ -1882,7 +1879,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
             info->updated++;
             if (table->versioned())
             {
-              if (table->versioned(VERS_TIMESTAMP))
+              if (table->versioned_write(VERS_TIMESTAMP))
               {
                 store_record(table, record[2]);
                 if ((error= table->vers_insert_history_row()))
@@ -1956,7 +1953,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
             !table->file->referenced_by_foreign_key() &&
             (!table->triggers || !table->triggers->has_delete_triggers()))
         {
-          if (table->versioned(VERS_TRX_ID) && table->vers_write)
+          if (table->versioned_write(VERS_TRX_ID))
           {
             bitmap_set_bit(table->write_set, table->vers_start_field()->field_index);
             table->vers_start_field()->store(0, false);
@@ -1968,7 +1965,7 @@ int write_record(THD *thd, TABLE *table,COPY_INFO *info)
           if (likely(!error))
           {
             info->deleted++;
-            if (table->versioned(VERS_TIMESTAMP) && table->vers_write)
+            if (table->versioned_write(VERS_TIMESTAMP))
             {
               store_record(table, record[2]);
               error= table->vers_insert_history_row();
