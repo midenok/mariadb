@@ -5592,8 +5592,7 @@ Item* Item_func_eq::vers_remove_conds_transformer(THD* thd, uchar* t_arg)
   {
     DBUG_ASSERT(*arg);
     Item &i= **arg;
-    DBUG_ASSERT(i.is_fixed());
-    if (i.type() == FIELD_ITEM && i.origin == Item::ORIGIN_VERS_COND) {
+    if (i.is_fixed() && i.type() == FIELD_ITEM && i.origin == Item::ORIGIN_VERS_COND) {
       Item_field &f= static_cast<Item_field &>(i);
       DBUG_ASSERT(f.field);
       DBUG_ASSERT(f.field->table);
