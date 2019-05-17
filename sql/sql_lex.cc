@@ -8746,15 +8746,30 @@ bool LEX::part_values_history(THD *thd)
 }
 
 
-bool LEX::vers_init_sys_field(Lex_ident *p, const char *type, uint flag)
+bool LEX::vers_init_sys_field(THD *thd, uint flag)
 {
+  Lex_ident *p;
+  if (flag == VERS_SYS_START_FLAG)
+  {
+    p= &thd->lex->vers_get_info().as_row.start;
+  }
+  else
+  {
+    DBUG_ASSERT(flag == VERS_SYS_END_FLAG);
+    p= &thd->lex->vers_get_info().as_row.end;
+  }
   if (unlikely(p->str))
   {
-    my_error(ER_VERS_DUPLICATE_ROW_START_END, MYF(0), type,
+    my_error(ER_VERS_DUPLICATE_ROW_START_END, MYF(0),
+             flag == VERS_SYS_START_FLAG ? "START" : "END",
              last_field->field_name.str);
     return true;
   }
   last_field->flags|= (flag | NOT_NULL_FLAG);
+  MYSQL_TIME max_time;
+  max_time.second_part= TIME_MAX_SECOND_PART;
+  Item *d= new (thd->mem_root) Item_datetime_literal(thd, &max_time, TIME_SECOND_PART_DIGITS);
+  last_field->vcol_info= add_virtual_expression(thd, d);
   DBUG_ASSERT(p);
   *p= last_field->field_name;
   return false;
