@@ -178,3 +178,12 @@ Item_func_trt_trx_sees::val_int()
   null_value= trt.query_sees(result, trx_id1, trx_id0);
   return result;
 }
+
+bool Item_vers_sys_field_setter::get_date(THD* thd, MYSQL_TIME* res, date_mode_t fuzzydate)
+{
+  MYSQL_TIME max_time;
+  memset(&max_time, 0, sizeof(max_time));
+  max_time.second_part= TIME_MAX_SECOND_PART;
+  *res= max_time;
+  return false;
+}

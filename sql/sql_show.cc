@@ -2258,7 +2258,7 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
       }
     }
 
-    if (field->vcol_info)
+    if (field->vcol_info && !field->vers_sys_field())
     {
       StringBuffer<MAX_FIELD_WIDTH> str(&my_charset_utf8mb4_general_ci);
       field->vcol_info->print(&str);

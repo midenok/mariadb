@@ -113,4 +113,19 @@ public:
   }
 };
 
+
+class Item_vers_sys_field_setter: public Item_datetimefunc
+{
+public:
+  Item_vers_sys_field_setter(THD *thd): Item_datetimefunc(thd) {}
+  const char *func_name() const
+  { return "vers_sys_field_setter"; }
+  bool get_date(THD *thd, MYSQL_TIME *res, date_mode_t fuzzydate);
+  Item *get_copy(THD *thd)
+  { return get_item_copy<Item_vers_sys_field_setter>(thd, this); }
+  bool fix_length_and_dec()
+  { fix_attributes_datetime(decimals); return FALSE; }
+  virtual bool is_fixed() const { return true; }
+};
+
 #endif /* ITEM_VERS_INCLUDED */

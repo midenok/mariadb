@@ -8766,10 +8766,12 @@ bool LEX::vers_init_sys_field(THD *thd, uint flag)
     return true;
   }
   last_field->flags|= (flag | NOT_NULL_FLAG);
-  MYSQL_TIME max_time;
-  max_time.second_part= TIME_MAX_SECOND_PART;
-  Item *d= new (thd->mem_root) Item_datetime_literal(thd, &max_time, TIME_SECOND_PART_DIGITS);
+
+  Item *d= new (thd->mem_root) Item_vers_sys_field_setter(thd);
   last_field->vcol_info= add_virtual_expression(thd, d);
+  last_field->vcol_info->set_vcol_type(VCOL_GENERATED_STORED);
+  last_field->vcol_info->set_stored_in_db_flag(true);
+  last_field->vcol_info->set_field_type(last_field->real_field_type());
   DBUG_ASSERT(p);
   *p= last_field->field_name;
   return false;
