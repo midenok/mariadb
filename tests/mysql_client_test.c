@@ -8582,6 +8582,33 @@ static void test_bug19671()
 }
 
 
+/**
+  MDEV-19504 Segfault in COM_FIELD_LIST for INFORMATION_SCHEMA
+*/
+
+static void test_mdev19504()
+{
+  MYSQL_RES *result;
+  MYSQL* mysql1;
+  myheader("test_mdev19504");
+
+  mysql1= mysql_client_init(NULL);
+
+  if (!mysql_real_connect(mysql1, opt_host, opt_user, opt_password,
+                          "information_schema", opt_port, opt_unix_socket,
+                          CLIENT_MULTI_STATEMENTS))
+  {
+    fprintf(stderr, "Failed to connect to the database\n");
+    DIE_UNLESS(0);
+  }
+
+  result= mysql_list_fields(mysql1, "ALL_PLUGINS", NULL);
+  mytest(result);
+  mysql_free_result(result);
+  mysql_close(mysql1);
+}
+
+
 /* Test a memory ovverun bug */
 
 static void test_mem_overun()
@@ -21080,6 +21107,7 @@ static struct my_tests_st my_tests[]= {
 #endif
   { "test_explain_meta", test_explain_meta },
   { "test_mdev18408", test_mdev18408 },
+  { "test_mdev19504", test_mdev19504 },
   { 0, 0 }
 };
 

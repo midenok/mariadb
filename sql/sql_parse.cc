@@ -2015,7 +2015,10 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     {
       ST_SCHEMA_TABLE *schema_table= find_schema_table(thd, &table_list.alias);
       if (schema_table)
+      {
         table_list.schema_table= schema_table;
+        table_list.schema_table_name= table_list.table_name;
+      }
     }
 
     uint query_length= (uint) (packet_end - packet); // Don't count end \0
