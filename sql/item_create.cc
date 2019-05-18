@@ -331,23 +331,42 @@ protected:
 };
 
 
-class Create_func_vers_sys_field_setter : public Create_native_func
+class Create_func_vers_row_start_setter : public Create_native_func
 {
 public:
   virtual Item *create_native(THD *thd, LEX_CSTRING *name, List<Item> *item_list)
   {
     DBUG_ASSERT(!item_list);
-    return new (thd->mem_root) Item_vers_sys_field_setter(thd);
+    return new (thd->mem_root) Item_vers_row_start_setter(thd);
   }
 
-  static Create_func_vers_sys_field_setter s_singleton;
+  static Create_func_vers_row_start_setter s_singleton;
 
 protected:
-  Create_func_vers_sys_field_setter() {}
-  virtual ~Create_func_vers_sys_field_setter() {}
+  Create_func_vers_row_start_setter() {}
+  virtual ~Create_func_vers_row_start_setter() {}
 };
 
-Create_func_vers_sys_field_setter Create_func_vers_sys_field_setter::s_singleton;
+Create_func_vers_row_start_setter Create_func_vers_row_start_setter::s_singleton;
+
+
+class Create_func_vers_row_end_setter : public Create_native_func
+{
+public:
+  virtual Item *create_native(THD *thd, LEX_CSTRING *name, List<Item> *item_list)
+  {
+    DBUG_ASSERT(!item_list);
+    return new (thd->mem_root) Item_vers_row_end_setter(thd);
+  }
+
+  static Create_func_vers_row_end_setter s_singleton;
+
+protected:
+  Create_func_vers_row_end_setter() {}
+  virtual ~Create_func_vers_row_end_setter() {}
+};
+
+Create_func_vers_row_end_setter Create_func_vers_row_end_setter::s_singleton;
 
 
 class Create_func_benchmark : public Create_func_arg2
@@ -7458,7 +7477,8 @@ static Native_func_registry func_array[] =
   { { STRING_WITH_LEN("UPPER") }, BUILDER(Create_func_ucase)},
   { { STRING_WITH_LEN("UUID") }, BUILDER(Create_func_uuid)},
   { { STRING_WITH_LEN("UUID_SHORT") }, BUILDER(Create_func_uuid_short)},
-  { { STRING_WITH_LEN("VERS_SYS_FIELD_SETTER") }, BUILDER(Create_func_vers_sys_field_setter)},
+  { { STRING_WITH_LEN("VERS_ROW_START_SETTER") }, BUILDER(Create_func_vers_row_start_setter)},
+  { { STRING_WITH_LEN("VERS_ROW_END_SETTER") }, BUILDER(Create_func_vers_row_end_setter)},
   { { STRING_WITH_LEN("VERSION") }, BUILDER(Create_func_version)},
   { { STRING_WITH_LEN("WEEKDAY") }, BUILDER(Create_func_weekday)},
   { { STRING_WITH_LEN("WEEKOFYEAR") }, BUILDER(Create_func_weekofyear)},

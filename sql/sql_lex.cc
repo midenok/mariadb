@@ -8749,25 +8749,35 @@ bool LEX::part_values_history(THD *thd)
 bool LEX::vers_init_sys_field(THD *thd, uint flag)
 {
   Lex_ident *p;
+  Item *d;
   if (flag == VERS_SYS_START_FLAG)
   {
     p= &thd->lex->vers_get_info().as_row.start;
+    if (unlikely(p->str))
+    {
+      vers_init_sys_field_error:
+      my_error(ER_VERS_DUPLICATE_ROW_START_END, MYF(0),
+              flag == VERS_SYS_START_FLAG ? "START" : "END",
+              last_field->field_name.str);
+      return true;
+    }
+    d= new (thd->mem_root) Item_vers_row_start_setter(thd);
   }
   else
   {
     DBUG_ASSERT(flag == VERS_SYS_END_FLAG);
     p= &thd->lex->vers_get_info().as_row.end;
+    if (unlikely(p->str))
+      goto vers_init_sys_field_error;
+    d= new (thd->mem_root) Item_vers_row_end_setter(thd);
   }
-  if (unlikely(p->str))
+  if (unlikely(!d))
   {
-    my_error(ER_VERS_DUPLICATE_ROW_START_END, MYF(0),
-             flag == VERS_SYS_START_FLAG ? "START" : "END",
-             last_field->field_name.str);
+    my_error(ER_OUT_OF_RESOURCES, MYF(ME_FATAL));
     return true;
   }
-  last_field->flags|= (flag | NOT_NULL_FLAG);
 
-  Item *d= new (thd->mem_root) Item_vers_sys_field_setter(thd);
+  last_field->flags|= (flag | NOT_NULL_FLAG);
   last_field->vcol_info= add_virtual_expression(thd, d);
   last_field->vcol_info->set_vcol_type(VCOL_GENERATED_STORED);
   last_field->vcol_info->set_stored_in_db_flag(true);
