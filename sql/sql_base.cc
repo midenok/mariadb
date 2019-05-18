@@ -8473,11 +8473,12 @@ fill_record(THD *thd, TABLE *table_arg, List<Item> &fields, List<Item> &values,
     }
   }
 
+  if (only_unvers_fields)
+    table_arg->vers_write= false;
+
   if (!update && table_arg->default_field &&
       table_arg->update_default_fields(0, ignore_errors))
     goto err;
-  if (table_arg->versioned() && !only_unvers_fields)
-    table_arg->vers_update_fields();
   /* Update virtual fields */
   if (table_arg->vfield &&
       table_arg->update_virtual_fields(table_arg->file, VCOL_UPDATE_FOR_WRITE))
