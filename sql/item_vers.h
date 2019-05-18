@@ -114,10 +114,29 @@ public:
 };
 
 
-class Item_vers_row_start_setter: public Item_datetimefunc
+class Item_vers_sys_field_setter: public Item_datetimefunc
+{
+protected:
+  Field *field;
+
+public:
+  Item_vers_sys_field_setter(THD *thd): Item_datetimefunc(thd), field(NULL) {}
+  virtual bool is_fixed() const { return true; }
+  void set_field(Field *in) { field= in; }
+  TABLE *table()
+  {
+    DBUG_ASSERT(field);
+    DBUG_ASSERT(field->vers_sys_field());
+    DBUG_ASSERT(field->table);
+    DBUG_ASSERT(field->table->versioned());
+    return field->table;
+  }
+};
+
+class Item_vers_row_start_setter: public Item_vers_sys_field_setter
 {
 public:
-  Item_vers_row_start_setter(THD *thd): Item_datetimefunc(thd) {}
+  Item_vers_row_start_setter(THD *thd): Item_vers_sys_field_setter(thd) {}
   const char *func_name() const
   { return "vers_row_start_setter"; }
   bool get_date(THD *thd, MYSQL_TIME *res, date_mode_t fuzzydate);
@@ -125,13 +144,12 @@ public:
   { return get_item_copy<Item_vers_row_start_setter>(thd, this); }
   bool fix_length_and_dec()
   { fix_attributes_datetime(decimals); return FALSE; }
-  virtual bool is_fixed() const { return true; }
 };
 
-class Item_vers_row_end_setter: public Item_datetimefunc
+class Item_vers_row_end_setter: public Item_vers_sys_field_setter
 {
 public:
-  Item_vers_row_end_setter(THD *thd): Item_datetimefunc(thd) {}
+  Item_vers_row_end_setter(THD *thd): Item_vers_sys_field_setter(thd) {}
   const char *func_name() const
   { return "vers_row_end_setter"; }
   bool get_date(THD *thd, MYSQL_TIME *res, date_mode_t fuzzydate);
@@ -139,7 +157,6 @@ public:
   { return get_item_copy<Item_vers_row_end_setter>(thd, this); }
   bool fix_length_and_dec()
   { fix_attributes_datetime(decimals); return FALSE; }
-  virtual bool is_fixed() const { return true; }
 };
 
 #endif /* ITEM_VERS_INCLUDED */

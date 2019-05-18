@@ -595,6 +595,7 @@ public:
   }
   inline bool is_equal(const Virtual_column_info* vcol) const;
   inline void print(String*);
+  void vers_update_info(Field *field);
 };
 
 class Field: public Value_source

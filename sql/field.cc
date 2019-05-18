@@ -10703,6 +10703,15 @@ uint pack_length_to_packflag(uint type)
 }
 
 
+void Virtual_column_info::vers_update_info(Field* field)
+{
+  DBUG_ASSERT(expr);
+  DBUG_ASSERT(field->vers_sys_field());
+  Item_vers_sys_field_setter *setter= static_cast<Item_vers_sys_field_setter *>(expr);
+  setter->set_field(field);
+}
+
+
 uint Column_definition_attributes::pack_flag_to_pack_length() const
 {
   uint type= f_packtype(pack_flag); // 0..15
