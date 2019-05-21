@@ -114,7 +114,7 @@ public:
 };
 
 
-class Item_vers_sys_field_setter: public Item_datetimefunc
+class Item_vers_sys_field_setter : public Item_datetimefunc
 {
 protected:
   Field *field;
@@ -131,6 +131,47 @@ public:
     DBUG_ASSERT(field->table->versioned());
     return field->table;
   }
+
+  const Type_handler *type_handler() const { return &type_handler_timestamp2; }
+  int save_in_field(Field *field, bool no_conversions)
+  {
+    DBUG_ASSERT(0);
+    return true;
+  }
+  longlong val_int()
+  {
+    DBUG_ASSERT(0);
+    return 0;
+  }
+  double val_real()
+  {
+    DBUG_ASSERT(0);
+    return 0;
+  }
+  String *val_str(String *to)
+  {
+    DBUG_ASSERT(0);
+    return NULL;
+  }
+  my_decimal *val_decimal(my_decimal *to)
+  {
+    DBUG_ASSERT(0);
+    return NULL;
+  }
+  bool get_date(THD *thd, MYSQL_TIME *ltime, date_mode_t fuzzydate)
+  {
+    DBUG_ASSERT(0);
+    return true;
+  }
+  bool val_native(THD *thd, Native *to)
+  {
+    DBUG_ASSERT(0);
+    return true;
+  }
+  void set_value(const Timestamp_or_zero_datetime &value)
+  {
+    DBUG_ASSERT(0);
+  }
 };
 
 class Item_vers_row_start_setter: public Item_vers_sys_field_setter
@@ -144,6 +185,7 @@ public:
   { return get_item_copy<Item_vers_row_start_setter>(thd, this); }
   bool fix_length_and_dec()
   { fix_attributes_datetime(decimals); return FALSE; }
+  int save_in_field(Field *field, bool no_conversions);
 };
 
 class Item_vers_row_end_setter: public Item_vers_sys_field_setter
@@ -157,6 +199,7 @@ public:
   { return get_item_copy<Item_vers_row_end_setter>(thd, this); }
   bool fix_length_and_dec()
   { fix_attributes_datetime(decimals); return FALSE; }
+  int save_in_field(Field *field, bool no_conversions);
 };
 
 #endif /* ITEM_VERS_INCLUDED */

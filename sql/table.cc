@@ -1137,7 +1137,7 @@ bool parse_vcol_defs(THD *thd, MEM_ROOT *mem_root, TABLE *table,
       vcol= unpack_vcol_info_from_frm(thd, mem_root, table, &expr_str,
                                     &((*field_ptr)->vcol_info), error_reported);
       *(vfield_ptr++)= *field_ptr;
-      if ((*field_ptr)->vers_sys_field())
+      if (vcol && (*field_ptr)->vers_sys_field())
         vcol->vers_update_info(*field_ptr);
       break;
     case VCOL_DEFAULT:

@@ -196,3 +196,36 @@ bool Item_vers_row_end_setter::get_date(THD* thd, MYSQL_TIME* res, date_mode_t f
   *res= max_time;
   return false;
 }
+
+int Item_vers_row_start_setter::save_in_field(Field* field, bool no_conversions)
+{
+  DBUG_ASSERT(field == table()->vers_start_field());
+  if (!table()->vers_write)
+  {
+    DBUG_PRINT("vers", (" SKIPPED!\n"));
+    return false;
+  }
+  bitmap_set_bit(table()->write_set, field->field_index);
+  field->set_notnull();
+  if (table()->versioned(VERS_TIMESTAMP) &&
+      field->store_timestamp(table()->in_use->query_start(),
+                             table()->in_use->query_start_sec_part()))
+  {
+    DBUG_ASSERT(0);
+    return true;
+  }
+  return false;
+}
+
+int Item_vers_row_end_setter::save_in_field(Field* field, bool no_conversions)
+{
+  DBUG_ASSERT(field == table()->vers_end_field());
+  if (!table()->vers_write)
+    return false;
+  bitmap_set_bit(table()->write_set, field->field_index);
+  field->set_notnull();
+  field->set_max();
+  DBUG_EXECUTE("vers", table()->vers_print(" to"););
+  bitmap_set_bit(table()->read_set, field->field_index);
+ return false;
+}
