@@ -8297,8 +8297,6 @@ int TABLE::update_generated_fields()
 
   if (likely(!res) && vfield)
     res= update_virtual_fields(file, VCOL_UPDATE_FOR_WRITE);
-  if (likely(!res) && versioned())
-    vers_update_fields();
   if (likely(!res))
     res= verify_constraints(false) == VIEW_CHECK_ERROR;
   return res;
