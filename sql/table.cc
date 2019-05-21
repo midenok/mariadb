@@ -1137,6 +1137,8 @@ bool parse_vcol_defs(THD *thd, MEM_ROOT *mem_root, TABLE *table,
       vcol= unpack_vcol_info_from_frm(thd, mem_root, table, &expr_str,
                                     &((*field_ptr)->vcol_info), error_reported);
       *(vfield_ptr++)= *field_ptr;
+      if (vcol && (*field_ptr)->vers_sys_field())
+        vcol->vers_update_info(*field_ptr);
       break;
     case VCOL_DEFAULT:
       vcol= unpack_vcol_info_from_frm(thd, mem_root, table, &expr_str,
@@ -1145,8 +1147,6 @@ bool parse_vcol_defs(THD *thd, MEM_ROOT *mem_root, TABLE *table,
       *(dfield_ptr++)= *field_ptr;
       if (vcol && (vcol->flags & (VCOL_NON_DETERMINISTIC | VCOL_SESSION_FUNC)))
         table->s->non_determinstic_insert= true;
-      if (vcol && (*field_ptr)->vers_sys_field())
-        vcol->vers_update_info(*field_ptr);
       break;
     case VCOL_CHECK_FIELD:
       vcol= unpack_vcol_info_from_frm(thd, mem_root, table, &expr_str,
