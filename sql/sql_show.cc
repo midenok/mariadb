@@ -2258,7 +2258,7 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
       }
     }
 
-    if (field->vcol_info && !field->vers_sys_field())
+    if (field->vcol_info)
     {
       StringBuffer<MAX_FIELD_WIDTH> str(&my_charset_utf8mb4_general_ci);
       field->vcol_info->print(&str);
@@ -2296,7 +2296,7 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
         packet->append(STRING_WITH_LEN(" INVISIBLE"));
       }
       def_value.set(def_value_buf, sizeof(def_value_buf), system_charset_info);
-      if (get_field_default_value(thd, field, &def_value, 1))
+      if (!field->vers_sys_field() && get_field_default_value(thd, field, &def_value, 1))
       {
         packet->append(STRING_WITH_LEN(" DEFAULT "));
         packet->append(def_value.ptr(), def_value.length(), system_charset_info);

@@ -8778,10 +8778,10 @@ bool LEX::vers_init_sys_field(THD *thd, uint flag)
   }
 
   last_field->flags|= (flag | NOT_NULL_FLAG);
-  last_field->vcol_info= add_virtual_expression(thd, d);
-  last_field->vcol_info->set_vcol_type(VCOL_GENERATED_STORED);
-  last_field->vcol_info->set_stored_in_db_flag(true);
-  last_field->vcol_info->set_field_type(last_field->real_field_type());
+  last_field->default_value= add_virtual_expression(thd, d);
+  last_field->default_value->set_vcol_type(VCOL_DEFAULT);
+  last_field->default_value->set_stored_in_db_flag(true);
+  last_field->default_value->set_field_type(last_field->real_field_type());
   DBUG_ASSERT(p);
   *p= last_field->field_name;
   return false;
