@@ -3824,7 +3824,7 @@ partititon_err:
 #endif
 
   /* Check virtual columns against table's storage engine. */
-  if (share->virtual_fields &&
+  if (share->virtual_fields > (share->versioned ? 2 : 0) &&
         (outparam->file && 
           !(outparam->file->ha_table_flags() & HA_CAN_VIRTUAL_COLUMNS)))
   {

@@ -3967,7 +3967,7 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
 	  }
 	}
 #endif
-        if (sql_field->vcol_info)
+        if (sql_field->vcol_info && !sql_field->vers_sys_field())
         {
           if (key->type == Key::PRIMARY)
           {
