@@ -2950,7 +2950,7 @@ bool Column_definition::prepare_stage2(handler *file,
     DBUG_RETURN(true);
 
   if (!(flags & NOT_NULL_FLAG) ||
-      (vcol_info))  /* Make virtual columns allow NULL values */
+      (vcol_info && !vers_sys_field()))  /* Make virtual columns allow NULL values */
     pack_flag|= FIELDFLAG_MAYBE_NULL;
   if (flags & NO_DEFAULT_VALUE_FLAG)
     pack_flag|= FIELDFLAG_NO_DEFAULT;
@@ -3473,7 +3473,7 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
       DBUG_RETURN(true);
 
     /* Virtual fields are always NULL */
-    if (sql_field->vcol_info)
+    if (sql_field->vcol_info && !sql_field->vers_sys_field())
       sql_field->flags&= ~NOT_NULL_FLAG;
 
     if (sql_field->prepare_stage1(thd, thd->mem_root,
@@ -10686,6 +10686,8 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       if (!from_row_end->is_max())
         continue; // Drop history rows.
     }
+    else if (keep_versioned)
+      to->vers_write= false;
 
     prev_insert_id= to->file->next_insert_id;
     if (to->default_field)
@@ -10701,8 +10703,6 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       error= 1;
       break;
     }
-    if (keep_versioned && to->versioned(VERS_TRX_ID))
-      to->vers_write= false;
 
     if (to->next_number_field)
     {
