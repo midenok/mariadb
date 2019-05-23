@@ -2793,9 +2793,15 @@ int multi_update::do_updates()
         if (table->default_field &&
             (error= table->update_default_fields(1, ignore)))
           goto err2;
-        if (table->vfield &&
-            table->update_virtual_fields(table->file, VCOL_UPDATE_FOR_WRITE))
-          goto err2;
+        if (table->vfield)
+        {
+          bool saved_vers_write= table->vers_write;
+          table->vers_write= has_vers_fields;
+          int err= table->update_virtual_fields(table->file, VCOL_UPDATE_FOR_WRITE);
+          table->vers_write= saved_vers_write;
+          if (err)
+            goto err2;
+        }
         if ((error= cur_table->view_check_option(thd, ignore)) !=
             VIEW_CHECK_OK)
         {
