@@ -8101,11 +8101,13 @@ int TABLE::update_virtual_fields(handler *h, enum_vcol_update_mode update_mode)
   Turn_errors_to_warnings_handler Suppress_errors;
   int error;
   bool handler_pushed= 0, update_all_columns= 1;
+  bool saved_vers_write= vers_write;
   DBUG_ASSERT(vfield);
 
   if (h->keyread_enabled())
     DBUG_RETURN(0);
 
+  vers_write= false;
   error= 0;
   in_use->set_n_backup_active_arena(expr_arena, &backup_arena);
 
@@ -8126,6 +8128,10 @@ int TABLE::update_virtual_fields(handler *h, enum_vcol_update_mode update_mode)
       calculate all virtual columns.
     */
     update_all_columns= 1;
+  }
+  else if (update_mode == VCOL_UPDATE_FOR_WRITE)
+  {
+    vers_write= saved_vers_write;
   }
 
   /* Iterate over virtual fields in the table */
@@ -8205,6 +8211,7 @@ int TABLE::update_virtual_fields(handler *h, enum_vcol_update_mode update_mode)
     in_use->pop_internal_handler();
   in_use->restore_active_arena(expr_arena, &backup_arena);
   
+  vers_write= saved_vers_write;
   /* Return 1 only of we got a fatal error, not a warning */
   DBUG_RETURN(in_use->is_error());
 }

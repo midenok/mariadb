@@ -7396,6 +7396,24 @@ static Create_field *vers_init_sys_field(THD *thd, const char *field_name, int f
   if (f->check(thd))
     return NULL;
 
+  Item *expr;
+  if (flags & VERS_SYS_START_FLAG)
+    expr= new (thd->mem_root) Item_vers_row_start_setter(thd);
+  else
+  {
+    DBUG_ASSERT(flags & VERS_SYS_END_FLAG);
+    expr= new (thd->mem_root) Item_vers_row_end_setter(thd);
+  }
+  if (unlikely(!expr))
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(ME_FATAL));
+    return NULL;
+  }
+  f->vcol_info= add_virtual_expression(thd, expr);
+  f->vcol_info->set_vcol_type(VCOL_GENERATED_STORED);
+  f->vcol_info->set_stored_in_db_flag(true);
+  f->vcol_info->set_field_type(f->real_field_type());
+
   return f;
 }
 
