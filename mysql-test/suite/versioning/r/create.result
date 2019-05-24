@@ -18,7 +18,7 @@ table_catalog	def
 table_schema	test
 table_name	t1
 table_type	SYSTEM VERSIONED
-version	10
+version	11
 table_rows	0
 data_free	0
 auto_increment	NULL

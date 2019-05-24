@@ -6012,7 +6012,16 @@ static int get_schema_column_record(THD *thd, TABLE_LIST *tables,
         buf.set(STRING_WITH_LEN("auto_increment"),cs);
     if (print_on_update_clause(field, &type, true))
         buf.set(type.ptr(), type.length(),cs);
-    if (field->vcol_info)
+    if (field->vers_sys_field())
+    {
+      if (field->flags & VERS_SYS_START_FLAG)
+        table->field[21]->store(STRING_WITH_LEN("ROW START"), cs);
+      else
+        table->field[21]->store(STRING_WITH_LEN("ROW END"), cs);
+      table->field[21]->set_notnull();
+      table->field[20]->store(STRING_WITH_LEN("ALWAYS"), cs);
+    }
+    else if (field->vcol_info)
     {
       String gen_s(tmp,sizeof(tmp), system_charset_info);
       gen_s.length(0);
@@ -6025,15 +6034,6 @@ static int get_schema_column_record(THD *thd, TABLE_LIST *tables,
         buf.set(STRING_WITH_LEN("STORED GENERATED"), cs);
       else
         buf.set(STRING_WITH_LEN("VIRTUAL GENERATED"), cs);
-    }
-    else if (field->flags & VERS_SYSTEM_FIELD)
-    {
-      if (field->flags & VERS_SYS_START_FLAG)
-        table->field[21]->store(STRING_WITH_LEN("ROW START"), cs);
-      else
-        table->field[21]->store(STRING_WITH_LEN("ROW END"), cs);
-      table->field[21]->set_notnull();
-      table->field[20]->store(STRING_WITH_LEN("ALWAYS"), cs);
     }
     else
       table->field[20]->store(STRING_WITH_LEN("NEVER"), cs);
