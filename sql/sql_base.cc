@@ -8422,8 +8422,9 @@ fill_record(THD *thd, TABLE *table_arg, List<Item> &fields, List<Item> &values,
         rfield->field_index ==  table->next_number_field->field_index)
       table->auto_increment_field_not_null= TRUE;
     Item::Type type= value->type();
+    // FIXME: table->versioned() redundant check?
     bool vers_sys_field= table->versioned() && rfield->vers_sys_field();
-    if ((rfield->vcol_info || (vers_sys_field && !thd->vers_modify_history())) &&
+    if ((rfield->vcol_info && !(vers_sys_field && thd->vers_modify_history())) &&
         type != Item::DEFAULT_VALUE_ITEM &&
         type != Item::NULL_ITEM &&
         table->s->table_category != TABLE_CATEGORY_TEMPORARY)

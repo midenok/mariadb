@@ -1037,6 +1037,7 @@ update_begin:
         }
         else if (likely(!error))
         {
+          // FIXME: table->versioned() redundant check
           if (has_vers_fields && table->versioned())
           {
             if (table->versioned_write(VERS_TIMESTAMP))
@@ -2796,7 +2797,8 @@ int multi_update::do_updates()
         if (table->vfield)
         {
           bool saved_vers_write= table->vers_write;
-          table->vers_write= has_vers_fields;
+          if (table->vers_write)
+            table->vers_write= has_vers_fields;
           int err= table->update_virtual_fields(table->file, VCOL_UPDATE_FOR_WRITE);
           table->vers_write= saved_vers_write;
           if (err)

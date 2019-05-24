@@ -133,6 +133,10 @@ public:
   }
 
   const Type_handler *type_handler() const { return &type_handler_timestamp2; }
+  bool check_partition_func_processor(void *int_arg) { return false; }
+  bool check_vcol_func_processor(void *arg) { return false; }
+  bool check_valid_arguments_processor(void *arg) { return false; }
+
   int save_in_field(Field *field, bool no_conversions)
   {
     DBUG_ASSERT(0);
