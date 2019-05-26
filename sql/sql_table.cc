@@ -10542,7 +10542,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
         if (def->field == from->found_next_number_field)
           thd->variables.sql_mode|= MODE_NO_AUTO_VALUE_ON_ZERO;
       }
-      if (!(*ptr)->vcol_info)
+      if (!(*ptr)->vcol_info || (*ptr)->vers_sys_field())
       {
         bitmap_set_bit(from->read_set, def->field->field_index);
         (copy_end++)->set(*ptr,def->field,0);
