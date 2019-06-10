@@ -1086,7 +1086,16 @@ int SELECT_LEX::vers_setup_conds(THD *thd, TABLE_LIST *tables)
     if (is_select)
       table->on_expr= and_items(thd, table->on_expr, cond);
     else
-      where= and_items(thd, where, cond);
+    {
+      if (join)
+      {
+        where= and_items(thd, join->conds, cond);
+        join->conds= where;
+      }
+      else
+        where= and_items(thd, where, cond);
+      table->where= and_items(thd, table->where, cond);
+    }
 
     table->vers_conditions.type= SYSTEM_TIME_ALL;
   } // for (table= tables; ...)

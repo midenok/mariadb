@@ -976,9 +976,26 @@ bool st_select_lex_unit::prepare(TABLE_LIST *derived_arg,
       if (sl->tvc->prepare(thd, sl, tmp_result, this))
 	goto err;
     }
-    else if (prepare_join(thd, first_sl, tmp_result, additional_options,
+    else
+    {
+      if (prepare_join(thd, first_sl, tmp_result, additional_options,
                      is_union_select))
-      goto err;
+        goto err;
+
+      if (derived_arg && derived_arg->table && derived_arg->table->versioned())
+      {
+        LEX *old_lex= thd->lex;
+        const bool view_is_mergeable= (derived_arg->algorithm != VIEW_ALGORITHM_TMPTABLE &&
+                          derived_arg->view->can_be_merged());
+        if (view_is_mergeable &&
+            (derived_arg->select_lex->master_unit() != &old_lex->unit ||
+            old_lex->can_use_merged()) &&
+            !old_lex->can_not_use_merged())
+        {
+          derived_arg->where= first_sl->where;
+        }
+      }
+    }
     types= first_sl->item_list;
     goto cont;
   }
