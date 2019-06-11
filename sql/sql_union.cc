@@ -982,18 +982,13 @@ bool st_select_lex_unit::prepare(TABLE_LIST *derived_arg,
                      is_union_select))
         goto err;
 
-      if (derived_arg && derived_arg->table && derived_arg->table->versioned())
+      if (derived_arg && derived_arg->table &&
+          derived_arg->derived_type == VIEW_ALGORITHM_MERGE &&
+          derived_arg->table->versioned())
       {
-        LEX *old_lex= thd->lex;
-        const bool view_is_mergeable= (derived_arg->algorithm != VIEW_ALGORITHM_TMPTABLE &&
-                          derived_arg->view->can_be_merged());
-        if (view_is_mergeable &&
-            (derived_arg->select_lex->master_unit() != &old_lex->unit ||
-            old_lex->can_use_merged()) &&
-            !old_lex->can_not_use_merged())
-        {
-          derived_arg->where= first_sl->where;
-        }
+        /* Got versioning conditions (see vers_setup_conds()), need to update
+           derived_arg. */
+        derived_arg->where= first_sl->where;
       }
     }
     types= first_sl->item_list;
