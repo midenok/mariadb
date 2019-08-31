@@ -2638,6 +2638,7 @@ export const char *optimizer_switch_names[]=
   "condition_pushdown_for_subquery",
   "rowid_filter",
   "condition_pushdown_from_having",
+  "not_null_range_scan",
   "default", 
   NullS
 };
