@@ -3785,7 +3785,6 @@ dict_foreign_report_syntax_err(
 /*********************************************************************//**
 Push warning message to SQL-layer based on foreign key constraint
 index match error. */
-static
 void
 dict_foreign_push_index_error(
 /*==========================*/
@@ -3890,7 +3889,8 @@ dict_create_foreign_constraints_low(
 	CHARSET_INFO*		cs,
 	const char*		sql_string,
 	const char*		name,
-	ibool			reject_fks)
+	ibool			reject_fks,
+	dict_foreign_set	&local_fk_set)
 {
 	dict_table_t*	table			= NULL;
 	dict_table_t*	referenced_table	= NULL;
@@ -3921,8 +3921,6 @@ dict_create_foreign_constraints_low(
 	const char*	column_names[500];
 	const char*	ref_column_names[500];
 	const char*	referenced_table_name;
-	dict_foreign_set	local_fk_set;
-	dict_foreign_set_free	local_fk_set_free(local_fk_set);
 	const char*	create_table_name;
 	const char*	orig;
 	char	create_name[MAX_TABLE_NAME_LEN + 1];
@@ -4780,7 +4778,8 @@ dict_create_foreign_constraints(
 	const char*		sql_string,
 	size_t			sql_length,
 	const char*		name,
-	ibool			reject_fks)
+	ibool			reject_fks,
+	dict_foreign_set	&local_fk_set)
 {
 	char*		str;
 	dberr_t		err;
@@ -4794,7 +4793,7 @@ dict_create_foreign_constraints(
 
 	err = dict_create_foreign_constraints_low(
 		trx, heap, innobase_get_charset(trx->mysql_thd),
-		str, name, reject_fks);
+		str, name, reject_fks, local_fk_set);
 
 	mem_heap_free(heap);
 	ut_free(str);

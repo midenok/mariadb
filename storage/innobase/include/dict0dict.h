@@ -79,6 +79,28 @@ dict_table_get_highest_foreign_id(
 /*==============================*/
 	dict_table_t*	table);		/*!< in: table in the dictionary
 					memory cache */
+
+/*********************************************************************//**
+Push warning message to SQL-layer based on foreign key constraint
+index match error. */
+void
+dict_foreign_push_index_error(
+/*==========================*/
+	trx_t*		trx,		/*!< in: trx */
+	const char*	operation,	/*!< in: operation create or alter
+					*/
+	const char*	create_name,	/*!< in: table name in create or
+					alter table */
+	const char*	latest_foreign,	/*!< in: start of latest foreign key
+					constraint name */
+	const char**	columns,	/*!< in: foreign key columns */
+	ulint		index_error,	/*!< in: error code */
+	ulint		err_col,	/*!< in: column where error happened
+					*/
+	dict_index_t*	err_index,	/*!< in: index where error happened
+					*/
+	dict_table_t*	table,		/*!< in: table */
+	FILE*		ef);		/*!< in: output stream */
 /********************************************************************//**
 Return the end of table name where we have removed dbname and '/'.
 @return table name */
@@ -452,7 +474,8 @@ dict_create_foreign_constraints(
 	const char*		sql_string,
 	size_t			sql_length,
 	const char*		name,
-	ibool			reject_fks)
+	ibool			reject_fks,
+	dict_foreign_set	&local_fk_set)
 	MY_ATTRIBUTE((warn_unused_result));
 /**********************************************************************//**
 Parses the CONSTRAINT id's to be dropped in an ALTER TABLE statement.

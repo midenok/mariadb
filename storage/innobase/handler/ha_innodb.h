@@ -643,6 +643,11 @@ public:
 	/** Set m_tablespace_type. */
 	void set_tablespace_type(bool table_being_altered_is_file_per_table);
 
+	dberr_t tmp_forge_fk_set(
+		dict_foreign_set &local_fk_set0,
+		const char* name,
+		mem_heap_t*	heap);
+
 	/** Create the internal innodb table.
 	@param create_fk	whether to add FOREIGN KEY constraints */
 	int create_table(bool create_fk = true);
