@@ -11160,6 +11160,12 @@ bool Sql_cmd_create_table_like::execute(THD *thd)
     goto end_with_restore_list;
   }
 
+  /*
+   Since CREATE_INFO is not full without Alter_info, it is better to pass them as
+   a signle parameter. TODO: remove alter_info argument where create_info is passed.
+  */
+  create_info.alter_info= &alter_info;
+
   /* Check privileges */
   if ((res= create_table_precheck(thd, select_tables, create_table)))
     goto end_with_restore_list;
