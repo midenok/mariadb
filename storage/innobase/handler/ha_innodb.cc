@@ -12389,18 +12389,17 @@ bool tmp_dict_scan_col(dict_table_t*		table,
 dberr_t
 create_table_info_t::tmp_forge_fk_set(
 	dict_foreign_set &local_fk_set0,
-	const char* name,
-	mem_heap_t*	heap)
+	const char* name)
 {
 	dict_foreign_set	local_fk_set;
 	dict_foreign_set_free	local_fk_set_free(local_fk_set);
-	dict_foreign_t*	foreign			= NULL;
 	const char*	constraint_name = NULL;
 	dberr_t		error;
 	ulint		number			= 1;
-	const dict_col_t*columns[500];
-	const char*	column_names[500];
-	const char*	ref_column_names[500];
+	static const unsigned MAX_COLS_PER_FK = 500;
+	const dict_col_t*columns[MAX_COLS_PER_FK];
+	const char*	column_names[MAX_COLS_PER_FK];
+	const char*	ref_column_names[MAX_COLS_PER_FK];
 	FILE*		ef			= dict_foreign_err_file;
 	char	create_name[MAX_TABLE_NAME_LEN + 1];
 	dict_index_t*	index			= NULL;
@@ -12431,10 +12430,16 @@ create_table_info_t::tmp_forge_fk_set(
 		Key_part_spec *col;
 		bool success;
 
+		dict_foreign_t* foreign = dict_mem_foreign_create();
+		if (!foreign) {
+			// TODO: malloc error
+			return(DB_OUT_OF_MEMORY);
+		}
+
 		List_iterator_fast<Key_part_spec> col_it(fk->columns);
 		int i = 0, j = 0;
 		while ((col = col_it++)) {
-			column_names[i] = mem_heap_strdupl(heap, col->field_name.str, col->field_name.length);
+			column_names[i] = mem_heap_strdupl(foreign->heap, col->field_name.str, col->field_name.length);
 			success = tmp_dict_scan_col(table, columns + i, column_names + i);
 			if (!success) {
 constraint_error:
@@ -12456,6 +12461,10 @@ constraint_error:
 				return(DB_CANNOT_ADD_CONSTRAINT);
 			}
 			++i;
+			if (i >= MAX_COLS_PER_FK) {
+				// TODO: error message
+				return(DB_CANNOT_ADD_CONSTRAINT);
+			}
 		}
 
 		index = dict_foreign_find_index(
@@ -12482,16 +12491,14 @@ constraint_error:
 
 		col_it.init(fk->ref_columns);
 		while ((col = col_it++)) {
-			ref_column_names[j] = mem_heap_strdupl(heap, col->field_name.str, col->field_name.length);
+			ref_column_names[j] = mem_heap_strdupl(foreign->heap, col->field_name.str, col->field_name.length);
 			success = tmp_dict_scan_col(table, columns + j, ref_column_names + j);
 			if (!success) {
 				goto constraint_error;
 			}
 			++j;
 		}
-		ut_ad(i == j); // FIXME: test
-
-		foreign = dict_mem_foreign_create();
+		ut_ad(i == j); // See ER_WRONG_FK_DEF in mysql_prepare_create_table()
 
 		if (constraint_name) {
 			ulint	db_len;
@@ -12532,6 +12539,10 @@ constraint_error:
 		foreign->foreign_table = table;
 		foreign->foreign_table_name = mem_heap_strdup(
 			foreign->heap, table->name.m_name);
+		if (!foreign->foreign_table_name) {
+			// TODO: malloc error
+			return(DB_OUT_OF_MEMORY);
+		}
 
 		dict_mem_foreign_table_name_lookup_set(foreign, TRUE);
 
@@ -12540,12 +12551,12 @@ constraint_error:
 
 		foreign->foreign_col_names = static_cast<const char**>(
 			mem_heap_alloc(foreign->heap, i * sizeof(void*)));
-
-		// FIXME: don't allocate it twice
-		for (i = 0; i < foreign->n_fields; i++) {
-			foreign->foreign_col_names[i] = mem_heap_strdup(
-				foreign->heap, column_names[i]);
+		if (!foreign->foreign_col_names) {
+			// TODO: malloc error
+			return(DB_OUT_OF_MEMORY);
 		}
+
+		memcpy(foreign->foreign_col_names, column_names, i * sizeof(void*));
 
 		foreign->referenced_table_name =
 			dict_get_referenced_table(name,
@@ -12556,7 +12567,7 @@ constraint_error:
 
 		if (!foreign->referenced_table_name) {
 			// TODO: malloc error
-			return(DB_CANNOT_ADD_CONSTRAINT);
+			return(DB_OUT_OF_MEMORY);
 		}
 
 		if (!foreign->referenced_table) {
@@ -12568,12 +12579,12 @@ constraint_error:
 
 		foreign->referenced_col_names = static_cast<const char**>(
 			mem_heap_alloc(foreign->heap, i * sizeof(void*)));
-
-		// FIXME: don't allocate it twice
-		for (i = 0; i < foreign->n_fields; i++) {
-			foreign->referenced_col_names[i]
-				= mem_heap_strdup(foreign->heap, ref_column_names[i]);
+		if (!foreign->referenced_col_names) {
+			// TODO: malloc error
+			return(DB_OUT_OF_MEMORY);
 		}
+
+		memcpy(foreign->referenced_col_names, ref_column_names, i * sizeof(void*));
 
 		if (fk->delete_opt == FK_OPTION_SET_NULL || fk->update_opt == FK_OPTION_SET_NULL) {
 			for (j = 0; j < foreign->n_fields; j++) {
@@ -12831,9 +12842,7 @@ int create_table_info_t::create_table(bool create_fk)
 		dict_foreign_set_free	local_fk_set_free(local_fk_set);
 		dberr_t err = DB_SUCCESS;
 		if (create_fk) {
-			mem_heap_t*	heap = mem_heap_create(10000);
-			err = tmp_forge_fk_set(local_fk_set, m_table_name, heap);
-			mem_heap_free(heap);
+			err = tmp_forge_fk_set(local_fk_set, m_table_name);
 		}
 		if (err == DB_SUCCESS) {
 			/* Check that also referencing constraints are ok */

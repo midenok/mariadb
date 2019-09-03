@@ -645,8 +645,7 @@ public:
 
 	dberr_t tmp_forge_fk_set(
 		dict_foreign_set &local_fk_set0,
-		const char* name,
-		mem_heap_t*	heap);
+		const char* name);
 
 	/** Create the internal innodb table.
 	@param create_fk	whether to add FOREIGN KEY constraints */
