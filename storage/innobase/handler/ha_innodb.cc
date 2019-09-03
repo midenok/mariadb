@@ -12409,6 +12409,7 @@ create_table_info_t::tmp_forge_fk_set(
 	ulint		err_col;
 	const char * start_of_latest_foreign = "FIXME";
 	const char * operation = "FIXME";
+	const bool reject_fks = m_flags2 & DICT_TF2_TEMPORARY;
 
 	{
 		char *bufend = innobase_convert_name(create_name, MAX_TABLE_NAME_LEN,
@@ -12420,6 +12421,7 @@ create_table_info_t::tmp_forge_fk_set(
 	List_iterator_fast<Key> key_it(alter_info->key_list);
 
 	dict_table_t*	table = dict_table_get_low(name);
+	// TODO: handle error
 
 	while (Key *key = key_it++) {
 		if (key->type != Key::FOREIGN_KEY)
@@ -12487,7 +12489,7 @@ constraint_error:
 			}
 			++j;
 		}
-		ut_ad(i == j);
+		ut_ad(i == j); // FIXME: test
 
 		foreign = dict_mem_foreign_create();
 
@@ -12545,27 +12547,163 @@ constraint_error:
 				foreign->heap, column_names[i]);
 		}
 
+		foreign->referenced_table_name =
+			dict_get_referenced_table(name,
+						LEX_STRING_WITH_LEN(fk->ref_db),
+						LEX_STRING_WITH_LEN(fk->ref_table),
+						&foreign->referenced_table,
+						foreign->heap);
+
+		if (!foreign->referenced_table_name) {
+			// TODO: malloc error
+			return(DB_CANNOT_ADD_CONSTRAINT);
+		}
+
+		if (!foreign->referenced_table) {
+			// TODO: table not found error
+			return(DB_CANNOT_ADD_CONSTRAINT);
+		}
+
+		dict_mem_referenced_table_name_lookup_set(foreign, TRUE);
+
+		foreign->referenced_col_names = static_cast<const char**>(
+			mem_heap_alloc(foreign->heap, i * sizeof(void*)));
+
+		// FIXME: don't allocate it twice
+		for (i = 0; i < foreign->n_fields; i++) {
+			foreign->referenced_col_names[i]
+				= mem_heap_strdup(foreign->heap, ref_column_names[i]);
+		}
+
+		if (fk->delete_opt == FK_OPTION_SET_NULL || fk->update_opt == FK_OPTION_SET_NULL) {
+			for (j = 0; j < foreign->n_fields; j++) {
+				if ((dict_index_get_nth_col(foreign->foreign_index, j)->prtype)
+				& DATA_NOT_NULL) {
+					const dict_col_t*	col
+						= dict_index_get_nth_col(foreign->foreign_index, j);
+					const char* col_name = dict_table_get_col_name(foreign->foreign_index->table,
+						dict_col_get_no(col));
+
+					/* It is not sensible to define SET NULL
+					if the column is not allowed to be NULL! */
+
+					mutex_enter(&dict_foreign_err_mutex);
+					rewind(ef); ut_print_timestamp(ef);
+					fprintf(ef, " Error in foreign key constraint of table %s:\n",
+						create_name);
+					fprintf(ef,
+						"Table %s with foreign key constraint"
+						" failed. You have defined a SET NULL condition but column '%s' is defined as NOT NULL.\n",
+						create_name, col_name);
+					mutex_exit(&dict_foreign_err_mutex);
+
+					ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
+						"Table %s with foreign key constraint"
+						" failed. You have defined a SET NULL condition but column '%s' is defined as NOT NULL.\n",
+						create_name, col_name);
+
+					return(DB_CANNOT_ADD_CONSTRAINT);
+				}
+			}
+		}
+
 		switch (fk->delete_opt)
 		{
-		FK_OPTION_UNDEF:
-		FK_OPTION_RESTRICT:
+		case FK_OPTION_UNDEF:
+		case FK_OPTION_RESTRICT:
 			break;
-		FK_OPTION_CASCADE:
+		case FK_OPTION_CASCADE:
 			foreign->type |= DICT_FOREIGN_ON_DELETE_CASCADE;
 			break;
-		FK_OPTION_SET_NULL:
-		FK_OPTION_NO_ACTION:
+		case FK_OPTION_SET_NULL:
+			foreign->type |= DICT_FOREIGN_ON_DELETE_SET_NULL;
+			break;
+		case FK_OPTION_NO_ACTION:
 			foreign->type |= DICT_FOREIGN_ON_DELETE_NO_ACTION;
 			break;
-		FK_OPTION_SET_DEFAULT:
+		case FK_OPTION_SET_DEFAULT:
+			// TODO: test
 			break;
 		default:
 			ut_ad(0);
+			break;
 		}
 
-		// TODO: copy this ^^^ for fk->update_opt
+		switch (fk->update_opt)
+		{
+		case FK_OPTION_UNDEF:
+		case FK_OPTION_RESTRICT:
+			break;
+		case FK_OPTION_CASCADE:
+			foreign->type |= DICT_FOREIGN_ON_UPDATE_CASCADE;
+			break;
+		case FK_OPTION_SET_NULL:
+			foreign->type |= DICT_FOREIGN_ON_UPDATE_SET_NULL;
+			break;
+		case FK_OPTION_NO_ACTION:
+			foreign->type |= DICT_FOREIGN_ON_UPDATE_NO_ACTION;
+			break;
+		case FK_OPTION_SET_DEFAULT:
+			// TODO: test
+			break;
+		default:
+			ut_ad(0);
+			break;
+		}
 	}
-	return DB_SUCCESS;
+
+	/* The proper way to reject foreign keys for temporary
+	tables would be to split the lexing and syntactical
+	analysis of foreign key clauses from the actual adding
+	of them, so that ha_innodb.cc could first parse the SQL
+	command, determine if there are any foreign keys, and
+	if so, immediately reject the command if the table is a
+	temporary one. For now, this kludge will work. */
+	if (reject_fks && !local_fk_set.empty()) {
+		mutex_enter(&dict_foreign_err_mutex);
+		rewind(ef); ut_print_timestamp(ef);
+		fprintf(ef, " Error in foreign key constraint of table %s:\n",
+			create_name);
+		fprintf(ef, "Table %s with foreign key constraint"
+			" failed. Temporary tables can't have foreign key constraints.\n",
+			create_name);
+		mutex_exit(&dict_foreign_err_mutex);
+
+		ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
+			"Table %s with foreign key constraint"
+			" failed. Temporary tables can't have foreign key constraints.",
+			create_name);
+
+		return(DB_CANNOT_ADD_CONSTRAINT);
+	}
+
+	if (dict_foreigns_has_s_base_col(local_fk_set, table)) {
+		return(DB_NO_FK_ON_S_BASE_COL);
+	}
+
+	/**********************************************************/
+	/* The following call adds the foreign key constraints
+	to the data dictionary system tables on disk */
+	m_trx->op_info = "adding foreign keys";
+
+	trx_start_if_not_started_xa(m_trx, true);
+
+	trx_set_dict_operation(m_trx, TRX_DICT_OP_TABLE);
+
+	error = dict_create_add_foreigns_to_dictionary(
+		local_fk_set, table, m_trx);
+
+	if (error == DB_SUCCESS) {
+
+		table->foreign_set.insert(local_fk_set.begin(), local_fk_set.end());
+		std::for_each(local_fk_set.begin(),
+				local_fk_set.end(),
+				dict_foreign_add_to_referenced_table());
+		local_fk_set.clear();
+
+		dict_mem_table_fill_foreign_vcol_set(table);
+	}
+	return(error);
 }
 
 /** Create the internal innodb table.
@@ -12691,14 +12829,10 @@ int create_table_info_t::create_table(bool create_fk)
 	if (const char* stmt = innobase_get_stmt_unsafe(m_thd, &stmt_len)) {
 		dict_foreign_set	local_fk_set;
 		dict_foreign_set_free	local_fk_set_free(local_fk_set);
-		dberr_t err = create_fk
-			? dict_create_foreign_constraints(
-				m_trx, stmt, stmt_len, m_table_name,
-				m_flags2 & DICT_TF2_TEMPORARY, local_fk_set)
-			: DB_SUCCESS;
+		dberr_t err = DB_SUCCESS;
 		if (create_fk) {
 			mem_heap_t*	heap = mem_heap_create(10000);
-			tmp_forge_fk_set(local_fk_set, m_table_name, heap);
+			err = tmp_forge_fk_set(local_fk_set, m_table_name, heap);
 			mem_heap_free(heap);
 		}
 		if (err == DB_SUCCESS) {

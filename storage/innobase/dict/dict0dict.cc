@@ -3443,6 +3443,7 @@ dict_get_referenced_table(
 {
 	char*		ref;
 	const char*	db_name;
+	ut_ad(database_name || name);
 
 	if (!database_name) {
 		/* Use the database name of the foreign key table */
@@ -3456,6 +3457,8 @@ dict_get_referenced_table(
 	/* Copy database_name, '/', table_name, '\0' */
 	ref = static_cast<char*>(
 		mem_heap_alloc(heap, database_name_len + table_name_len + 2));
+	if (!ref)
+		return NULL;
 
 	memcpy(ref, db_name, database_name_len);
 	ref[database_name_len] = '/';
