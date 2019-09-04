@@ -12417,6 +12417,7 @@ create_table_info_t::tmp_forge_fk_set(
 	}
 
 	Alter_info *alter_info = m_create_info->alter_info;
+	ut_ad(alter_info);
 	List_iterator_fast<Key> key_it(alter_info->key_list);
 
 	dict_table_t*	table = dict_table_get_low(name);
