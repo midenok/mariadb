@@ -12386,6 +12386,8 @@ bool tmp_dict_scan_col(dict_table_t*		table,
 	return false;
 }
 
+
+// replacement for dict_create_foreign_constraints_low()
 dberr_t
 create_table_info_t::tmp_forge_fk_set(
 	dict_foreign_set &local_fk_set0,
@@ -12571,11 +12573,72 @@ constraint_error:
 			return(DB_OUT_OF_MEMORY);
 		}
 
-		if (!foreign->referenced_table) {
+		if (!foreign->referenced_table && m_trx->check_foreigns) {
 			// TODO: table not found error
+			char	buf[MAX_TABLE_NAME_LEN + 1] = "";
+			char*	bufend;
+
+			bufend = innobase_convert_name(buf, MAX_TABLE_NAME_LEN,
+					foreign->referenced_table_name, strlen(foreign->referenced_table_name),
+					m_trx->mysql_thd);
+			buf[bufend - buf] = '\0';
+			ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
+				"Table %s with foreign key constraint failed. Referenced table %s not found in the data dictionary.", create_name, buf);
 			return(DB_CANNOT_ADD_CONSTRAINT);
 		}
 
+		/* Don't allow foreign keys on partitioned tables yet. */
+		if (foreign->referenced_table && dict_table_is_partition(foreign->referenced_table)) {
+			/* How could one make a referenced table to be a partition? */
+			ut_ad(0);
+			my_error(ER_FOREIGN_KEY_ON_PARTITIONED,MYF(0));
+			return(DB_CANNOT_ADD_CONSTRAINT);
+		}
+
+		/* Try to find an index which contains the columns as the first fields
+		and in the right order, and the types are the same as in
+		foreign->foreign_index */
+
+		if (foreign->referenced_table) {
+			index = dict_foreign_find_index(foreign->referenced_table, NULL,
+							ref_column_names, i,
+							foreign->foreign_index,
+				TRUE, FALSE, &index_error, &err_col, &err_index);
+
+			if (!index) {
+				mutex_enter(&dict_foreign_err_mutex);
+				rewind(ef); ut_print_timestamp(ef);
+				fprintf(ef, " Error in foreign key constraint of table %s:\n",
+					create_name);
+				fprintf(ef, "%s:\n"
+					"Cannot find an index in the"
+					" referenced table where the\n"
+					"referenced columns appear as the"
+					" first columns, or column types\n"
+					"in the table and the referenced table"
+					" do not match for constraint.\n"
+					"Note that the internal storage type of"
+					" ENUM and SET changed in\n"
+					"tables created with >= InnoDB-4.1.12,"
+					" and such columns in old tables\n"
+					"cannot be referenced by such columns"
+					" in new tables.\n%s\n",
+					start_of_latest_foreign,
+					FOREIGN_KEY_CONSTRAINTS_MSG);
+
+				dict_foreign_push_index_error(m_trx, operation, create_name, start_of_latest_foreign,
+					column_names, index_error, err_col, err_index, foreign->referenced_table, ef);
+
+				mutex_exit(&dict_foreign_err_mutex);
+
+				return(DB_CANNOT_ADD_CONSTRAINT);
+			}
+		} else {
+			ut_a(m_trx->check_foreigns == FALSE);
+			index = NULL;
+		}
+
+		foreign->referenced_index = index;
 		dict_mem_referenced_table_name_lookup_set(foreign, TRUE);
 
 		foreign->referenced_col_names = static_cast<const char**>(
