@@ -12348,11 +12348,9 @@ int create_table_info_t::prepare_create_table(const char* name, bool strict)
 }
 
 bool tmp_dict_scan_col(dict_table_t*		table,
-		       const dict_col_t**	column,
 		       const char**		name)
 {
 	ulint		i;
-	bool success = false;
 	for (i = 0; i < dict_table_get_n_cols(table); i++) {
 
 		const char*	col_name = dict_table_get_col_name(
@@ -12360,10 +12358,7 @@ bool tmp_dict_scan_col(dict_table_t*		table,
 
 		if (0 == innobase_strcasecmp(col_name, *name)) {
 			/* Found */
-
-			*column = dict_table_get_nth_col(table, i);
 			strcpy((char*) *name, col_name);
-
 			return true;
 		}
 	}
@@ -12377,9 +12372,7 @@ bool tmp_dict_scan_col(dict_table_t*		table,
 			/* Found */
 			dict_v_col_t * vcol;
 			vcol = dict_table_get_nth_v_col(table, i);
-			*column = &vcol->m_col;
 			strcpy((char*) *name, col_name);
-
 			return true;
 		}
 	}
@@ -12399,7 +12392,6 @@ create_table_info_t::tmp_forge_fk_set(
 	dberr_t		error;
 	ulint		number			= 1;
 	static const unsigned MAX_COLS_PER_FK = 500;
-	const dict_col_t*columns[MAX_COLS_PER_FK];
 	const char*	column_names[MAX_COLS_PER_FK];
 	const char*	ref_column_names[MAX_COLS_PER_FK];
 	FILE*		ef			= dict_foreign_err_file;
@@ -12440,10 +12432,10 @@ create_table_info_t::tmp_forge_fk_set(
 		}
 
 		List_iterator_fast<Key_part_spec> col_it(fk->columns);
-		int i = 0, j = 0;
+		unsigned i = 0, j = 0;
 		while ((col = col_it++)) {
 			column_names[i] = mem_heap_strdupl(foreign->heap, col->field_name.str, col->field_name.length);
-			success = tmp_dict_scan_col(table, columns + i, column_names + i);
+			success = tmp_dict_scan_col(table, column_names + i);
 			if (!success) {
 constraint_error:
 				mutex_enter(&dict_foreign_err_mutex);
@@ -12491,17 +12483,6 @@ constraint_error:
 			mutex_exit(&dict_foreign_err_mutex);
 			return(DB_CANNOT_ADD_CONSTRAINT);
 		}
-
-		col_it.init(fk->ref_columns);
-		while ((col = col_it++)) {
-			ref_column_names[j] = mem_heap_strdupl(foreign->heap, col->field_name.str, col->field_name.length);
-			success = tmp_dict_scan_col(table, columns + j, ref_column_names + j);
-			if (!success) {
-				goto constraint_error;
-			}
-			++j;
-		}
-		ut_ad(i == j); // See ER_WRONG_FK_DEF in mysql_prepare_create_table()
 
 		if (constraint_name) {
 			ulint	db_len;
@@ -12594,6 +12575,21 @@ constraint_error:
 			my_error(ER_FOREIGN_KEY_ON_PARTITIONED,MYF(0));
 			return(DB_CANNOT_ADD_CONSTRAINT);
 		}
+
+		col_it.init(fk->ref_columns);
+		while ((col = col_it++)) {
+			ref_column_names[j] = mem_heap_strdupl(foreign->heap, col->field_name.str, col->field_name.length);
+			if (foreign->referenced_table)
+			{
+				success = tmp_dict_scan_col(foreign->referenced_table, ref_column_names + j);
+				if (!success) {
+					goto constraint_error;
+				}
+			}
+			++j;
+		}
+		ut_ad(i == j); // See ER_WRONG_FK_DEF in mysql_prepare_create_table()
+
 
 		/* Try to find an index which contains the columns as the first fields
 		and in the right order, and the types are the same as in
