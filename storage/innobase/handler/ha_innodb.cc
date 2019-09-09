@@ -12404,9 +12404,45 @@ create_table_info_t::tmp_forge_fk_set(
 	const char * operation = "FIXME";
 	const bool reject_fks = m_flags2 & DICT_TF2_TEMPORARY;
 
-	{
+	enum_sql_command sqlcom = enum_sql_command(thd_sql_command(m_thd));
+
+	if (sqlcom == SQLCOM_ALTER_TABLE) {
+		dict_table_t *table_to_alter;
+		mem_heap_t*     heap = mem_heap_create(10000);
+		ulint highest_id_so_far;
+		char *n =
+			dict_get_referenced_table(name,
+						LEX_STRING_WITH_LEN(m_form->s->db),
+						LEX_STRING_WITH_LEN(m_form->s->table_name),
+						&table_to_alter,
+						heap);
+
+		/* Starting from 4.0.18 and 4.1.2, we generate foreign key id's in the
+		format databasename/tablename_ibfk_[number], where [number] is local
+		to the table; look for the highest [number] for table_to_alter, so
+		that we can assign to new constraints higher numbers. */
+
+		/* If we are altering a temporary table, the table name after ALTER
+		TABLE does not correspond to the internal table name, and
+		table_to_alter is NULL. TODO: should we fix this somehow? */
+
+		if (table_to_alter) {
+			n = table_to_alter->name.m_name;
+			highest_id_so_far = dict_table_get_highest_foreign_id(
+				table_to_alter);
+		} else {
+			highest_id_so_far = 0;
+		}
+
+		char* bufend = innobase_convert_name(
+			create_name, MAX_TABLE_NAME_LEN, n, strlen(n),
+			m_thd);
+		create_name[bufend-create_name]='\0';
+		number = highest_id_so_far + 1;
+		mem_heap_free(heap);
+	} else {
 		char *bufend = innobase_convert_name(create_name, MAX_TABLE_NAME_LEN,
-						name, strlen(name), m_trx->mysql_thd);
+						name, strlen(name), m_thd);
 		create_name[bufend-create_name] = '\0';
 	}
 
@@ -12561,7 +12597,7 @@ constraint_error:
 
 			bufend = innobase_convert_name(buf, MAX_TABLE_NAME_LEN,
 					foreign->referenced_table_name, strlen(foreign->referenced_table_name),
-					m_trx->mysql_thd);
+					m_thd);
 			buf[bufend - buf] = '\0';
 			ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
 				"Table %s with foreign key constraint failed. Referenced table %s not found in the data dictionary.", create_name, buf);
