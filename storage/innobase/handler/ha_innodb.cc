@@ -12403,6 +12403,7 @@ create_table_info_t::tmp_forge_fk_set(
 	const char * start_of_latest_foreign = "FIXME";
 	const char * operation = "FIXME";
 	const bool reject_fks = m_flags2 & DICT_TF2_TEMPORARY;
+	const CHARSET_INFO*	cs = innobase_get_charset(m_thd);
 
 	enum_sql_command sqlcom = enum_sql_command(thd_sql_command(m_thd));
 
@@ -12415,7 +12416,7 @@ create_table_info_t::tmp_forge_fk_set(
 						LEX_STRING_WITH_LEN(m_form->s->db),
 						LEX_STRING_WITH_LEN(m_form->s->table_name),
 						&table_to_alter,
-						heap);
+						heap, cs);
 
 		/* Starting from 4.0.18 and 4.1.2, we generate foreign key id's in the
 		format databasename/tablename_ibfk_[number], where [number] is local
@@ -12583,7 +12584,7 @@ constraint_error:
 						LEX_STRING_WITH_LEN(fk->ref_db),
 						LEX_STRING_WITH_LEN(fk->ref_table),
 						&foreign->referenced_table,
-						foreign->heap);
+						foreign->heap, cs);
 
 		if (!foreign->referenced_table_name) {
 			// TODO: malloc error

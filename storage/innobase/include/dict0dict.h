@@ -62,7 +62,8 @@ dict_get_referenced_table(
 	const char*	table_name,	/*!< in: table name */
 	ulint		table_name_len,	/*!< in: table name length */
 	dict_table_t**	table,		/*!< out: table object or NULL */
-	mem_heap_t*	heap);		/*!< in: heap memory */
+	mem_heap_t*	heap,		/*!< in: heap memory */
+	CHARSET_INFO*	cs);
 /*********************************************************************//**
 Frees a foreign key struct. */
 void

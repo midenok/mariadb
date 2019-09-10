@@ -3422,7 +3422,8 @@ dict_get_referenced_table(
 	const char*	table_name,	/*!< in: table name */
 	ulint		table_name_len, /*!< in: table name length */
 	dict_table_t**	table,		/*!< out: table object or NULL */
-	mem_heap_t*	heap)		/*!< in/out: heap memory */
+	mem_heap_t*	heap,		/*!< in/out: heap memory */
+	CHARSET_INFO*	cs)
 {
 	char*		ref;
 	const char*	db_name;
@@ -3437,15 +3438,17 @@ dict_get_referenced_table(
 		db_name = database_name;
 	}
 
+	const ulint table_name_alloc = 5 * table_name_len + 1;
+
 	/* Copy database_name, '/', table_name, '\0' */
 	ref = static_cast<char*>(
-		mem_heap_alloc(heap, database_name_len + table_name_len + 2));
+		mem_heap_alloc(heap, database_name_len + table_name_alloc + 1));
 	if (!ref)
 		return NULL;
 
 	memcpy(ref, db_name, database_name_len);
 	ref[database_name_len] = '/';
-	memcpy(ref + database_name_len + 1, table_name, table_name_len + 1);
+	innobase_convert_from_table_id(cs, ref + database_name_len + 1, table_name, table_name_alloc);
 
 	/* Values;  0 = Store and compare as given; case sensitive
 	            1 = Store and compare in lower; case insensitive
@@ -3470,6 +3473,7 @@ dict_get_referenced_table(
 
 	return(ref);
 }
+// FIXME: remove
 /*********************************************************************//**
 Scans a table name from an SQL string.
 @return scanned to */
@@ -3537,9 +3541,9 @@ dict_scan_table_name(
 		table_name = scan_name;
 	}
 
-	*ref_name = dict_get_referenced_table(
-		name, database_name, database_name_len,
-		table_name, strlen(table_name), table, heap);
+// 	*ref_name = dict_get_referenced_table(
+// 		name, database_name, database_name_len,
+// 		table_name, strlen(table_name), table, heap);
 
 	*success = TRUE;
 	return(ptr);
