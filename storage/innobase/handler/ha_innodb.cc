@@ -12400,9 +12400,9 @@ create_table_info_t::tmp_forge_fk_set(
 	dict_index_t*	err_index		= NULL;
 	ulint		err_col;
 	const char * start_of_latest_foreign = "FIXME";
-	const char * operation = "FIXME";
 	const bool reject_fks = m_flags2 & DICT_TF2_TEMPORARY;
 	const CHARSET_INFO*	cs = innobase_get_charset(m_thd);
+	const char * operation = "Create ";
 
 	enum_sql_command sqlcom = enum_sql_command(thd_sql_command(m_thd));
 
@@ -12440,6 +12440,7 @@ create_table_info_t::tmp_forge_fk_set(
 		create_name[bufend-create_name]='\0';
 		number = highest_id_so_far + 1;
 		mem_heap_free(heap);
+		operation = "Alter ";
 	} else {
 		char *bufend = innobase_convert_name(create_name, MAX_TABLE_NAME_LEN,
 						name, strlen(name), m_thd);
@@ -12479,14 +12480,14 @@ constraint_error:
 					create_name);
 				// FIXME: better text
 				fprintf(ef,
-					"Table %s foreign key constraint"
-					" failed.", create_name);
+					"%s table %s foreign key constraint"
+					" failed.", operation, create_name);
 
 				mutex_exit(&dict_foreign_err_mutex);
 
 				ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
-					"Table %s foreign key constraint"
-					" failed.", create_name);
+					"%s table %s foreign key constraint"
+					" failed.", operation, create_name);
 
 				return(DB_CANNOT_ADD_CONSTRAINT);
 			}
@@ -12599,7 +12600,7 @@ constraint_error:
 					m_thd);
 			buf[bufend - buf] = '\0';
 			ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
-				"Table %s with foreign key constraint failed. Referenced table %s not found in the data dictionary.", create_name, buf);
+				"%s table %s with foreign key constraint failed. Referenced table %s not found in the data dictionary.", operation, create_name, buf);
 			return(DB_CANNOT_ADD_CONSTRAINT);
 		}
 
@@ -12698,15 +12699,15 @@ constraint_error:
 					fprintf(ef, " Error in foreign key constraint of table %s:\n",
 						create_name);
 					fprintf(ef,
-						"Table %s with foreign key constraint"
+						"%s table %s with foreign key constraint"
 						" failed. You have defined a SET NULL condition but column '%s' is defined as NOT NULL.\n",
-						create_name, col_name);
+						operation, create_name, col_name);
 					mutex_exit(&dict_foreign_err_mutex);
 
 					ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
-						"Table %s with foreign key constraint"
+						"%s table %s with foreign key constraint"
 						" failed. You have defined a SET NULL condition but column '%s' is defined as NOT NULL.\n",
-						create_name, col_name);
+						operation, create_name, col_name);
 
 					return(DB_CANNOT_ADD_CONSTRAINT);
 				}
@@ -12770,15 +12771,15 @@ constraint_error:
 		rewind(ef); ut_print_timestamp(ef);
 		fprintf(ef, " Error in foreign key constraint of table %s:\n",
 			create_name);
-		fprintf(ef, "Table %s with foreign key constraint"
+		fprintf(ef, "%s table %s with foreign key constraint"
 			" failed. Temporary tables can't have foreign key constraints.\n",
-			create_name);
+			operation, create_name);
 		mutex_exit(&dict_foreign_err_mutex);
 
 		ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
-			"Table %s with foreign key constraint"
+			"%s table %s with foreign key constraint"
 			" failed. Temporary tables can't have foreign key constraints.",
-			create_name);
+			operation, create_name);
 
 		return(DB_CANNOT_ADD_CONSTRAINT);
 	}
