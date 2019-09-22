@@ -12388,7 +12388,6 @@ create_table_info_t::tmp_forge_fk_set(
 {
 	dict_foreign_set	local_fk_set;
 	dict_foreign_set_free	local_fk_set_free(local_fk_set);
-	const char*	constraint_name = NULL;
 	dberr_t		error;
 	ulint		number			= 1;
 	static const unsigned MAX_COLS_PER_FK = 500;
@@ -12458,7 +12457,6 @@ create_table_info_t::tmp_forge_fk_set(
 		if (key->type != Key::FOREIGN_KEY)
 			continue;
 		Foreign_key *fk = static_cast<Foreign_key *>(key);
-		constraint_name = fk->name.str;
 		Key_part_spec *col;
 		bool success;
 
@@ -12521,7 +12519,7 @@ constraint_error:
 			return(DB_CANNOT_ADD_CONSTRAINT);
 		}
 
-		if (constraint_name) {
+		if (fk->constraint_name.str) {
 			ulint	db_len;
 
 			/* Catenate 'databasename/' to the constraint name specified
@@ -12532,11 +12530,11 @@ constraint_error:
 			db_len = dict_get_db_name_len(table->name.m_name);
 
 			foreign->id = static_cast<char*>(mem_heap_alloc(
-				foreign->heap, db_len + strlen(constraint_name) + 2));
+				foreign->heap, db_len + fk->constraint_name.length + 2));
 
 			ut_memcpy(foreign->id, table->name.m_name, db_len);
 			foreign->id[db_len] = '/';
-			strcpy(foreign->id + db_len + 1, constraint_name);
+			strcpy(foreign->id + db_len + 1, fk->constraint_name.str);
 		}
 
 		if (foreign->id == NULL) {
