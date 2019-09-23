@@ -12382,9 +12382,7 @@ bool tmp_dict_scan_col(dict_table_t*		table,
 
 // replacement for dict_create_foreign_constraints_low()
 dberr_t
-create_table_info_t::tmp_forge_fk_set(
-	dict_foreign_set &local_fk_set0,
-	const char* name)
+create_table_info_t::tmp_forge_fk_set(dict_foreign_set &local_fk_set0)
 {
 	dict_foreign_set	local_fk_set;
 	dict_foreign_set_free	local_fk_set_free(local_fk_set);
@@ -12400,9 +12398,10 @@ create_table_info_t::tmp_forge_fk_set(
 	dict_index_t*	err_index		= NULL;
 	ulint		err_col;
 	const char * start_of_latest_foreign = "FIXME";
-	const bool reject_fks = m_flags2 & DICT_TF2_TEMPORARY;
+	const bool tmp_table = m_flags2 & DICT_TF2_TEMPORARY;
 	const CHARSET_INFO*	cs = innobase_get_charset(m_thd);
 	const char * operation = "Create ";
+	const char * name = m_table_name;
 
 	enum_sql_command sqlcom = enum_sql_command(thd_sql_command(m_thd));
 
@@ -12759,14 +12758,7 @@ constraint_error:
 		}
 	}
 
-	/* The proper way to reject foreign keys for temporary
-	tables would be to split the lexing and syntactical
-	analysis of foreign key clauses from the actual adding
-	of them, so that ha_innodb.cc could first parse the SQL
-	command, determine if there are any foreign keys, and
-	if so, immediately reject the command if the table is a
-	temporary one. For now, this kludge will work. */
-	if (reject_fks && !local_fk_set.empty()) {
+	if (tmp_table && !local_fk_set.empty()) {
 		mutex_enter(&dict_foreign_err_mutex);
 		rewind(ef); ut_print_timestamp(ef);
 		fprintf(ef, " Error in foreign key constraint of table %s:\n",
@@ -12938,7 +12930,7 @@ int create_table_info_t::create_table(bool create_fk)
 		dict_foreign_set_free	local_fk_set_free(local_fk_set);
 		dberr_t err = DB_SUCCESS;
 		if (create_fk) {
-			err = tmp_forge_fk_set(local_fk_set, m_table_name);
+			err = tmp_forge_fk_set(local_fk_set);
 		}
 		if (err == DB_SUCCESS) {
 			/* Check that also referencing constraints are ok */
