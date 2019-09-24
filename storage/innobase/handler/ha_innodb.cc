@@ -12456,6 +12456,25 @@ create_table_info_t::tmp_forge_fk_set(dict_foreign_set &local_fk_set0)
 	while (Key *key = key_it++) {
 		if (key->type != Key::FOREIGN_KEY)
 			continue;
+
+		if (tmp_table) {
+			mutex_enter(&dict_foreign_err_mutex);
+			rewind(ef); ut_print_timestamp(ef);
+			fprintf(ef, " Error in foreign key constraint of table %s:\n",
+				create_name);
+			fprintf(ef, "%s table `%s`.`%s` with foreign key constraint"
+				" failed. Temporary tables can't have foreign key constraints.",
+				operation, m_form->s->db.str, m_form->s->table_name.str);
+			mutex_exit(&dict_foreign_err_mutex);
+
+			ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
+				"%s table `%s`.`%s` with foreign key constraint"
+				" failed. Temporary tables can't have foreign key constraints.",
+				operation, m_form->s->db.str, m_form->s->table_name.str);
+
+			return(DB_CANNOT_ADD_CONSTRAINT);
+		}
+
 		Foreign_key *fk = static_cast<Foreign_key *>(key);
 		Key_part_spec *col;
 		bool success;
@@ -12756,24 +12775,6 @@ constraint_error:
 			ut_ad(0);
 			break;
 		}
-	}
-
-	if (tmp_table && !local_fk_set.empty()) {
-		mutex_enter(&dict_foreign_err_mutex);
-		rewind(ef); ut_print_timestamp(ef);
-		fprintf(ef, " Error in foreign key constraint of table %s:\n",
-			create_name);
-		fprintf(ef, "%s table %s with foreign key constraint"
-			" failed. Temporary tables can't have foreign key constraints.\n",
-			operation, create_name);
-		mutex_exit(&dict_foreign_err_mutex);
-
-		ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
-			"%s table %s with foreign key constraint"
-			" failed. Temporary tables can't have foreign key constraints.",
-			operation, create_name);
-
-		return(DB_CANNOT_ADD_CONSTRAINT);
 	}
 
 	if (dict_foreigns_has_s_base_col(local_fk_set, table)) {
