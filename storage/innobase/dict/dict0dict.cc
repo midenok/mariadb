@@ -3340,6 +3340,7 @@ convert_id:
 	return(ptr);
 }
 
+#if 0
 /*********************************************************************//**
 Tries to scan a column name.
 @return scanned to */
@@ -3407,6 +3408,7 @@ dict_scan_col(
 
 	return(ptr);
 }
+#endif
 
 /*********************************************************************//**
 Open a table from its database and table name, this is currently used by
@@ -3496,7 +3498,7 @@ dict_get_referenced_table(
 
 	return(ref);
 }
-// FIXME: remove
+#if 0
 /*********************************************************************//**
 Scans a table name from an SQL string.
 @return scanned to */
@@ -3596,6 +3598,7 @@ dict_skip_word(
 
 	return(ptr);
 }
+#endif
 
 /*********************************************************************//**
 Removes MySQL comments from an SQL string. A comment is either
@@ -3771,6 +3774,7 @@ dict_table_get_highest_foreign_id(
 	DBUG_RETURN(biggest_id);
 }
 
+#if 0
 /*********************************************************************//**
 Reports a simple foreign key create clause syntax error. */
 static
@@ -3794,6 +3798,7 @@ dict_foreign_report_syntax_err(
 	fprintf(ef, fmt, oper, name, start_of_latest_foreign, ptr);
 	mutex_exit(&dict_foreign_err_mutex);
 }
+#endif
 
 /*********************************************************************//**
 Push warning message to SQL-layer based on foreign key constraint
@@ -3887,6 +3892,7 @@ dict_foreign_push_index_error(
 	}
 }
 
+#if 0
 /*********************************************************************//**
 Scans a table create SQL string and adds to the data dictionary the foreign key
 constraints declared in the string. This function should be called after the
@@ -3920,7 +3926,7 @@ dict_create_foreign_constraints_low(
 	ulint		index_error		= DB_SUCCESS;
 	dict_index_t*	err_index		= NULL;
 	ulint		err_col;
-	const char*	constraint_name;
+	c#endifonst char*	constraint_name;
 	ibool		success;
 	dberr_t		error;
 	const char*	ptr1;
@@ -4813,6 +4819,7 @@ dict_create_foreign_constraints(
 
 	return(err);
 }
+#endif
 
 /**********************************************************************//**
 Parses the CONSTRAINT id's to be dropped in an ALTER TABLE statement.

@@ -465,6 +465,7 @@ dict_foreign_replace_index(
 					to use table->col_names */
 	const dict_index_t*	index)	/*!< in: index to be replaced */
 	MY_ATTRIBUTE((nonnull(1,3), warn_unused_result));
+#if 0
 /** Scans a table create SQL string and adds to the data dictionary
 the foreign key constraints declared in the string. This function
 should be called after the indexes for a table have been created.
@@ -494,6 +495,7 @@ dict_create_foreign_constraints(
 	ibool			reject_fks,
 	dict_foreign_set	&local_fk_set)
 	MY_ATTRIBUTE((warn_unused_result));
+#endif
 /**********************************************************************//**
 Parses the CONSTRAINT id's to be dropped in an ALTER TABLE statement.
 @return DB_SUCCESS or DB_CANNOT_DROP_CONSTRAINT if syntax error or the
