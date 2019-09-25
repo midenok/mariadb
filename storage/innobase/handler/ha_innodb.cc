@@ -12382,7 +12382,7 @@ bool tmp_dict_scan_col(dict_table_t*		table,
 
 // replacement for dict_create_foreign_constraints_low()
 dberr_t
-create_table_info_t::tmp_forge_fk_set(dict_foreign_set &local_fk_set0)
+create_table_info_t::create_foreign_key_info()
 {
 	dict_foreign_set	local_fk_set;
 	dict_foreign_set_free	local_fk_set_free(local_fk_set);
@@ -12897,11 +12897,9 @@ int create_table_info_t::create_table(bool create_fk)
 
 	size_t stmt_len;
 	if (const char* stmt = innobase_get_stmt_unsafe(m_thd, &stmt_len)) {
-		dict_foreign_set	local_fk_set;
-		dict_foreign_set_free	local_fk_set_free(local_fk_set);
 		dberr_t err = DB_SUCCESS;
 		if (create_fk) {
-			err = tmp_forge_fk_set(local_fk_set);
+			err = create_foreign_key_info();
 		}
 		if (err == DB_SUCCESS) {
 			/* Check that also referencing constraints are ok */
