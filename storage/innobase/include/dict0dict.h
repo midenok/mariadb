@@ -465,37 +465,6 @@ dict_foreign_replace_index(
 					to use table->col_names */
 	const dict_index_t*	index)	/*!< in: index to be replaced */
 	MY_ATTRIBUTE((nonnull(1,3), warn_unused_result));
-#if 0
-/** Scans a table create SQL string and adds to the data dictionary
-the foreign key constraints declared in the string. This function
-should be called after the indexes for a table have been created.
-Each foreign key constraint must be accompanied with indexes in
-bot participating tables. The indexes are allowed to contain more
-fields than mentioned in the constraint.
-
-@param[in]	trx		transaction
-@param[in]	sql_string	table create statement where
-				foreign keys are declared like:
-				FOREIGN KEY (a, b) REFERENCES table2(c, d),
-				table2 can be written also with the database
-				name before it: test.table2; the default
-				database id the database of parameter name
-@param[in]	sql_length	length of sql_string
-@param[in]	name		table full name in normalized form
-@param[in]	reject_fks	if TRUE, fail with error code
-				DB_CANNOT_ADD_CONSTRAINT if any
-				foreign keys are found.
-@return error code or DB_SUCCESS */
-dberr_t
-dict_create_foreign_constraints(
-	trx_t*			trx,
-	const char*		sql_string,
-	size_t			sql_length,
-	const char*		name,
-	ibool			reject_fks,
-	dict_foreign_set	&local_fk_set)
-	MY_ATTRIBUTE((warn_unused_result));
-#endif
 /**********************************************************************//**
 Parses the CONSTRAINT id's to be dropped in an ALTER TABLE statement.
 @return DB_SUCCESS or DB_CANNOT_DROP_CONSTRAINT if syntax error or the
