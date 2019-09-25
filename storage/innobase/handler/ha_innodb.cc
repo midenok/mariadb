@@ -12458,16 +12458,7 @@ create_table_info_t::tmp_forge_fk_set(dict_foreign_set &local_fk_set0)
 			continue;
 
 		if (tmp_table) {
-			mutex_enter(&dict_foreign_err_mutex);
-			rewind(ef); ut_print_timestamp(ef);
-			fprintf(ef, " Error in foreign key constraint of table %s:\n",
-				create_name);
-			fprintf(ef, "%s table `%s`.`%s` with foreign key constraint"
-				" failed. Temporary tables can't have foreign key constraints.",
-				operation, m_form->s->db.str, m_form->s->table_name.str);
-			mutex_exit(&dict_foreign_err_mutex);
-
-			ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
+			ib_foreign_warn(m_trx, DB_CANNOT_ADD_CONSTRAINT, create_name,
 				"%s table `%s`.`%s` with foreign key constraint"
 				" failed. Temporary tables can't have foreign key constraints.",
 				operation, m_form->s->db.str, m_form->s->table_name.str);
@@ -12492,20 +12483,9 @@ create_table_info_t::tmp_forge_fk_set(dict_foreign_set &local_fk_set0)
 			success = tmp_dict_scan_col(table, column_names + i);
 			if (!success) {
 constraint_error:
-				mutex_enter(&dict_foreign_err_mutex);
-				rewind(ef); ut_print_timestamp(ef);
-				fprintf(ef, " Error in foreign key constraint of table %s:\n",
-					create_name);
-				// FIXME: better text
-				fprintf(ef,
+				ib_foreign_warn(m_trx, DB_CANNOT_ADD_CONSTRAINT, create_name,
 					"%s table %s foreign key constraint"
-					" failed.", operation, create_name);
-
-				mutex_exit(&dict_foreign_err_mutex);
-
-				ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
-					"%s table %s foreign key constraint"
-					" failed.", operation, create_name);
+					" failed. Column %s was not found.", operation, create_name, column_names[i]);
 
 				return(DB_CANNOT_ADD_CONSTRAINT);
 			}
@@ -12617,7 +12597,7 @@ constraint_error:
 					foreign->referenced_table_name, strlen(foreign->referenced_table_name),
 					m_thd);
 			buf[bufend - buf] = '\0';
-			ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
+			ib_foreign_warn(m_trx, DB_CANNOT_ADD_CONSTRAINT, create_name,
 				"%s table %s with foreign key constraint failed. Referenced table %s not found in the data dictionary.", operation, create_name, buf);
 			return(DB_CANNOT_ADD_CONSTRAINT);
 		}
@@ -12712,17 +12692,7 @@ constraint_error:
 					/* It is not sensible to define SET NULL
 					if the column is not allowed to be NULL! */
 
-					mutex_enter(&dict_foreign_err_mutex);
-					rewind(ef); ut_print_timestamp(ef);
-					fprintf(ef, " Error in foreign key constraint of table %s:\n",
-						create_name);
-					fprintf(ef,
-						"%s table %s with foreign key constraint"
-						" failed. You have defined a SET NULL condition but column '%s' is defined as NOT NULL.\n",
-						operation, create_name, col_name);
-					mutex_exit(&dict_foreign_err_mutex);
-
-					ib_push_warning(m_trx, DB_CANNOT_ADD_CONSTRAINT,
+					ib_foreign_warn(m_trx, DB_CANNOT_ADD_CONSTRAINT, create_name,
 						"%s table %s with foreign key constraint"
 						" failed. You have defined a SET NULL condition but column '%s' is defined as NOT NULL.\n",
 						operation, create_name, col_name);
@@ -21788,11 +21758,12 @@ ib_push_warning(
 	const char	*format,/*!< in: warning message */
 	...)
 {
+	static const size_t MAX_BUF_SIZE = 4*1024;
+
 	if (trx && trx->mysql_thd) {
 		THD *thd = (THD *)trx->mysql_thd;
 		va_list args;
 		char *buf;
-#define MAX_BUF_SIZE 4*1024
 
 		va_start(args, format);
 		buf = (char *)my_malloc(MAX_BUF_SIZE, MYF(MY_WME));
@@ -21819,7 +21790,7 @@ ib_push_warning(
 	va_list args;
 	THD *thd = (THD *)ithd;
 	char *buf;
-#define MAX_BUF_SIZE 4*1024
+	static const size_t MAX_BUF_SIZE = 4*1024;
 
 	if (ithd == NULL) {
 		thd = current_thd;
@@ -21836,6 +21807,46 @@ ib_push_warning(
 		my_free(buf);
 		va_end(args);
 	}
+}
+
+
+/********************************************************************//**
+Helper function to push warnings from InnoDB internals to SQL-layer. */
+UNIV_INTERN
+void
+ib_foreign_warn(
+	trx_t*		trx,	/*!< in: trx */
+	dberr_t		error,	/*!< in: error code to push as warning */
+	const char	*table_name,
+	const char	*format,/*!< in: warning message */
+	...)
+{
+	va_list args;
+	char *buf;
+	static FILE* ef = dict_foreign_err_file;
+	static const size_t MAX_BUF_SIZE = 4*1024;
+
+	va_start(args, format);
+	buf = (char *)my_malloc(MAX_BUF_SIZE, MYF(MY_WME));
+	vsprintf(buf, format, args);
+
+	mutex_enter(&dict_foreign_err_mutex);
+	rewind(ef); ut_print_timestamp(ef);
+	fprintf(ef, " Error in foreign key constraint of table %s:\n",
+		table_name);
+	fputs(buf, ef);
+	mutex_exit(&dict_foreign_err_mutex);
+
+	if (trx && trx->mysql_thd) {
+		THD *thd = (THD *)trx->mysql_thd;
+
+		push_warning_printf(
+			thd, Sql_condition::WARN_LEVEL_WARN,
+			uint(convert_error_code_to_mysql(error, 0, thd)), buf);
+	}
+
+	my_free(buf);
+	va_end(args);
 }
 
 /********************************************************************//**
