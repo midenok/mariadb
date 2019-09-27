@@ -12451,7 +12451,14 @@ create_table_info_t::create_foreign_key_info()
 	List_iterator_fast<Key> key_it(alter_info->key_list);
 
 	dict_table_t*	table = dict_table_get_low(name);
-	// TODO: handle error
+	if (!table) {
+		ib_foreign_warn(m_trx, DB_CANNOT_ADD_CONSTRAINT, create_name,
+			"%s table %s foreign key constraint"
+			" failed. Table not found.",
+			operation, create_name);
+
+		return(DB_CANNOT_ADD_CONSTRAINT);
+	}
 
 	while (Key *key = key_it++) {
 		if (key->type != Key::FOREIGN_KEY)
@@ -12472,7 +12479,6 @@ create_table_info_t::create_foreign_key_info()
 
 		dict_foreign_t* foreign = dict_mem_foreign_create();
 		if (!foreign) {
-			// TODO: malloc error
 			return(DB_OUT_OF_MEMORY);
 		}
 
@@ -12491,7 +12497,9 @@ constraint_error:
 			}
 			++i;
 			if (i >= MAX_COLS_PER_FK) {
-				// TODO: error message
+				ib_foreign_warn(m_trx, DB_CANNOT_ADD_CONSTRAINT, create_name,
+					"%s table %s foreign key constraint"
+					" failed. Too many columns: %u (%u allowed).", operation, create_name, i, MAX_COLS_PER_FK);
 				return(DB_CANNOT_ADD_CONSTRAINT);
 			}
 		}
@@ -12558,7 +12566,6 @@ constraint_error:
 		foreign->foreign_table_name = mem_heap_strdup(
 			foreign->heap, table->name.m_name);
 		if (!foreign->foreign_table_name) {
-			// TODO: malloc error
 			return(DB_OUT_OF_MEMORY);
 		}
 
@@ -12570,7 +12577,6 @@ constraint_error:
 		foreign->foreign_col_names = static_cast<const char**>(
 			mem_heap_alloc(foreign->heap, i * sizeof(void*)));
 		if (!foreign->foreign_col_names) {
-			// TODO: malloc error
 			return(DB_OUT_OF_MEMORY);
 		}
 
@@ -12584,15 +12590,14 @@ constraint_error:
 						foreign->heap, cs);
 
 		if (!foreign->referenced_table_name) {
-			// TODO: malloc error
 			return(DB_OUT_OF_MEMORY);
 		}
 
 		if (!foreign->referenced_table && m_trx->check_foreigns) {
-			// TODO: table not found error
 			char	buf[MAX_TABLE_NAME_LEN + 1] = "";
 			char*	bufend;
 
+			// TODO: is this conversion absolutely needed?
 			bufend = innobase_convert_name(buf, MAX_TABLE_NAME_LEN,
 					foreign->referenced_table_name, strlen(foreign->referenced_table_name),
 					m_thd);
@@ -12606,7 +12611,7 @@ constraint_error:
 		if (foreign->referenced_table && dict_table_is_partition(foreign->referenced_table)) {
 			/* How could one make a referenced table to be a partition? */
 			ut_ad(0);
-			my_error(ER_FOREIGN_KEY_ON_PARTITIONED,MYF(0));
+			my_error(ER_FOREIGN_KEY_ON_PARTITIONED, MYF(0));
 			return(DB_CANNOT_ADD_CONSTRAINT);
 		}
 
@@ -12674,7 +12679,6 @@ constraint_error:
 		foreign->referenced_col_names = static_cast<const char**>(
 			mem_heap_alloc(foreign->heap, i * sizeof(void*)));
 		if (!foreign->referenced_col_names) {
-			// TODO: malloc error
 			return(DB_OUT_OF_MEMORY);
 		}
 
