@@ -394,6 +394,27 @@ TABLE_SHARE *alloc_table_share(const char *db, const char *table_name,
 }
 
 
+bool TABLE_SHARE::update_name(LEX_CSTRING new_db, LEX_CSTRING new_name)
+{
+  char buf[FN_REFLEN];
+  uint len= build_table_filename(buf, sizeof(buf) - 1, new_db.str, new_name.str, "", 0);
+  char *apath, *adb, *aname;
+  if (!multi_alloc_root(&mem_root, &apath, len + 1, &adb, new_db.length + 1, &aname, new_name.length + 1, NULL))
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+  strmov(apath, buf);
+  strmov(adb, new_db.str);
+  strmov(aname, new_name.str);
+  path= {apath, len};
+  normalized_path= path;
+  db= {adb, new_db.length};
+  table_name= {aname, new_name.length};
+  return false;
+}
+
+
 /*
   Initialize share for temporary tables
 
@@ -10660,7 +10681,7 @@ bool TABLE_SHARE::fk_check_consistency(THD *thd, bool repair)
   uint fk_self_refs= 0;
   mbd::set<FK_table_to_lock> fk_tables_to_lock;
   MDL_request_list fk_mdl_reqs;
-  mbd::map<TABLE_SHARE *, FK_ref_backup> fk_ref_backup;
+  FK_backup_storage fk_ref_backup;
 
   for (FK_info &rk: referenced_keys)
   {
@@ -10813,25 +10834,33 @@ bool TABLE_SHARE::fk_check_consistency(THD *thd, bool repair)
         if (ref_share->partitioned())
         {
           my_error(ER_FEATURE_NOT_SUPPORTED_WITH_PARTITIONING, MYF(0), "FOREIGN KEY");
-          return true;
+          error= true;
+          break;
         }
-        FK_ref_backup *ref_bak;
-        FK_ref_backup fk_bak;
-        if (fk_bak.init(ref_share))
-          return true;
+        FK_ddl_backup *ref_bak;
+        FK_ddl_backup fk_bak(std::move(sa)); // sets update_frm
+        if (!fk_bak.get_share())
+        {
+          error= true;
+          break;
+        }
         auto found= fk_ref_backup.find(ref_share);
         if (found != fk_ref_backup.end())
           ref_bak= &found->second;
         else
-          ref_bak= fk_ref_backup.insert(ref_share, fk_bak);
+          ref_bak= fk_ref_backup.emplace(NULL, ref_share, std::move(fk_bak));
         if (!ref_bak)
-          return true;
+        {
+          error= true;
+          break;
+        }
         FK_info *dst= fk.clone(&ref_share->mem_root);
         if (!dst ||
             ref_share->referenced_keys.push_back(dst, &ref_share->mem_root))
         {
           my_error(ER_OUT_OF_RESOURCES, MYF(0));
-          return true;
+          error= true;
+          break;
         }
       }
       else
@@ -10846,11 +10875,11 @@ bool TABLE_SHARE::fk_check_consistency(THD *thd, bool repair)
         }
         DBUG_ASSERT(warn || error);
         error= true;
-      }
-    }
-  }
+      } // if (!repair)
+    } // if (!rk)
+  } // for (FK_info &fk: foreign_keys)
 
-  if (foreign_keys.elements - fk_self_refs)
+  if (!error && foreign_keys.elements - fk_self_refs)
   {
     push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
                         WARN_FK_FOUND,
@@ -10864,7 +10893,7 @@ bool TABLE_SHARE::fk_check_consistency(THD *thd, bool repair)
     error= true;
   }
 
-  if (fk_self_refs)
+  if (!error && fk_self_refs)
   {
     push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
                         WARN_FK_FOUND_SELFREFS,
@@ -10877,40 +10906,17 @@ bool TABLE_SHARE::fk_check_consistency(THD *thd, bool repair)
   {
     const uint count= fk_ref_backup.size();
     if (!error)
-    {
-      for (auto &key_val: fk_ref_backup)
-      {
-        FK_ref_backup *ref_bak= const_cast<FK_ref_backup *>(&key_val.second);
-        TABLE_SHARE *ref_share= ref_bak->share;
-        if (ref_share->fk_write_shadow_frm(thd))
-        {
-          error= true;
-          break;
-        }
-        ref_bak->install_shadow= true;
-      }
-    }
-    for (auto &key_val: fk_ref_backup)
-    {
-      FK_ref_backup *ref_bak= const_cast<FK_ref_backup *>(&key_val.second);
-      TABLE_SHARE *ref_share= ref_bak->share;
-      if (error)
-      {
-        if (ref_bak->install_shadow)
-          ref_share->fk_drop_shadow_frm();
-        ref_bak->rollback();
-      }
-      else
-      {
-        DBUG_ASSERT(ref_bak->install_shadow);
-        ref_share->fk_install_shadow_frm();
-      }
-    }
+      error= fk_ref_backup.write_shadow_frms(thd) ||
+             fk_ref_backup.install_shadow_frms();
+
     if (!error && count)
       push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
                           WARN_FK_UPDATED_SHARES,
                           ER_THD(thd, WARN_FK_UPDATED_SHARES), count);
-
+    if (error)
+      fk_ref_backup.rollback(thd);
+    else
+      fk_ref_backup.drop_backup_frms(thd);
   }
 
   return error;
