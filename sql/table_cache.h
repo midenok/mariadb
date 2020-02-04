@@ -134,15 +134,17 @@ public:
   {
     src.share= NULL;
   }
+  Share_acquire& operator= (Share_acquire &&src)
+  {
+    flush_unused= src.flush_unused;
+    share= src.share;
+    src.share= NULL;
+    return *this;
+  }
   ~Share_acquire();
   bool fk_error(THD *thd, bool use_check_foreign= true) const;
   void acquire(THD *thd, TABLE_LIST &tl, uint flags= 0);
-  void acquire(THD *thd, Table_name &tn, uint flags= 0)
-  {
-    TABLE_LIST tl;
-    tl.init_one_table(&tn.db, &tn.name, NULL, TL_IGNORE);
-    return acquire(thd, tl, flags);
-  }
+  void acquire(THD *thd, Table_name &tn, uint flags= 0);
   void release()
   {
     if (share)
@@ -157,10 +159,6 @@ public:
   bool upgrade(THD *thd, TABLE_LIST *table_list);
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 };
-
-
-struct Share_map: public mbd::map<Table_name, Share_acquire, Table_name_lt>
-{};
 
 
 /**

@@ -690,4 +690,5 @@ private:
   int m_unhandled_errors;
   uint first_error;
 };
+
 #endif /* SQL_BASE_INCLUDED */

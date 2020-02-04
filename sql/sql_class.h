@@ -38,6 +38,7 @@
 #include "scheduler.h"      /* thd_scheduler */
 #include "protocol.h"       /* Protocol_text, Protocol_binary */
 #include "violite.h"        /* vio_is_connected */
+#include "table_cache.h"
 #include "thr_lock.h"       /* thr_lock_type, THR_LOCK_DATA, THR_LOCK_INFO */
 #include "thr_timer.h"
 #include "thr_malloc.h"
@@ -384,6 +385,27 @@ public:
     }
     return false;
   }
+  template <class... Args>
+  typename Base::iterator emplace(bool &inserted, Args&&... args) noexcept
+  {
+    try
+    {
+      auto ret= Base::emplace(std::forward<Args>(args)...);
+      inserted= ret.second;
+      return ret.first;
+    }
+    catch (std::bad_alloc())
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return Base::end();
+    }
+    catch (...)
+    {
+      my_error(ER_INTERNAL_ERROR, MYF(0), "Unexpected exception");
+      return Base::end();
+    }
+    return Base::end();
+  }
 };
 
 
@@ -478,6 +500,18 @@ public:
       *inserted= ins;
     return &ret->second;
   }
+  template <class... Args>
+  T* emplace(bool *inserted, Args&&... args)
+  {
+    bool ins;
+    auto ret= exception_wrapper<std::map<Key, T, Compare, Allocator> >::
+      emplace(ins, std::forward<Args>(args)...);
+    if (inserted)
+      *inserted= ins;
+    if (ret == std::map<Key, T, Compare, Allocator>::end())
+      return NULL;
+    return &ret->second;
+  }
 };
 } // namespace mbd
 
@@ -565,6 +599,16 @@ struct Table_name_lt
 
 typedef mbd::set<Lex_cstring, Lex_ident_lt> Lex_ident_set;
 
+inline
+void Share_acquire::acquire(THD *thd, Table_name &tn, uint flags)
+{
+  TABLE_LIST tl;
+  tl.init_one_table(&tn.db, &tn.name, NULL, TL_IGNORE);
+  return acquire(thd, tl, flags);
+}
+
+struct Share_map: public mbd::map<Table_name, Share_acquire, Table_name_lt>
+{};
 
 
 class Key_part_spec :public Sql_alloc {
@@ -952,6 +996,167 @@ enum killed_type
 #else
 #define WAIT_FOR_KILL_TRY_TIMES 2
 #endif
+
+
+struct ddl_log_info : public st_ddl_log_state
+{
+#ifndef DBUG_OFF
+  bool dbg_fail;
+#endif
+  ddl_log_info()
+  {
+    list= NULL;
+    execute_entry= NULL;
+#ifndef DBUG_OFF
+    dbg_fail= false;
+#endif
+  }
+  ~ddl_log_info()
+  {
+    // write_log_finish() must be called
+    DBUG_ASSERT(!list);
+  }
+  void release();
+  bool write_log_replace_delete_file(const char *from_path, const char *to_path,
+                                    bool replace_flag);
+
+  void write_log_finish();
+};
+
+
+class FK_backup
+{
+public:
+  DDL_LOG_MEMORY_ENTRY *delete_shadow_entry;
+  DDL_LOG_MEMORY_ENTRY *restore_backup_entry;
+  bool update_frm;
+  Table_name old_name;
+
+  FK_backup() :
+    delete_shadow_entry(NULL),
+    restore_backup_entry(NULL),
+    update_frm(false)
+  {}
+  virtual ~FK_backup()
+  {}
+  FK_list foreign_keys;
+  FK_list referenced_keys;
+  int fk_write_shadow_frm(THD *thd, ddl_log_info& log_info);
+  bool fk_backup_frm(ddl_log_info& log_info);
+  bool fk_install_shadow_frm(ddl_log_info& log_info);
+  void fk_drop_shadow_frm(ddl_log_info& log_info);
+  void fk_drop_backup_frm(ddl_log_info& log_info);
+  virtual TABLE_SHARE *get_share() const= 0;
+};
+
+
+// NB: used for ALTER TABLE
+class FK_share_backup : public FK_backup
+{
+protected:
+  TABLE_SHARE *share;
+
+public:
+  bool init(TABLE_SHARE *_share);
+
+  FK_share_backup(TABLE_SHARE *_share)
+  {
+    if (init(_share))
+      share= NULL;
+  }
+  FK_share_backup(FK_share_backup&& src) :
+    FK_backup(std::move(src)),
+    share(src.share)
+  {
+    src.share= NULL;
+  }
+  FK_share_backup& operator=(FK_share_backup&& src)
+  {
+    *((FK_backup *) this)= std::move(src);
+    share= src.share;
+    src.share= NULL;
+    return *this;
+  }
+  TABLE_SHARE *get_share() const
+  {
+    return share;
+  }
+  void rollback(ddl_log_info& log_info);
+};
+
+
+// NB: FK_ddl_backup responds for share release unlike FK_share_backup
+class FK_ddl_backup : public FK_share_backup
+{
+  /* NB: if sa.share is not empty, share is auto-released on destructor */
+  Share_acquire sa;
+  /*
+     NB: if sa.share is not empty, share == sa.share. ALTER algorithms are more
+     complex and shares are held and released in separate container alter_ctx.fk_shares.
+     To make DDL logging common for all commands we handle it via FK_backup_storage interface, but
+     without templating and virtual interfaces (these are overcomplexity for only 2 variants)
+     we have to converge backup operations into single FK_ddl_backup.
+  */
+
+public:
+  FK_ddl_backup(Share_acquire&& _sa);
+  FK_ddl_backup(const FK_ddl_backup&)= delete; // (explict reminder for default)
+  FK_ddl_backup(FK_ddl_backup&& src) :
+    FK_share_backup(std::move(src)),
+    sa(std::move(src.sa)) {}
+
+  // used by ALTER and fk_upgrade_legacy_storage()
+  FK_ddl_backup(TABLE_SHARE *_share) : FK_share_backup(_share)
+  {}
+
+  FK_ddl_backup& operator=(FK_ddl_backup&& src)
+  {
+    *((FK_share_backup *) this)= std::move(src);
+    sa= std::move(src.sa);
+    return *this;
+  }
+
+  TABLE_SHARE *get_share() const
+  {
+    DBUG_ASSERT(!sa.share || sa.share == share);
+    return share;
+  }
+
+  bool backup_frm(ddl_log_info &log_info, Table_name table);
+};
+
+#ifndef DBUG_OFF
+// NB: we do want definite order of shares in test cases
+struct TABLE_SHARE_by_name
+{
+  bool operator() (const TABLE_SHARE *s1, const TABLE_SHARE *s2) const
+  {
+    return s1->cmp_db_table(s2->db, s2->table_name) < 0;
+  }
+};
+#endif
+
+
+/*
+   NB: again, ALTER does require duplicate check hence mbd::map is used, while other commands
+   do not require and mbd::vector is enough. To avoid templating or code complexity via virtual
+   ifaces we just use mbd::map for everything. We are not going to hit bottleneck here:
+   it is DDL (rare operation), it is less than hundred of foreign keys normally.
+*/
+class FK_backup_storage: public mbd::map<TABLE_SHARE *, FK_ddl_backup
+#ifndef DBUG_OFF
+                                         , TABLE_SHARE_by_name
+#endif
+                         >,
+                         public ddl_log_info
+{
+public:
+  int write_shadow_frms(THD *thd);
+  bool install_shadow_frms();
+  void drop_backup_frms(THD *thd);
+  void rollback(THD *thd);
+};
+
 
 #include "sql_lex.h"				/* Must be here */
 
