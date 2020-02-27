@@ -575,6 +575,19 @@ btr_cur_parse_update_in_place(
 	page_t*		page,	/*!< in/out: page or NULL */
 	page_zip_des_t*	page_zip,/*!< in/out: compressed page, or NULL */
 	dict_index_t*	index);	/*!< in: index corresponding to page */
+/** Arguments to btr_estimate_n_rows_in_range */
+struct btr_pos_t
+{
+  btr_pos_t(dtuple_t *arg_tuple,
+            page_cur_mode_t arg_mode,
+            page_id_t arg_page_id)
+  :tuple(arg_tuple), mode(arg_mode), page_id(arg_page_id)
+  {}
+
+  dtuple_t*       tuple;       /* Range start or end. May be NULL */
+  page_cur_mode_t mode;        /* search mode for range */
+  page_id_t       page_id;     /* Out: Page where we found the tuple */
+};
 /****************************************************************//**
 Parses the redo log record for delete marking or unmarking of a clustered
 index record.
@@ -601,18 +614,14 @@ btr_cur_parse_del_mark_set_sec_rec(
 
 /** Estimates the number of rows in a given index range.
 @param[in]	index	index
-@param[in]	tuple1	range start, may also be empty tuple
-@param[in]	mode1	search mode for range start
-@param[in]	tuple2	range end, may also be empty tuple
-@param[in]	mode2	search mode for range end
+@param[in/out]	range_start
+@param[in/out]	range_ end
 @return estimated number of rows */
 ha_rows
 btr_estimate_n_rows_in_range(
 	dict_index_t*	index,
-	const dtuple_t*	tuple1,
-	page_cur_mode_t	mode1,
-	const dtuple_t*	tuple2,
-	page_cur_mode_t	mode2);
+        btr_pos_t*      range_start,
+        btr_pos_t*      range_end);
 
 
 /** Statistics for one field of an index. */
