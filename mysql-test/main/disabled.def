@@ -22,3 +22,6 @@ execution_constants : SAMU-230
 json_debug_nonembedded : SAMU-230
 sp_notembedded : SAMU-230
 sp-error : SAMU-230
+partition_innodb         : Waiting for fix MDEV-20169
+type_enum                : Waiting for fix MDEV-6978
+type_set                 : Waiting for fix MDEV-6978

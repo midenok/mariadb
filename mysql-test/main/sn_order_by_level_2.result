@@ -23,22 +23,29 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
-    "table": {
-      "table_name": "task0",
-      "access_type": "range",
-      "possible_keys": [
-        "task_ref2",
-        "task_task_class_created",
-        "sys_class_name_2",
-        "active",
-        "all_k"
-      ],
-      "key": "all_k",
-      "key_length": "120",
-      "used_key_parts": ["active", "sys_class_name", "assignment_group"],
-      "rows": 1,
-      "filtered": 100,
-      "attached_condition": "task0.assignment_group <=> '58280f58584120006863f2dea01f7f04' and task0.active <=> 1 and task0.sys_class_name = 'sn_customerservice_case' and task0.assignment_group = '58280f58584120006863f2dea01f7f04'"
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "task0.`number`",
+        "table": {
+          "table_name": "task0",
+          "access_type": "ref",
+          "possible_keys": [
+            "task_ref2",
+            "task_task_class_created",
+            "sys_class_name_2",
+            "active",
+            "all_k"
+          ],
+          "key": "task_ref2",
+          "key_length": "37",
+          "used_key_parts": ["assignment_group", "active"],
+          "ref": ["const", "const"],
+          "rows": 1,
+          "filtered": 100,
+          "index_condition": "task0.assignment_group = '58280f58584120006863f2dea01f7f04'",
+          "attached_condition": "task0.assignment_group <=> '58280f58584120006863f2dea01f7f04' and task0.active <=> 1 and task0.sys_class_name = 'sn_customerservice_case'"
+        }
+      }
     }
   }
 }

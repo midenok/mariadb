@@ -2724,7 +2724,7 @@ public:
   {
     return IO_COEFF*io_count*avg_io_cost +
            IO_COEFF*idx_io_count*idx_avg_io_cost +
-           CPU_COEFF*cpu_cost + 
+           CPU_COEFF*(cpu_cost + idx_cpu_cost) +
            MEM_COEFF*mem_cost + IMPORT_COEFF*import_cost;
   }
 
@@ -3234,6 +3234,11 @@ public:
     DBUG_ASSERT(m_lock_type == F_UNLCK);
     DBUG_ASSERT(inited == NONE);
   }
+  /* To check if table has been properely opened */
+  bool is_open()
+  {
+    return ref != 0;
+  }
   virtual handler *clone(const char *name, MEM_ROOT *mem_root);
   /** This is called after create to allow us to set up cached variables */
   void init()
@@ -3429,11 +3434,19 @@ public:
     reset_statistics();
   }
   virtual double scan_time()
-  { return ulonglong2double(stats.data_file_length) / IO_SIZE + 2; }
+  {
+    return ((ulonglong2double(stats.data_file_length) / stats.block_size + 2) *
+            avg_io_cost());
+  }
 
   virtual double key_scan_time(uint index)
   {
     return keyread_time(index, 1, records());
+  }
+
+  virtual double avg_io_cost()
+  {
+   return 1.0;
   }
 
   /**
@@ -3441,7 +3454,8 @@ public:
      to access it.
      
      @param index  The index number.
-     @param ranges The number of ranges to be read.
+     @param ranges The number of ranges to be read. If 0, it means that
+                   we calculate separately the cost of reading the key.
      @param rows   Total number of rows to be read.
      
      This method can be used to calculate the total cost of scanning a table
@@ -4900,6 +4914,7 @@ public:
     ha_share= arg_ha_share;
     return false;
   }
+  void set_table(TABLE* table_arg) { table= table_arg; }
   int get_lock_type() const { return m_lock_type; }
 public:
   /* XXX to be removed, see ha_partition::partition_ht() */
