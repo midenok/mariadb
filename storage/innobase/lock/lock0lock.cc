@@ -3988,10 +3988,12 @@ dberr_t lock_sys_tables(trx_t *trx)
       !(err= lock_table_for_trx(dict_sys.sys_indexes, trx, LOCK_X)) &&
       !(err= lock_table_for_trx(dict_sys.sys_fields, trx, LOCK_X)))
   {
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
     if (dict_sys.sys_foreign)
       err= lock_table_for_trx(dict_sys.sys_foreign, trx, LOCK_X);
     if (!err && dict_sys.sys_foreign_cols)
       err= lock_table_for_trx(dict_sys.sys_foreign_cols, trx, LOCK_X);
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
     if (!err && dict_sys.sys_virtual)
       err= lock_table_for_trx(dict_sys.sys_virtual, trx, LOCK_X);
   }
@@ -6768,3 +6770,7 @@ void lock_sys_t::deadlock_check()
   if (acquired)
     wr_unlock();
 }
+
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
+bool innobase_table_is_empty(const dict_table_t *table);
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */

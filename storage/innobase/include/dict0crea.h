@@ -117,6 +117,24 @@ dict_create_index_tree_in_mem(
 	dict_index_t*	index,		/*!< in/out: index */
 	const trx_t*	trx);		/*!< in: InnoDB transaction handle */
 
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
+dberr_t
+fk_check_if_system_table_exists(
+	const char*	tablename,	/*!< in: name of table */
+	ulint		num_fields,	/*!< in: number of fields */
+	ulint		num_indexes);	/*!< in: number of indexes */
+dberr_t fk_legacy_storage_exists(bool lock_dict_mutex);
+#ifndef DBUG_OFF
+/****************************************************************//**
+Creates the foreign key constraints system tables inside InnoDB
+at server bootstrap or server start if they are not found or are
+not of the right form.
+@return DB_SUCCESS or error code */
+dberr_t
+dict_create_or_check_foreign_constraint_tables(void);
+#endif /* DBUG_OFF */
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
+
 /********************************************************************//**
 Generate a foreign key constraint name when it was not named by the user.
 A generated constraint has a name of the format dbname/tablename_ibfk_NUMBER,
@@ -143,6 +161,18 @@ bool
 dict_foreigns_has_s_base_col(
 	const dict_foreign_set&	local_fk_set,
 	const dict_table_t*	table);
+
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
+/********************************************************************//**
+Construct foreign key constraint defintion from data dictionary information.
+*/
+UNIV_INTERN
+char*
+dict_foreign_def_get(
+/*=================*/
+	dict_foreign_t*	foreign,/*!< in: foreign */
+	trx_t*		trx);	/*!< in: trx */
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 /* Table create node structure */
 struct tab_node_t{

@@ -432,6 +432,7 @@ dict_foreign_replace_index(
 					to use table->col_names */
 	const dict_index_t*	index)	/*!< in: index to be replaced */
 	MY_ATTRIBUTE((nonnull(1,3), warn_unused_result));
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
 /**********************************************************************//**
 Parses the CONSTRAINT id's to be dropped in an ALTER TABLE statement.
 @return DB_SUCCESS or DB_CANNOT_DROP_CONSTRAINT if syntax error or the
@@ -448,6 +449,7 @@ dict_foreign_parse_drop_constraints(
 	const char***	constraints_to_drop)	/*!< out: id's of the
 						constraints to drop */
 	MY_ATTRIBUTE((nonnull, warn_unused_result));
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
 /**********************************************************************//**
 Returns a table object and increments its open handle count.
 NOTE! This is a high-level function to be used mainly from outside the
@@ -1347,15 +1349,24 @@ public:
   /** the SYS_FIELDS table */
   dict_table_t *sys_fields;
   /** the SYS_FOREIGN table */
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
   dict_table_t *sys_foreign;
   /** the SYS_FOREIGN_COLS table */
   dict_table_t *sys_foreign_cols;
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
+
   /** the SYS_VIRTUAL table */
   dict_table_t *sys_virtual;
 
   /** @return whether all non-hard-coded system tables exist */
   bool sys_tables_exist() const
-  { return UNIV_LIKELY(sys_foreign && sys_foreign_cols && sys_virtual); }
+  {
+    return UNIV_LIKELY((bool) sys_virtual
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
+      && sys_foreign && sys_foreign_cols
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
+    );
+  }
 
   /** list of persistent tables that can be evicted */
   UT_LIST_BASE_NODE_T(dict_table_t) table_LRU;
