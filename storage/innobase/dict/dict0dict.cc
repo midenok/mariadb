@@ -3195,6 +3195,7 @@ dict_foreign_add_to_cache(
 	DBUG_RETURN(DB_SUCCESS);
 }
 
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
 /*********************************************************************//**
 Scans from pointer onwards. Stops if is at the start of a copy of
 'string' where characters are compared without case sensitivity, and
@@ -3409,6 +3410,7 @@ convert_id:
 
 	return(ptr);
 }
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 /*********************************************************************//**
 Open a table from its database and table name, this is currently used by
@@ -3459,6 +3461,7 @@ dict_get_referenced_table(
 	return (dict_name);
 }
 
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
 /*********************************************************************//**
 Removes MySQL comments from an SQL string. A comment is either
 (a) '#' to the end of the line,
@@ -3570,6 +3573,7 @@ end_of_string:
 		sptr++;
 	}
 }
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 /*********************************************************************//**
 Finds the highest [number] for foreign key constraints of the table. Looks
@@ -3633,6 +3637,7 @@ dict_table_get_highest_foreign_id(
 	DBUG_RETURN(biggest_id);
 }
 
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
 /**********************************************************************//**
 Parses the CONSTRAINT id's to be dropped in an ALTER TABLE statement.
 @return DB_SUCCESS or DB_CANNOT_DROP_CONSTRAINT if syntax error or the
@@ -3769,6 +3774,7 @@ syntax_error:
 
 	return(DB_CANNOT_DROP_CONSTRAINT);
 }
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 /*==================== END OF FOREIGN KEY PROCESSING ====================*/
 
