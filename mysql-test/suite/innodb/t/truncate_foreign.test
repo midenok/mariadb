@@ -53,6 +53,7 @@ send INSERT INTO child SET a=5;
 connection default;
 SET DEBUG_SYNC='now WAIT_FOR fk';
 SET foreign_key_checks=0, innodb_lock_wait_timeout=0;
+# NB: child now prelocks parent
 --error ER_LOCK_WAIT_TIMEOUT
 TRUNCATE TABLE parent;
 SET DEBUG_SYNC='now SIGNAL go';
