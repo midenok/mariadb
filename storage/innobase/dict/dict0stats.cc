@@ -407,7 +407,9 @@ dict_stats_table_clone_create(
 
 	dict_table_t*	t;
 
-	t = (dict_table_t*) mem_heap_alloc(heap, sizeof(*t));
+	t = (dict_table_t*) mem_heap_zalloc(heap, sizeof(*t));
+
+	t->stats_mutex_init();
 
 	MEM_CHECK_DEFINED(&table->id, sizeof(table->id));
 	t->id = table->id;
@@ -435,7 +437,7 @@ dict_stats_table_clone_create(
 
 		dict_index_t*	idx;
 
-		idx = (dict_index_t*) mem_heap_alloc(heap, sizeof(*idx));
+		idx = (dict_index_t*) mem_heap_zalloc(heap, sizeof(*idx));
 
 		MEM_CHECK_DEFINED(&index->id, sizeof(index->id));
 		idx->id = index->id;
@@ -453,7 +455,7 @@ dict_stats_table_clone_create(
 
 		idx->n_uniq = index->n_uniq;
 
-		idx->fields = (dict_field_t*) mem_heap_alloc(
+		idx->fields = (dict_field_t*) mem_heap_zalloc(
 			heap, idx->n_uniq * sizeof(idx->fields[0]));
 
 		for (ulint i = 0; i < idx->n_uniq; i++) {
@@ -464,15 +466,15 @@ dict_stats_table_clone_create(
 		/* hook idx into t->indexes */
 		UT_LIST_ADD_LAST(t->indexes, idx);
 
-		idx->stat_n_diff_key_vals = (ib_uint64_t*) mem_heap_alloc(
+		idx->stat_n_diff_key_vals = (ib_uint64_t*) mem_heap_zalloc(
 			heap,
 			idx->n_uniq * sizeof(idx->stat_n_diff_key_vals[0]));
 
-		idx->stat_n_sample_sizes = (ib_uint64_t*) mem_heap_alloc(
+		idx->stat_n_sample_sizes = (ib_uint64_t*) mem_heap_zalloc(
 			heap,
 			idx->n_uniq * sizeof(idx->stat_n_sample_sizes[0]));
 
-		idx->stat_n_non_null_key_vals = (ib_uint64_t*) mem_heap_alloc(
+		idx->stat_n_non_null_key_vals = (ib_uint64_t*) mem_heap_zalloc(
 			heap,
 			idx->n_uniq * sizeof(idx->stat_n_non_null_key_vals[0]));
 		ut_d(idx->magic_n = DICT_INDEX_MAGIC_N);
@@ -495,6 +497,7 @@ dict_stats_table_clone_free(
 /*========================*/
 	dict_table_t*	t)	/*!< in: dummy table object to free */
 {
+	t->stats_mutex_destroy();
 	mem_heap_free(t->heap);
 }
 
@@ -511,7 +514,7 @@ dict_stats_empty_index(
 {
 	ut_ad(!(index->type & DICT_FTS));
 	ut_ad(!dict_index_is_ibuf(index));
-	ut_ad(mutex_own(&dict_sys.mutex));
+	ut_ad(index->table->stats_mutex_is_owner());
 
 	ulint	n_uniq = index->n_uniq;
 
@@ -541,7 +544,9 @@ dict_stats_empty_table(
 	bool		empty_defrag_stats)
 				/*!< in: whether to empty defrag stats */
 {
-	mutex_enter(&dict_sys.mutex);
+	/* Initialize table/index level stats is now protected by
+	table level lock_mutex.*/
+	table->stats_mutex_lock();
 
 	/* Zero the stats members */
 	table->stat_n_rows = 0;
@@ -567,7 +572,7 @@ dict_stats_empty_table(
 	}
 
 	table->stat_initialized = TRUE;
-	mutex_exit(&dict_sys.mutex);
+	table->stats_mutex_unlock();
 }
 
 /*********************************************************************//**
@@ -666,7 +671,8 @@ dict_stats_copy(
                                              to have the same statistics as if
                                              the table was empty */
 {
-	ut_ad(mutex_own(&dict_sys.mutex));
+	ut_ad(src->stats_mutex_is_owner());
+	ut_ad(dst->stats_mutex_is_owner());
 
 	dst->stats_last_recalc = src->stats_last_recalc;
 	dst->stat_n_rows = src->stat_n_rows;
@@ -791,7 +797,13 @@ dict_stats_snapshot_create(
 
 	t = dict_stats_table_clone_create(table);
 
+	table->stats_mutex_lock();
+	ut_d(t->stats_mutex_lock());
+
 	dict_stats_copy(t, table, false);
+
+	ut_d(t->stats_mutex_unlock());
+	table->stats_mutex_unlock();
 
 	t->stat_persistent = table->stat_persistent;
 	t->stats_auto_recalc = table->stats_auto_recalc;
@@ -837,14 +849,14 @@ dict_stats_update_transient_for_index(
 		Initialize some bogus index cardinality
 		statistics, so that the data can be queried in
 		various means, also via secondary indexes. */
-		mutex_enter(&dict_sys.mutex);
+		index->table->stats_mutex_lock();
 		dict_stats_empty_index(index, false);
-		mutex_exit(&dict_sys.mutex);
+		index->table->stats_mutex_unlock();
 #if defined UNIV_DEBUG || defined UNIV_IBUF_DEBUG
 	} else if (ibuf_debug && !dict_index_is_clust(index)) {
-		mutex_enter(&dict_sys.mutex);
+		index->table->stats_mutex_lock();
 		dict_stats_empty_index(index, false);
-		mutex_exit(&dict_sys.mutex);
+		index->table->stats_mutex_unlock();
 #endif /* UNIV_DEBUG || UNIV_IBUF_DEBUG */
 	} else {
 		mtr_t	mtr;
@@ -865,9 +877,9 @@ dict_stats_update_transient_for_index(
 
 		switch (size) {
 		case ULINT_UNDEFINED:
-			mutex_enter(&dict_sys.mutex);
+			index->table->stats_mutex_lock();
 			dict_stats_empty_index(index, false);
-			mutex_exit(&dict_sys.mutex);
+			index->table->stats_mutex_unlock();
 			return;
 		case 0:
 			/* The root node of the tree is a leaf */
@@ -884,8 +896,7 @@ dict_stats_update_transient_for_index(
 					index);
 
 			if (!stats.empty()) {
-				ut_ad(!mutex_own(&dict_sys.mutex));
-				mutex_enter(&dict_sys.mutex);
+				index->table->stats_mutex_lock();
 				for (size_t i = 0; i < stats.size(); ++i) {
 					index->stat_n_diff_key_vals[i]
 						= stats[i].n_diff_key_vals;
@@ -894,7 +905,7 @@ dict_stats_update_transient_for_index(
 					index->stat_n_non_null_key_vals[i]
 						= stats[i].n_non_null_key_vals;
 				}
-				mutex_exit(&dict_sys.mutex);
+				index->table->stats_mutex_unlock();
 			}
 		}
 	}
@@ -912,7 +923,7 @@ dict_stats_update_transient(
 /*========================*/
 	dict_table_t*	table)	/*!< in/out: table */
 {
-	ut_ad(!mutex_own(&dict_sys.mutex));
+	ut_ad(!table->stats_mutex_is_owner());
 
 	dict_index_t*	index;
 	ulint		sum_of_index_sizes	= 0;
@@ -945,9 +956,9 @@ dict_stats_update_transient(
 
 		if (dict_stats_should_ignore_index(index)
 		    || !index->is_readable()) {
-			mutex_enter(&dict_sys.mutex);
+			index->table->stats_mutex_lock();
 			dict_stats_empty_index(index, false);
-			mutex_exit(&dict_sys.mutex);
+			index->table->stats_mutex_unlock();
 			continue;
 		}
 
@@ -956,7 +967,7 @@ dict_stats_update_transient(
 		sum_of_index_sizes += index->stat_index_size;
 	}
 
-	mutex_enter(&dict_sys.mutex);
+	table->stats_mutex_lock();
 
 	index = dict_table_get_first_index(table);
 
@@ -974,7 +985,7 @@ dict_stats_update_transient(
 
 	table->stat_initialized = TRUE;
 
-	mutex_exit(&dict_sys.mutex);
+	table->stats_mutex_unlock();
 }
 
 /* @{ Pseudo code about the relation between the following functions
@@ -1933,7 +1944,7 @@ static index_stats_t dict_stats_analyze_index(dict_index_t* index)
 	DBUG_PRINT("info", ("index: %s, online status: %d", index->name(),
 			    dict_index_get_online_status(index)));
 
-	ut_ad(!mutex_own(&dict_sys.mutex)); // because this function is slow
+	ut_ad(!index->table->stats_mutex_is_owner());
 	ut_ad(index->table->get_ref_count());
 
 	/* Disable update statistic for Rtree */
@@ -2005,14 +2016,14 @@ static index_stats_t dict_stats_analyze_index(dict_index_t* index)
 
 		mtr.commit();
 
-		mutex_enter(&dict_sys.mutex);
+		index->table->stats_mutex_lock();
 		for (ulint i = 0; i < n_uniq; i++) {
 			result.stats[i].n_diff_key_vals = index->stat_n_diff_key_vals[i];
 			result.stats[i].n_sample_sizes = total_pages;
 			result.stats[i].n_non_null_key_vals = index->stat_n_non_null_key_vals[i];
 		}
 		result.n_leaf_pages = index->stat_n_leaf_pages;
-		mutex_exit(&dict_sys.mutex);
+		index->table->stats_mutex_unlock();
 
 		DBUG_RETURN(result);
 	}
@@ -2246,13 +2257,13 @@ dict_stats_update_persistent(
 	}
 
 	ut_ad(!dict_index_is_ibuf(index));
-	mutex_enter(&dict_sys.mutex);
+	table->stats_mutex_lock();
 	dict_stats_empty_index(index, false);
-	mutex_exit(&dict_sys.mutex);
+	table->stats_mutex_unlock();
 
 	index_stats_t stats = dict_stats_analyze_index(index);
 
-	mutex_enter(&dict_sys.mutex);
+	table->stats_mutex_lock();
 	index->stat_index_size = stats.index_size;
 	index->stat_n_leaf_pages = stats.n_leaf_pages;
 	for (size_t i = 0; i < stats.stats.size(); ++i) {
@@ -2288,9 +2299,9 @@ dict_stats_update_persistent(
 		}
 
 		if (!(table->stats_bg_flag & BG_STAT_SHOULD_QUIT)) {
-			mutex_exit(&dict_sys.mutex);
+			table->stats_mutex_unlock();
 			stats = dict_stats_analyze_index(index);
-			mutex_enter(&dict_sys.mutex);
+			table->stats_mutex_lock();
 
 			index->stat_index_size = stats.index_size;
 			index->stat_n_leaf_pages = stats.n_leaf_pages;
@@ -2316,7 +2327,7 @@ dict_stats_update_persistent(
 
 	dict_stats_assert_initialized(table);
 
-	mutex_exit(&dict_sys.mutex);
+	table->stats_mutex_unlock();
 
 	return(DB_SUCCESS);
 }
@@ -3128,13 +3139,11 @@ dict_stats_update_for_index(
 {
 	DBUG_ENTER("dict_stats_update_for_index");
 
-	ut_ad(!mutex_own(&dict_sys.mutex));
-
 	if (dict_stats_is_persistent_enabled(index->table)) {
 
 		if (dict_stats_persistent_storage_check(false)) {
 			index_stats_t stats = dict_stats_analyze_index(index);
-			mutex_enter(&dict_sys.mutex);
+			index->table->stats_mutex_lock();
 			index->stat_index_size = stats.index_size;
 			index->stat_n_leaf_pages = stats.n_leaf_pages;
 			for (size_t i = 0; i < stats.stats.size(); ++i) {
@@ -3147,7 +3156,7 @@ dict_stats_update_for_index(
 			}
 			index->table->stat_sum_of_other_index_sizes
 				+= index->stat_index_size;
-			mutex_exit(&dict_sys.mutex);
+			index->table->stats_mutex_unlock();
 
 			dict_stats_save(index->table, &index->id);
 			DBUG_VOID_RETURN;
@@ -3188,7 +3197,7 @@ dict_stats_update(
 					the persistent statistics
 					storage */
 {
-	ut_ad(!mutex_own(&dict_sys.mutex));
+	ut_ad(!table->stats_mutex_is_owner());
 
 	if (!table->is_readable()) {
 		return (dict_stats_report_error(table));
@@ -3323,7 +3332,10 @@ dict_stats_update(
 		switch (err) {
 		case DB_SUCCESS:
 
-			mutex_enter(&dict_sys.mutex);
+			table->stats_mutex_lock();
+			/* t is localized to this thread so no need to
+			take stats mutex lock (limiting it to debug only) */
+			ut_d(t->stats_mutex_lock());
 
 			/* Pass reset_ignored_indexes=true as parameter
 			to dict_stats_copy. This will cause statictics
@@ -3332,7 +3344,8 @@ dict_stats_update(
 
 			dict_stats_assert_initialized(table);
 
-			mutex_exit(&dict_sys.mutex);
+			ut_d(t->stats_mutex_unlock());
+			table->stats_mutex_unlock();
 
 			dict_stats_table_clone_free(t);
 

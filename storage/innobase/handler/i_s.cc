@@ -58,6 +58,7 @@ Modified Dec 29, 2014 Jan Lindström (Added sys_semaphore_waits)
 #include "fil0fil.h"
 #include "fil0crypt.h"
 #include "dict0crea.h"
+#include "scope.h"
 
 /** The latest successfully looked up innodb_fts_aux_table */
 UNIV_INTERN table_id_t innodb_ft_aux_table_id;
@@ -6269,11 +6270,9 @@ i_s_dict_fill_sys_tablestats(
 			      table->name.m_name));
 
 	{
-		struct Locking
-		{
-			Locking() { mutex_enter(&dict_sys.mutex); }
-			~Locking() { mutex_exit(&dict_sys.mutex); }
-		} locking;
+		table->stats_mutex_lock();
+		auto _ = make_scope_exit([table]() {
+			table->stats_mutex_unlock(); });
 
 		if (table->stat_initialized) {
 			OK(field_store_string(fields[SYS_TABLESTATS_INIT],
