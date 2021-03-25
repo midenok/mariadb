@@ -4538,8 +4538,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
   {
     if (likely(!thd->is_error()))             // CREATE ... IF NOT EXISTS
       my_ok(thd);                             //   succeed, but did nothing
-    ddl_log_complete(&ddl_log_state_rm);
-    ddl_log_complete(&ddl_log_state_create);
+    ddl_log_state_rm.complete(thd);
+    ddl_log_state_create.complete(thd);
     DBUG_RETURN(NULL);
   }
 
@@ -4578,8 +4578,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
       *lock= 0;
     }
     drop_open_table(thd, table, &create_table->db, &create_table->table_name);
-    ddl_log_complete(&ddl_log_state_rm);
-    ddl_log_complete(&ddl_log_state_create);
+    ddl_log_state_create.complete(thd);
+    ddl_log_state_rm.complete(thd);
     DBUG_RETURN(NULL);
     /* purecov: end */
   }
@@ -4937,7 +4937,7 @@ bool select_create::send_eof()
       We can ignore if we replaced an old table as ddl_log_state_create will
       now handle the logging of the drop if needed.
     */
-    ddl_log_complete(&ddl_log_state_rm);
+    ddl_log_state_rm.complete(thd);
   }
 
   if (prepare_eof())
@@ -4967,6 +4967,8 @@ bool select_create::send_eof()
       thd->restore_tmp_table_share(saved_tmp_table_share);
     }
   }
+
+  DBUG_ASSERT(!(table->s->tmp_table && ddl_log_state_rm.revert));
 
   /*
     Do an implicit commit at end of statement for non-temporary
@@ -5015,7 +5017,6 @@ bool select_create::send_eof()
     thd->binlog_xid= thd->query_id;
     /* Remember xid's for the case of row based logging */
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
-    ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
     trans_commit_stmt(thd);
     if (!(thd->variables.option_bits & OPTION_GTID_BEGIN))
       trans_commit_implicit(thd);
@@ -5059,8 +5060,8 @@ bool select_create::send_eof()
     (as the query was logged before commit!)
   */
   debug_crash_here("ddl_log_create_after_binlog");
-  ddl_log_complete(&ddl_log_state_rm);
-  ddl_log_complete(&ddl_log_state_create);
+  ddl_log_state_create.complete(thd);
+  ddl_log_state_rm.complete(thd);
   debug_crash_here("ddl_log_create_log_complete");
 
   /*
@@ -5208,8 +5209,8 @@ void select_create::abort_result_set()
       }
     }
   }
-  ddl_log_complete(&ddl_log_state_rm);
-  ddl_log_complete(&ddl_log_state_create);
+  ddl_log_revert(thd, &ddl_log_state_create);
+  ddl_log_state_rm.complete(thd);
   DBUG_VOID_RETURN;
 }
 
