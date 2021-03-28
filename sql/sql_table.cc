@@ -1230,6 +1230,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
   bool non_tmp_table_deleted= 0;
   bool is_drop_tmp_if_exists_added= 0;
   bool was_view= 0, was_table= 0, log_if_exists= if_exists;
+  bool force_if_exists;
   const LEX_CSTRING *object_to_drop= ((drop_sequence) ?
                                       &SEQUENCE_clex_str :
                                       &TABLE_clex_str);
@@ -1323,32 +1324,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     DBUG_PRINT("table", ("table_l: '%s'.'%s'  table: %p  s: %p",
                          db.str, table_name.str,  table->table,
                          table->table ?  table->table->s : NULL));
-
-    rename_param param;
-    bool force_if_exists;
-    if (!opt_bootstrap)
-    {
-      TABLE_LIST t;
-
-      if (make_backup_name(thd, table, &t))
-      {
-        error= 1;
-        goto err;
-      }
-
-      if(mysql_check_rename(thd, &param, table, &table->db, &t.table_name, &t.table_name, false, false) ||
-         mysql_do_rename(thd, &param, ddl_log_state, table, &table->db, &t.table_name,
-                  &t.table_name, false, false, &force_if_exists))
-      {
-        error= ENOENT;
-        not_found_errors++;
-        continue;
-      }
-
-      table->table_name= t.table_name;
-      table->alias= t.table_name;
-      table_name= t.table_name;
-    }
 
     /*
       If we are in locked tables mode and are dropping a temporary table,
@@ -1449,6 +1424,35 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     }
     else if (!drop_temporary)
     {
+//       if (!opt_bootstrap)
+      {
+        rename_param param;
+        TABLE_LIST t;
+
+        if (make_backup_name(thd, table, &t))
+        {
+          error= 1;
+          goto err;
+        }
+
+        if (!mysql_check_rename(thd, &param, table, &table->db, &t.table_name,
+                                &t.table_name, false, false) &&
+            !mysql_do_rename(thd, &param, ddl_log_state, table, &table->db,
+                             &t.table_name, &t.table_name, false, false,
+                             &force_if_exists))
+        {
+          error= ENOENT;
+          not_found_errors++;
+          continue;
+        }
+
+        // FIXME: copy ticket?
+        // FIXME: what about unknown_tables, etc.
+        table->table_name= t.table_name;
+        table->alias= t.table_name;
+        table_name= t.table_name;
+      }
+
       non_temp_tables_count++;
 
       DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
