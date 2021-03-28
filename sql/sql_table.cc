@@ -1070,7 +1070,7 @@ bool mysql_rm_table(THD *thd,TABLE_LIST *tables, bool if_exists,
   @retval  >0 the lenght of the comment found
 
 */
-static uint32 comment_length(THD *thd, uint32 comment_pos,
+static uint32 get_comment(THD *thd, uint32 comment_pos,
                              const char **comment_start)
 {
   /* We use uchar * here to make array indexing portable */
@@ -1169,7 +1169,7 @@ bool make_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
 }
 
 /**
-  Execute the drop of a normal or temporary table.
+  Execute the drop of sequence, view or table (normal or temporary).
 
   @param  thd             Thread handler
   @param  tables          Tables to drop
@@ -1222,7 +1222,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
   DDL_LOG_STATE local_ddl_log_state;
   const char *comment_start;
   uint32 comment_len;
-  uint not_found_errors= 0, first_table= 0;
+  uint not_found_errors= 0;
   int error= 0;
   int non_temp_tables_count= 0;
   bool non_tmp_error= 0;
@@ -1244,8 +1244,15 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
   }
 
   unknown_tables.length(0);
-  comment_len= comment_length(thd, if_exists ? 17:9,
+  comment_len= get_comment(thd, if_exists ? 17:9,
                               &comment_start);
+
+  LEX_CSTRING comment= {comment_start, (size_t) comment_len};
+  if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
+  {
+    error= 1;
+    goto err;
+  }
 
   /*
     Prepares the drop statements that will be written into the binary
@@ -1318,9 +1325,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
                          table->table ?  table->table->s : NULL));
 
     rename_param param;
-    DDL_LOG_STATE rename_log_state;
-    DDL_LOG_STATE *ddl_log_state2= &rename_log_state;
-
     bool force_if_exists;
     if (!opt_bootstrap)
     {
@@ -1447,7 +1451,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     {
       non_temp_tables_count++;
 
-      // FIXME: lock tmp-name
       DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
                                                  table_name.str, MDL_SHARED));
 
@@ -1489,16 +1492,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
     thd->replication_flags= 0;
     was_view= table_type == TABLE_TYPE_VIEW;
-
-    if (!first_table++)
-    {
-      LEX_CSTRING comment= {comment_start, (size_t) comment_len};
-      if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
-      {
-        error= 1;
-        goto err;
-      }
-    }
 
     if ((table_type == TABLE_TYPE_UNKNOWN) || (was_view && !drop_view) ||
         (table_type != TABLE_TYPE_SEQUENCE && drop_sequence))
