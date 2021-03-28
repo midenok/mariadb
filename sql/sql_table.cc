@@ -1137,15 +1137,19 @@ bool make_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
   for (int i= 0; i < 1000; ++i)
   {
     DBUG_ASSERT(strlen(res_name) == n.length);
-    res->init_one_table(&orig->db, &n, &n, TL_WRITE);
-    if (thd->mdl_context.try_acquire_lock(&res->mdl_request))
-      return true;
-    if (res->mdl_request.ticket)
+    if (!thd->mdl_context.is_lock_owner(MDL_key::TABLE, orig->db.str, res_name,
+                                        MDL_SHARED))
     {
-      if (!ha_table_exists(thd, &res->db, &n))
-        break;
-      thd->mdl_context.set_lock_duration(res->mdl_request.ticket, MDL_EXPLICIT);
-      thd->mdl_context.release_lock(res->mdl_request.ticket);
+      res->init_one_table(&orig->db, &n, &n, TL_WRITE);
+      if (thd->mdl_context.try_acquire_lock(&res->mdl_request))
+        return true;
+      if (res->mdl_request.ticket)
+      {
+        if (!ha_table_exists(thd, &res->db, &n))
+          break;
+        thd->mdl_context.set_lock_duration(res->mdl_request.ticket, MDL_EXPLICIT);
+        thd->mdl_context.release_lock(res->mdl_request.ticket);
+      }
     }
     n.length= sprintf(&res_name[len + 1], "%d", i);
     if (n.length < 1)
@@ -1424,7 +1428,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     }
     else if (!drop_temporary)
     {
-//       if (!opt_bootstrap)
+//       if (false) // FIXME: remove
       {
         rename_param param;
         TABLE_LIST t;
@@ -1440,16 +1444,12 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
             !mysql_do_rename(thd, &param, ddl_log_state, table, &table->db,
                              false, &force_if_exists))
         {
-          error= ENOENT;
-          not_found_errors++;
-          continue;
+          // FIXME: copy ticket?
+          // FIXME: what about unknown_tables, etc.
+          table->table_name= t.table_name;
+          table->alias= t.table_name;
+          table_name= t.table_name;
         }
-
-        // FIXME: copy ticket?
-        // FIXME: what about unknown_tables, etc.
-        table->table_name= t.table_name;
-        table->alias= t.table_name;
-        table_name= t.table_name;
       }
 
       non_temp_tables_count++;
