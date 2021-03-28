@@ -1436,10 +1436,9 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
         }
 
         if (!mysql_check_rename(thd, &param, table, &table->db, &t.table_name,
-                                &t.table_name, false, false) &&
+                                &t.table_name, if_exists) &&
             !mysql_do_rename(thd, &param, ddl_log_state, table, &table->db,
-                             &t.table_name, &t.table_name, false, false,
-                             &force_if_exists))
+                             false, &force_if_exists))
         {
           error= ENOENT;
           not_found_errors++;
