@@ -2997,6 +2997,7 @@ static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
                               const LEX_CSTRING *comment)
 {
   DDL_LOG_ENTRY ddl_log_entry;
+  DDL_LOG_MEMORY_ENTRY *log_entry;
   DBUG_ENTER("ddl_log_drop_file");
 
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
@@ -3005,7 +3006,28 @@ static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(db);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
 
-  DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
+  if (!ddl_state->is_active())
+    DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
+
+  mysql_mutex_lock(&LOCK_gdl);
+  if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
+    goto error;
+
+  if (update_next_entry_pos(ddl_state->list->entry_pos,
+                            log_entry->entry_pos))
+  {
+    ddl_log_release_memory_entry(log_entry);
+    goto error;
+  }
+  (void) ddl_log_sync_no_lock();
+
+  mysql_mutex_unlock(&LOCK_gdl);
+  add_log_entry(ddl_state, log_entry);
+  DBUG_RETURN(0);
+
+error:
+  mysql_mutex_unlock(&LOCK_gdl);
+  DBUG_RETURN(1);
 }
 
 
@@ -3052,7 +3074,7 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
   if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
     goto error;
 
-  (void) ddl_log_sync_no_lock();
+  (void) ddl_log_sync_no_lock(); // FIXME: why sync is before ddl_log_write_entry()
   if (update_next_entry_pos(ddl_state->list->entry_pos,
                             log_entry->entry_pos))
   {

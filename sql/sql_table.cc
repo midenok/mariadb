@@ -1226,7 +1226,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
   DDL_LOG_STATE local_ddl_log_state;
   const char *comment_start;
   uint32 comment_len;
-  uint not_found_errors= 0;
+  uint not_found_errors= 0, first_table= 0;
   int error= 0;
   int non_temp_tables_count= 0;
   bool non_tmp_error= 0;
@@ -1251,13 +1251,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
   unknown_tables.length(0);
   comment_len= get_comment(thd, if_exists ? 17:9,
                               &comment_start);
-
-  LEX_CSTRING comment= {comment_start, (size_t) comment_len};
-  if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
-  {
-    error= 1;
-    goto err;
-  }
 
   /*
     Prepares the drop statements that will be written into the binary
@@ -1495,6 +1488,16 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
     thd->replication_flags= 0;
     was_view= table_type == TABLE_TYPE_VIEW;
+
+    if (!first_table++)
+    {
+      LEX_CSTRING comment= {comment_start, (size_t) comment_len};
+      if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
+      {
+        error= 1;
+        goto err;
+      }
+    }
 
     if ((table_type == TABLE_TYPE_UNKNOWN) || (was_view && !drop_view) ||
         (table_type != TABLE_TYPE_SEQUENCE && drop_sequence))
