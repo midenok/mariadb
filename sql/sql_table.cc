@@ -1123,7 +1123,7 @@ static uint32 get_comment(THD *thd, uint32 comment_pos,
   @retval  true   Error
 */
 
-bool make_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
+bool find_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
 {
   char res_name[NAME_LEN + 1];
   static const LEX_CSTRING pre= { tmp_file_prefix, strlen(tmp_file_prefix) };
@@ -1433,7 +1433,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
         rename_param param;
         TABLE_LIST t;
 
-        if (make_backup_name(thd, table, &t))
+        if (find_backup_name(thd, table, &t))
         {
           error= 1;
           goto err;
@@ -4217,7 +4217,7 @@ err:
 static
 int create_table_impl(THD *thd,
                       DDL_LOG_STATE *ddl_log_state_create,
-                      DDL_LOG_STATE *ddl_log_state_rm,
+                      DDL_LOG_STATE *ddl_log_state_rm, // FIXME: remove
                       const LEX_CSTRING &orig_db,
                       const LEX_CSTRING &orig_table_name,
                       const LEX_CSTRING &db, const LEX_CSTRING &table_name,
@@ -4240,7 +4240,6 @@ int create_table_impl(THD *thd,
   if (create_info->tmp_table())
   {
     ddl_log_state_create= 0;
-    ddl_log_state_rm= 0;
   }
 
   if (fix_constraints_names(thd, &alter_info->check_constraint_list,
@@ -4355,7 +4354,7 @@ int create_table_impl(THD *thd,
         (void) trans_rollback_stmt(thd);
         /* Remove normal table without logging. Keep tables locked */
         if (mysql_rm_table_no_locks(thd, &table_list, &thd->db,
-                                    ddl_log_state_rm,
+                                    ddl_log_state_create,
                                     0, 0, 0, 0, 1, 1))
           goto err;
 
