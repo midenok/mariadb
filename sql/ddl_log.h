@@ -229,6 +229,7 @@ typedef struct st_ddl_log_state
   */
   DDL_LOG_MEMORY_ENTRY *main_entry;
   uint16 flags;                                 /* Cache for flags */
+  bool execute;                                 /* Execute before ddl_log_complete() */
   bool is_active() { return list != 0; }
 } DDL_LOG_STATE;
 

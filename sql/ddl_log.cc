@@ -2997,7 +2997,6 @@ static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
                               const LEX_CSTRING *comment)
 {
   DDL_LOG_ENTRY ddl_log_entry;
-  DDL_LOG_MEMORY_ENTRY *log_entry;
   DBUG_ENTER("ddl_log_drop_file");
 
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
@@ -3006,28 +3005,7 @@ static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(db);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
 
-  if (!ddl_state->is_active())
-    DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
-
-  mysql_mutex_lock(&LOCK_gdl);
-  if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
-    goto error;
-
-  if (update_next_entry_pos(ddl_state->list->entry_pos,
-                            log_entry->entry_pos))
-  {
-    ddl_log_release_memory_entry(log_entry);
-    goto error;
-  }
-  (void) ddl_log_sync_no_lock();
-
-  mysql_mutex_unlock(&LOCK_gdl);
-  add_log_entry(ddl_state, log_entry);
-  DBUG_RETURN(0);
-
-error:
-  mysql_mutex_unlock(&LOCK_gdl);
-  DBUG_RETURN(1);
+  DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
 }
 
 
@@ -3196,6 +3174,7 @@ bool ddl_log_create_table(THD *thd, DDL_LOG_STATE *ddl_state,
                           bool only_frm)
 {
   DDL_LOG_ENTRY ddl_log_entry;
+  DDL_LOG_MEMORY_ENTRY *log_entry;
   DBUG_ENTER("ddl_log_create_table");
 
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
@@ -3208,7 +3187,29 @@ bool ddl_log_create_table(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.flags=        only_frm ? DDL_LOG_FLAG_ONLY_FRM : 0;
 
-  DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
+  if (!ddl_state->is_active())
+    DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
+
+  ddl_log_entry.next_entry= ddl_state->list->entry_pos;
+  mysql_mutex_lock(&LOCK_gdl);
+  if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
+    goto error;
+
+  if (update_next_entry_pos(ddl_state->execute_entry->entry_pos,
+                            log_entry->entry_pos))
+  {
+    ddl_log_release_memory_entry(log_entry);
+    goto error;
+  }
+  (void) ddl_log_sync_no_lock();
+
+  mysql_mutex_unlock(&LOCK_gdl);
+  add_log_entry(ddl_state, log_entry);
+  DBUG_RETURN(0);
+
+error:
+  mysql_mutex_unlock(&LOCK_gdl);
+  DBUG_RETURN(1);
 }
 
 
