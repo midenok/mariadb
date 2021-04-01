@@ -1126,14 +1126,13 @@ static uint32 get_comment(THD *thd, uint32 comment_pos,
 bool find_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
 {
   char res_name[NAME_LEN + 1];
-  static const LEX_CSTRING pre= { tmp_file_prefix, strlen(tmp_file_prefix) };
+  static const LEX_CSTRING pre= { tmp_file_prefix "b-", strlen(tmp_file_prefix) + 2 };
   static const size_t name_trim= NAME_LEN - pre.length - 1 - 3;
   strcpy(res_name, pre.str);
   strncpy(res_name + pre.length, orig->table_name.str, name_trim);
   size_t len= std::min(name_trim, orig->table_name.length + pre.length);
-  strcpy(&res_name[len], "$");
-  bzero(res_name + len + 1, NAME_LEN - len); // FIXME: test
-  LEX_CSTRING n= { res_name, len + 1 };
+  bzero(res_name + len, NAME_LEN - len + 1); // FIXME: test
+  LEX_CSTRING n= { res_name, len };
   for (int i= 0; i < 1000; ++i)
   {
     DBUG_ASSERT(strlen(res_name) == n.length);
@@ -1151,10 +1150,10 @@ bool find_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
         thd->mdl_context.release_lock(res->mdl_request.ticket);
       }
     }
-    n.length= sprintf(&res_name[len + 1], "%d", i);
+    n.length= sprintf(res_name + len, "-%d", i);
     if (n.length < 1)
       return true;
-    n.length+= len + 1;
+    n.length+= len;
   }
   if (!res->mdl_request.ticket)
     return true;
@@ -4796,7 +4795,8 @@ err:
   }
   if (ddl_log_state_rm.execute)
   {
-    if (ddl_log_execute_entry(thd, ddl_log_state_rm.execute_entry->entry_pos))
+    if (ddl_log_execute_entry(thd, ddl_log_state_rm.execute_entry->
+                                     next_log_entry->entry_pos))
     {
       ddl_log_complete(&ddl_log_state_rm);
       push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 1,
