@@ -238,6 +238,7 @@ typedef struct st_ddl_log_state
 bool ddl_log_initialize();
 void ddl_log_release();
 bool ddl_log_close_binlogged_events(HASH *xids);
+void ddl_log_update_recovery(uint entry_pos, ulonglong xid);
 int ddl_log_execute_recovery();
 
 /* functions for updating the ddl log */

@@ -2614,6 +2614,13 @@ bool ddl_log_close_binlogged_events(HASH *xids)
 }
 
 
+void ddl_log_update_recovery(uint entry_pos, ulonglong xid)
+{
+  recovery_state.execute_entry_pos= entry_pos;
+  recovery_state.xid= xid;
+}
+
+
 /**
   Execute the ddl log at recovery of MySQL Server.
 
@@ -2663,11 +2670,10 @@ int ddl_log_execute_recovery()
     if (ddl_log_entry.entry_type == DDL_LOG_EXECUTE_CODE)
     {
       /*
-        Remeber information about executive ddl log entry,
+        Remember information about executive ddl log entry,
         used for binary logging during recovery
       */
-      recovery_state.execute_entry_pos= i;
-      recovery_state.xid= ddl_log_entry.xid;
+      ddl_log_update_recovery(i, ddl_log_entry.xid);
 
       /* purecov: begin tested */
       if (ddl_log_entry.unique_id >= DDL_LOG_MAX_RETRY)

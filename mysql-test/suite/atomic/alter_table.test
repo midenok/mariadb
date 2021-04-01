@@ -28,7 +28,7 @@ let $MYSQLD_DATADIR= `SELECT @@datadir`;
 
 create database test2;
 
-let $engine_count=1;
+let $engine_count=2;
 let $engines='myisam','innodb';
 
 let $crash_count=12;

@@ -5022,7 +5022,6 @@ bool select_create::send_eof()
     thd->binlog_xid= thd->query_id;
     /* Remember xid's for the case of row based logging */
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
-    ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
     trans_commit_stmt(thd);
     if (!(thd->variables.option_bits & OPTION_GTID_BEGIN))
       trans_commit_implicit(thd);
@@ -5052,6 +5051,16 @@ bool select_create::send_eof()
     (as the query was logged before commit!)
   */
   debug_crash_here("ddl_log_create_after_binlog");
+  if (ddl_log_state_rm.execute)
+  {
+    DDL_LOG_MEMORY_ENTRY *e= ddl_log_state_rm.execute_entry;
+    ddl_log_update_recovery(e->entry_pos, 0);
+    if (ddl_log_execute_entry(thd, e->next_log_entry->entry_pos))
+    {
+      push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 1,
+                   "Failed to remove old table");
+    }
+  }
   ddl_log_complete(&ddl_log_state_rm);
   ddl_log_complete(&ddl_log_state_create);
   debug_crash_here("ddl_log_create_log_complete");
