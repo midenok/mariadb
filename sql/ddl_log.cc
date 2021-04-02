@@ -986,7 +986,8 @@ static bool ddl_log_drop_to_binary_log(THD *thd, DDL_LOG_ENTRY *ddl_log_entry,
                                   String *query)
 {
   DBUG_ENTER("ddl_log_drop_to_binary_log");
-  if (mysql_bin_log.is_open())
+  if (!(ddl_log_entry->flags & DDL_LOG_FLAG_SKIP_BINLOG) &&
+      mysql_bin_log.is_open())
   {
     if (!ddl_log_entry->next_entry ||
         query->length() + end_comment.length + NAME_LEN + 100 >
@@ -3053,6 +3054,8 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.name=         *const_cast<LEX_CSTRING*>(table);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.phase=        (uchar) phase;
+  if (ddl_state->execute)
+    ddl_log_entry.flags= DDL_LOG_FLAG_SKIP_BINLOG;
 
   mysql_mutex_lock(&LOCK_gdl);
   if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
@@ -3422,4 +3425,16 @@ err:
   */
   mysql_mutex_unlock(&LOCK_gdl);
   DBUG_RETURN(1);
+}
+
+
+void st_ddl_log_state::do_execute(THD *thd)
+{
+  DBUG_ASSERT(execute);
+  ddl_log_update_recovery(execute_entry->entry_pos, 0);
+  if (ddl_log_execute_entry(thd, execute_entry->next_log_entry->entry_pos))
+  {
+    push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 1,
+                  "Failed to remove old table");
+  }
 }

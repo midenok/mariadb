@@ -1444,10 +1444,12 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
           table->table_name= t.table_name;
           table->alias= t.table_name;
           table_name= t.table_name;
+          if (!first_table)
+          {
+            ddl_log_state->execute= true;
+            dont_log_query= true;
+          }
         }
-
-        if (!first_table)
-          ddl_log_state->execute= true;
       }
 
       non_temp_tables_count++;
@@ -4793,15 +4795,7 @@ err:
     thd->binlog_xid= 0;
   }
   if (ddl_log_state_rm.execute)
-  {
-    DDL_LOG_MEMORY_ENTRY *e= ddl_log_state_rm.execute_entry;
-    ddl_log_update_recovery(e->entry_pos, 0);
-    if (ddl_log_execute_entry(thd, e->next_log_entry->entry_pos))
-    {
-      push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 1,
-                   "Failed to remove old table");
-    }
-  }
+    ddl_log_state_rm.do_execute(thd);
   ddl_log_complete(&ddl_log_state_rm);
   ddl_log_complete(&ddl_log_state_create);
   DBUG_RETURN(result);
@@ -5400,7 +5394,7 @@ err:
   {
     thd->binlog_xid= thd->query_id;
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
-    debug_crash_here("ddl_log_create_before_binlog");      
+    debug_crash_here("ddl_log_create_before_binlog");
     if (res && create_info->table_was_deleted)
     {
       /*
@@ -5421,16 +5415,8 @@ err:
     thd->binlog_xid= 0;
   }
 
-  if (ddl_log_state_rm.execute)
-  {
-    DDL_LOG_MEMORY_ENTRY *e= ddl_log_state_rm.execute_entry;
-    ddl_log_update_recovery(e->entry_pos, 0);
-    if (ddl_log_execute_entry(thd, e->next_log_entry->entry_pos))
-    {
-      push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 1,
-                   "Failed to remove old table");
-    }
-  }
+  if (ddl_log_state_rm.execute)   // FIXME: inject error and test
+    ddl_log_state_rm.do_execute(thd);
   ddl_log_complete(&ddl_log_state_rm);
   ddl_log_complete(&ddl_log_state_create);
   DBUG_RETURN(res != 0);

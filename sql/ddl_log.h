@@ -167,6 +167,7 @@ enum enum_ddl_log_alter_table_phase {
 #define DDL_LOG_FLAG_ALTER_ENGINE_CHANGED (1 << 1)
 #define DDL_LOG_FLAG_ONLY_FRM             (1 << 2)
 #define DDL_LOG_FLAG_UPDATE_STAT          (1 << 3)
+#define DDL_LOG_FLAG_SKIP_BINLOG          (1 << 4)
 
 /*
   Setting ddl_log_entry.phase to this has the same effect as setting
@@ -231,6 +232,7 @@ typedef struct st_ddl_log_state
   uint16 flags;                                 /* Cache for flags */
   bool execute;                                 /* Execute before ddl_log_complete() */
   bool is_active() { return list != 0; }
+  void do_execute(THD *thd);
 } DDL_LOG_STATE;
 
 

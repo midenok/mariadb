@@ -4976,6 +4976,8 @@ bool select_create::send_eof()
     }
   }
 
+  DBUG_ASSERT(!(table->s->tmp_table && ddl_log_state_rm.execute));
+
   /*
     Do an implicit commit at end of statement for non-temporary
     tables.  This can fail, but we should unlock the table
@@ -5052,15 +5054,7 @@ bool select_create::send_eof()
   */
   debug_crash_here("ddl_log_create_after_binlog");
   if (ddl_log_state_rm.execute)
-  {
-    DDL_LOG_MEMORY_ENTRY *e= ddl_log_state_rm.execute_entry;
-    ddl_log_update_recovery(e->entry_pos, 0);
-    if (ddl_log_execute_entry(thd, e->next_log_entry->entry_pos))
-    {
-      push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 1,
-                   "Failed to remove old table");
-    }
-  }
+    ddl_log_state_rm.do_execute(thd);
   ddl_log_complete(&ddl_log_state_rm);
   ddl_log_complete(&ddl_log_state_create);
   debug_crash_here("ddl_log_create_log_complete");
