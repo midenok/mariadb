@@ -1130,7 +1130,7 @@ mysql_rm_db_internal(THD *thd, const LEX_CSTRING *db, bool if_exists,
       thd->pop_internal_handler();
       my_error(EE_DELETE, MYF(0), path, my_errno);
       error= true;
-      ddl_log_complete(&ddl_log_state);
+      ddl_log_state.complete(thd);
       goto end;
     }
     del_dbopt(path);				// Remove dboption hash entry
@@ -1255,7 +1255,7 @@ update_binlog:
   }
 
 exit:
-  ddl_log_complete(&ddl_log_state);
+  ddl_log_state.complete(thd);
   /*
     If this database was the client's selected database, we silently
     change the client's selected database to nothing (to have an empty

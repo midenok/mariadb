@@ -4550,8 +4550,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
   {
     if (likely(!thd->is_error()))             // CREATE ... IF NOT EXISTS
       my_ok(thd);                             //   succeed, but did nothing
-    ddl_log_complete(&ddl_log_state_rm);
-    ddl_log_complete(&ddl_log_state_create);
+    ddl_log_state_rm.complete(thd);
+    ddl_log_state_create.complete(thd);
     DBUG_RETURN(NULL);
   }
 
@@ -4590,8 +4590,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
       *lock= 0;
     }
     drop_open_table(thd, table, &create_table->db, &create_table->table_name);
-    ddl_log_complete(&ddl_log_state_rm);
-    ddl_log_complete(&ddl_log_state_create);
+    ddl_log_state_rm.complete(thd);
+    ddl_log_state_create.complete(thd);
     DBUG_RETURN(NULL);
     /* purecov: end */
   }
@@ -4945,7 +4945,7 @@ bool select_create::send_eof()
       We can ignore if we replaced an old table as ddl_log_state_create will
       now handle the logging of the drop if needed.
     */
-    ddl_log_complete(&ddl_log_state_rm);
+    ddl_log_state_rm.complete(thd);
   }
 
   if (prepare_eof())
@@ -4976,7 +4976,7 @@ bool select_create::send_eof()
     }
   }
 
-  DBUG_ASSERT(!(table->s->tmp_table && ddl_log_state_rm.execute));
+  DBUG_ASSERT(!(table->s->tmp_table && ddl_log_state_rm.revert));
 
   /*
     Do an implicit commit at end of statement for non-temporary
@@ -5053,10 +5053,8 @@ bool select_create::send_eof()
     (as the query was logged before commit!)
   */
   debug_crash_here("ddl_log_create_after_binlog");
-  if (ddl_log_state_rm.execute)
-    ddl_log_state_rm.do_execute(thd);
-  ddl_log_complete(&ddl_log_state_rm);
-  ddl_log_complete(&ddl_log_state_create);
+  ddl_log_state_rm.complete(thd);
+  ddl_log_state_create.complete(thd);
   debug_crash_here("ddl_log_create_log_complete");
 
   /*
@@ -5186,8 +5184,8 @@ void select_create::abort_result_set()
       }
     }
   }
-  ddl_log_complete(&ddl_log_state_rm);
-  ddl_log_complete(&ddl_log_state_create);
+  ddl_log_state_rm.complete(thd);
+  ddl_log_state_create.complete(thd);
   DBUG_VOID_RETURN;
 }
 

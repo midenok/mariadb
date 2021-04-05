@@ -2801,19 +2801,29 @@ void ddl_log_release_entries(DDL_LOG_STATE *ddl_log_state)
    successfully and we can disable the execute log entry.
 */
 
-void ddl_log_complete(DDL_LOG_STATE *state)
+void st_ddl_log_state::complete(THD *thd)
 {
   DBUG_ENTER("ddl_log_complete");
 
-  if (unlikely(!state->list))
+  if (unlikely(!list))
     DBUG_VOID_RETURN;                           // ddl log not used
 
   mysql_mutex_lock(&LOCK_gdl);
-  if (likely(state->execute_entry))
-    ddl_log_disable_execute_entry(&state->execute_entry);
-  ddl_log_release_entries(state);
+  if (revert)
+  {
+    ddl_log_update_recovery(execute_entry->entry_pos, 0);
+    if (ddl_log_execute_entry_no_lock(thd, execute_entry->next_log_entry->entry_pos))
+    {
+      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, 1,
+                    "Failed execute entry %u", execute_entry->entry_pos);
+    }
+    ddl_log_disable_execute_entry(&execute_entry);
+  }
+  else if (likely(execute_entry))
+    ddl_log_disable_execute_entry(&execute_entry);
+  ddl_log_release_entries(this);
   mysql_mutex_unlock(&LOCK_gdl);
-  state->list= 0;
+  list= 0;
   DBUG_VOID_RETURN;
 };
 
@@ -2831,15 +2841,10 @@ void ddl_log_revert(THD *thd, DDL_LOG_STATE *state)
   if (unlikely(!state->list))
     DBUG_VOID_RETURN;                           // ddl log not used
 
-  mysql_mutex_lock(&LOCK_gdl);
   if (likely(state->execute_entry))
-  {
-    ddl_log_execute_entry_no_lock(thd, state->list->entry_pos);
-    ddl_log_disable_execute_entry(&state->execute_entry);
-  }
-  ddl_log_release_entries(state);
-  mysql_mutex_unlock(&LOCK_gdl);
-  state->list= 0;
+    state->revert= true;
+
+  state->complete(thd);
   DBUG_VOID_RETURN;
 }
 
@@ -3054,7 +3059,7 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.name=         *const_cast<LEX_CSTRING*>(table);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.phase=        (uchar) phase;
-  if (ddl_state->execute)
+  if (ddl_state->revert)
     ddl_log_entry.flags= DDL_LOG_FLAG_SKIP_BINLOG;
 
   mysql_mutex_lock(&LOCK_gdl);
@@ -3430,7 +3435,7 @@ err:
 
 void st_ddl_log_state::do_execute(THD *thd)
 {
-  DBUG_ASSERT(execute);
+  DBUG_ASSERT(revert);
   ddl_log_update_recovery(execute_entry->entry_pos, 0);
   if (ddl_log_execute_entry(thd, execute_entry->next_log_entry->entry_pos))
   {

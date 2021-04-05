@@ -1446,7 +1446,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
           table_name= t.table_name;
           if (!first_table)
           {
-            ddl_log_state->execute= true;
+            ddl_log_state->revert= true;
             dont_log_query= true;
           }
         }
@@ -1875,7 +1875,7 @@ err:
     }
   }
   if (ddl_log_state == &local_ddl_log_state)
-    ddl_log_complete(ddl_log_state);
+    ddl_log_state->complete(thd);
 
   if (!drop_temporary)
   {
@@ -4542,7 +4542,7 @@ err:
   if (unlikely(error) && ddl_log_state_create)
   {
     /* Table was never created, so we can ignore the ddl log entry */
-    ddl_log_complete(ddl_log_state_create);
+    ddl_log_state_create->complete(thd);
   }
 
   THD_STAGE_INFO(thd, stage_after_create);
@@ -4794,10 +4794,8 @@ err:
     debug_crash_here("ddl_log_create_after_binlog");
     thd->binlog_xid= 0;
   }
-  if (ddl_log_state_rm.execute)
-    ddl_log_state_rm.do_execute(thd);
-  ddl_log_complete(&ddl_log_state_rm);
-  ddl_log_complete(&ddl_log_state_create);
+  ddl_log_state_rm.complete(thd);
+  ddl_log_state_create.complete(thd);
   DBUG_RETURN(result);
 }
 
@@ -5415,10 +5413,9 @@ err:
     thd->binlog_xid= 0;
   }
 
-  if (ddl_log_state_rm.execute)   // FIXME: inject error and test
-    ddl_log_state_rm.do_execute(thd);
-  ddl_log_complete(&ddl_log_state_rm);
-  ddl_log_complete(&ddl_log_state_create);
+  // FIXME: inject error and test
+  ddl_log_state_rm.complete(thd);
+  ddl_log_state_create.complete(thd);
   DBUG_RETURN(res != 0);
 }
 
@@ -8937,7 +8934,7 @@ simple_rename_or_index_change(THD *thd, TABLE_LIST *table_list,
     if (likely(!error))
       my_ok(thd);
   }
-  ddl_log_complete(&ddl_log_state);
+  ddl_log_state.complete(thd);
   table_list->table= NULL;                    // For query cache
   query_cache_invalidate3(thd, table_list, 0);
 
@@ -10402,7 +10399,7 @@ end_inplace:
 
 end_temporary:
   my_free(const_cast<uchar*>(frm.str));
-  ddl_log_complete(&ddl_log_state);
+  ddl_log_state.complete(thd);
 
   thd->variables.option_bits&= ~OPTION_BIN_COMMIT_OFF;
 
@@ -10444,7 +10441,7 @@ err_new_table_cleanup:
 
 err_cleanup:
   my_free(const_cast<uchar*>(frm.str));
-  ddl_log_complete(&ddl_log_state);
+  ddl_log_state.complete(thd);
   DBUG_RETURN(true);
 
 err_with_mdl_after_alter:
@@ -10461,7 +10458,7 @@ err_with_mdl_after_alter:
     write_bin_log_with_if_exists(thd, FALSE, FALSE, log_if_exists);
 
 err_with_mdl:
-  ddl_log_complete(&ddl_log_state);
+  ddl_log_state.complete(thd);
   /*
     An error happened while we were holding exclusive name metadata lock
     on table being altered. To be safe under LOCK TABLES we should
