@@ -1159,10 +1159,16 @@ set timestamp= default;
 
 --echo # Couple of more LOCK TABLES cases
 create or replace table t1 (x int) with system versioning
-partition by system_time limit 1000 auto;
+partition by system_time limit 1 auto;
+# TODO: now it increments only 1 at lock tables.
+# Must be fixed after MDEV-22292
 lock tables t1 write;
 insert into t1 values (1);
 update t1 set x= x + 1;
+update t1 set x= x + 1;
+update t1 set x= x + 1;
+--replace_result $default_engine DEFAULT_ENGINE
+show create table t1;
 unlock tables;
 --replace_result $default_engine DEFAULT_ENGINE
 show create table t1;
@@ -1189,16 +1195,18 @@ drop tables t1;
 --echo # Test VIEW, LOCK TABLES
 set timestamp= unix_timestamp('2000-01-01 00:00:00');
 create or replace table t1 (x int) with system versioning
-partition by system_time interval 1 hour auto partitions 3;
+partition by system_time interval 1 hour auto;
 create or replace view v1 as select * from t1;
 
-insert into v1 values (1);
+insert into t1 values (1);
+set timestamp= unix_timestamp('2000-01-01 01:00:00');
+update v1 set x= x + 2;
 --replace_result $default_engine DEFAULT_ENGINE
 show create table t1;
 
-set timestamp= unix_timestamp('2000-01-01 01:00:00');
-lock tables t1 write;
-update t1 set x= x + 3;
+set timestamp= unix_timestamp('2000-01-01 02:00:00');
+lock tables v1 write;
+update v1 set x= x + 3;
 --replace_result $default_engine DEFAULT_ENGINE
 show create table t1;
 unlock tables;
@@ -1285,7 +1293,7 @@ drop procedure sp;
 
 set timestamp= unix_timestamp('2001-01-01 00:00:00');
 create or replace table t1 (i int) with system versioning
-partition by system_time interval 1 day starts '2000-01-01 00:00:00';
+partition by system_time interval 1 day starts '2001-01-01 00:00:00';
 insert into t1 values (0);
 set timestamp= unix_timestamp('2001-01-01 00:00:01');
 prepare s from 'update t1 set i= i + 1';
@@ -1294,6 +1302,7 @@ set timestamp= unix_timestamp('2001-01-02 00:00:01');
 execute s;
 drop prepare s;
 
+# Because of blobs:
 if (!$MTR_COMBINATION_HEAP)
 {
 --echo # Complex table
@@ -1416,6 +1425,7 @@ drop tables t1;
 set timestamp= default;
 
 --echo # Transaction
+--echo # MDEV-25339 Assertion `thd->transaction.stmt.is_empty() || thd->in_sub_stmt' failed
 create or replace table t1 (x int) with system versioning engine innodb
 partition by system_time interval 1 hour auto;
 start transaction;
@@ -1444,6 +1454,7 @@ start transaction;
 update t1 set x= 0;
 --connect con1, localhost, root
 select * from t1;
+show create table t1;
 --connection default
 commit;
 show create table t1;
@@ -1461,7 +1472,7 @@ show create table t1;
 drop table t1;
 
 --echo #
---echo # MENT-724 Locking timeout caused by auto-creation affects original DML
+--echo # MDEV-23642 Locking timeout caused by auto-creation affects original DML
 --echo #
 set timestamp= unix_timestamp('2000-01-01 00:00:00');
 create or replace table t1 (x int primary key) with system versioning engine innodb

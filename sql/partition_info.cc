@@ -818,9 +818,8 @@ bool partition_info::has_unique_name(partition_element *element)
 */
 uint partition_info::vers_set_hist_part(THD *thd, bool auto_hist)
 {
-  DBUG_ASSERT(!thd->lex->last_table() ||
-              !thd->lex->last_table()->vers_conditions.delete_history);
-
+  DBUG_ASSERT(!table->pos_in_table_list ||
+              !table->pos_in_table_list->vers_conditions.delete_history);
   uint create_count= 0;
   auto_hist= auto_hist && vers_info->auto_hist;
 
@@ -900,13 +899,13 @@ uint partition_info::vers_set_hist_part(THD *thd, bool auto_hist)
   }
 
   /*
-     When hist_part is almost full LOCK TABLES my overflow the partition as we
-     can't add new partitions under LOCK TABLES. Reserve one for this case.
+     When hist_part is almost full LOCK TABLES may overflow the partition as we
+     can't add new partitions under LOCK TABLES. Reserve one more for this case.
   */
-  if (auto_hist && create_count == 0 &&
+  if (auto_hist && create_count < 2 &&
       thd->lex->sql_command == SQLCOM_LOCK_TABLES &&
       vers_info->hist_part->id + 1 == vers_info->now_part->id)
-    create_count= 1;
+    create_count++;
 
   return create_count;
 }
@@ -927,7 +926,6 @@ bool vers_add_auto_hist_parts(THD *thd, TABLE_LIST* tl, uint num_parts)
   bool save_no_write_to_binlog= thd->lex->no_write_to_binlog;
   thd->m_reprepare_observer= NULL;
   thd->lex->reset_n_backup_query_tables_list(&save_query_tables);
-  thd->in_sub_stmt|= SUB_STMT_AUTO_HIST;
   thd->lex->no_write_to_binlog= true;
   TABLE *table= tl->table;
 
@@ -1043,7 +1041,6 @@ exit:
   thd->work_part_info= save_part_info;
   thd->m_reprepare_observer= save_reprepare_observer;
   thd->lex->restore_backup_query_tables_list(&save_query_tables);
-  thd->in_sub_stmt&= ~SUB_STMT_AUTO_HIST;
   thd->lex->no_write_to_binlog= save_no_write_to_binlog;
   return result;
 }
