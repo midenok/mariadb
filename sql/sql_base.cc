@@ -5208,6 +5208,8 @@ TABLE *open_ltable(THD *thd, TABLE_LIST *table_list, thr_lock_type lock_type,
 {
   TABLE *table;
   Open_table_context ot_ctx(thd, lock_flags);
+  /* Skip vers_need_hist_part() this time. */
+  ot_ctx.vers_create_count= 1;
   bool error;
   DBUG_ENTER("open_ltable");
 

@@ -1425,7 +1425,7 @@ set timestamp= default;
 affected rows: 0
 # Couple of more LOCK TABLES cases
 create or replace table t1 (x int) with system versioning
-partition by system_time limit 1000 auto;
+partition by system_time limit 1 auto;
 affected rows: 0
 lock tables t1 write;
 affected rows: 0
@@ -1434,6 +1434,22 @@ affected rows: 1
 update t1 set x= x + 1;
 affected rows: 1
 info: Rows matched: 1  Changed: 1  Inserted: 1  Warnings: 0
+update t1 set x= x + 1;
+affected rows: 1
+info: Rows matched: 1  Changed: 1  Inserted: 1  Warnings: 0
+update t1 set x= x + 1;
+affected rows: 1
+info: Rows matched: 1  Changed: 1  Inserted: 1  Warnings: 1
+Warnings:
+Warning	4114	Versioned table `test`.`t1`: last HISTORY partition (`p1`) is out of LIMIT, need more HISTORY partitions
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `x` int(11) DEFAULT NULL
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+ PARTITION BY SYSTEM_TIME LIMIT 1 AUTO
+PARTITIONS 3
+affected rows: 1
 unlock tables;
 affected rows: 0
 show create table t1;
@@ -1441,7 +1457,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
- PARTITION BY SYSTEM_TIME LIMIT 1000 AUTO
+ PARTITION BY SYSTEM_TIME LIMIT 1 AUTO
 PARTITIONS 3
 affected rows: 1
 # Overflow prevention under LOCK TABLES
@@ -1486,25 +1502,15 @@ affected rows: 0
 set timestamp= unix_timestamp('2000-01-01 00:00:00');
 affected rows: 0
 create or replace table t1 (x int) with system versioning
-partition by system_time interval 1 hour auto partitions 3;
+partition by system_time interval 1 hour auto;
 affected rows: 0
 create or replace view v1 as select * from t1;
 affected rows: 0
-insert into v1 values (1);
-affected rows: 1
-show create table t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `x` int(11) DEFAULT NULL
-) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
- PARTITION BY SYSTEM_TIME INTERVAL 1 HOUR STARTS TIMESTAMP'2000-01-01 00:00:00' AUTO
-PARTITIONS 3
+insert into t1 values (1);
 affected rows: 1
 set timestamp= unix_timestamp('2000-01-01 01:00:00');
 affected rows: 0
-lock tables t1 write;
-affected rows: 0
-update t1 set x= x + 3;
+update v1 set x= x + 2;
 affected rows: 1
 info: Rows matched: 1  Changed: 1  Inserted: 1  Warnings: 0
 show create table t1;
@@ -1513,7 +1519,22 @@ t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
  PARTITION BY SYSTEM_TIME INTERVAL 1 HOUR STARTS TIMESTAMP'2000-01-01 00:00:00' AUTO
-PARTITIONS 4
+PARTITIONS 3
+affected rows: 1
+set timestamp= unix_timestamp('2000-01-01 02:00:00');
+affected rows: 0
+lock tables v1 write;
+affected rows: 0
+update v1 set x= x + 3;
+affected rows: 1
+info: Rows matched: 1  Changed: 1  Inserted: 1  Warnings: 0
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `x` int(11) DEFAULT NULL
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+ PARTITION BY SYSTEM_TIME INTERVAL 1 HOUR STARTS TIMESTAMP'2000-01-01 00:00:00' AUTO
+PARTITIONS 5
 affected rows: 1
 unlock tables;
 affected rows: 0
@@ -1936,6 +1957,7 @@ PARTITIONS 4
 drop tables t1;
 set timestamp= default;
 # Transaction
+# MDEV-25339 Assertion `thd->transaction.stmt.is_empty() || thd->in_sub_stmt' failed
 create or replace table t1 (x int) with system versioning engine innodb
 partition by system_time interval 1 hour auto;
 start transaction;
