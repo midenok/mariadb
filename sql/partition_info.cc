@@ -879,6 +879,23 @@ uint partition_info::vers_set_hist_part(THD *thd, bool auto_hist)
       {
         DBUG_ASSERT(thd->query_start() >= vers_info->hist_part->range_value);
         my_time_t diff= thd->query_start() - (my_time_t) vers_info->hist_part->range_value;
+        MYSQL_TIME t, q;
+        my_tz_OFFSET0->gmt_sec_to_TIME(&t, vers_info->hist_part->range_value);
+        my_tz_OFFSET0->gmt_sec_to_TIME(&q, thd->query_start());
+        longlong q_p= pack_time(&q);
+        longlong t_p= pack_time(&t);
+        uint create_count2= 0;
+        if (t_p == q_p)
+          create_count2++;
+        else while (t_p < q_p)
+        {
+          if (date_add_interval(thd, &t, vers_info->interval.type,
+                                vers_info->interval.step))
+            return 0;
+          t_p= pack_time(&t);
+          create_count2++;
+        }
+
         if (diff > 0)
         {
           size_t delta= vers_info->interval.seconds();
@@ -888,6 +905,8 @@ uint partition_info::vers_set_hist_part(THD *thd, bool auto_hist)
         }
         else
           create_count= 1;
+
+        DBUG_ASSERT(create_count == 8785 || create_count == create_count2);
       }
       else
       {
@@ -973,9 +992,6 @@ bool vers_add_auto_hist_parts(THD *thd, TABLE_LIST* tl, uint num_parts)
       goto exit;
     }
 
-    // NB: set_ok_status() requires DA_EMPTY
-    thd->get_stmt_da()->reset_diagnostics_area();
-
     thd->work_part_info= part_info;
     if (part_info->set_up_defaults_for_partitioning(thd, table->file, NULL,
                                     table->part_info->next_part_no(num_parts)))
@@ -1034,7 +1050,8 @@ bool vers_add_auto_hist_parts(THD *thd, TABLE_LIST* tl, uint num_parts)
   }
 
   result= false;
-  // NB: we have to return DA_EMPTY for new command
+  // NOTE: we have to return DA_EMPTY for new command
+  DBUG_ASSERT(thd->get_stmt_da()->is_ok());
   thd->get_stmt_da()->reset_diagnostics_area();
 
 exit:
