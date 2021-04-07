@@ -816,12 +816,11 @@ bool partition_info::has_unique_name(partition_element *element)
     vers_info->interval   Limit by fixed time interval
     vers_info->hist_part  (out) Working history partition
 */
-uint partition_info::vers_set_hist_part(THD *thd, bool auto_hist)
+bool partition_info::vers_set_hist_part(THD *thd, uint *create_count)
 {
   DBUG_ASSERT(!table->pos_in_table_list ||
               !table->pos_in_table_list->vers_conditions.delete_history);
-  uint create_count= 0;
-  auto_hist= auto_hist && vers_info->auto_hist;
+  const bool auto_hist= create_count && vers_info->auto_hist;
 
   if (vers_info->limit)
   {
@@ -845,7 +844,7 @@ uint partition_info::vers_set_hist_part(THD *thd, bool auto_hist)
       if (next == vers_info->now_part)
       {
         if (auto_hist)
-          create_count= 1;
+          *create_count= 1;
         else
           my_error(WARN_VERS_PART_FULL, MYF(ME_WARNING|ME_ERROR_LOG),
                   table->s->db.str, table->s->table_name.str,
@@ -877,36 +876,28 @@ uint partition_info::vers_set_hist_part(THD *thd, bool auto_hist)
     {
       if (auto_hist)
       {
+        *create_count= 0;
         DBUG_ASSERT(thd->query_start() >= vers_info->hist_part->range_value);
-        my_time_t diff= thd->query_start() - (my_time_t) vers_info->hist_part->range_value;
         MYSQL_TIME t, q;
         my_tz_OFFSET0->gmt_sec_to_TIME(&t, vers_info->hist_part->range_value);
         my_tz_OFFSET0->gmt_sec_to_TIME(&q, thd->query_start());
         longlong q_p= pack_time(&q);
         longlong t_p= pack_time(&t);
-        uint create_count2= 0;
         if (t_p == q_p)
-          create_count2++;
+          ++*create_count;
         else while (t_p < q_p)
         {
           if (date_add_interval(thd, &t, vers_info->interval.type,
                                 vers_info->interval.step))
-            return 0;
+            return true;
           t_p= pack_time(&t);
-          create_count2++;
+          ++*create_count;
+          if (*create_count > MAX_PARTITIONS)
+          {
+            my_error(ER_TOO_MANY_PARTITIONS_ERROR, MYF(0));
+            return true;
+          }
         }
-
-        if (diff > 0)
-        {
-          size_t delta= vers_info->interval.seconds();
-          create_count= (uint) (diff / delta + 1);
-          if (diff % delta)
-            create_count++;
-        }
-        else
-          create_count= 1;
-
-        DBUG_ASSERT(create_count == 8785 || create_count == create_count2);
       }
       else
       {
@@ -921,12 +912,12 @@ uint partition_info::vers_set_hist_part(THD *thd, bool auto_hist)
      When hist_part is almost full LOCK TABLES may overflow the partition as we
      can't add new partitions under LOCK TABLES. Reserve one more for this case.
   */
-  if (auto_hist && create_count < 2 &&
+  if (auto_hist && *create_count < 2 &&
       thd->lex->sql_command == SQLCOM_LOCK_TABLES &&
       vers_info->hist_part->id + 1 == vers_info->now_part->id)
-    create_count++;
+    ++*create_count;
 
-  return create_count;
+  return false;
 }
 
 

@@ -417,7 +417,7 @@ public:
                          interval_type int_type, Item *starts,
                          bool auto_part, const char *table_name);
   bool vers_set_limit(ulonglong limit, bool auto_part, const char *table_name);
-  unsigned int vers_set_hist_part(THD* thd, bool auto_part);
+  bool vers_set_hist_part(THD* thd, uint *create_count);
   bool vers_fix_field_list(THD *thd);
   void vers_update_el_ids();
   partition_element *get_partition(uint part_id)

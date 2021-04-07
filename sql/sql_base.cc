@@ -1826,7 +1826,7 @@ bool open_table(THD *thd, TABLE_LIST *table_list, Open_table_context *ot_ctx)
       if (table->vers_need_hist_part(thd, table_list))
       {
         /* Rotation is still needed under LOCK TABLES */
-        table->part_info->vers_set_hist_part(thd, false);
+        (void) table->part_info->vers_set_hist_part(thd, NULL);
       }
 #endif
       goto reset;
@@ -2086,7 +2086,12 @@ retry_share:
   if (!ot_ctx->vers_create_count &&
       table->vers_need_hist_part(thd, table_list))
   {
-    ot_ctx->vers_create_count= table->part_info->vers_set_hist_part(thd, true);
+    if (table->part_info->vers_set_hist_part(thd, &ot_ctx->vers_create_count))
+    {
+      MYSQL_UNBIND_TABLE(table->file);
+      tc_release_table(table);
+      DBUG_RETURN(TRUE);
+    }
     if (ot_ctx->vers_create_count)
     {
       MYSQL_UNBIND_TABLE(table->file);
