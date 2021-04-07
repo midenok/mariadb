@@ -74,22 +74,6 @@ struct Vers_part_info : public Sql_alloc
     INTERVAL step;
     enum interval_type type;
     bool is_set() const { return type < INTERVAL_LAST; }
-    size_t seconds() const
-    {
-      if (step.second)
-        return step.second;
-      if (step.minute)
-        return step.minute * 60;
-      if (step.hour)
-        return step.hour * 3600;
-      if (step.day)
-        return step.day * 3600 * 24;
-      // comparison is used in rough estimates, it doesn't need to be calendar-correct
-      if (step.month)
-        return step.month * 3600 * 24 * 30;
-      DBUG_ASSERT(step.year);
-      return step.year * 86400 * 30 * 365;
-    }
   } interval;
   ulonglong limit;
   bool auto_hist;

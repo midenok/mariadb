@@ -1885,6 +1885,22 @@ t1	CREATE TABLE `t1` (
   PRIMARY KEY (`x`)
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
  PARTITION BY SYSTEM_TIME INTERVAL 1 HOUR STARTS TIMESTAMP'2000-01-01 00:00:00' AUTO
+PARTITIONS 2
+# LOAD DATA .. REPLACE
+set timestamp= unix_timestamp('2000-01-01 00:00:00');
+create or replace table t1 (x int primary key) with system versioning
+partition by system_time interval 1 hour auto;
+insert t1 values (1), (2), (3);
+select x into outfile 'MDEV-17554.data' from t1;
+set timestamp= unix_timestamp('2000-01-01 01:00:00');
+load data infile 'MDEV-17554.data' replace into table t1 (x);
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `x` int(11) NOT NULL,
+  PRIMARY KEY (`x`)
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
+ PARTITION BY SYSTEM_TIME INTERVAL 1 HOUR STARTS TIMESTAMP'2000-01-01 00:00:00' AUTO
 PARTITIONS 3
 # Concurrent DML
 set timestamp= unix_timestamp('2000-01-01 00:00:00');
