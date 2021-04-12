@@ -5184,8 +5184,8 @@ void select_create::abort_result_set()
       }
     }
   }
+  ddl_log_revert(thd, &ddl_log_state_create);
   ddl_log_state_rm.complete(thd);
-  ddl_log_state_create.complete(thd);
   DBUG_VOID_RETURN;
 }
 

@@ -230,7 +230,7 @@ typedef struct st_ddl_log_state
   */
   DDL_LOG_MEMORY_ENTRY *main_entry;
   uint16 flags;                                 /* Cache for flags */
-  bool revert;                                 /* Execute on complete() */
+  bool revert;                                 /* Execute log on complete() */
   bool is_active() { return list != 0; }
   void do_execute(THD *thd);
   void complete(THD *thd);
