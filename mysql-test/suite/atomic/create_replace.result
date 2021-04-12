@@ -1,3 +1,4 @@
+# Crash recovery
 create table const_table (a int, b int) engine=myisam;
 insert into const_table values (1,1),(2,2);
 flush tables;

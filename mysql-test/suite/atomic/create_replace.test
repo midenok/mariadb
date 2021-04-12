@@ -4,15 +4,19 @@
 --source include/have_log_bin.inc
 --source include/not_valgrind.inc
 
-#
-# Testing of atomic create table with crashes in a lot of different places
-#
-# We test both statement based logging and row logging as CREATE ... SELECT
-# works a bit differently depending on the logging format
-# First engine will use row logging and second engine will use statement
-# based logging 
-#
+if (0)
+{
+--echo # Error recovery
+create table t1 (a int);
+insert t1 values (1), (1);
+create table t2 (c int);
+--error ER_DUP_ENTRY
+create or replace table t2 (a int primary key) as select * from t1;
+show create table t2;
+drop tables t2, t1;
+}
 
+--echo # Crash recovery
 --disable_query_log
 call mtr.add_suppression("InnoDB: .* does not exist in the InnoDB internal");
 call mtr.add_suppression("Table './test/t1' is marked as crashed and should be repaired");

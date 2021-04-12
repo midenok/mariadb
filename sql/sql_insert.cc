@@ -4590,8 +4590,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
       *lock= 0;
     }
     drop_open_table(thd, table, &create_table->db, &create_table->table_name);
-    ddl_log_state_rm.complete(thd);
     ddl_log_state_create.complete(thd);
+    ddl_log_state_rm.complete(thd);
     DBUG_RETURN(NULL);
     /* purecov: end */
   }
@@ -5053,8 +5053,8 @@ bool select_create::send_eof()
     (as the query was logged before commit!)
   */
   debug_crash_here("ddl_log_create_after_binlog");
-  ddl_log_state_rm.complete(thd);
   ddl_log_state_create.complete(thd);
+  ddl_log_state_rm.complete(thd);
   debug_crash_here("ddl_log_create_log_complete");
 
   /*

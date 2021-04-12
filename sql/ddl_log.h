@@ -88,6 +88,7 @@ enum ddl_log_action_code
   DDL_LOG_CREATE_TRIGGER_ACTION=15,
   DDL_LOG_ALTER_TABLE_ACTION=16,
   DDL_LOG_STORE_QUERY_ACTION=17,
+  DDL_LOG_EXECUTE_ACTION=18,
   DDL_LOG_LAST_ACTION                          /* End marker */
 };
 
@@ -234,6 +235,7 @@ typedef struct st_ddl_log_state
   bool is_active() { return list != 0; }
   void do_execute(THD *thd);
   void complete(THD *thd);
+  bool set_master(st_ddl_log_state *master_chain);
 } DDL_LOG_STATE;
 
 

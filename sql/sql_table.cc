@@ -1446,6 +1446,11 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
           table_name= t.table_name;
           if (!first_table)
           {
+            /*
+              NOTE: write renamed table name into drop-chain and replay it after
+              CREATE OR REPLACE finishes. We need to finalize rename-chain first,
+              so replay would not execute it.
+            */
             ddl_log_state->revert= true;
             dont_log_query= true;
           }
@@ -1500,6 +1505,16 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     if (!first_table++)
     {
       LEX_CSTRING comment= {comment_start, (size_t) comment_len};
+
+      if (ddl_log_state_rename)
+      {
+        if (ddl_log_state->set_master(ddl_log_state_rename))
+        {
+          error= 1;
+          goto err;
+        }
+      }
+
       if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
       {
         error= 1;
@@ -4794,8 +4809,8 @@ err:
     debug_crash_here("ddl_log_create_after_binlog");
     thd->binlog_xid= 0;
   }
-  ddl_log_state_rm.complete(thd);
   ddl_log_state_create.complete(thd);
+  ddl_log_state_rm.complete(thd);
   DBUG_RETURN(result);
 }
 
@@ -5414,8 +5429,8 @@ err:
   }
 
   // FIXME: inject error and test
-  ddl_log_state_rm.complete(thd);
   ddl_log_state_create.complete(thd);
+  ddl_log_state_rm.complete(thd);
   DBUG_RETURN(res != 0);
 }
 
