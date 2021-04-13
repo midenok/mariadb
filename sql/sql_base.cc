@@ -2122,10 +2122,22 @@ retry_share:
     }
     if (ot_ctx->vers_create_count)
     {
+      Open_table_context::enum_open_table_action action;
+      mysql_mutex_lock(&table->s->LOCK_share);
+      if (!table->s->vers_skip_auto_create)
+      {
+        table->s->vers_skip_auto_create= true;
+        action= Open_table_context::OT_ADD_HISTORY_PARTITION;
+      }
+      else
+      {
+        ot_ctx->vers_create_count= 0;
+        action= Open_table_context::OT_REOPEN_TABLES;
+      }
+      mysql_mutex_unlock(&table->s->LOCK_share);
       MYSQL_UNBIND_TABLE(table->file);
       tc_release_table(table);
-      ot_ctx->request_backoff_action(Open_table_context::OT_ADD_HISTORY_PARTITION,
-                                      table_list);
+      ot_ctx->request_backoff_action(action, table_list);
       DBUG_RETURN(TRUE);
     }
   }
