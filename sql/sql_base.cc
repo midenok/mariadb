@@ -2111,23 +2111,29 @@ retry_share:
        NOTE: The semantics of vers_set_hist_part() is double: even when we
        don't need auto-create, we need to update part_info->hist_part.
     */
-    uint *create_count= table_list->vers_skip_auto_create ?
-      NULL : &ot_ctx->vers_create_count;
+    mysql_mutex_lock(&table->s->LOCK_share);
+    uint *create_count= (table_list->vers_skip_auto_create ||
+                         table->s->vers_skip_auto_create) ?
+                           NULL : &ot_ctx->vers_create_count;
     table_list->vers_skip_auto_create= true;
     if (table->part_info->vers_set_hist_part(thd, create_count))
     {
+      mysql_mutex_unlock(&table->s->LOCK_share);
       MYSQL_UNBIND_TABLE(table->file);
       tc_release_table(table);
       DBUG_RETURN(TRUE);
     }
     if (ot_ctx->vers_create_count)
     {
+      table->s->vers_skip_auto_create= true;
+      mysql_mutex_unlock(&table->s->LOCK_share);
       MYSQL_UNBIND_TABLE(table->file);
       tc_release_table(table);
       ot_ctx->request_backoff_action(Open_table_context::OT_ADD_HISTORY_PARTITION,
                                       table_list);
       DBUG_RETURN(TRUE);
     }
+    mysql_mutex_unlock(&table->s->LOCK_share);
   }
 
   if (!(flags & MYSQL_OPEN_HAS_MDL_LOCK) &&
@@ -3328,9 +3334,23 @@ Open_table_context::recover_from_failed_open()
             break;
           }
 
+          mysql_mutex_lock(&table->s->LOCK_share);
+          if (table->s->vers_skip_auto_create)
+          {
+            mysql_mutex_unlock(&table->s->LOCK_share);
+            break;
+          }
+          table->s->vers_skip_auto_create= true;
+          mysql_mutex_unlock(&table->s->LOCK_share);
+
           DBUG_ASSERT(vers_create_count);
           TABLE_LIST *tl= m_failed_table;
           result= vers_add_hist_parts(m_thd, tl, vers_create_count);
+#ifndef DBUG_OFF
+          TABLE_SHARE *share= tdc_acquire_share(m_thd, tl, GTS_TABLE, NULL);
+          DBUG_ASSERT(!share->vers_skip_auto_create);
+          tdc_release_share(share);
+#endif
           if (!m_thd->transaction->stmt.is_empty())
             trans_commit_stmt(m_thd);
           close_tables_for_reopen(m_thd, &tl, start_of_statement_svp());
