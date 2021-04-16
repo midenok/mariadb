@@ -374,6 +374,8 @@ TABLE_SHARE *alloc_table_share(const char *db, const char *table_name,
                      &share->LOCK_share, MY_MUTEX_INIT_SLOW);
     mysql_mutex_init(key_TABLE_SHARE_LOCK_ha_data,
                      &share->LOCK_ha_data, MY_MUTEX_INIT_FAST);
+    mysql_mutex_init(0, &share->mutex, 0);
+    mysql_cond_init(0, &share->suspend, 0);
 
     DBUG_EXECUTE_IF("simulate_big_table_id",
                     if (last_table_id < UINT_MAX32)
@@ -483,6 +485,8 @@ void TABLE_SHARE::destroy()
   {
     mysql_mutex_destroy(&LOCK_share);
     mysql_mutex_destroy(&LOCK_ha_data);
+    mysql_mutex_destroy(&mutex);
+    mysql_cond_destroy(&suspend);
   }
   my_hash_free(&name_hash);
 

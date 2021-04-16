@@ -2135,6 +2135,10 @@ retry_share:
         action= Open_table_context::OT_REOPEN_TABLES;
       }
       mysql_mutex_unlock(&table->s->LOCK_share);
+      if (table->s->vers_skip_auto_create)
+      {
+        mysql_cond_wait(&table->s->suspend, &table->s->mutex);
+      }
       MYSQL_UNBIND_TABLE(table->file);
       tc_release_table(table);
       ot_ctx->request_backoff_action(action, table_list);

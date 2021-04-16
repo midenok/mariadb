@@ -914,6 +914,8 @@ struct TABLE_SHARE
       single share.
   */
   bool          vers_skip_auto_create;
+  mysql_cond_t suspend;
+  mysql_mutex_t mutex;
 
   bool init_period_from_extra2(period_info_t *period, const uchar *data,
                                const uchar *end);
