@@ -39,9 +39,8 @@ drop tables t1, t2, t3;
 create table const_table (a int, b int) engine=myisam;
 insert into const_table values (1,1),(2,2);
 flush tables;
-engine: myisam
-query: CREATE OR REPLACE TABLE t1 (a int)
-crash point: ddl_log_create_before_create_frm
+# QUERY: CREATE OR REPLACE TABLE t1 (a int)
+# CRASH POINT: ddl_log_create_before_create_frm
 t1.MYD
 t1.MYI
 t1.frm
@@ -49,7 +48,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_before_create_table
+# CRASH POINT: ddl_log_create_before_create_table
 t1.MYD
 t1.MYI
 t1.frm
@@ -57,7 +56,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_create_table
+# CRASH POINT: ddl_log_create_after_create_table
 t1.MYD
 t1.MYI
 t1.frm
@@ -65,7 +64,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_drop
+# CRASH POINT: ddl_log_create_after_drop
 t1.MYD
 t1.MYI
 t1.frm
@@ -73,7 +72,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_before_binlog
+# CRASH POINT: ddl_log_create_before_binlog
 t1.MYD
 t1.MYI
 t1.frm
@@ -81,8 +80,8 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_prepare_eof
-"No crash!"
+# CRASH POINT: ddl_log_create_after_prepare_eof
+"# No crash!"
 t1.MYD
 t1.MYI
 t1.frm
@@ -91,7 +90,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_binlog
+# CRASH POINT: ddl_log_create_after_binlog
 t1.MYD
 t1.MYI
 t1.frm
@@ -100,8 +99,8 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_log_complete
-"No crash!"
+# CRASH POINT: ddl_log_create_log_complete
+"# No crash!"
 t1.MYD
 t1.MYI
 t1.frm
@@ -110,8 +109,8 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-query: CREATE OR REPLACE TABLE t1 LIKE const_table
-crash point: ddl_log_create_before_create_frm
+# QUERY: CREATE OR REPLACE TABLE t1 LIKE const_table
+# CRASH POINT: ddl_log_create_before_create_frm
 t1.MYD
 t1.MYI
 t1.frm
@@ -119,7 +118,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_before_create_table
+# CRASH POINT: ddl_log_create_before_create_table
 t1.MYD
 t1.MYI
 t1.frm
@@ -127,7 +126,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_create_table
+# CRASH POINT: ddl_log_create_after_create_table
 t1.MYD
 t1.MYI
 t1.frm
@@ -135,7 +134,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_drop
+# CRASH POINT: ddl_log_create_after_drop
 t1.MYD
 t1.MYI
 t1.frm
@@ -143,7 +142,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_before_binlog
+# CRASH POINT: ddl_log_create_before_binlog
 t1.MYD
 t1.MYI
 t1.frm
@@ -151,8 +150,8 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_prepare_eof
-"No crash!"
+# CRASH POINT: ddl_log_create_after_prepare_eof
+"# No crash!"
 t1.MYD
 t1.MYI
 t1.frm
@@ -162,7 +161,7 @@ t1	CREATE TABLE `t1` (
   `a` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_binlog
+# CRASH POINT: ddl_log_create_after_binlog
 t1.MYD
 t1.MYI
 t1.frm
@@ -172,8 +171,8 @@ t1	CREATE TABLE `t1` (
   `a` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_log_complete
-"No crash!"
+# CRASH POINT: ddl_log_create_log_complete
+"# No crash!"
 t1.MYD
 t1.MYI
 t1.frm
@@ -183,8 +182,8 @@ t1	CREATE TABLE `t1` (
   `a` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-query: CREATE OR REPLACE TABLE t1 SELECT * from const_table
-crash point: ddl_log_create_before_create_frm
+# QUERY: CREATE OR REPLACE TABLE t1 SELECT * from const_table
+# CRASH POINT: ddl_log_create_before_create_frm
 t1.MYD
 t1.MYI
 t1.frm
@@ -192,7 +191,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_before_create_table
+# CRASH POINT: ddl_log_create_before_create_table
 t1.MYD
 t1.MYI
 t1.frm
@@ -200,7 +199,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_create_table
+# CRASH POINT: ddl_log_create_after_create_table
 t1.MYD
 t1.MYI
 t1.frm
@@ -208,7 +207,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_drop
+# CRASH POINT: ddl_log_create_after_drop
 t1.MYD
 t1.MYI
 t1.frm
@@ -216,7 +215,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_before_binlog
+# CRASH POINT: ddl_log_create_before_binlog
 t1.MYD
 t1.MYI
 t1.frm
@@ -224,7 +223,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_prepare_eof
+# CRASH POINT: ddl_log_create_after_prepare_eof
 t1.MYD
 t1.MYI
 t1.frm
@@ -232,7 +231,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-crash point: ddl_log_create_after_binlog
+# CRASH POINT: ddl_log_create_after_binlog
 t1.MYD
 t1.MYI
 t1.frm
@@ -251,7 +250,7 @@ Error	145	Table './test/t1' is marked as crashed and should be repaired
 Warning	1034	1 client is using or hasn't closed the table properly
 Warning	1034	Size of datafile is:        18       Should be: 0
 Note	1034	Table is fixed
-crash point: ddl_log_create_log_complete
+# CRASH POINT: ddl_log_create_log_complete
 t1.MYD
 t1.MYI
 t1.frm

@@ -4937,11 +4937,6 @@ bool select_create::send_eof()
   {
     if (ddl_log_state_create.is_active())       // Not temporary table
       ddl_log_update_phase(&ddl_log_state_create, DDL_CREATE_TABLE_PHASE_LOG);
-    /*
-      We can ignore if we replaced an old table as ddl_log_state_create will
-      now handle the logging of the drop if needed.
-    */
-    ddl_log_state_rm.complete(thd);
   }
 
   if (prepare_eof())

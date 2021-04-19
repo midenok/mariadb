@@ -1,0 +1,4 @@
+[innodb]
+[myisam]
+[aria]
+[aria_notrans]
