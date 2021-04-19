@@ -4,17 +4,28 @@
 --source include/have_log_bin.inc
 --source include/not_valgrind.inc
 
-if (0)
-{
 --echo # Error recovery
 create table t1 (a int);
 insert t1 values (1), (1);
 create table t2 (c int);
+--error ER_DUP_KEYNAME
+create or replace table t2 (a int, b int, key k (a), key k (b));
+show create table t2;
+--error ER_DUP_KEYNAME
+create or replace table t2 (a int, b int, key k (a), key k (b)) as select a, a as b from t1;
+show create table t2;
 --error ER_DUP_ENTRY
 create or replace table t2 (a int primary key) as select * from t1;
 show create table t2;
-drop tables t2, t1;
-}
+set @old_mode= @@sql_mode;
+set @@sql_mode='ALLOW_INVALID_DATES';
+create table t3 (dt datetime default '2008-02-31 00:00:00');
+set @@sql_mode= @old_mode;
+--error ER_INVALID_DEFAULT
+create or replace table t2 like t3;
+show create table t2;
+
+drop tables t1, t2, t3;
 
 --echo # Crash recovery
 --disable_query_log

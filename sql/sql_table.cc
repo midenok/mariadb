@@ -4567,12 +4567,6 @@ int create_table_impl(THD *thd,
 
   error= 0;
 err:
-  if (unlikely(error) && ddl_log_state_create)
-  {
-    /* Table was never created, so we can ignore the ddl log entry */
-    ddl_log_state_create->complete(thd);
-  }
-
   THD_STAGE_INFO(thd, stage_after_create);
   delete file;
   DBUG_PRINT("exit", ("return: %d", error));
@@ -4839,6 +4833,11 @@ err:
       ddl_log.org_table_id=     create_info->tabledef_version;
       backup_log_ddl(&ddl_log);
     }
+  }
+  if (result)
+  {
+    ddl_log_state_create.revert= true;
+    ddl_log_state_rm.revert= false;
   }
   ddl_log_state_create.complete(thd);
   ddl_log_state_rm.complete(thd);
@@ -5496,7 +5495,11 @@ err:
     backup_log_ddl(&ddl_log);
   }
 
-  // FIXME: inject error and test
+  if (res)
+  {
+    ddl_log_state_create.revert= true;
+    ddl_log_state_rm.revert= false;
+  }
   ddl_log_state_create.complete(thd);
   ddl_log_state_rm.complete(thd);
   DBUG_RETURN(res != 0);

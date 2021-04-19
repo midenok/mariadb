@@ -4538,6 +4538,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
   {
     if (likely(!thd->is_error()))             // CREATE ... IF NOT EXISTS
       my_ok(thd);                             //   succeed, but did nothing
+    ddl_log_state_create.revert= true;
+    ddl_log_state_rm.revert= false;
     ddl_log_state_rm.complete(thd);
     ddl_log_state_create.complete(thd);
     DBUG_RETURN(NULL);
@@ -4578,6 +4580,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
       *lock= 0;
     }
     drop_open_table(thd, table, &create_table->db, &create_table->table_name);
+    ddl_log_state_create.revert= true;
+    ddl_log_state_rm.revert= false;
     ddl_log_state_create.complete(thd);
     ddl_log_state_rm.complete(thd);
     DBUG_RETURN(NULL);
@@ -5209,7 +5213,9 @@ void select_create::abort_result_set()
       }
     }
   }
-  ddl_log_revert(thd, &ddl_log_state_create);
+  ddl_log_state_create.revert= true;
+  ddl_log_state_rm.revert= false;
+  ddl_log_state_create.complete(thd);
   ddl_log_state_rm.complete(thd);
   DBUG_VOID_RETURN;
 }
