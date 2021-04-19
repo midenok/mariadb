@@ -1438,11 +1438,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
             !mysql_do_rename(thd, &param, ddl_log_state_rename, table, &table->db,
                              false, &force_if_exists))
         {
-          // FIXME: copy ticket?
-          // FIXME: what about unknown_tables, etc.
           // FIXME: binlog logs DROP TABLE IF EXISTS `#sqlb-t1`
-          table->table_name= t.table_name;
-          table->alias= t.table_name;
           table_name= t.table_name;
           if (!first_table)
           {
