@@ -77,14 +77,14 @@ let $crash_points='ddl_log_create_before_create_frm', 'ddl_log_create_before_cre
 # let $crash_points='ddl_log_create_after_prepare_eof', 'ddl_log_create_after_binlog';
 
 let $statement_count=3;
-let $statements='CREATE OR REPLACE TABLE t1 (a int)',
+let $statements='CREATE OR REPLACE TABLE t1 (new int)',
                 'CREATE OR REPLACE TABLE t1 LIKE const_table',
                 'CREATE OR REPLACE TABLE t1 SELECT * from const_table';
 
 # let $statement_count=1;
 # let $statements='CREATE OR REPLACE TABLE t1 SELECT * from const_table';
 
-create table const_table (a int, b int) engine=myisam;
+create table const_table (new int, b int) engine=myisam;
 insert into const_table values (1,1),(2,2);
 flush tables;
 
@@ -108,7 +108,7 @@ while ($r < $statement_count)
     let $crash=`select ELT($c, $crash_points)`;
 
     --eval set @@default_storage_engine=$default_engine
-    create or replace table t1 (x int);
+    create or replace table t1 (old int);
     flush tables;
 
     --source $binlog_format
@@ -129,7 +129,7 @@ while ($r < $statement_count)
 
     if ($error == 0)
     {
-      echo "# No crash!";
+      --echo # No crash!
     }
     # Check which tables still exists
     --list_files $MYSQLD_DATADIR/test t*
