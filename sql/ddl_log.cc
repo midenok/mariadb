@@ -1540,6 +1540,11 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         break;
       /* fall through */
     case DDL_DROP_PHASE_COLLECT:
+      if (ddl_log_entry->flags & DDL_LOG_FLAG_DROP_SKIP_BINLOG)
+      {
+        (void) increment_phase(entry_pos);
+        break;
+      }
       if (strcmp(recovery_state.current_db, db.str))
       {
         append_identifier(thd, &recovery_state.drop_table, &db);
@@ -3106,6 +3111,8 @@ static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.action_type=  action_code;
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(db);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
+  if (ddl_state->skip_binlog)
+    ddl_log_entry.flags|=     DDL_LOG_FLAG_DROP_SKIP_BINLOG;
 
   mysql_mutex_lock(&LOCK_gdl);
   if (ddl_log_write_entry(&ddl_log_entry, &log_entry))

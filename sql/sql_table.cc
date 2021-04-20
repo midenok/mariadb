@@ -1510,6 +1510,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
           error= 1;
           goto err;
         }
+        ddl_log_state->skip_binlog= true;
       }
 
       if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))

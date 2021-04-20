@@ -170,6 +170,8 @@ enum enum_ddl_log_alter_table_phase {
 #define DDL_LOG_FLAG_UPDATE_STAT          (1 << 3)
 #define DDL_LOG_FLAG_SKIP_BINLOG          (1 << 4)
 
+#define DDL_LOG_FLAG_DROP_SKIP_BINLOG     (1 << 5)
+
 /*
   Setting ddl_log_entry.phase to this has the same effect as setting
   action_type to DDL_IGNORE_LOG_ENTRY_CODE
@@ -231,7 +233,8 @@ typedef struct st_ddl_log_state
   */
   DDL_LOG_MEMORY_ENTRY *main_entry;
   uint16 flags;                                 /* Cache for flags */
-  bool revert;                                 /* Execute log on complete() */
+  bool revert;                                  /* Execute log on complete() */
+  bool skip_binlog;                             /* Don't log DROP to binlog */
   bool is_active() { return list != 0; }
   void do_execute(THD *thd);
   void complete(THD *thd);
