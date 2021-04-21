@@ -4945,7 +4945,7 @@ bool select_create::send_eof()
     abort_result_set();
     DBUG_RETURN(true);
   }
-  if (binary_logged)
+  if (binary_logged && ddl_log_state_rm.is_active())
     ddl_log_state_create.complete(thd);
   debug_crash_here("ddl_log_create_after_prepare_eof");
 
