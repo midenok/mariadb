@@ -1,35 +1,35 @@
 --- create_replace.result
 +++ create_replace,row.reject
 @@ -228,7 +228,6 @@
- t1.MYD
- t1.MYI
+ t1.MAD
+ t1.MAI
  t1.frm
 -master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
  Table	Create Table
  t1	CREATE TABLE `t1` (
    `new` int(11) DEFAULT NULL,
-@@ -243,7 +242,11 @@
- t1.MYD
- t1.MYI
+@@ -238,7 +237,11 @@
+ t1.MAD
+ t1.MAI
  t1.frm
 -master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 +master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE `t1` (
 +  `new` int(11) DEFAULT NULL,
 +  `b` int(11) DEFAULT NULL
-+)
++) PAGE_CHECKSUM=1
 +master-bin.000001	#	Annotate_rows	#	#	CREATE OR REPLACE TABLE t1 SELECT * from const_table
  Table	Create Table
  t1	CREATE TABLE `t1` (
    `new` int(11) DEFAULT NULL,
-@@ -258,7 +261,11 @@
- t1.MYD
- t1.MYI
+@@ -248,7 +251,11 @@
+ t1.MAD
+ t1.MAI
  t1.frm
 -master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 +master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE `t1` (
 +  `new` int(11) DEFAULT NULL,
 +  `b` int(11) DEFAULT NULL
-+)
++) PAGE_CHECKSUM=1
 +master-bin.000001	#	Annotate_rows	#	#	CREATE OR REPLACE TABLE t1 SELECT * from const_table
  Table	Create Table
  t1	CREATE TABLE `t1` (

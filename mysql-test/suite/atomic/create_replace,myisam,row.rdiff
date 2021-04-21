@@ -1,0 +1,282 @@
+--- create_replace.result
++++ create_replace,myisam,row.reject
+@@ -1,5 +1,5 @@
+ # Error recovery
+-set @@default_storage_engine=Aria;
++set @@default_storage_engine=MyISAM;
+ create table t1 (a int);
+ insert t1 values (1), (1);
+ create table t2 (c int);
+@@ -42,40 +42,40 @@
+ flush tables;
+ # QUERY: CREATE OR REPLACE TABLE t1 (new int)
+ # CRASH POINT: ddl_log_create_before_create_frm
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_before_create_table
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_create_table
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_drop
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_before_binlog
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+@@ -83,8 +83,8 @@
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_prepare_eof
+ # No crash!
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
+ Table	Create Table
+@@ -92,8 +92,8 @@
+   `new` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_binlog
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
+ Table	Create Table
+@@ -102,8 +102,8 @@
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_log_complete
+ # No crash!
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
+ Table	Create Table
+@@ -112,40 +112,40 @@
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # QUERY: CREATE OR REPLACE TABLE t1 LIKE const_table
+ # CRASH POINT: ddl_log_create_before_create_frm
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_before_create_table
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_create_table
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_drop
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_before_binlog
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+@@ -161,7 +161,7 @@
+ t1	CREATE TABLE `t1` (
+   `new` int(11) DEFAULT NULL,
+   `b` int(11) DEFAULT NULL
+-) ENGINE=MyISAM DEFAULT CHARSET=latin1
++) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_binlog
+ t1.MYD
+ t1.MYI
+@@ -171,7 +171,7 @@
+ t1	CREATE TABLE `t1` (
+   `new` int(11) DEFAULT NULL,
+   `b` int(11) DEFAULT NULL
+-) ENGINE=MyISAM DEFAULT CHARSET=latin1
++) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_log_complete
+ # No crash!
+ t1.MYD
+@@ -182,77 +182,99 @@
+ t1	CREATE TABLE `t1` (
+   `new` int(11) DEFAULT NULL,
+   `b` int(11) DEFAULT NULL
+-) ENGINE=MyISAM DEFAULT CHARSET=latin1
++) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # QUERY: CREATE OR REPLACE TABLE t1 SELECT * from const_table
+ # CRASH POINT: ddl_log_create_before_create_frm
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_before_create_table
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_create_table
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_drop
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_before_binlog
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `old` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ # CRASH POINT: ddl_log_create_after_prepare_eof
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+-master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `new` int(11) DEFAULT NULL,
+   `b` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
++Warnings:
++Error	145	Table './test/t1' is marked as crashed and should be repaired
++Warning	1034	1 client is using or hasn't closed the table properly
++Warning	1034	Size of datafile is:        18       Should be: 0
++Note	1034	Table is fixed
+ # CRASH POINT: ddl_log_create_after_binlog
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+-master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
++master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE `t1` (
++  `new` int(11) DEFAULT NULL,
++  `b` int(11) DEFAULT NULL
++)
++master-bin.000001	#	Annotate_rows	#	#	CREATE OR REPLACE TABLE t1 SELECT * from const_table
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `new` int(11) DEFAULT NULL,
+   `b` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
++Warnings:
++Error	145	Table './test/t1' is marked as crashed and should be repaired
++Warning	1034	1 client is using or hasn't closed the table properly
++Warning	1034	Size of datafile is:        18       Should be: 0
++Note	1034	Table is fixed
+ # CRASH POINT: ddl_log_create_log_complete
+-t1.MAD
+-t1.MAI
++t1.MYD
++t1.MYI
+ t1.frm
+-master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
++master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE `t1` (
++  `new` int(11) DEFAULT NULL,
++  `b` int(11) DEFAULT NULL
++)
++master-bin.000001	#	Annotate_rows	#	#	CREATE OR REPLACE TABLE t1 SELECT * from const_table
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `new` int(11) DEFAULT NULL,
+   `b` int(11) DEFAULT NULL
+ ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+ Warnings:
++Error	145	Table './test/t1' is marked as crashed and should be repaired
++Warning	1034	1 client is using or hasn't closed the table properly
++Warning	1034	Size of datafile is:        18       Should be: 0
++Note	1034	Table is fixed
++Warnings:
+ Note	1051	Unknown table 'test.t1'
