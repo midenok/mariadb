@@ -1,4 +1,5 @@
 # Error recovery
+set @@default_storage_engine=MyISAM;
 create table t1 (a int);
 insert t1 values (1), (1);
 create table t2 (c int);
@@ -8,21 +9,21 @@ show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
   `c` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 create or replace table t2 (a int, b int, key k (a), key k (b)) as select a, a as b from t1;
 ERROR 42000: Duplicate key name 'k'
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
   `c` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 create or replace table t2 (a int primary key) as select * from t1;
 ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
   `c` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 set @old_mode= @@sql_mode;
 set @@sql_mode='ALLOW_INVALID_DATES';
 create table t3 (dt datetime default '2008-02-31 00:00:00');
@@ -33,7 +34,7 @@ show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
   `c` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 drop tables t1, t2, t3;
 # Crash recovery
 create table const_table (new int, b int) engine=myisam;
@@ -47,7 +48,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_before_create_table
 t1.MYD
 t1.MYI
@@ -55,7 +56,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_create_table
 t1.MYD
 t1.MYI
@@ -63,7 +64,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_drop
 t1.MYD
 t1.MYI
@@ -71,7 +72,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_before_binlog
 t1.MYD
 t1.MYI
@@ -79,7 +80,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_prepare_eof
 # No crash!
 t1.MYD
@@ -89,7 +90,7 @@ master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `new` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_binlog
 t1.MYD
 t1.MYI
@@ -98,7 +99,7 @@ master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `new` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_log_complete
 # No crash!
 t1.MYD
@@ -108,7 +109,7 @@ master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `new` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # QUERY: CREATE OR REPLACE TABLE t1 LIKE const_table
 # CRASH POINT: ddl_log_create_before_create_frm
 t1.MYD
@@ -117,7 +118,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_before_create_table
 t1.MYD
 t1.MYI
@@ -125,7 +126,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_create_table
 t1.MYD
 t1.MYI
@@ -133,7 +134,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_drop
 t1.MYD
 t1.MYI
@@ -141,7 +142,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_before_binlog
 t1.MYD
 t1.MYI
@@ -149,7 +150,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_prepare_eof
 # No crash!
 t1.MYD
@@ -160,7 +161,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `new` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_binlog
 t1.MYD
 t1.MYI
@@ -170,7 +171,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `new` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_log_complete
 # No crash!
 t1.MYD
@@ -181,7 +182,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `new` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # QUERY: CREATE OR REPLACE TABLE t1 SELECT * from const_table
 # CRASH POINT: ddl_log_create_before_create_frm
 t1.MYD
@@ -190,7 +191,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_before_create_table
 t1.MYD
 t1.MYI
@@ -198,7 +199,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_create_table
 t1.MYD
 t1.MYI
@@ -206,7 +207,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_drop
 t1.MYD
 t1.MYI
@@ -214,7 +215,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_before_binlog
 t1.MYD
 t1.MYI
@@ -222,7 +223,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_prepare_eof
 t1.MYD
 t1.MYI
@@ -230,7 +231,7 @@ t1.frm
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `old` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 # CRASH POINT: ddl_log_create_after_binlog
 t1.MYD
 t1.MYI
@@ -244,7 +245,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `new` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Warnings:
 Error	145	Table './test/t1' is marked as crashed and should be repaired
 Warning	1034	1 client is using or hasn't closed the table properly
@@ -263,7 +264,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `new` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Warnings:
 Error	145	Table './test/t1' is marked as crashed and should be repaired
 Warning	1034	1 client is using or hasn't closed the table properly

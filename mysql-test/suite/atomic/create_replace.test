@@ -4,22 +4,22 @@
 --source include/log_bin.inc
 --source include/not_valgrind.inc
 
-let $default_engine=innodb;
+let $default_engine=InnoDB;
 let $extra_option=;
 
 if ($MTR_COMBINATION_MYISAM)
 {
-  let $default_engine=myisam;
+  let $default_engine=MyISAM;
   let $extra_option=;
 }
 if ($MTR_COMBINATION_ARIA)
 {
-  let $default_engine=aria;
+  let $default_engine=Aria;
   let $extra_option=transactional=1;
 }
 if ($MTR_COMBINATION_ARIA_NOTRANS)
 {
-  let $default_engine=aria;
+  let $default_engine=Aria;
   let $extra_option=transactional=0;
 }
 
@@ -38,18 +38,21 @@ if ($MTR_COMBINATION_MIX)
 
 
 --echo # Error recovery
-
+--eval set @@default_storage_engine=$default_engine
 create table t1 (a int);
 insert t1 values (1), (1);
 create table t2 (c int);
 --error ER_DUP_KEYNAME
 create or replace table t2 (a int, b int, key k (a), key k (b));
+--replace_result $default_engine DEFAULT_ENGINE
 show create table t2;
 --error ER_DUP_KEYNAME
 create or replace table t2 (a int, b int, key k (a), key k (b)) as select a, a as b from t1;
+--replace_result $default_engine DEFAULT_ENGINE
 show create table t2;
 --error ER_DUP_ENTRY
 create or replace table t2 (a int primary key) as select * from t1;
+--replace_result $default_engine DEFAULT_ENGINE
 show create table t2;
 set @old_mode= @@sql_mode;
 set @@sql_mode='ALLOW_INVALID_DATES';
@@ -57,6 +60,7 @@ create table t3 (dt datetime default '2008-02-31 00:00:00');
 set @@sql_mode= @old_mode;
 --error ER_INVALID_DEFAULT
 create or replace table t2 like t3;
+--replace_result $default_engine DEFAULT_ENGINE
 show create table t2;
 
 drop tables t1, t2, t3;
@@ -73,16 +77,16 @@ let $MYSQLD_DATADIR= `SELECT @@datadir`;
 let $crash_count=8;
 let $crash_points='ddl_log_create_before_create_frm', 'ddl_log_create_before_create_table', 'ddl_log_create_after_create_table', 'ddl_log_create_after_drop', 'ddl_log_create_before_binlog', 'ddl_log_create_after_prepare_eof', 'ddl_log_create_after_binlog', 'ddl_log_create_log_complete';
 
-# let $crash_count=2;
-# let $crash_points='ddl_log_create_after_prepare_eof', 'ddl_log_create_after_binlog';
+#let $crash_count=2;
+#let $crash_points='ddl_log_create_after_prepare_eof', 'ddl_log_create_after_binlog';
 
 let $statement_count=3;
 let $statements='CREATE OR REPLACE TABLE t1 (new int)',
                 'CREATE OR REPLACE TABLE t1 LIKE const_table',
                 'CREATE OR REPLACE TABLE t1 SELECT * from const_table';
 
-# let $statement_count=1;
-# let $statements='CREATE OR REPLACE TABLE t1 SELECT * from const_table';
+#let $statement_count=1;
+#let $statements='CREATE OR REPLACE TABLE t1 SELECT * from const_table';
 
 create table const_table (new int, b int) engine=myisam;
 insert into const_table values (1,1),(2,2);
@@ -142,6 +146,7 @@ while ($r < $statement_count)
       --let $binlog_file=master-bin.000002
       --source include/show_binlog_events.inc
     }
+    --replace_result $default_engine DEFAULT_ENGINE
     show create table t1;
     # Drop the tables. The warnings will show what was dropped
     --disable_warnings
