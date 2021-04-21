@@ -3796,7 +3796,8 @@ select_insert::select_insert(THD *thd_arg, TABLE_LIST *table_list_par,
   sel_result(result),
   table_list(table_list_par), table(table_par), fields(fields_par),
   autoinc_value_of_last_inserted_row(0),
-  insert_into_view(table_list_par && table_list_par->view != 0)
+  insert_into_view(table_list_par && table_list_par->view != 0),
+  binary_logged(false)
 {
   bzero((char*) &info,sizeof(info));
   info.handle_duplicates= duplic;
@@ -4128,7 +4129,6 @@ bool select_insert::prepare_eof()
   int error;
   bool const trans_table= table->file->has_transactions_and_rollback();
   bool changed;
-  bool binary_logged= 0;
   killed_state killed_status= thd->killed;
 
   DBUG_ENTER("select_insert::prepare_eof");
@@ -4933,7 +4933,8 @@ bool select_create::send_eof()
     the CREATE TABLE will already be logged if we are not using row based
     replication.
   */
-  if (!thd->is_current_stmt_binlog_format_row())
+  if (!ddl_log_state_rm.is_active() &&
+      !thd->is_current_stmt_binlog_format_row())
   {
     if (ddl_log_state_create.is_active())       // Not temporary table
       ddl_log_update_phase(&ddl_log_state_create, DDL_CREATE_TABLE_PHASE_LOG);
@@ -5147,8 +5148,6 @@ void select_create::abort_result_set()
   if (table)
   {
     bool tmp_table= table->s->tmp_table;
-    bool table_creation_was_logged= (!tmp_table ||
-                                     table->s->table_creation_was_logged);
     if (tmp_table)
     {
       DBUG_ASSERT(saved_tmp_table_share);
@@ -5179,8 +5178,9 @@ void select_create::abort_result_set()
         /* Remove logging of drop, create + insert rows */
         binlog_reset_cache(thd);
         /* Original table was deleted. We have to log it */
-        if (table_creation_was_logged)
+        if (binary_logged && !ddl_log_state_rm.is_active())
         {
+          // FIXME: this branch is not tested. Is it needed?
           thd->binlog_xid= thd->query_id;
           ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
           ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
@@ -5208,8 +5208,11 @@ void select_create::abort_result_set()
       }
     }
   }
-  ddl_log_state_create.revert= true;
-  ddl_log_state_rm.revert= false;
+  if (!binary_logged)
+  {
+    ddl_log_state_create.revert= true;
+    ddl_log_state_rm.revert= false;
+  }
   ddl_log_state_create.complete(thd);
   ddl_log_state_rm.complete(thd);
   DBUG_VOID_RETURN;
