@@ -228,19 +228,7 @@ do_rename_temporary(THD *thd, TABLE_LIST *ren_table, TABLE_LIST *new_table)
 
 
 /**
-   Parameters for do_rename
-*/
-
-struct rename_param
-{
-  LEX_CSTRING old_alias, new_alias;
-  LEX_CUSTRING old_version;
-  handlerton *from_table_hton;
-};
-
-
-/**
-  check_rename()
+  mysql_check_rename()
 
   Check pre-conditions for rename
   - From table should exists
@@ -257,8 +245,8 @@ struct rename_param
   @retval <0  Can't do rename, but no error
 */
 
-static int
-check_rename(THD *thd, rename_param *param,
+int
+rename_check(THD *thd, rename_param *param,
              TABLE_LIST *ren_table,
              const LEX_CSTRING *new_db,
              const LEX_CSTRING *new_table_name,
@@ -267,7 +255,6 @@ check_rename(THD *thd, rename_param *param,
 {
   DBUG_ENTER("check_rename");
   DBUG_PRINT("enter", ("if_exists: %d", (int) if_exists));
-
 
   if (lower_case_table_names == 2)
   {
@@ -333,10 +320,10 @@ check_rename(THD *thd, rename_param *param,
     true      rename failed
 */
 
-static bool
-do_rename(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
-          TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
-          bool skip_error, bool *force_if_exists)
+bool
+rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
+                TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
+                bool skip_error, bool *force_if_exists)
 {
   int rc= 1;
   handlerton *hton;
@@ -349,14 +336,13 @@ do_rename(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
   new_alias= &param->new_alias;
   hton=      param->from_table_hton;
 
-  DBUG_ASSERT(!thd->locked_tables_mode);
-
 #ifdef WITH_WSREP
   if (WSREP(thd) && hton && hton != view_pseudo_hton &&
       !wsrep_should_replicate_ddl(thd, hton))
     DBUG_RETURN(1);
 #endif
 
+  // FIXME: close_or_remove_table()
   tdc_remove_table(thd, ren_table->db.str, ren_table->table_name.str);
 
   if (hton != view_pseudo_hton)
@@ -522,7 +508,7 @@ rename_tables(THD *thd, TABLE_LIST *table_list, DDL_LOG_STATE *ddl_log_state,
     {
       int error;
       rename_param param;
-      error= check_rename(thd, &param, ren_table, &new_table->db,
+      error= rename_check(thd, &param, ren_table, &new_table->db,
                           &new_table->table_name,
                           &new_table->alias, (skip_error || if_exists));
       if (error < 0)
@@ -530,9 +516,9 @@ rename_tables(THD *thd, TABLE_LIST *table_list, DDL_LOG_STATE *ddl_log_state,
       if (error > 0)
         goto revert_rename;
 
-      if (do_rename(thd, &param, ddl_log_state,
-                    ren_table, &new_table->db,
-                    skip_error, force_if_exists))
+      if (rename_do(thd, &param, ddl_log_state,
+                          ren_table, &new_table->db,
+                          skip_error, force_if_exists))
         goto revert_rename;
     }
   }
