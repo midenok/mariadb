@@ -88,6 +88,7 @@ enum ddl_log_action_code
   DDL_LOG_CREATE_TRIGGER_ACTION=15,
   DDL_LOG_ALTER_TABLE_ACTION=16,
   DDL_LOG_STORE_QUERY_ACTION=17,
+  DDL_LOG_EXECUTE_ACTION=18,
   DDL_LOG_LAST_ACTION                          /* End marker */
 };
 
@@ -126,7 +127,6 @@ enum enum_ddl_log_drop_db_phase {
 
 enum enum_ddl_log_create_table_phase {
   DDL_CREATE_TABLE_PHASE_INIT=0,
-  DDL_CREATE_TABLE_PHASE_LOG,
   DDL_CREATE_TABLE_PHASE_END
 };
 
@@ -173,6 +173,7 @@ enum enum_ddl_log_alter_table_phase {
   engine is not changed
 */
 #define DDL_LOG_FLAG_ALTER_PARTITION      (1 << 4)
+#define DDL_LOG_FLAG_DROP_SKIP_BINLOG     (1 << 5)
 
 /*
   Setting ddl_log_entry.phase to this has the same effect as setting
@@ -248,7 +249,12 @@ typedef struct st_ddl_log_state
   */
   DDL_LOG_MEMORY_ENTRY *main_entry;
   uint16 flags;                                 /* Cache for flags */
+  bool revert;                                  /* Execute log on complete() */
+  bool skip_binlog;                             /* Don't log DROP to binlog */
   bool is_active() { return list != 0; }
+  void do_execute(THD *thd);
+  void complete(THD *thd);
+  bool execute_after(st_ddl_log_state *master_chain);
 } DDL_LOG_STATE;
 
 
@@ -256,6 +262,7 @@ typedef struct st_ddl_log_state
 bool ddl_log_initialize();
 void ddl_log_release();
 bool ddl_log_close_binlogged_events(HASH *xids);
+void ddl_log_update_recovery(uint entry_pos, ulonglong xid);
 int ddl_log_execute_recovery();
 
 /* functions for updating the ddl log */
@@ -266,7 +273,6 @@ bool ddl_log_write_execute_entry(uint first_entry,
                                  DDL_LOG_MEMORY_ENTRY **active_entry);
 bool ddl_log_disable_execute_entry(DDL_LOG_MEMORY_ENTRY **active_entry);
 
-void ddl_log_complete(DDL_LOG_STATE *ddl_log_state);
 void ddl_log_revert(THD *thd, DDL_LOG_STATE *ddl_log_state);
 
 bool ddl_log_update_phase(DDL_LOG_STATE *entry, uchar phase);
