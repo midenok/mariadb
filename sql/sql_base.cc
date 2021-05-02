@@ -1622,62 +1622,121 @@ bool is_locked_view(THD *thd, TABLE_LIST *t)
 }
 
 
-bool TABLE::vers_need_hist_part(const THD *thd, const TABLE_LIST *table_list) const
-{
 #ifdef WITH_PARTITION_STORAGE_ENGINE
-  if (part_info && part_info->part_type == VERSIONING_PARTITION &&
-      !table_list->vers_conditions.delete_history &&
-      !thd->stmt_arena->is_stmt_prepare() &&
-      table_list->lock_type >= TL_WRITE_ALLOW_WRITE &&
-       table_list->mdl_request.type >= MDL_SHARED_WRITE &&
-      table_list->mdl_request.type < MDL_EXCLUSIVE)
-  {
-    switch (thd->lex->sql_command)
-    {
-      case SQLCOM_INSERT:
-        if (thd->lex->duplicates != DUP_UPDATE)
-          break;
-        return true;
-      case SQLCOM_LOAD:
-        if (thd->lex->duplicates != DUP_REPLACE)
-          break;
-        return true;
-      case SQLCOM_LOCK_TABLES:
-      case SQLCOM_DELETE:
-      case SQLCOM_UPDATE:
-      case SQLCOM_REPLACE:
-      case SQLCOM_REPLACE_SELECT:
-      case SQLCOM_DELETE_MULTI:
-      case SQLCOM_UPDATE_MULTI:
-        return true;
-      default:;
-        break;
-    }
-    /*
-      TODO: make row events set thd->lex->sql_command appropriately.
+/**
+  Switch part_info->hist_part and request partition creation if needed.
 
-      Sergei Golubchik: f.ex. currently row events increment
-      thd->status_var.com_stat[] each event for its own SQLCOM_xxx, it won't be
-      needed if they'll just set thd->lex->sql_command.
-    */
-    if (thd->rgi_slave && thd->rgi_slave->current_event &&
-        thd->lex->sql_command == SQLCOM_END)
+  @retval true  Error or partition creation was requested.
+  @retval false No error
+*/
+bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
+                                  Open_table_context *ot_ctx)
+{
+  if (!part_info || part_info->part_type != VERSIONING_PARTITION ||
+      table_list->vers_conditions.delete_history ||
+      thd->stmt_arena->is_stmt_prepare() ||
+      table_list->lock_type < TL_WRITE_ALLOW_WRITE ||
+      table_list->mdl_request.type < MDL_SHARED_WRITE ||
+      table_list->mdl_request.type == MDL_EXCLUSIVE)
+  {
+    return false;
+  }
+
+  switch (thd->lex->sql_command)
+  {
+    case SQLCOM_INSERT:
+      if (thd->lex->duplicates != DUP_UPDATE)
+        return false;
+      break;
+    case SQLCOM_LOAD:
+      if (thd->lex->duplicates != DUP_REPLACE)
+        return false;
+      break;
+    case SQLCOM_LOCK_TABLES:
+    case SQLCOM_DELETE:
+    case SQLCOM_UPDATE:
+    case SQLCOM_REPLACE:
+    case SQLCOM_REPLACE_SELECT:
+    case SQLCOM_DELETE_MULTI:
+    case SQLCOM_UPDATE_MULTI:
+      break;
+    default:;
+      return false;
+  }
+
+  /*
+    TODO: make row events set thd->lex->sql_command appropriately.
+
+    Sergei Golubchik: f.ex. currently row events increment
+    thd->status_var.com_stat[] each event for its own SQLCOM_xxx, it won't be
+    needed if they'll just set thd->lex->sql_command.
+  */
+  if (thd->rgi_slave && thd->rgi_slave->current_event &&
+      thd->lex->sql_command == SQLCOM_END)
+  {
+    switch (thd->rgi_slave->current_event->get_type_code())
     {
-      switch (thd->rgi_slave->current_event->get_type_code())
-      {
-      case UPDATE_ROWS_EVENT:
-      case UPDATE_ROWS_EVENT_V1:
-      case DELETE_ROWS_EVENT:
-      case DELETE_ROWS_EVENT_V1:
-        return true;
-      default:;
-        break;
-      }
+    case UPDATE_ROWS_EVENT:
+    case UPDATE_ROWS_EVENT_V1:
+    case DELETE_ROWS_EVENT:
+    case DELETE_ROWS_EVENT_V1:
+      break;
+    default:;
+      return false;
     }
   }
-#endif
+
+  TABLE *table= this;
+
+  /*
+      NOTE: The semantics of vers_set_hist_part() is double: even when we
+      don't need auto-create, we need to update part_info->hist_part.
+  */
+  uint *create_count= table_list->vers_skip_create ?
+    NULL : &ot_ctx->vers_create_count;
+  table_list->vers_skip_create= true;
+  if (table->part_info->vers_set_hist_part(thd, create_count))
+  {
+    MYSQL_UNBIND_TABLE(table->file);
+    tc_release_table(table);
+    return true;
+  }
+  if (ot_ctx->vers_create_count)
+  {
+    Open_table_context::enum_open_table_action action;
+    TABLE_LIST *table_arg;
+    mysql_mutex_lock(&table->s->LOCK_share);
+    if (!table->s->vers_skip_auto_create)
+    {
+      table->s->vers_skip_auto_create= true;
+      action= Open_table_context::OT_ADD_HISTORY_PARTITION;
+      table_arg= table_list;
+    }
+    else
+    {
+      /*
+          NOTE: this may repeat multiple times until creating thread acquires
+          MDL_EXCLUSIVE. Since auto-creation is rare operation this is acceptable.
+          We could suspend this thread on cond-var but we must first exit
+          MDL_SHARED_WRITE first and we cannot store cond-var into TABLE_SHARE
+          because it is already released and there is no guarantee that it will
+          be same instance if we acquire it again.
+      */
+      table_list->vers_skip_create= false;
+      ot_ctx->vers_create_count= 0;
+      action= Open_table_context::OT_REOPEN_TABLES;
+      table_arg= NULL;
+    }
+    mysql_mutex_unlock(&table->s->LOCK_share);
+    MYSQL_UNBIND_TABLE(table->file);
+    tc_release_table(table);
+    ot_ctx->request_backoff_action(action, table_arg);
+    return true;
+  }
+
   return false;
 }
+#endif /* WITH_PARTITION_STORAGE_ENGINE */
 
 
 /**
@@ -1832,14 +1891,8 @@ bool open_table(THD *thd, TABLE_LIST *table_list, Open_table_context *ot_ctx)
       DBUG_PRINT("info",("Using locked table"));
 #ifdef WITH_PARTITION_STORAGE_ENGINE
       part_names_error= set_partitions_as_used(table_list, table);
-      if (table->vers_need_hist_part(thd, table_list))
-      {
-        /*
-          New partitions are not auto-created under LOCK TABLES (TODO: fix it)
-          but rotation can still happen.
-        */
-        (void) table->part_info->vers_set_hist_part(thd, NULL);
-      }
+      if (table->vers_switch_partition(thd, table_list, ot_ctx))
+        DBUG_RETURN(true);
 #endif
       goto reset;
     }
@@ -2095,54 +2148,10 @@ retry_share:
     tc_add_table(thd, table);
   }
 
-  if (table->vers_need_hist_part(thd, table_list))
-  {
-    /*
-       NOTE: The semantics of vers_set_hist_part() is double: even when we
-       don't need auto-create, we need to update part_info->hist_part.
-    */
-    uint *create_count= table_list->vers_skip_create ?
-      NULL : &ot_ctx->vers_create_count;
-    table_list->vers_skip_create= true;
-    if (table->part_info->vers_set_hist_part(thd, create_count))
-    {
-      MYSQL_UNBIND_TABLE(table->file);
-      tc_release_table(table);
-      DBUG_RETURN(TRUE);
-    }
-    if (ot_ctx->vers_create_count)
-    {
-      Open_table_context::enum_open_table_action action;
-      TABLE_LIST *table_arg;
-      mysql_mutex_lock(&table->s->LOCK_share);
-      if (!table->s->vers_skip_auto_create)
-      {
-        table->s->vers_skip_auto_create= true;
-        action= Open_table_context::OT_ADD_HISTORY_PARTITION;
-        table_arg= table_list;
-      }
-      else
-      {
-        /*
-           NOTE: this may repeat multiple times until creating thread acquires
-           MDL_EXCLUSIVE. Since auto-creation is rare operation this is acceptable.
-           We could suspend this thread on cond-var but we must first exit
-           MDL_SHARED_WRITE first and we cannot store cond-var into TABLE_SHARE
-           because it is already released and there is no guarantee that it will
-           be same instance if we acquire it again.
-        */
-        table_list->vers_skip_create= false;
-        ot_ctx->vers_create_count= 0;
-        action= Open_table_context::OT_REOPEN_TABLES;
-        table_arg= NULL;
-      }
-      mysql_mutex_unlock(&table->s->LOCK_share);
-      MYSQL_UNBIND_TABLE(table->file);
-      tc_release_table(table);
-      ot_ctx->request_backoff_action(action, table_arg);
-      DBUG_RETURN(TRUE);
-    }
-  }
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+  if (table->vers_switch_partition(thd, table_list, ot_ctx))
+    DBUG_RETURN(true);
+#endif /* WITH_PARTITION_STORAGE_ENGINE */
 
   if (!(flags & MYSQL_OPEN_HAS_MDL_LOCK) &&
       table->s->table_category < TABLE_CATEGORY_INFORMATION)
