@@ -1502,16 +1502,14 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Inserted: 1  Warnings: 0
 update t1 set x= x + 1;
 affected rows: 1
-info: Rows matched: 1  Changed: 1  Inserted: 1  Warnings: 1
-Warnings:
-Warning	4114	Versioned table `test`.`t1`: last HISTORY partition (`p1`) is out of LIMIT, need more HISTORY partitions
+info: Rows matched: 1  Changed: 1  Inserted: 1  Warnings: 0
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
  PARTITION BY SYSTEM_TIME LIMIT 1 AUTO
-PARTITIONS 3
+PARTITIONS 4
 affected rows: 1
 unlock tables;
 affected rows: 0
@@ -1521,7 +1519,7 @@ t1	CREATE TABLE `t1` (
   `x` int(11) DEFAULT NULL
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1 WITH SYSTEM VERSIONING
  PARTITION BY SYSTEM_TIME LIMIT 1 AUTO
-PARTITIONS 3
+PARTITIONS 4
 affected rows: 1
 # Overflow prevention under LOCK TABLES
 create or replace table t1 (x int)
