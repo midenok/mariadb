@@ -931,7 +931,7 @@ void close_thread_table(THD *thd, TABLE **table_ptr)
   DBUG_PRINT("tcache", ("table: '%s'.'%s' %p", table->s->db.str,
                         table->s->table_name.str, table));
   DBUG_ASSERT(!table->file->keyread_enabled());
-  DBUG_ASSERT(!table->file || table->file->inited == handler::NONE);
+  DBUG_ASSERT(table->file->inited == handler::NONE);
 
   /*
     The metadata lock must be released after giving back
@@ -943,11 +943,8 @@ void close_thread_table(THD *thd, TABLE **table_ptr)
                                              MDL_SHARED));
   table->mdl_ticket= NULL;
 
-  if (table->file)
-  {
-    table->file->update_global_table_stats();
-    table->file->update_global_index_stats();
-  }
+  table->file->update_global_table_stats();
+  table->file->update_global_index_stats();
 
   /*
     This look is needed to allow THD::notify_shared_lock() to
@@ -2224,6 +2221,7 @@ retry_share:
 
   table->init(thd, table_list);
 
+  DBUG_ASSERT(table != thd->open_tables);
   table->next= thd->open_tables;		/* Link into simple list */
   thd->set_open_tables(table);
 
@@ -2679,7 +2677,7 @@ unlink_all_closed_tables(THD *thd, MYSQL_LOCK *lock, size_t reopen_count)
   This is only needed when LOCK TABLES is active
 */
 
-void Locked_tables_list::mark_table_for_reopen(THD *thd, TABLE *table)
+void Locked_tables_list::mark_table_for_reopen(TABLE *table)
 {
   TABLE_SHARE *share= table->s;
 

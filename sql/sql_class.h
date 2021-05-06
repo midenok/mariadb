@@ -1750,7 +1750,7 @@ public:
     *this= *state;
   }
 
-  void reset_open_tables_state(THD *thd)
+  void reset_open_tables_state()
   {
     open_tables= 0;
     temporary_tables= 0;
@@ -2079,7 +2079,7 @@ public:
   bool restore_lock(THD *thd, TABLE_LIST *dst_table_list, TABLE *table,
                     MYSQL_LOCK *lock);
   void add_back_last_deleted_lock(TABLE_LIST *dst_table_list);
-  void mark_table_for_reopen(THD *thd, TABLE *table);
+  void mark_table_for_reopen(TABLE *table);
 };
 
 
