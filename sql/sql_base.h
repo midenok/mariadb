@@ -609,6 +609,7 @@ private:
 
 public:
   uint vers_create_count;
+  Open_tables_backup ot_backup;
 };
 
 
