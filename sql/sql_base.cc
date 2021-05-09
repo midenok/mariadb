@@ -1728,17 +1728,31 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
       table_arg= NULL;
     }
     mysql_mutex_unlock(&table->s->LOCK_share);
+    MYSQL_UNBIND_TABLE(table->file);
     if (thd->locked_tables_mode)
     {
+      handler *old_handler= table->file;
+      TABLE_LIST *pos_in_locked_tables= table->pos_in_locked_tables;
+      handler *new_handler= table->file->clone(table->s->normalized_path.str,
+                                               thd->mem_root);
+      if (!new_handler)
+      {
+        // FIXME: error?
+        return true;
+      }
+      table->file= new_handler;
+      if (mysql_lock_remove(thd, thd->lock, table))
+      {
+        table->file= old_handler;
+        new_handler->ha_close();
+        return true;
+      }
+      table->pos_in_locked_tables= NULL;
       // FIXME: restore
       // FIXME: what about mdl_system_tables_svp vs m_start_of_statement_svp?
       thd->reset_n_backup_open_tables_state(&ot_ctx->ot_backup);
     }
-    else
-    {
-      MYSQL_UNBIND_TABLE(table->file);
-      tc_release_table(table);
-    }
+    tc_release_table(table);
     ot_ctx->request_backoff_action(action, table_arg);
     return true;
   }
