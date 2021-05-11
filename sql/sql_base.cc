@@ -1749,17 +1749,20 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
       /* FIXME: cleanup */
       ot_ctx->locked_handler= locked_handler;
       ot_ctx->pos_in_locked_tables= table->pos_in_locked_tables;
+      ot_ctx->lock_type= table->reginfo.lock_type; // FIXME: get from somewhere else?
       table->pos_in_locked_tables= NULL;
-      for (TABLE *t= thd->open_tables; t; t= t->next)
+      for (TABLE **t= &thd->open_tables; *t; t= &((*t)->next))
       {
-        if (t->next == table)
+        if (*t == table)
         {
-          t->next= table->next;
+          *t= table->next;
           break;
         }
       }
+      DBUG_ASSERT(!ot_ctx->ot_backup.lock);
       // FIXME: what about mdl_system_tables_svp vs m_start_of_statement_svp?
       thd->reset_n_backup_open_tables_state(&ot_ctx->ot_backup);
+      DBUG_ASSERT(ot_ctx->ot_backup.lock);
     }
     tc_release_table(table);
     ot_ctx->request_backoff_action(action, table_arg);
@@ -3422,9 +3425,17 @@ Open_table_context::recover_from_failed_open()
             /* NOTE: we were under locked_tables_mode, restore it. */
             // FIXME: test with other locked tables
             m_thd->restore_backup_open_tables_state(&ot_backup);
-            bool r= open_table(m_thd, tl, &ot_ctx);
-            if (!result && r)
-              result= r;
+            if (open_table(m_thd, tl, &ot_ctx))
+              result= true;
+            else
+            {
+              TABLE *table= tl->table;
+              result= table->file->ha_close();
+              DBUG_ASSERT(!result);
+              table->file= locked_handler;
+              table->reginfo.lock_type= lock_type;
+              // FIXME: compare TABLE before and after
+            }
           }
           vers_create_count= 0;
           break;

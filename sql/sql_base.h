@@ -612,6 +612,7 @@ public:
   Open_tables_backup ot_backup;
   handler *locked_handler;
   TABLE_LIST *pos_in_locked_tables;
+  enum thr_lock_type lock_type;
 };
 
 
