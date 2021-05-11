@@ -610,6 +610,8 @@ private:
 public:
   uint vers_create_count;
   Open_tables_backup ot_backup;
+  handler *locked_handler;
+  TABLE_LIST *pos_in_locked_tables;
 };
 
 

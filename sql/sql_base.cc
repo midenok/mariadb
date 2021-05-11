@@ -1731,8 +1731,7 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
     MYSQL_UNBIND_TABLE(table->file);
     if (thd->locked_tables_mode)
     {
-      handler *old_handler= table->file;
-      TABLE_LIST *pos_in_locked_tables= table->pos_in_locked_tables;
+      handler *locked_handler= table->file;
       handler *new_handler= table->file->clone(table->s->normalized_path.str,
                                                thd->mem_root);
       if (!new_handler)
@@ -1743,12 +1742,22 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
       table->file= new_handler;
       if (mysql_lock_remove(thd, thd->lock, table))
       {
-        table->file= old_handler;
+        table->file= locked_handler;
         new_handler->ha_close();
         return true;
       }
+      /* FIXME: cleanup */
+      ot_ctx->locked_handler= locked_handler;
+      ot_ctx->pos_in_locked_tables= table->pos_in_locked_tables;
       table->pos_in_locked_tables= NULL;
-      // FIXME: restore
+      for (TABLE *t= thd->open_tables; t; t= t->next)
+      {
+        if (t->next == table)
+        {
+          t->next= table->next;
+          break;
+        }
+      }
       // FIXME: what about mdl_system_tables_svp vs m_start_of_statement_svp?
       thd->reset_n_backup_open_tables_state(&ot_ctx->ot_backup);
     }
@@ -3173,8 +3182,12 @@ Open_table_context::Open_table_context(THD *thd, uint flags)
    m_action(OT_NO_ACTION),
    m_has_locks(thd->mdl_context.has_locks()),
    m_has_protection_against_grl(0),
-   vers_create_count(0)
-{}
+   vers_create_count(0),
+   locked_handler(NULL),
+   pos_in_locked_tables(NULL)
+{
+  ot_backup.reset_open_tables_state();
+}
 
 
 /**
@@ -3398,6 +3411,21 @@ Open_table_context::recover_from_failed_open()
           if (!m_thd->transaction->stmt.is_empty())
             trans_commit_stmt(m_thd);
           close_tables_for_reopen(m_thd, &tl, start_of_statement_svp());
+          if (ot_backup.lock)
+          {
+            // FIXME: what about result == true?
+            Open_table_context ot_ctx(m_thd, MYSQL_OPEN_HAS_MDL_LOCK |
+                                      MYSQL_OPEN_IGNORE_KILLED |
+                                      MYSQL_OPEN_GET_NEW_TABLE |
+                                      MYSQL_OPEN_IGNORE_FLUSH |
+                                      MYSQL_OPEN_IGNORE_REPAIR);
+            /* NOTE: we were under locked_tables_mode, restore it. */
+            // FIXME: test with other locked tables
+            m_thd->restore_backup_open_tables_state(&ot_backup);
+            bool r= open_table(m_thd, tl, &ot_ctx);
+            if (!result && r)
+              result= r;
+          }
           vers_create_count= 0;
           break;
         }
