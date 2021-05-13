@@ -2685,11 +2685,13 @@ void Locked_tables_list::mark_table_for_reopen(TABLE *table)
        table_list; table_list= table_list->next_global)
   {
     if (table_list->table->s == share)
+    {
       table_list->table->internal_set_needs_reopen(true);
+      some_table_marked_for_reopen= 1;
+    }
   }
   /* This is needed in the case where lock tables where not used */
   table->internal_set_needs_reopen(true);
-  some_table_marked_for_reopen= 1;
 }
 
 
