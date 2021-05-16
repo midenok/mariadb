@@ -2681,7 +2681,26 @@ void Locked_tables_list::mark_table_for_reopen(TABLE *table)
 {
   TABLE_SHARE *share= table->s;
 
-    for (TABLE_LIST *table_list= m_locked_tables;
+  /* This is needed in the case where lock tables were not used */
+  table->internal_set_needs_reopen(true);
+
+  if (m_reopen_count)
+  {
+    /*
+      If we are in the middle of reopening we cannot mark more tables for reopen.
+      That tables must be already marked.
+    */
+#ifndef DBUG_OFF
+    for (TABLE_LIST *table_list= m_locked_tables; table_list;
+         table_list= table_list->next_global)
+    {
+      DBUG_ASSERT(!table_list->table || table_list->table->s != share);
+    }
+#endif
+    return;
+  }
+
+  for (TABLE_LIST *table_list= m_locked_tables;
        table_list; table_list= table_list->next_global)
   {
     if (table_list->table->s == share)
@@ -2690,8 +2709,6 @@ void Locked_tables_list::mark_table_for_reopen(TABLE *table)
       some_table_marked_for_reopen= 1;
     }
   }
-  /* This is needed in the case where lock tables where not used */
-  table->internal_set_needs_reopen(true);
 }
 
 
@@ -2714,14 +2731,17 @@ void Locked_tables_list::mark_table_for_reopen(TABLE *table)
 bool
 Locked_tables_list::reopen_tables(THD *thd, bool need_reopen)
 {
-  Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN);
-  uint reopen_count= 0;
-  MYSQL_LOCK *lock;
-  MYSQL_LOCK *merged_lock;
   DBUG_ENTER("Locked_tables_list::reopen_tables");
+  close_tables(thd, need_reopen);
+  DBUG_RETURN(open_tables(thd));
+}
 
+
+void
+Locked_tables_list::close_tables(THD *thd, bool need_reopen)
+{
   DBUG_ASSERT(some_table_marked_for_reopen || !need_reopen);
-
+  DBUG_ASSERT(!m_reopen_count);
 
   /* Reset flag that some table was marked for reopen */
   if (need_reopen)
@@ -2753,14 +2773,26 @@ Locked_tables_list::reopen_tables(THD *thd, bool need_reopen)
         continue;
     }
 
-    DBUG_ASSERT(reopen_count < m_locked_tables_count);
-    m_reopen_array[reopen_count++]= table_list;
+    DBUG_ASSERT(m_reopen_count < m_locked_tables_count);
+    m_reopen_array[m_reopen_count++]= table_list;
   }
-  if (reopen_count)
-  {
-    TABLE **tables= (TABLE**) my_alloca(reopen_count * sizeof(TABLE*));
+}
 
-    for (uint i= 0 ; i < reopen_count ; i++)
+
+bool
+Locked_tables_list::open_tables(THD *thd)
+{
+  Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN);
+  MYSQL_LOCK *lock;
+  MYSQL_LOCK *merged_lock;
+
+  if (!m_reopen_count)
+    return false;
+
+  {
+    TABLE **tables= (TABLE**) my_alloca(m_reopen_count * sizeof(TABLE*));
+
+    for (uint i= 0 ; i < m_reopen_count ; i++)
     {
       TABLE_LIST *table_list= m_reopen_array[i];
       /* Links into thd->open_tables upon success */
@@ -2768,7 +2800,7 @@ Locked_tables_list::reopen_tables(THD *thd, bool need_reopen)
       {
         unlink_all_closed_tables(thd, 0, i);
         my_afree((void*) tables);
-        DBUG_RETURN(TRUE);
+        return true;
       }
       tables[i]= table_list->table;
       table_list->table->pos_in_locked_tables= table_list;
@@ -2788,23 +2820,26 @@ Locked_tables_list::reopen_tables(THD *thd, bool need_reopen)
       works fine. Patching legacy code of thr_lock.c is risking to
       break something else.
     */
-    lock= mysql_lock_tables(thd, tables, reopen_count,
+    lock= mysql_lock_tables(thd, tables, m_reopen_count,
                             MYSQL_OPEN_REOPEN | MYSQL_LOCK_USE_MALLOC);
     thd->in_lock_tables= 0;
     if (lock == NULL || (merged_lock=
                          mysql_lock_merge(thd->lock, lock)) == NULL)
     {
-      unlink_all_closed_tables(thd, lock, reopen_count);
+      unlink_all_closed_tables(thd, lock, m_reopen_count);
       if (! thd->killed)
         my_error(ER_LOCK_DEADLOCK, MYF(0));
       my_afree((void*) tables);
-      DBUG_RETURN(TRUE);
+      return true;
     }
     thd->lock= merged_lock;
     my_afree((void*) tables);
+    m_reopen_count= 0;
   }
-  DBUG_RETURN(FALSE);
+
+  return false;
 }
+
 
 /**
   Add back a locked table to the locked list that we just removed from it.
