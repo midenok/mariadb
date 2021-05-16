@@ -1731,26 +1731,26 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
     MYSQL_UNBIND_TABLE(table->file);
     if (thd->locked_tables_mode)
     {
-      handler *locked_handler= table->file;
-      handler *new_handler= table->file->clone(table->s->normalized_path.str,
-                                               thd->mem_root);
-      if (!new_handler)
+      // FIXME: move to MDL_EXCLUSIVE? What about ot_backup.lock vs locks?
+      MYSQL_LOCK *locks= get_lock_data(thd, &table, 1, GET_LOCK_UNLOCK | GET_LOCK_ON_THD);
+      if (!locks)
       {
-        // FIXME: error?
+        my_error(ER_OUT_OF_RESOURCES, MYF(0));
         return true;
       }
-      table->file= new_handler;
+
+      /*
+         NOTE: new_handler stops mysql_unlock_some_tables() from really
+         unlocking the table.
+      */
       if (mysql_lock_remove(thd, thd->lock, table))
       {
-        table->file= locked_handler;
-        new_handler->ha_close();
         return true;
       }
       /* FIXME: cleanup */
-      ot_ctx->locked_handler= locked_handler;
+      ot_ctx->locks= locks;
       ot_ctx->pos_in_locked_tables= table->pos_in_locked_tables;
       ot_ctx->lock_type= table->reginfo.lock_type; // FIXME: get from somewhere else?
-      table->pos_in_locked_tables= NULL;
       for (TABLE **t= &thd->open_tables; *t; t= &((*t)->next))
       {
         if (*t == table)
@@ -1760,6 +1760,8 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
         }
       }
       DBUG_ASSERT(!ot_ctx->ot_backup.lock);
+      thd->locked_tables_list.unlink_from_list(thd, ot_ctx->pos_in_locked_tables,
+                                               true);
       // FIXME: what about mdl_system_tables_svp vs m_start_of_statement_svp?
       thd->reset_n_backup_open_tables_state(&ot_ctx->ot_backup);
       DBUG_ASSERT(ot_ctx->ot_backup.lock);
@@ -3186,7 +3188,7 @@ Open_table_context::Open_table_context(THD *thd, uint flags)
    m_has_locks(thd->mdl_context.has_locks()),
    m_has_protection_against_grl(0),
    vers_create_count(0),
-   locked_handler(NULL),
+   locks(NULL),
    pos_in_locked_tables(NULL)
 {
   ot_backup.reset_open_tables_state();
@@ -3426,14 +3428,17 @@ Open_table_context::recover_from_failed_open()
             // FIXME: test with other locked tables
             m_thd->restore_backup_open_tables_state(&ot_backup);
             if (open_table(m_thd, tl, &ot_ctx))
-              result= true;
+              result= true; // FIXME: exit locked_tables_mode
             else
             {
+              // FIXME: ot_backup.lock->table is stale
               TABLE *table= tl->table;
-              result= table->file->ha_close();
-              DBUG_ASSERT(!result);
-              table->file= locked_handler;
               table->reginfo.lock_type= lock_type;
+              DBUG_ASSERT(locks->table_count == 1);
+              locks->table[0]= table;
+              result= mysql_lock_tables(m_thd, locks, MYSQL_LOCK_NOT_TEMPORARY);
+              DBUG_ASSERT(!result);
+              // FIXME: if failed, exit locked_tables_mode
               // FIXME: compare TABLE before and after
             }
           }

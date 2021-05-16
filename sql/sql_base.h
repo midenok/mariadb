@@ -610,7 +610,7 @@ private:
 public:
   uint vers_create_count;
   Open_tables_backup ot_backup;
-  handler *locked_handler;
+  MYSQL_LOCK *locks;
   TABLE_LIST *pos_in_locked_tables;
   enum thr_lock_type lock_type;
 };
