@@ -1730,9 +1730,11 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
     mysql_mutex_unlock(&table->s->LOCK_share);
     if (thd->locked_tables_mode)
     {
-      // FIXME: restore
-      // FIXME: what about mdl_system_tables_svp vs m_start_of_statement_svp?
-      thd->reset_n_backup_open_tables_state(&ot_ctx->ot_backup);
+      thd->locked_tables_list.mark_table_for_reopen(table);
+      thd->locked_tables_list.close_tables(thd, true);
+      /* NOTE: Open_tables_backup would be superfluous here. */
+      ot_ctx->locked_tables_mode= thd->locked_tables_mode;
+      thd->locked_tables_mode= LTM_NONE;
     }
     else
     {
@@ -3194,7 +3196,8 @@ Open_table_context::Open_table_context(THD *thd, uint flags)
    m_action(OT_NO_ACTION),
    m_has_locks(thd->mdl_context.has_locks()),
    m_has_protection_against_grl(0),
-   vers_create_count(0)
+   vers_create_count(0),
+   locked_tables_mode(LTM_NONE)
 {}
 
 
@@ -3420,6 +3423,19 @@ Open_table_context::recover_from_failed_open()
           if (!m_thd->transaction->stmt.is_empty())
             trans_commit_stmt(m_thd);
           close_tables_for_reopen(m_thd, &tl, start_of_statement_svp());
+          if (locked_tables_mode)
+          {
+            if (m_thd->locked_tables_list.open_tables(m_thd))
+            {
+              result= true;
+              // FIXME: exit locked_tables_mode properly
+            }
+            else
+            {
+              m_thd->locked_tables_mode= locked_tables_mode;
+            }
+            locked_tables_mode= LTM_NONE;
+          }
           vers_create_count= 0;
           break;
         }

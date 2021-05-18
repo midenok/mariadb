@@ -609,7 +609,7 @@ private:
 
 public:
   uint vers_create_count;
-  Open_tables_backup ot_backup;
+  enum_locked_tables_mode locked_tables_mode;
 };
 
 
