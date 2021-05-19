@@ -3320,8 +3320,9 @@ Open_table_context::recover_from_failed_open()
         break;
       }
 
-      tdc_remove_table(m_thd, m_failed_table->db.str,
-                       m_failed_table->table_name.str);
+      if (m_action != OT_ADD_HISTORY_PARTITION)
+        tdc_remove_table(m_thd, m_failed_table->db.str,
+                        m_failed_table->table_name.str);
 
       switch (m_action)
       {
