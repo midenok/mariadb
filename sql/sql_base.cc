@@ -3422,7 +3422,8 @@ Open_table_context::recover_from_failed_open()
           result= vers_create_partitions(m_thd, tl, vers_create_count);
           if (!m_thd->transaction->stmt.is_empty())
             trans_commit_stmt(m_thd);
-          close_tables_for_reopen(m_thd, &tl, start_of_statement_svp());
+//           close_tables_for_reopen(m_thd, &tl, start_of_statement_svp());
+          m_thd->mdl_context.rollback_to_savepoint(start_of_statement_svp());
           if (locked_tables_mode)
           {
             if (m_thd->locked_tables_list.open_tables(m_thd))
