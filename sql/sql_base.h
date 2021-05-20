@@ -609,7 +609,6 @@ private:
 
 public:
   uint vers_create_count;
-  enum_locked_tables_mode locked_tables_mode;
 };
 
 

@@ -63,6 +63,9 @@
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
+static bool
+open_tables_check_upgradable_mdl(THD *thd, TABLE_LIST *tables_start,
+                                 TABLE_LIST *tables_end, uint flags);
 
 bool
 No_such_table_error_handler::handle_condition(THD *,
@@ -1728,15 +1731,7 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
       table_arg= NULL;
     }
     mysql_mutex_unlock(&table->s->LOCK_share);
-    if (thd->locked_tables_mode)
-    {
-      thd->locked_tables_list.mark_table_for_reopen(table);
-      thd->locked_tables_list.close_tables(thd, true);
-      /* NOTE: Open_tables_backup would be superfluous here. */
-      ot_ctx->locked_tables_mode= thd->locked_tables_mode;
-      thd->locked_tables_mode= LTM_NONE;
-    }
-    else
+    if (!thd->locked_tables_mode)
     {
       MYSQL_UNBIND_TABLE(table->file);
       tc_release_table(table);
@@ -3196,8 +3191,7 @@ Open_table_context::Open_table_context(THD *thd, uint flags)
    m_action(OT_NO_ACTION),
    m_has_locks(thd->mdl_context.has_locks()),
    m_has_protection_against_grl(0),
-   vers_create_count(0),
-   locked_tables_mode(LTM_NONE)
+   vers_create_count(0)
 {}
 
 
@@ -3347,8 +3341,16 @@ Open_table_context::recover_from_failed_open()
     case OT_DISCOVER:
     case OT_REPAIR:
     case OT_ADD_HISTORY_PARTITION:
-      result= lock_table_names(m_thd, m_thd->lex->create_info, m_failed_table,
-                               NULL, get_timeout(), 0);
+      if (!m_thd->locked_tables_mode)
+        result= lock_table_names(m_thd, m_thd->lex->create_info, m_failed_table,
+                                NULL, get_timeout(), 0);
+      else
+      {
+        DBUG_ASSERT(!result);
+        /* The caller already done that check: */
+        DBUG_ASSERT(!open_tables_check_upgradable_mdl(
+          m_thd, m_failed_table, m_failed_table->next_global, 0));
+      }
       /*
          We are now under MDL_EXCLUSIVE mode. Other threads have no table share
          acquired: they are blocked either at open_table_get_mdl_lock() in
@@ -3376,6 +3378,10 @@ Open_table_context::recover_from_failed_open()
         break;
       }
 
+      /*
+         We don't need to remove share under OT_ADD_HISTORY_PARTITION.
+         Moreover we need TABLE instance as an argument.
+      */
       if (m_action != OT_ADD_HISTORY_PARTITION)
         tdc_remove_table(m_thd, m_failed_table->db.str,
                         m_failed_table->table_name.str);
@@ -3422,21 +3428,17 @@ Open_table_context::recover_from_failed_open()
           result= vers_create_partitions(m_thd, tl, vers_create_count);
           if (!m_thd->transaction->stmt.is_empty())
             trans_commit_stmt(m_thd);
-//           close_tables_for_reopen(m_thd, &tl, start_of_statement_svp());
-          m_thd->mdl_context.rollback_to_savepoint(start_of_statement_svp());
-          if (locked_tables_mode)
+          if (!m_thd->locked_tables_mode)
           {
-            if (m_thd->locked_tables_list.open_tables(m_thd))
-            {
-              result= true;
-              // FIXME: exit locked_tables_mode properly
-            }
-            else
-            {
-              m_thd->locked_tables_mode= locked_tables_mode;
-            }
-            locked_tables_mode= LTM_NONE;
+            /*
+              alter_partition_lock_handling() calls close_all_tables_for_name()
+              which calls mysql_lock_remove() but this does not clear
+              thd->lock completely.
+            */
+            DBUG_ASSERT(m_thd->lock->lock_count == 0);
+            m_thd->lock= NULL;
           }
+          m_thd->mdl_context.rollback_to_savepoint(start_of_statement_svp());
           vers_create_count= 0;
           break;
         }
