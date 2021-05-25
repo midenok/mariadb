@@ -98,8 +98,26 @@ void Item_args::set_arguments(THD *thd, List<Item> &list)
 }
 
 
+// FIXME: remove
 Item_args::Item_args(THD *thd, const Item_args *other)
   : Item_result_field(thd), arg_count(other->arg_count)
+{
+  if (arg_count <= 2)
+  {
+    args= tmp_arg;
+  }
+  else if (!(args= (Item**) thd->alloc(sizeof(Item*) * arg_count)))
+  {
+    arg_count= 0;
+    return;
+  }
+  if (arg_count)
+    memcpy(args, other->args, sizeof(Item*) * arg_count);
+}
+
+
+Item_args::Item_args(Item_args *other, THD *thd)
+  : Item_result_field(thd, other), arg_count(other->arg_count)
 {
   if (arg_count <= 2)
   {

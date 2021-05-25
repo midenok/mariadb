@@ -4163,10 +4163,6 @@ public:
   Item_args(THD *thd) :
     Item_result_field(thd), args(NULL), arg_count(0)
   { }
-  Item_args(THD *thd, Item_result_field *item) :
-    Item_result_field(thd, item), args(NULL), arg_count(0)
-  { }
-
   Item_args(THD *thd, Item *a) :
     Item_result_field(thd), args(tmp_arg), arg_count(1)
   {
@@ -4212,7 +4208,13 @@ public:
   {
     set_arguments(thd, list);
   }
+  // FIXME: remove
   Item_args(THD *thd, const Item_args *other);
+  /*
+    NOTE different argument order distinguishes next ctor from the previous one.
+    Otherwise next ctor will be silently ignored and the previous one used.
+  */
+  Item_args(Item_args *item, THD *thd);
   inline Item **arguments() const { return args; }
   inline uint argument_count() const { return arg_count; }
   inline void remove_arguments() { arg_count=0; }
@@ -4422,7 +4424,7 @@ public:
   Item_func_or_sum(THD *thd, Item *a, Item *b, Item *c, Item *d, Item *e):
     Item_args(thd, a, b, c, d, e) { }
   Item_func_or_sum(THD *thd, Item_func_or_sum *item):
-    Item_args(thd, item),
+    Item_args(item, thd),
     Used_tables_and_const_cache(item) { }
   Item_func_or_sum(THD *thd, List<Item> &list):
     Item_args(thd, list) { }
