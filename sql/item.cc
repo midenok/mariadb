@@ -825,7 +825,6 @@ void Item_ident::cleanup()
   db_name= orig_db_name; 
   table_name= orig_table_name;
   field_name= orig_field_name;
-  cached_table= NULL;
   /* Store if this Item was depended */
   if (was_fixed)
   {
@@ -845,6 +844,12 @@ bool Item_ident::remove_dependence_processor(void * arg)
     depended_from= 0;
   context= &((st_select_lex *) arg)->context;
   DBUG_RETURN(0);
+}
+
+bool Item_ident::cached_table_cleanup_processor(void * arg)
+{
+  cached_table= NULL;
+  return false;
 }
 
 

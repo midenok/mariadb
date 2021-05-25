@@ -4674,6 +4674,9 @@ void TABLE::init(THD *thd, TABLE_LIST *tl)
     for (Field **vf_ptr= vfield; *vf_ptr; vf_ptr++)
     {
       Item *expr= (*vf_ptr)->vcol_info->expr;
+      expr->walk(&Item::cached_table_cleanup_processor, 0, 0);
+      expr->walk(&Item::cleanup_processor, 0, 0);
+      // FIXME: remove
       expr->cleanup();
       (void) expr->walk(&Item::change_context_processor, 0,
                         thd->lex->current_context());
