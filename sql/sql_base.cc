@@ -1979,7 +1979,6 @@ retry_share:
   */
   DBUG_ASSERT(table->file->pushed_cond == NULL);
   table_list->updatable= 1; // It is not derived table nor non-updatable VIEW
-  table_list->table= table;
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE
   if (table->part_info)

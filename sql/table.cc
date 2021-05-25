@@ -4661,6 +4661,7 @@ void TABLE::init(THD *thd, TABLE_LIST *tl)
   auto_increment_field_not_null= FALSE;
 
   pos_in_table_list= tl;
+  tl->table= this;
 
   clear_column_bitmaps();
   for (Field **f_ptr= field ; *f_ptr ; f_ptr++)
@@ -4668,6 +4669,16 @@ void TABLE::init(THD *thd, TABLE_LIST *tl)
     (*f_ptr)->next_equal_field= NULL;
     (*f_ptr)->cond_selectivity= 1.0;
   }
+
+  if (vfield)
+    for (Field **vf_ptr= vfield; *vf_ptr; vf_ptr++)
+    {
+      Item *expr= (*vf_ptr)->vcol_info->expr;
+      expr->cleanup();
+      (void) expr->walk(&Item::change_context_processor, 0,
+                        thd->lex->current_context());
+      (void) fix_and_check_vcol_expr(thd, this, (*vf_ptr)->vcol_info);
+    }
 
   DBUG_ASSERT(!file->keyread_enabled());
 
