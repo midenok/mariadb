@@ -99,7 +99,7 @@ void Item_args::set_arguments(THD *thd, List<Item> &list)
 
 
 Item_args::Item_args(THD *thd, const Item_args *other)
-  :arg_count(other->arg_count)
+  : Item_result_field(thd), arg_count(other->arg_count)
 {
   if (arg_count <= 2)
   {
@@ -412,14 +412,15 @@ Item *Item_func::compile(THD *thd, Item_analyzer analyzer, uchar **arg_p,
 }
 
 
-void Item_args::propagate_equal_fields(THD *thd,
+Item *Item_args::propagate_equal_fields(THD *thd,
                                        const Item::Context &ctx,
                                        COND_EQUAL *cond)
 {
   uint i;
   for (i= 0; i < arg_count; i++)
-    args[i]->propagate_equal_fields_and_change_item_tree(thd, ctx, cond,
+    (void) args[i]->propagate_equal_fields_and_change_item_tree(thd, ctx, cond,
                                                          &args[i]);
+  return Item_result_field::propagate_equal_fields(thd, ctx, cond);
 }
 
 
@@ -429,6 +430,14 @@ Sql_mode_dependency Item_args::value_depends_on_sql_mode_bit_or() const
   for (uint i= 0; i < arg_count; i++)
     res|= args[i]->value_depends_on_sql_mode();
   return res;
+}
+
+
+void Item_args::cleanup()
+{
+  Item **arg, **arg_end;
+  for (arg= args, arg_end= args + arg_count; arg != arg_end; arg++)
+    (*arg)->cleanup();
 }
 
 

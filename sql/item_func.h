@@ -321,8 +321,7 @@ public:
       are never equal is allowed in the arguments of a function.
       This is overruled for the direct arguments of comparison functions.
     */
-    Item_args::propagate_equal_fields(thd, Context_identity(), cond);
-    return this;
+    return Item_args::propagate_equal_fields(thd, Context_identity(), cond);
   }
 
   bool excl_dep_on_table(table_map tab_map)

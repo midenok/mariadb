@@ -1958,7 +1958,7 @@ public:
                                 const char *func_name);
   Item *const_charset_converter(THD *thd, CHARSET_INFO *tocs, bool lossless)
   { return const_charset_converter(thd, tocs, lossless, NULL); }
-  void delete_self()
+  virtual void delete_self()
   {
     cleanup();
     delete this;
@@ -4120,7 +4120,7 @@ public:
 /**
   Array of items, e.g. function or aggerate function arguments.
 */
-class Item_args
+class Item_args : public Item_result_field
 {
 protected:
   Item **args, *tmp_arg[2];
@@ -4136,7 +4136,7 @@ protected:
     return false;
   }
   bool transform_args(THD *thd, Item_transformer transformer, uchar *arg);
-  void propagate_equal_fields(THD *, const Item::Context &, COND_EQUAL *);
+  Item* propagate_equal_fields(THD *, const Item::Context &, COND_EQUAL *);
   bool excl_dep_on_table(table_map tab_map)
   {
     for (uint i= 0; i < arg_count; i++)
@@ -4160,20 +4160,25 @@ protected:
     return true;
   }
 public:
-  Item_args(void)
-    :args(NULL), arg_count(0)
+  Item_args(THD *thd) :
+    Item_result_field(thd), args(NULL), arg_count(0)
   { }
-  Item_args(Item *a)
-    :args(tmp_arg), arg_count(1)
+  Item_args(THD *thd, Item_result_field *item) :
+    Item_result_field(thd, item), args(NULL), arg_count(0)
+  { }
+
+  Item_args(THD *thd, Item *a) :
+    Item_result_field(thd), args(tmp_arg), arg_count(1)
   {
     args[0]= a;
   }
-  Item_args(Item *a, Item *b)
-    :args(tmp_arg), arg_count(2)
+  Item_args(THD *thd, Item *a, Item *b) :
+    Item_result_field(thd), args(tmp_arg), arg_count(2)
   {
     args[0]= a; args[1]= b;
   }
-  Item_args(THD *thd, Item *a, Item *b, Item *c)
+  Item_args(THD *thd, Item *a, Item *b, Item *c) :
+    Item_result_field(thd)
   {
     arg_count= 0;
     if ((args= (Item**) thd_alloc(thd, sizeof(Item*) * 3)))
@@ -4182,7 +4187,8 @@ public:
       args[0]= a; args[1]= b; args[2]= c;
     }
   }
-  Item_args(THD *thd, Item *a, Item *b, Item *c, Item *d)
+  Item_args(THD *thd, Item *a, Item *b, Item *c, Item *d) :
+    Item_result_field(thd)
   {
     arg_count= 0;
     if ((args= (Item**) thd_alloc(thd, sizeof(Item*) * 4)))
@@ -4191,7 +4197,8 @@ public:
       args[0]= a; args[1]= b; args[2]= c; args[3]= d;
     }
   }
-  Item_args(THD *thd, Item *a, Item *b, Item *c, Item *d, Item* e)
+  Item_args(THD *thd, Item *a, Item *b, Item *c, Item *d, Item* e) :
+    Item_result_field(thd)
   {
     arg_count= 5;
     if ((args= (Item**) thd_alloc(thd, sizeof(Item*) * 5)))
@@ -4200,7 +4207,8 @@ public:
       args[0]= a; args[1]= b; args[2]= c; args[3]= d; args[4]= e;
     }
   }
-  Item_args(THD *thd, List<Item> &list)
+  Item_args(THD *thd, List<Item> &list) :
+    Item_result_field(thd)
   {
     set_arguments(thd, list);
   }
@@ -4209,6 +4217,12 @@ public:
   inline uint argument_count() const { return arg_count; }
   inline void remove_arguments() { arg_count=0; }
   Sql_mode_dependency value_depends_on_sql_mode_bit_or() const;
+  void delete_self()
+  {
+    arg_count= 0;
+    Item_result_field::delete_self();
+  }
+  void cleanup();
 };
 
 
@@ -4277,8 +4291,7 @@ public:
   An abstract class representing common features of
   regular functions and aggregate functions.
 */
-class Item_func_or_sum: public Item_result_field,
-                        public Item_args,
+class Item_func_or_sum: public Item_args,
                         public Used_tables_and_const_cache
 {
   bool agg_item_collations(DTCollation &c, const char *name,
@@ -4399,21 +4412,20 @@ public:
   }
 
 public:
-  Item_func_or_sum(THD *thd): Item_result_field(thd), Item_args() {}
-  Item_func_or_sum(THD *thd, Item *a): Item_result_field(thd), Item_args(a) { }
-  Item_func_or_sum(THD *thd, Item *a, Item *b):
-    Item_result_field(thd), Item_args(a, b) { }
+  Item_func_or_sum(THD *thd): Item_args(thd) {}
+  Item_func_or_sum(THD *thd, Item *a): Item_args(thd, a) { }
+  Item_func_or_sum(THD *thd, Item *a, Item *b): Item_args(thd, a, b) { }
   Item_func_or_sum(THD *thd, Item *a, Item *b, Item *c):
-    Item_result_field(thd), Item_args(thd, a, b, c) { }
+    Item_args(thd, a, b, c) { }
   Item_func_or_sum(THD *thd, Item *a, Item *b, Item *c, Item *d):
-    Item_result_field(thd), Item_args(thd, a, b, c, d) { }
+    Item_args(thd, a, b, c, d) { }
   Item_func_or_sum(THD *thd, Item *a, Item *b, Item *c, Item *d, Item *e):
-    Item_result_field(thd), Item_args(thd, a, b, c, d, e) { }
+    Item_args(thd, a, b, c, d, e) { }
   Item_func_or_sum(THD *thd, Item_func_or_sum *item):
-    Item_result_field(thd, item), Item_args(thd, item),
+    Item_args(thd, item),
     Used_tables_and_const_cache(item) { }
   Item_func_or_sum(THD *thd, List<Item> &list):
-    Item_result_field(thd), Item_args(thd, list) { }
+    Item_args(thd, list) { }
   bool walk(Item_processor processor, bool walk_subquery, void *arg)
   {
     if (walk_args(processor, walk_subquery, arg))
@@ -4444,6 +4456,11 @@ public:
   Sql_mode_dependency value_depends_on_sql_mode() const
   {
     return Item_args::value_depends_on_sql_mode_bit_or().soft_to_hard();
+  }
+  void cleanup()
+  {
+    Item_args::cleanup();
+    Item_result_field::cleanup();
   }
 };
 

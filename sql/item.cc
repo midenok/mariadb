@@ -825,6 +825,7 @@ void Item_ident::cleanup()
   db_name= orig_db_name; 
   table_name= orig_table_name;
   field_name= orig_field_name;
+  cached_table= NULL;
   /* Store if this Item was depended */
   if (was_fixed)
   {
