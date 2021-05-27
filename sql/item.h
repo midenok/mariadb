@@ -1683,6 +1683,7 @@ public:
 
   /*========= Item processors, to be used with Item::walk() ========*/
   virtual bool remove_dependence_processor(void *arg) { return 0; }
+  virtual bool cached_table_cleanup_processor(void * arg) { return 0; }
   virtual bool cleanup_processor(void *arg);
   virtual bool cleanup_excluding_const_fields_processor(void *arg) { return cleanup_processor(arg); }
   virtual bool collect_item_field_processor(void *arg) { return 0; }
@@ -2627,6 +2628,7 @@ public:
   void cleanup();
   st_select_lex *get_depended_from() const;
   bool remove_dependence_processor(void * arg);
+  bool cached_table_cleanup_processor(void * arg);
   virtual void print(String *str, enum_query_type query_type);
   virtual bool change_context_processor(void *cntx)
     { context= (Name_resolution_context *)cntx; return FALSE; }
@@ -2638,6 +2640,19 @@ public:
                             const char *db_name,
                             const char *table_name, List_iterator<Item> *it,
                             bool any_privileges);
+  bool check_vcol_func_processor(void *arg)
+  {
+    if (table_name)
+    {
+      /*
+         NOTE: alias is different in every statement, we must update it.
+         We cannot rely on alias_name_used (see NOTE above).
+      */
+      DBUG_ASSERT(field_name);
+      return mark_unsupported_function(field_name, arg, VCOL_TABLE_ALIAS);
+    }
+    return false;
+  }
 };
 
 
@@ -2836,6 +2851,8 @@ public:
   bool check_vcol_func_processor(void *arg)
   {
     context= 0;
+    if (Item_ident::check_vcol_func_processor(arg))
+      return true;
     if (field && (field->unireg_check == Field::NEXT_NUMBER))
     {
       // Auto increment fields are unsupported
