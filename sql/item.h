@@ -1684,7 +1684,6 @@ public:
   /*========= Item processors, to be used with Item::walk() ========*/
   virtual bool remove_dependence_processor(void *arg) { return 0; }
   virtual bool cleanup_processor(void *arg);
-  virtual bool cleanup_excluding_fields_processor(void *arg) { return cleanup_processor(arg); }
   virtual bool cleanup_excluding_const_fields_processor(void *arg) { return cleanup_processor(arg); }
   virtual bool collect_item_field_processor(void *arg) { return 0; }
   virtual bool collect_outer_ref_processor(void *arg) {return 0; }
@@ -2586,6 +2585,12 @@ public:
   const char *db_name;
   const char *table_name;
   const char *field_name;
+  /*
+     NOTE: came from TABLE::alias_name_used and this is only a hint! It works
+     only in need_correct_ident() condition. On other cases it is FALSE even if
+     table_name is alias! It cannot be TRUE in these cases, lots of spaghetti
+     logic depends on that.
+  */
   bool alias_name_used; /* true if item was resolved against alias */
   /* 
     Cached value of index for this field in table->field array, used by prep. 
@@ -4657,14 +4662,6 @@ public:
   }
   bool excl_dep_on_grouping_fields(st_select_lex *sel)
   { return (*ref)->excl_dep_on_grouping_fields(sel); }
-  bool cleanup_excluding_fields_processor(void *arg)
-  {
-    Item *item= real_item();
-    if (item && item->type() == FIELD_ITEM &&
-        ((Item_field *)item)->field)
-      return 0;
-    return cleanup_processor(arg);
-  }
   bool cleanup_excluding_const_fields_processor(void *arg)
   { 
     Item *item= real_item();
