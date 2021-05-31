@@ -2887,8 +2887,7 @@ public:
     save_security_ctx(thd->security_ctx),
     save_sql_mode(thd->variables.sql_mode),
     stmt_backup(thd->stmt_arena),
-    expr_arena(table->expr_arena),
-    warnings_disabled(false) {}
+    expr_arena(table->expr_arena) {}
   bool init();
 
   ~Vcol_expr_context();
@@ -2908,13 +2907,7 @@ bool Vcol_expr_context::init()
     return true;
   }
 
-  if (!stmt_backup->is_conventional() &&
-      !stmt_backup->is_stmt_prepare_or_first_sp_execute())
-  {
-    thd->push_internal_handler(&disable_warnings);
-    warnings_disabled= true;
-  }
-
+  thd->push_internal_handler(&disable_warnings);
   table->grant.want_privilege= false;
   TABLE_LIST const *tl= table->pos_in_table_list;
 
@@ -2941,8 +2934,7 @@ Vcol_expr_context::~Vcol_expr_context()
   table->grant.want_privilege= old_want_privilege;
   thd->restore_active_arena(expr_arena, &backup_arena);
   thd->stmt_arena= stmt_backup;
-  if (warnings_disabled)
-    thd->pop_internal_handler();
+  thd->pop_internal_handler();
   end_lex_with_single_table(thd, table, old_lex);
   table->map= old_map;
   thd->security_ctx= save_security_ctx;
