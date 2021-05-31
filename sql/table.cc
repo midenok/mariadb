@@ -2867,11 +2867,14 @@ class Vcol_expr_context
   LEX *old_lex;
   LEX lex;
   table_map old_map;
+  bool old_want_privilege;
   Security_context *save_security_ctx;
   sql_mode_t save_sql_mode;
   Query_arena backup_arena;
   Query_arena *stmt_backup;
   Query_arena *expr_arena;
+  Silence_warnings disable_warnings;
+  bool warnings_disabled;
 
 public:
   Vcol_expr_context(THD *_thd, TABLE *_table) :
@@ -2880,10 +2883,12 @@ public:
     table(_table),
     old_lex(thd->lex),
     old_map(table->map),
+    old_want_privilege(table->grant.want_privilege),
     save_security_ctx(thd->security_ctx),
     save_sql_mode(thd->variables.sql_mode),
     stmt_backup(thd->stmt_arena),
-    expr_arena(table->expr_arena) {}
+    expr_arena(table->expr_arena),
+    warnings_disabled(false) {}
   bool init();
 
   ~Vcol_expr_context();
@@ -2903,6 +2908,14 @@ bool Vcol_expr_context::init()
     return true;
   }
 
+  if (!stmt_backup->is_conventional() &&
+      !stmt_backup->is_stmt_prepare_or_first_sp_execute())
+  {
+    thd->push_internal_handler(&disable_warnings);
+    warnings_disabled= true;
+  }
+
+  table->grant.want_privilege= false;
   TABLE_LIST const *tl= table->pos_in_table_list;
 
   /* Avoid fix_outer_field() in Item_field::fix_fields(). */
@@ -2925,8 +2938,11 @@ Vcol_expr_context::~Vcol_expr_context()
 {
   if (!inited)
     return;
+  table->grant.want_privilege= old_want_privilege;
   thd->restore_active_arena(expr_arena, &backup_arena);
   thd->stmt_arena= stmt_backup;
+  if (warnings_disabled)
+    thd->pop_internal_handler();
   end_lex_with_single_table(thd, table, old_lex);
   table->map= old_map;
   thd->security_ctx= save_security_ctx;

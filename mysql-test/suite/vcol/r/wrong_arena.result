@@ -30,9 +30,6 @@ a	b	c	d	e
 2010-10-10 10:10:10	1	0	0	NULL
 Warnings:
 Warning	1292	Incorrect datetime value: '1'
-Warning	1292	Incorrect datetime value: '2'
-Warning	1292	Incorrect datetime value: '3'
-Warning	1292	Incorrect datetime value: '1'
 Warning	1292	Incorrect datetime value: '1'
 Warning	1292	Incorrect datetime value: '2'
 Warning	1292	Incorrect datetime value: '1'
