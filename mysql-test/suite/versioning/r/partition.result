@@ -1304,7 +1304,11 @@ create or replace table t1 (x int) with system versioning
 partition by system_time interval 1 hour auto;
 set timestamp= unix_timestamp('2001-01-01 00:01:00');
 update t1 set x= x + 1;
-ERROR HY000: Too many partitions (including subpartitions) were defined
+ERROR HY000: Versioned table `test`.`t1`: adding HISTORY partition(s) failed
+show warnings;
+Level	Code	Message
+Warning	1499	Too many partitions (including subpartitions) were defined
+Error	4181	Versioned table `test`.`t1`: adding HISTORY partition(s) failed
 # Auto-create failed error
 set timestamp= unix_timestamp('2000-01-01 00:00:00');
 create or replace table t1 (x int) with system versioning engine innodb
@@ -1319,7 +1323,7 @@ show warnings;
 Level	Code	Message
 Error	1813	Tablespace for table '`test`.`t1` /* Partition `p1` */' exists. Please DISCARD the tablespace before IMPORT
 Error	1030	Got error 184 "Tablespace already exists" from storage engine InnoDB
-Warning	4181	Versioned table `test`.`t1`: adding HISTORY partition failed
+Warning	4181	Versioned table `test`.`t1`: adding HISTORY partition(s) failed
 # Partition overflow error and manual fix
 set timestamp= unix_timestamp('2000-01-01 00:00:00');
 create or replace table t1 (x int) with system versioning

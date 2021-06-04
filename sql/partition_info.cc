@@ -893,7 +893,9 @@ bool partition_info::vers_set_hist_part(THD *thd, uint *create_count)
           ++*create_count;
           if (*create_count == MAX_PARTITIONS - 2)
           {
-            my_error(ER_TOO_MANY_PARTITIONS_ERROR, MYF(0));
+            my_error(ER_TOO_MANY_PARTITIONS_ERROR, MYF(ME_WARNING));
+            my_error(ER_VERS_HIST_PART_FAILED, MYF(0),
+                     table->s->db.str, table->s->table_name.str);
             return true;
           }
         }
