@@ -1645,47 +1645,60 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
     return false;
   }
 
-  switch (thd->lex->sql_command)
-  {
-    case SQLCOM_INSERT:
-      if (thd->lex->duplicates != DUP_UPDATE)
-        return false;
-      break;
-    case SQLCOM_LOAD:
-      if (thd->lex->duplicates != DUP_REPLACE)
-        return false;
-      break;
-    case SQLCOM_LOCK_TABLES:
-    case SQLCOM_DELETE:
-    case SQLCOM_UPDATE:
-    case SQLCOM_REPLACE:
-    case SQLCOM_REPLACE_SELECT:
-    case SQLCOM_DELETE_MULTI:
-    case SQLCOM_UPDATE_MULTI:
-      break;
-    default:
-      /*
-        TODO: make row events set thd->lex->sql_command appropriately.
+  /*
+    NOTE: we need this condition of prelocking_placeholder because we cannot do
+    auto-create after the transaction is started. Auto-create does
+    close_tables_for_reopen() and that is not possible under started transaction.
+    Also the transaction may not be cancelled at that moment: f.ex. trigger
+    after insert is run when some data is already written.
 
-        Sergei Golubchik: f.ex. currently row events increment
-        thd->status_var.com_stat[] each event for its own SQLCOM_xxx, it won't be
-        needed if they'll just set thd->lex->sql_command.
-      */
-      if (thd->rgi_slave && thd->rgi_slave->current_event &&
-          thd->lex->sql_command == SQLCOM_END)
-      {
-        switch (thd->rgi_slave->current_event->get_type_code())
-        {
-        case UPDATE_ROWS_EVENT:
-        case UPDATE_ROWS_EVENT_V1:
-        case DELETE_ROWS_EVENT:
-        case DELETE_ROWS_EVENT_V1:
-          break;
-        default:;
+    We must do auto-creation for PRELOCK_ROUTINE tables at the initial
+    open_tables() no matter what initiating sql_command is.
+  */
+  if (table_list->prelocking_placeholder != TABLE_LIST::PRELOCK_ROUTINE)
+  {
+    switch (thd->lex->sql_command)
+    {
+      case SQLCOM_INSERT:
+        if (thd->lex->duplicates != DUP_UPDATE)
           return false;
+        break;
+      case SQLCOM_LOAD:
+        if (thd->lex->duplicates != DUP_REPLACE)
+          return false;
+        break;
+      case SQLCOM_LOCK_TABLES:
+      case SQLCOM_DELETE:
+      case SQLCOM_UPDATE:
+      case SQLCOM_REPLACE:
+      case SQLCOM_REPLACE_SELECT:
+      case SQLCOM_DELETE_MULTI:
+      case SQLCOM_UPDATE_MULTI:
+        break;
+      default:
+        /*
+          TODO: make row events set thd->lex->sql_command appropriately.
+
+          Sergei Golubchik: f.ex. currently row events increment
+          thd->status_var.com_stat[] each event for its own SQLCOM_xxx, it won't be
+          needed if they'll just set thd->lex->sql_command.
+        */
+        if (thd->rgi_slave && thd->rgi_slave->current_event &&
+            thd->lex->sql_command == SQLCOM_END)
+        {
+          switch (thd->rgi_slave->current_event->get_type_code())
+          {
+          case UPDATE_ROWS_EVENT:
+          case UPDATE_ROWS_EVENT_V1:
+          case DELETE_ROWS_EVENT:
+          case DELETE_ROWS_EVENT_V1:
+            break;
+          default:;
+            return false;
+          }
         }
-      }
-      break;
+        break;
+    }
   }
 
   TABLE *table= this;
