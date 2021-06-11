@@ -5481,7 +5481,7 @@ public:
     lex= backup_lex;
   }
 
-  bool vers_modify_sys_field() const;
+  bool vers_insert_history() const;
 };
 
 
