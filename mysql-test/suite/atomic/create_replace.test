@@ -32,7 +32,7 @@ if ($MTR_COMBINATION_ROW)
 }
 if ($MTR_COMBINATION_MIX)
 {
-  let $binlog_format=include/set_binlog_format_mixed.sql;
+  --skip same as stmt
 }
 
 

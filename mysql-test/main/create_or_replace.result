@@ -284,10 +284,12 @@ create or replace table mysqltest2.t2;
 ERROR 42000: A table must have at least 1 column
 select * from information_schema.metadata_lock_info;
 THREAD_ID	LOCK_MODE	LOCK_DURATION	LOCK_TYPE	TABLE_SCHEMA	TABLE_NAME
-create or replace table t1 (i int);
 drop table t1;
+create table t1 (i int);
+drop table t1;
+drop table mysqltest2.t2;
 create table test.t1 (i int);
-create or replace table mysqltest2.t2 like test.t1;
+create table mysqltest2.t2 like test.t1;
 lock table test.t1 write, mysqltest2.t2 write;
 select * from information_schema.metadata_lock_info;
 THREAD_ID	LOCK_MODE	LOCK_DURATION	LOCK_TYPE	TABLE_SCHEMA	TABLE_NAME
@@ -314,10 +316,12 @@ create or replace table mysqltest2.t2 (a int) select 1 as 'a', 2 as 'a';
 ERROR 42S21: Duplicate column name 'a'
 select * from information_schema.metadata_lock_info;
 THREAD_ID	LOCK_MODE	LOCK_DURATION	LOCK_TYPE	TABLE_SCHEMA	TABLE_NAME
-create or replace table t1 (i int);
 drop table t1;
+create table t1 (i int);
+drop table t1;
+drop table mysqltest2.t2;
 create table test.t1 (i int) engine=innodb;
-create or replace table mysqltest2.t2 like test.t1;
+create table mysqltest2.t2 like test.t1;
 lock table test.t1 write, mysqltest2.t2 write;
 select * from information_schema.metadata_lock_info;
 THREAD_ID	LOCK_MODE	LOCK_DURATION	LOCK_TYPE	TABLE_SCHEMA	TABLE_NAME

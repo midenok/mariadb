@@ -1124,10 +1124,10 @@ static uint32 get_comment(THD *thd, uint32 comment_pos,
 */
 
 static
-bool find_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
+bool make_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
 {
   char res_name[NAME_LEN + 1];
-  static const LEX_CSTRING pre= { tmp_file_prefix "b-", strlen(tmp_file_prefix) + 2 };
+  static const LEX_CSTRING pre= { backup_file_prefix, strlen(backup_file_prefix) };
   static const size_t name_trim= NAME_LEN - pre.length - 1 - 3;
   strcpy(res_name, pre.str);
   strncpy(res_name + pre.length, orig->table_name.str, name_trim);
@@ -1213,7 +1213,7 @@ bool find_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
 int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
                             const LEX_CSTRING *current_db,
                             DDL_LOG_STATE *ddl_log_state,
-                            DDL_LOG_STATE *ddl_log_state_rename,
+                            DDL_LOG_STATE *ddl_log_state_create,
                             bool if_exists,
                             bool drop_temporary, bool drop_view,
                             bool drop_sequence,
@@ -1244,7 +1244,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
   if (!ddl_log_state)
   {
-    DBUG_ASSERT(!ddl_log_state_rename);
+    DBUG_ASSERT(!ddl_log_state_create);
     ddl_log_state= &local_ddl_log_state;
     bzero(ddl_log_state, sizeof(*ddl_log_state));
   }
@@ -1424,12 +1424,12 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     }
     else if (!drop_temporary)
     {
-      if (ddl_log_state_rename)
+      if (ddl_log_state_create)
       {
         rename_param param;
         TABLE_LIST t;
 
-        if (find_backup_name(thd, table, &t) ||
+        if (make_backup_name(thd, table, &t) ||
             mysql_check_rename(thd, &param, table, &table->db, &t.table_name,
                                &t.table_name, if_exists))
         {
@@ -1440,11 +1440,11 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
         if (param.from_table_hton == view_pseudo_hton ||
             param.from_table_hton->flags & HTON_EXPENSIVE_RENAME)
         {
-          ddl_log_state_rename= NULL;
+          ddl_log_state_create= NULL;
         }
         else
         {
-          if (mysql_do_rename(thd, &param, ddl_log_state_rename, table,
+          if (mysql_do_rename(thd, &param, ddl_log_state_create, table,
                                 &table->db, false, &force_if_exists))
           {
             error= 1;
@@ -1479,7 +1479,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     DEBUG_SYNC(thd, "rm_table_no_locks_before_delete_table");
     if (drop_temporary)
     {
-      DBUG_ASSERT(!ddl_log_state_rename);
+      DBUG_ASSERT(!ddl_log_state_create);
       /* "DROP TEMPORARY" but a temporary table was not found */
       unknown_tables.append(&db);
       unknown_tables.append('.');
@@ -1514,9 +1514,9 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     {
       LEX_CSTRING comment= {comment_start, (size_t) comment_len};
 
-      if (ddl_log_state_rename)
+      if (ddl_log_state_create)
       {
-        if (ddl_log_state->execute_after(ddl_log_state_rename))
+        if (ddl_log_state->execute_after(ddl_log_state_create))
         {
           error= 1;
           goto err;
@@ -1540,7 +1540,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
           . "DROP TABLE" statement, but it's a view.
           . "DROP SEQUENCE", but it's not a sequence
       */
-      DBUG_ASSERT(!ddl_log_state_rename);
+      DBUG_ASSERT(!ddl_log_state_create);
       wrong_drop_sequence= drop_sequence && hton;
       was_table|= wrong_drop_sequence;
       error= table_type == TABLE_TYPE_UNKNOWN ? ENOENT : -1;
@@ -1599,7 +1599,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       }
 
       debug_crash_here("ddl_log_drop_before_delete_table");
-      if (ddl_log_state_rename)
+      if (ddl_log_state_create)
         goto report_error;
 
       error= ha_delete_table(thd, hton, path, &db, &table_name,
@@ -1789,7 +1789,7 @@ report_error:
         backup_log_ddl(&ddl_log);
       }
     }
-    if (!was_view && !ddl_log_state_rename)
+    if (!was_view && !ddl_log_state_create)
       ddl_log_update_phase(ddl_log_state, DDL_DROP_PHASE_BINLOG);
 
     if (!dont_log_query &&

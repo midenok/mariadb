@@ -227,11 +227,13 @@ create or replace table mysqltest2.t2;
 --replace_column 1 #
 --sorted_result
 select * from information_schema.metadata_lock_info;
-create or replace table t1 (i int);
 drop table t1;
+create table t1 (i int);
+drop table t1;
+drop table mysqltest2.t2;
 
 create table test.t1 (i int);
-create or replace table mysqltest2.t2 like test.t1;
+create table mysqltest2.t2 like test.t1;
 lock table test.t1 write, mysqltest2.t2 write;
 --replace_column 1 #
 --sorted_result
@@ -247,11 +249,13 @@ create or replace table mysqltest2.t2 (a int) select 1 as 'a', 2 as 'a';
 --replace_column 1 #
 --sorted_result
 select * from information_schema.metadata_lock_info;
-create or replace table t1 (i int);
 drop table t1;
+create table t1 (i int);
+drop table t1;
+drop table mysqltest2.t2;
 
 create table test.t1 (i int) engine=innodb;
-create or replace table mysqltest2.t2 like test.t1;
+create table mysqltest2.t2 like test.t1;
 lock table test.t1 write, mysqltest2.t2 write;
 --replace_column 1 #
 --sorted_result
