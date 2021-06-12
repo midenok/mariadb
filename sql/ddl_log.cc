@@ -2925,25 +2925,17 @@ void ddl_log_release_entries(DDL_LOG_STATE *ddl_log_state)
    successfully and we can disable the execute log entry.
 */
 
-void ddl_log_complete(THD *thd, DDL_LOG_STATE *state)
+void ddl_log_complete(DDL_LOG_STATE *state)
 {
   DBUG_ENTER("ddl_log_complete");
 
   if (unlikely(!state->list))
     DBUG_VOID_RETURN;                           // ddl log not used
 
+  DBUG_ASSERT(!state->revert);
+
   mysql_mutex_lock(&LOCK_gdl);
-  if (state->revert)
-  {
-    ddl_log_update_recovery(state->execute_entry->entry_pos, 0);
-    if (ddl_log_execute_entry_no_lock(thd, state->list->entry_pos))
-    {
-      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, 1,
-                    "Failed execute entry %u", state->execute_entry->entry_pos);
-    }
-    ddl_log_disable_execute_entry(&state->execute_entry);
-  }
-  else if (likely(state->execute_entry))
+  if (likely(state->execute_entry))
     ddl_log_disable_execute_entry(&state->execute_entry);
   ddl_log_release_entries(state);
   mysql_mutex_unlock(&LOCK_gdl);
@@ -2965,10 +2957,21 @@ void ddl_log_revert(THD *thd, DDL_LOG_STATE *state)
   if (unlikely(!state->list))
     DBUG_VOID_RETURN;                           // ddl log not used
 
+  mysql_mutex_lock(&LOCK_gdl);
   if (likely(state->execute_entry))
-    state->revert= true;
-
-  ddl_log_complete(thd, state);
+  {
+    ddl_log_update_recovery(state->execute_entry->entry_pos, 0);
+    if (ddl_log_execute_entry_no_lock(thd, state->list->entry_pos))
+    {
+      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, 1,
+                    "Failed execute entry %u", state->execute_entry->entry_pos);
+    }
+    ddl_log_disable_execute_entry(&state->execute_entry);
+  }
+  ddl_log_release_entries(state);
+  mysql_mutex_unlock(&LOCK_gdl);
+  state->list= 0;
+  state->revert= false;
   DBUG_VOID_RETURN;
 }
 
