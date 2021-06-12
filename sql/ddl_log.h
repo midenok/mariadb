@@ -253,7 +253,6 @@ typedef struct st_ddl_log_state
   bool skip_binlog;                             /* Don't log DROP to binlog */
   bool is_active() { return list != 0; }
   void do_execute(THD *thd);
-  void complete(THD *thd);
   bool execute_after(st_ddl_log_state *master_chain);
 } DDL_LOG_STATE;
 
@@ -273,6 +272,7 @@ bool ddl_log_write_execute_entry(uint first_entry,
                                  DDL_LOG_MEMORY_ENTRY **active_entry);
 bool ddl_log_disable_execute_entry(DDL_LOG_MEMORY_ENTRY **active_entry);
 
+void ddl_log_complete(THD *thd, DDL_LOG_STATE *ddl_log_state);
 void ddl_log_revert(THD *thd, DDL_LOG_STATE *ddl_log_state);
 
 bool ddl_log_update_phase(DDL_LOG_STATE *entry, uchar phase);

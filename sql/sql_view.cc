@@ -748,8 +748,8 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
 
   my_ok(thd);
   lex->link_first_table_back(view, link_to_local);
-  ddl_log_state.complete(thd);
-  ddl_log_state_tmp_file.complete(thd);
+  ddl_log_complete(thd, &ddl_log_state);
+  ddl_log_complete(thd, &ddl_log_state_tmp_file);
   DBUG_RETURN(0);
 
 #ifdef WITH_WSREP
@@ -764,8 +764,8 @@ err_no_relink:
   unit->cleanup();
   if (backup_file_name[0])
     mysql_file_delete(key_file_fileparser, backup_file_name, MYF(MY_WME));
-  ddl_log_state.complete(thd);
-  ddl_log_state_tmp_file.complete(thd);
+  ddl_log_complete(thd, &ddl_log_state);
+  ddl_log_complete(thd, &ddl_log_state_tmp_file);
   DBUG_RETURN(res || thd->is_error());
 }
 
@@ -1984,7 +1984,7 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views, enum_drop_mode drop_mode)
     thd->binlog_xid= 0;
     debug_crash_here("ddl_log_drop_after_binlog");
   }
-  ddl_log_state.complete(thd);
+  ddl_log_complete(thd, &ddl_log_state);
 
   if (unlikely(something_wrong))
   {
