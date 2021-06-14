@@ -5062,7 +5062,11 @@ bool select_create::send_eof()
   else
     ddl_log_complete(&ddl_log_state_create);
   if (ddl_log_state_rm.revert)
+  {
+    debug_crash_here("ddl_log_replace_before_remove_backup");
     ddl_log_revert(thd, &ddl_log_state_rm);
+    debug_crash_here("ddl_log_replace_after_remove_backup");
+  }
   else
     ddl_log_complete(&ddl_log_state_rm);
   debug_crash_here("ddl_log_create_log_complete");

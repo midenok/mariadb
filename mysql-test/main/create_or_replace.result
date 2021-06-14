@@ -551,3 +551,42 @@ SELECT * FROM t3;
 ERROR HY000: Table 't3' was not locked with LOCK TABLES
 UNLOCK TABLES;
 DROP TABLE t3;
+#
+# MDEV-25292 Atomic CREATE OR REPLACE TABLE
+#
+create table t1 (a int);
+insert t1 values (1), (1);
+create table t2 (c int);
+create or replace table t2 (a int, b int, key k (a), key k (b));
+ERROR 42000: Duplicate key name 'k'
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `c` int(11) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+create or replace table t2 (a int, b int, key k (a), key k (b)) as select a, a as b from t1;
+ERROR 42000: Duplicate key name 'k'
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `c` int(11) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+create or replace table t2 (a int primary key) as select * from t1;
+ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `c` int(11) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+set @old_mode= @@sql_mode;
+set @@sql_mode='ALLOW_INVALID_DATES';
+create table t3 (dt datetime default '2008-02-31 00:00:00');
+set @@sql_mode= @old_mode;
+create or replace table t2 like t3;
+ERROR 42000: Invalid default value for 'dt'
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `c` int(11) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+drop tables t1, t2, t3;

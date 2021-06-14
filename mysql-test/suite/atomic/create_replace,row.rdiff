@@ -1,6 +1,6 @@
 --- create_replace.result
 +++ create_replace,row.reject
-@@ -278,19 +278,23 @@
+@@ -342,19 +342,23 @@
  # CRASH POINT: ddl_log_create_after_prepare_eof
  t1.MAD
  t1.MAI
@@ -28,7 +28,33 @@
  Table	Create Table
  t1	CREATE TABLE `t1` (
    `new` int(11) DEFAULT NULL,
-@@ -301,7 +305,11 @@
+@@ -365,7 +369,11 @@
+ t1.MAD
+ t1.MAI
+ t1.frm
+-master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
++master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE `t1` (
++  `new` int(11) DEFAULT NULL,
++  `b` int(11) DEFAULT NULL
++) PAGE_CHECKSUM=1
++master-bin.000001	#	Annotate_rows	#	#	CREATE OR REPLACE TABLE t1 SELECT * from const_table
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `new` int(11) DEFAULT NULL,
+@@ -387,7 +395,11 @@
+ t1.MAD
+ t1.MAI
+ t1.frm
+-master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
++master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE `t1` (
++  `new` int(11) DEFAULT NULL,
++  `b` int(11) DEFAULT NULL
++) PAGE_CHECKSUM=1
++master-bin.000001	#	Annotate_rows	#	#	CREATE OR REPLACE TABLE t1 SELECT * from const_table
+ Table	Create Table
+ t1	CREATE TABLE `t1` (
+   `new` int(11) DEFAULT NULL,
+@@ -398,7 +410,11 @@
  t1.MAD
  t1.MAI
  t1.frm

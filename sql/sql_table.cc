@@ -1450,6 +1450,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
             error= 1;
             goto err;
           }
+          debug_crash_here("ddl_log_replace_after_rename_table");
           table_name= t.table_name;
           if (!non_temp_tables_count)
           {
@@ -4893,7 +4894,9 @@ err:
   else
   {
     ddl_log_complete(&ddl_log_state_create);
+    debug_crash_here("ddl_log_replace_before_remove_backup");
     ddl_log_revert(thd, &ddl_log_state_rm);
+    debug_crash_here("ddl_log_replace_after_remove_backup");
   }
   DBUG_RETURN(result);
 }
@@ -5561,7 +5564,9 @@ err:
   else
   {
     ddl_log_complete(&ddl_log_state_create);
+    debug_crash_here("ddl_log_replace_before_remove_backup");
     ddl_log_revert(thd, &ddl_log_state_rm);
+    debug_crash_here("ddl_log_replace_after_remove_backup");
   }
   DBUG_RETURN(res != 0);
 }
