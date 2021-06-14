@@ -3145,20 +3145,21 @@ bool ddl_log_rename_view(THD *thd, DDL_LOG_STATE *ddl_state,
    is in original delete order.
 */
 
-static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
-                              ddl_log_action_code action_code,
-                              const LEX_CSTRING *db,
-                              const LEX_CSTRING *comment)
+bool ddl_log_drop_init(DDL_LOG_STATE *ddl_state,
+                       const LEX_CSTRING *db,
+                       const LEX_CSTRING *comment)
 {
   DDL_LOG_ENTRY ddl_log_entry;
   DDL_LOG_MEMORY_ENTRY *log_entry;
+  const ddl_log_action_code action_code= DDL_LOG_DROP_INIT_ACTION;
   DBUG_ENTER("ddl_log_drop_init");
 
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
 
   ddl_log_entry.action_type=  action_code;
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(db);
-  ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
+  if (comment)
+    ddl_log_entry.tmp_name=   *const_cast<LEX_CSTRING*>(comment);
   if (ddl_state->skip_binlog)
     ddl_log_entry.flags|=     DDL_LOG_FLAG_DROP_SKIP_BINLOG;
 
@@ -3195,21 +3196,6 @@ error:
   DBUG_RETURN(1);
 }
 
-
-bool ddl_log_drop_table_init(THD *thd, DDL_LOG_STATE *ddl_state,
-                             const LEX_CSTRING *db,
-                             const LEX_CSTRING *comment)
-{
-  return ddl_log_drop_init(thd, ddl_state, DDL_LOG_DROP_INIT_ACTION,
-                           db, comment);
-}
-
-bool ddl_log_drop_view_init(THD *thd, DDL_LOG_STATE *ddl_state,
-                            const LEX_CSTRING *db)
-{
-  return ddl_log_drop_init(thd, ddl_state, DDL_LOG_DROP_INIT_ACTION,
-                           db, &empty_clex_str);
-}
 
 static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
                          ddl_log_action_code action_code,

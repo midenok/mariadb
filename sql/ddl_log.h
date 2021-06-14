@@ -297,11 +297,9 @@ bool ddl_log_rename_view(THD *thd, DDL_LOG_STATE *ddl_state,
                          const LEX_CSTRING *org_alias,
                          const LEX_CSTRING *new_db,
                          const LEX_CSTRING *new_alias);
-bool ddl_log_drop_table_init(THD *thd, DDL_LOG_STATE *ddl_state,
-                             const LEX_CSTRING *db,
-                             const LEX_CSTRING *comment);
-bool ddl_log_drop_view_init(THD *thd, DDL_LOG_STATE *ddl_state,
-                            const LEX_CSTRING *db);
+bool ddl_log_drop_init(DDL_LOG_STATE *ddl_state,
+                       const LEX_CSTRING *db,
+                       const LEX_CSTRING *comment);
 bool ddl_log_drop_table(THD *thd, DDL_LOG_STATE *ddl_state,
                         handlerton *hton,
                         const LEX_CSTRING *path,

@@ -1525,7 +1525,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
         ddl_log_state->skip_binlog= true;
       }
 
-      if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
+      if (ddl_log_drop_init(ddl_log_state, current_db, &comment)) /* DROP TABLE */
       {
         error= 1;
         goto err;
