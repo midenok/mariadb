@@ -1438,7 +1438,8 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
         }
 
         if (param.from_table_hton == view_pseudo_hton ||
-            param.from_table_hton->flags & HTON_EXPENSIVE_RENAME)
+            param.from_table_hton->flags & HTON_EXPENSIVE_RENAME ||
+            DBUG_EVALUATE_IF("ddl_log_expensive_rename", true, false))
         {
           ddl_log_state_create= NULL;
         }
@@ -4865,6 +4866,8 @@ err:
     }
     thd->binlog_xid= thd->query_id;
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
+    if (ddl_log_state_rm.is_active() && !ddl_log_state_rm.skip_binlog)
+      ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
     debug_crash_here("ddl_log_create_before_binlog");
     if (unlikely(write_bin_log(thd, result ? FALSE : TRUE, thd->query(),
                                thd->query_length(), is_trans)))
@@ -5519,6 +5522,8 @@ err:
   {
     thd->binlog_xid= thd->query_id;
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
+    if (ddl_log_state_rm.is_active() && !ddl_log_state_rm.skip_binlog)
+      ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
     debug_crash_here("ddl_log_create_before_binlog");
     if (res && create_info->table_was_deleted)
     {

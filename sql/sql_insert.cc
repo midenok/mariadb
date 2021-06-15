@@ -4663,6 +4663,8 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
         thd->binlog_xid= thd->query_id;
         /* Remember xid's for the case of row based logging */
         ddl_log_update_xid(&ptr->ddl_log_state_create, thd->binlog_xid);
+        if (ptr->ddl_log_state_rm.is_active() && !ptr->ddl_log_state_rm.skip_binlog)
+          ddl_log_update_xid(&ptr->ddl_log_state_rm, thd->binlog_xid);
         return binlog_show_create_table(thd, *tables, ptr->create_info);
       }
       return 0;
@@ -4938,6 +4940,8 @@ bool select_create::send_eof()
     thd->binlog_xid= thd->query_id;
     /* Remember xid's for the case of row based logging */
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
+    if (ddl_log_state_rm.is_active() && !ddl_log_state_rm.skip_binlog)
+      ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
   }
 
   if (prepare_eof())
