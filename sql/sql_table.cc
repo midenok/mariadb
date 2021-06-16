@@ -1453,16 +1453,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
           }
           debug_crash_here("ddl_log_replace_after_rename_table");
           table_name= t.table_name;
-          if (!non_temp_tables_count)
-          {
-            /*
-              NOTE: write renamed table name into drop-chain and replay it after
-              CREATE OR REPLACE finishes. We need to finalize rename-chain first,
-              so replay would not execute it.
-            */
-            ddl_log_state->revert= true;
-            dont_log_query= true;
-          }
         } /* else !(param.from_table_hton->flags & HTON_EXPENSIVE_RENAME) */
       } /* if (ddl_log_state_rename) */
 
@@ -1520,6 +1510,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       {
         ddl_log_state->skip_if_open(ddl_log_state_create);
         ddl_log_state->skip_binlog= true;
+        dont_log_query= true;
       }
 
       if (ddl_log_drop_init(ddl_log_state, current_db, &comment)) /* DROP TABLE */
@@ -1904,12 +1895,7 @@ err:
     }
   }
   if (ddl_log_state == &local_ddl_log_state)
-  {
-    if (ddl_log_state->revert)
-      ddl_log_revert(thd, ddl_log_state);
-    else
-      ddl_log_complete(ddl_log_state);
-  }
+    ddl_log_complete(ddl_log_state);
 
   if (!drop_temporary)
   {
@@ -4887,11 +4873,15 @@ err:
   if (result)
   {
     ddl_log_revert(thd, &ddl_log_state_create);
-    ddl_log_state_rm.revert= false;
     ddl_log_complete(&ddl_log_state_rm);
   }
   else
   {
+    /*
+      NOTE: write renamed table name into drop-chain and replay it after
+      CREATE OR REPLACE finishes. We need to finalize rename-chain first,
+      so replay would not execute it.
+    */
     ddl_log_complete(&ddl_log_state_create);
     debug_crash_here("ddl_log_replace_before_remove_backup");
     ddl_log_revert(thd, &ddl_log_state_rm);
@@ -5559,7 +5549,6 @@ err:
   if (res)
   {
     ddl_log_revert(thd, &ddl_log_state_create);
-    ddl_log_state_rm.revert= false;
     ddl_log_complete(&ddl_log_state_rm);
   }
   else

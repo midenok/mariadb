@@ -1300,9 +1300,8 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
 
   mysql_mutex_assert_owner(&LOCK_gdl);
   DBUG_PRINT("ddl_log",
-             ("pos: %u=>%u->%u  type: %u  action: %u (%s) phase: %u  "
+             ("pos: %u->%u  type: %u  action: %u (%s) phase: %u  "
               "handler: '%s'  name: '%s'  from_name: '%s'  tmp_name: '%s'",
-              recovery_state.execute_entry_pos,
               ddl_log_entry->entry_pos,
               ddl_log_entry->next_entry,
               (uint) ddl_log_entry->entry_type,
@@ -2684,13 +2683,6 @@ bool ddl_log_close_binlogged_events(HASH *xids)
 }
 
 
-void ddl_log_update_recovery(uint entry_pos, ulonglong xid)
-{
-  recovery_state.execute_entry_pos= entry_pos;
-  recovery_state.xid= xid;
-}
-
-
 /**
   Execute the ddl log at recovery of MySQL Server.
 
@@ -2751,7 +2743,8 @@ int ddl_log_execute_recovery()
         Remember information about executive ddl log entry,
         used for binary logging during recovery
       */
-      ddl_log_update_recovery(i, ddl_log_entry.xid);
+      recovery_state.execute_entry_pos= i;
+      recovery_state.xid= ddl_log_entry.xid;
 
       /* purecov: begin tested */
       if (ddl_log_entry.unique_id > DDL_LOG_MAX_RETRY)
@@ -2775,7 +2768,6 @@ int ddl_log_execute_recovery()
         error= -1;
         continue;
       }
-      (void) disable_execute_entry(i);
       count++;
     }
   }
@@ -2893,8 +2885,6 @@ void ddl_log_complete(DDL_LOG_STATE *state)
   if (unlikely(!state->list))
     DBUG_VOID_RETURN;                           // ddl log not used
 
-  DBUG_ASSERT(!state->revert);
-
   mysql_mutex_lock(&LOCK_gdl);
   if (likely(state->execute_entry))
     ddl_log_disable_execute_entry(&state->execute_entry);
@@ -2921,18 +2911,12 @@ void ddl_log_revert(THD *thd, DDL_LOG_STATE *state)
   mysql_mutex_lock(&LOCK_gdl);
   if (likely(state->execute_entry))
   {
-    ddl_log_update_recovery(state->execute_entry->entry_pos, 0);
-    if (ddl_log_execute_entry_no_lock(thd, state->list->entry_pos))
-    {
-      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, 1,
-                    "Failed execute entry %u", state->execute_entry->entry_pos);
-    }
+    ddl_log_execute_entry_no_lock(thd, state->list->entry_pos);
     ddl_log_disable_execute_entry(&state->execute_entry);
   }
   ddl_log_release_entries(state);
   mysql_mutex_unlock(&LOCK_gdl);
   state->list= 0;
-  state->revert= false;
   DBUG_VOID_RETURN;
 }
 
@@ -3117,7 +3101,8 @@ bool ddl_log_drop_init(DDL_LOG_STATE *ddl_state,
 
   ddl_log_entry.action_type=  DDL_LOG_DROP_INIT_ACTION;
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(db);
-  ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
+  if (comment)
+    ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
   ddl_log_entry.unique_id=    ddl_state->master_chain_pos;
 
   DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
@@ -3147,14 +3132,14 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.name=         *const_cast<LEX_CSTRING*>(table);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.phase=        (uchar) phase;
-  if (ddl_state->revert)
+  if (ddl_state->skip_binlog)
     ddl_log_entry.flags= DDL_LOG_FLAG_DROP_SKIP_BINLOG;
 
   mysql_mutex_lock(&LOCK_gdl);
   if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
     goto error;
 
-  (void) ddl_log_sync_no_lock(); // FIXME: why sync is before update_next_entry_pos()
+  (void) ddl_log_sync_no_lock();
   if (update_next_entry_pos(ddl_state->list->entry_pos,
                             log_entry->entry_pos))
   {
@@ -3536,18 +3521,11 @@ err:
 }
 
 
-void DDL_LOG_STATE::do_execute(THD *thd)
-{
-  DBUG_ASSERT(revert);
-  ddl_log_update_recovery(execute_entry->entry_pos, 0);
-  if (ddl_log_execute_entry(thd, execute_entry->next_log_entry->entry_pos))
-  {
-    push_warning(thd, Sql_condition::WARN_LEVEL_WARN, 1,
-                  "Failed to remove old table");
-  }
-}
-
-
+/**
+  Used for DROP action. When DDL recovery is executed if master_state chain is
+  open at the moment DDL_LOG_DROP_INIT_ACTION of this drop chain is executed the
+  drop chain will be closed without execution.
+*/
 void DDL_LOG_STATE::skip_if_open(DDL_LOG_STATE *master_state)
 {
   DBUG_ASSERT(master_state->execute_entry);

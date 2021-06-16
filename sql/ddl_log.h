@@ -249,11 +249,13 @@ typedef struct st_ddl_log_state
   */
   DDL_LOG_MEMORY_ENTRY *main_entry;
   uint16 flags;                                 /* Cache for flags */
-  bool revert;                                  /* Execute log on complete() */
-  bool skip_binlog;                             /* Don't log DROP to binlog */
+  /*
+    Don't log DROP to binlog and tell the upper level that it must skip
+    updating XID. HTON_EXPENSIVE_RENAME engines have this flag false.
+  */
+  bool skip_binlog;
   ulonglong master_chain_pos;
   bool is_active() { return list != 0; }
-  void do_execute(THD *thd);
   void skip_if_open(st_ddl_log_state *master_state);
 } DDL_LOG_STATE;
 
@@ -262,7 +264,6 @@ typedef struct st_ddl_log_state
 bool ddl_log_initialize();
 void ddl_log_release();
 bool ddl_log_close_binlogged_events(HASH *xids);
-void ddl_log_update_recovery(uint entry_pos, ulonglong xid);
 int ddl_log_execute_recovery();
 
 /* functions for updating the ddl log */
