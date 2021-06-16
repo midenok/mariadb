@@ -1518,11 +1518,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
       if (ddl_log_state_create)
       {
-        if (ddl_log_state->execute_after(ddl_log_state_create))
-        {
-          error= 1;
-          goto err;
-        }
+        ddl_log_state->skip_if_open(ddl_log_state_create);
         ddl_log_state->skip_binlog= true;
       }
 

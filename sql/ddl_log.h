@@ -251,9 +251,10 @@ typedef struct st_ddl_log_state
   uint16 flags;                                 /* Cache for flags */
   bool revert;                                  /* Execute log on complete() */
   bool skip_binlog;                             /* Don't log DROP to binlog */
+  ulonglong master_chain_pos;
   bool is_active() { return list != 0; }
   void do_execute(THD *thd);
-  bool execute_after(st_ddl_log_state *master_chain);
+  void skip_if_open(st_ddl_log_state *master_state);
 } DDL_LOG_STATE;
 
 

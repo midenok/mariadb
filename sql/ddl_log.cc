@@ -456,7 +456,7 @@ bool ddl_log_disable_execute_entry(DDL_LOG_MEMORY_ENTRY **active_entry)
 static bool is_execute_entry_active(uint entry_pos)
 {
   uchar buff[1];
-  DBUG_ENTER("disable_execute_entry");
+  DBUG_ENTER("is_execute_entry_active");
 
   if (mysql_file_pread(global_ddl_log.file_id, buff, sizeof(buff),
                        global_ddl_log.io_size * entry_pos +
@@ -1513,6 +1513,15 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   case DDL_LOG_DROP_INIT_ACTION:
   {
     LEX_CSTRING *comment= &ddl_log_entry->tmp_name;
+    ulonglong master_chain_pos= ddl_log_entry->unique_id;
+    if (master_chain_pos && is_execute_entry_active(master_chain_pos))
+    {
+      DBUG_ASSERT(ddl_log_entry->next_entry);
+      if ((error= disable_execute_entry(ddl_log_entry->next_entry)))
+        break;
+      error= increment_phase(entry_pos);
+      break;
+    }
     recovery_state.drop_table.length(0);
     recovery_state.drop_table.set_charset(system_charset_info);
     recovery_state.drop_table.append(STRING_WITH_LEN("DROP TABLE IF EXISTS "));
@@ -2264,54 +2273,6 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       break;
     }
     recovery_state.query.qs_append(&ddl_log_entry->extra_name);
-    break;
-  }
-  case DDL_LOG_EXECUTE_ACTION:
-  {
-    DBUG_ASSERT(ddl_log_entry->unique_id <= UINT_MAX32);
-    DBUG_ASSERT(ddl_log_entry->unique_id);
-    uint execute_pos= (uint) ddl_log_entry->unique_id;
-    if (is_execute_entry_active(execute_pos))
-    {
-      DDL_LOG_ENTRY execute_entry;
-      if (read_ddl_log_entry(execute_pos, &execute_entry))
-      {
-        error= 1;
-        my_printf_error(ER_INTERNAL_ERROR,
-                        "DDL log: failed to read execute action %u", MYF(0),
-                        execute_pos);
-        break;
-      }
-      DBUG_ASSERT(execute_entry.entry_pos == execute_pos);
-      DBUG_ASSERT(execute_entry.entry_type == DDL_LOG_EXECUTE_CODE);
-      if (execute_entry.entry_type != DDL_LOG_EXECUTE_CODE)
-      {
-        error= 1;
-        my_printf_error(ER_INTERNAL_ERROR,
-                        "DDL log: unexpected execute entry type %u", MYF(0),
-                        (uint) execute_entry.entry_type);
-        (void) update_phase(entry_pos, DDL_LOG_FINAL_PHASE);
-        break;
-      }
-      ddl_log_update_recovery(execute_pos, execute_entry.xid);
-      if (ddl_log_execute_entry_no_lock(thd, execute_entry.next_entry))
-      {
-        error= 1;
-        my_printf_error(ER_INTERNAL_ERROR,
-                        "DDL log: failed to execute action %u", MYF(0),
-                        execute_pos);
-        (void) update_phase(entry_pos, DDL_LOG_FINAL_PHASE);
-        break;
-      }
-      if (disable_execute_entry(execute_pos))
-      {
-        error= 1;
-        my_printf_error(ER_INTERNAL_ERROR,
-                        "DDL log: failed disable execute action %u", MYF(0),
-                        execute_pos);
-      }
-    }
-    (void) update_phase(entry_pos, DDL_LOG_FINAL_PHASE);
     break;
   }
   default:
@@ -3150,50 +3111,16 @@ bool ddl_log_drop_init(DDL_LOG_STATE *ddl_state,
                        const LEX_CSTRING *comment)
 {
   DDL_LOG_ENTRY ddl_log_entry;
-  DDL_LOG_MEMORY_ENTRY *log_entry;
-  const ddl_log_action_code action_code= DDL_LOG_DROP_INIT_ACTION;
-  DBUG_ENTER("ddl_log_drop_init");
+  DBUG_ENTER("ddl_log_drop_file");
 
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
 
-  ddl_log_entry.action_type=  action_code;
+  ddl_log_entry.action_type=  DDL_LOG_DROP_INIT_ACTION;
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(db);
-  if (comment)
-    ddl_log_entry.tmp_name=   *const_cast<LEX_CSTRING*>(comment);
-  if (ddl_state->skip_binlog)
-    ddl_log_entry.flags|=     DDL_LOG_FLAG_DROP_SKIP_BINLOG;
+  ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
+  ddl_log_entry.unique_id=    ddl_state->master_chain_pos;
 
-  mysql_mutex_lock(&LOCK_gdl);
-  if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
-    goto error;
-
-  (void) ddl_log_sync_no_lock(); // FIXME: why sync is before update_next_entry_pos()
-  if (ddl_state->list)
-  {
-    if (update_next_entry_pos(ddl_state->list->entry_pos,
-                              log_entry->entry_pos))
-    {
-      ddl_log_release_memory_entry(log_entry);
-      goto error;
-    }
-  }
-  else
-  {
-    if (ddl_log_write_execute_entry(log_entry->entry_pos,
-                                    &ddl_state->execute_entry))
-    {
-      ddl_log_release_memory_entry(log_entry);
-      goto error;
-    }
-  }
-
-  mysql_mutex_unlock(&LOCK_gdl);
-  add_log_entry(ddl_state, log_entry);
-  DBUG_RETURN(0);
-
-error:
-  mysql_mutex_unlock(&LOCK_gdl);
-  DBUG_RETURN(1);
+  DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
 }
 
 
@@ -3621,14 +3548,8 @@ void DDL_LOG_STATE::do_execute(THD *thd)
 }
 
 
-bool DDL_LOG_STATE::execute_after(DDL_LOG_STATE *master_chain)
+void DDL_LOG_STATE::skip_if_open(DDL_LOG_STATE *master_state)
 {
-  DBUG_ASSERT(master_chain->execute_entry);
-  DDL_LOG_ENTRY ddl_log_entry;
-  bzero(&ddl_log_entry, sizeof(ddl_log_entry));
-
-  ddl_log_entry.action_type=  DDL_LOG_EXECUTE_ACTION;
-  ddl_log_entry.unique_id=    master_chain->execute_entry->entry_pos;
-
-  return ddl_log_write(this, &ddl_log_entry);
+  DBUG_ASSERT(master_state->execute_entry);
+  master_chain_pos= master_state->execute_entry->entry_pos;
 }

@@ -1,4 +1,10 @@
 set @@default_storage_engine=Aria;
+create table t1 (c int);
+create or replace table t1 (a int, b int, key k (a), key k (b));
+ERROR 42000: Duplicate key name 'k'
+create or replace table t1 (a int, b int, key k (a), key k (b));
+ERROR 42000: Duplicate key name 'k'
+drop table t1;
 # Crash recovery
 create table const_table (new int, b int) engine=myisam;
 insert into const_table values (1,1),(2,2);
