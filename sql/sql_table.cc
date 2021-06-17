@@ -1172,6 +1172,28 @@ bool make_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
   return false;
 }
 
+
+static
+bool close_or_remove_table(THD *thd, TABLE_LIST *table)
+{
+  if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
+      thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)
+  {
+    if (table->table)
+    {
+      if (wait_while_table_is_used(thd, table->table, HA_EXTRA_NOT_USED))
+        return true;
+      close_all_tables_for_name(thd, table->table->s,
+                                HA_EXTRA_PREPARE_FOR_DROP, NULL);
+      table->table= 0;
+    }
+  }
+  else
+    tdc_remove_table(thd, table->db.str, table->table_name.str);
+  return false;
+}
+
+
 /**
   Execute the drop of a sequence, view or table (normal or temporary).
 
@@ -1430,8 +1452,8 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
         TABLE_LIST t;
 
         if (make_backup_name(thd, table, &t) ||
-            mysql_check_rename(thd, &param, table, &table->db, &t.table_name,
-                               &t.table_name, if_exists))
+            rename_check(thd, &param, table, &table->db, &t.table_name,
+                         &t.table_name, if_exists))
         {
           error= 1;
           goto err;
@@ -1445,8 +1467,9 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
         }
         else
         {
-          if (mysql_do_rename(thd, &param, ddl_log_state_create, table,
-                                &table->db, false, &force_if_exists))
+          if (close_or_remove_table(thd, table) ||
+              rename_do(thd, &param, ddl_log_state_create, table,
+                        &table->db, false, &force_if_exists))
           {
             error= 1;
             goto err;
@@ -1508,12 +1531,12 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
       if (ddl_log_state_create)
       {
-        ddl_log_state->skip_if_open(ddl_log_state_create);
-        ddl_log_state->skip_binlog= true;
+        ddl_log_link_events(ddl_log_state, ddl_log_state_create);
         dont_log_query= true;
       }
 
-      if (ddl_log_drop_init(ddl_log_state, current_db, &comment)) /* DROP TABLE */
+      if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment,
+                                  ddl_log_state_create != 0))
       {
         error= 1;
         goto err;
@@ -1545,23 +1568,12 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
         goto err;
       }
 
-      if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
-          thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)
+
+      if (close_or_remove_table(thd, table))
       {
-        if (table->table)
-        {
-          if (wait_while_table_is_used(thd, table->table, HA_EXTRA_NOT_USED))
-          {
-            error= -1;
-            goto err;
-          }
-          close_all_tables_for_name(thd, table->table->s,
-                                    HA_EXTRA_PREPARE_FOR_DROP, NULL);
-          table->table= 0;
-        }
+        error= 1;
+        goto err;
       }
-      else
-        tdc_remove_table(thd, db.str, table_name.str);
 
       /* Check that we have an exclusive lock on the table to be dropped. */
       DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
@@ -4314,6 +4326,7 @@ int create_table_impl(THD *thd,
   if (create_info->tmp_table())
   {
     ddl_log_state_create= 0;
+    ddl_log_state_rm= 0;
   }
 
   if (fix_constraints_names(thd, &alter_info->check_constraint_list,

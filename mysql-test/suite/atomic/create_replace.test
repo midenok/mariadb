@@ -61,16 +61,17 @@ drop table t1;
 
 let $MYSQLD_DATADIR= `SELECT @@datadir`;
 
-let $crash_count=11;
-let $crash_points='ddl_log_create_before_create_frm',
+let $crash_count=12;
+let $crash_points='ddl_log_replace_after_rename_table',
+                  'ddl_log_create_before_create_frm',
                   'ddl_log_create_before_create_table',
                   'ddl_log_create_after_create_table',
                   'ddl_log_create_after_drop',
+                  'ddl_log_create_after_send_data',
                   'ddl_log_create_before_binlog',
                   'ddl_log_create_after_prepare_eof',
                   'ddl_log_create_after_binlog',
                   'ddl_log_create_log_complete',
-                  'ddl_log_replace_after_rename_table',
                   'ddl_log_replace_before_remove_backup',
                   'ddl_log_replace_after_remove_backup';
 
@@ -160,6 +161,11 @@ while ($r < $statement_count)
     --replace_result $default_engine DEFAULT_ENGINE ' PAGE_CHECKSUM=1' ''
     --error $show_error
     show create table t1;
+    if (`select locate('SELECT', '$statement')`)
+    {
+      --error $show_error
+      select * from t1;
+    }
     --enable_warnings
     --replace_column 6 '' 7 '' 8 '' 9 '' 10 '' 11 ''
     show triggers;

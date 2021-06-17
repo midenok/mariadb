@@ -179,11 +179,11 @@ struct rename_param
   handlerton *from_table_hton;
 };
 bool
-mysql_do_rename(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
+rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
                 TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
                 bool skip_error, bool *force_if_exists);
 int
-mysql_check_rename(THD *thd, rename_param *param,
+rename_check(THD *thd, rename_param *param,
              TABLE_LIST *ren_table,
              const LEX_CSTRING *new_db,
              const LEX_CSTRING *new_table_name,

@@ -90,8 +90,7 @@ const char *ddl_log_action_name[DDL_LOG_LAST_ACTION]=
   "rename table", "rename view",
   "initialize drop table", "drop table",
   "drop view", "drop trigger", "drop db", "create table", "create view",
-  "delete tmp file", "create trigger", "alter table", "store query",
-  "execute action"
+  "delete tmp file", "create trigger", "alter table", "store query"
 };
 
 /* Number of phases per entry */
@@ -102,7 +101,7 @@ const uchar ddl_log_entry_phases[DDL_LOG_LAST_ACTION]=
   (uchar) DDL_DROP_PHASE_END, 1, 1,
   (uchar) DDL_DROP_DB_PHASE_END, (uchar) DDL_CREATE_TABLE_PHASE_END,
   (uchar) DDL_CREATE_VIEW_PHASE_END, 0, (uchar) DDL_CREATE_TRIGGER_PHASE_END,
-  DDL_ALTER_TABLE_PHASE_END, 1, 0
+  DDL_ALTER_TABLE_PHASE_END, 1
 };
 
 
@@ -140,8 +139,6 @@ static st_global_ddl_log global_ddl_log;
 static st_ddl_recovery   recovery_state;
 
 mysql_mutex_t LOCK_gdl;
-
-static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry);
 
 /* Positions to different data in a ddl log block */
 #define DDL_LOG_ENTRY_TYPE_POS 0
@@ -1523,10 +1520,8 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     if (master_chain_pos && is_execute_entry_active(master_chain_pos))
     {
       DBUG_ASSERT(ddl_log_entry->next_entry);
-      if ((error= disable_execute_entry(ddl_log_entry->next_entry)))
+      error= disable_execute_entry(ddl_log_entry->next_entry);
         break;
-      error= increment_phase(entry_pos);
-      break;
     }
     recovery_state.drop_table.length(0);
     recovery_state.drop_table.set_charset(system_charset_info);
@@ -1586,27 +1581,27 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         break;
       /* Fall through */
     case DDL_DROP_PHASE_BINLOG:
-      if (ddl_log_entry->flags & DDL_LOG_FLAG_DROP_SKIP_BINLOG)
+      if (!(ddl_log_entry->flags & DDL_LOG_FLAG_DROP_SKIP_BINLOG))
       {
-        (void) increment_phase(entry_pos);
+        if (strcmp(recovery_state.current_db, db.str))
+        {
+          append_identifier(thd, &recovery_state.drop_table, &db);
+          recovery_state.drop_table.append('.');
+        }
+        append_identifier(thd, &recovery_state.drop_table, &table);
+        recovery_state.drop_table.append(',');
+        /* We don't increment phase as we want to retry this in case of crash */
+
+        if (ddl_log_drop_to_binary_log(thd, ddl_log_entry,
+                                      &recovery_state.drop_table))
+        {
+          if (increment_phase(entry_pos))
+            break;
+        }
         break;
       }
-      if (strcmp(recovery_state.current_db, db.str))
-      {
-        append_identifier(thd, &recovery_state.drop_table, &db);
-        recovery_state.drop_table.append('.');
-      }
-      append_identifier(thd, &recovery_state.drop_table, &table);
-      recovery_state.drop_table.append(',');
-      /* We don't increment phase as we want to retry this in case of crash */
-
-      if (ddl_log_drop_to_binary_log(thd, ddl_log_entry,
-                                     &recovery_state.drop_table))
-      {
-        if (increment_phase(entry_pos))
-          break;
-      }
-      break;
+      (void) increment_phase(entry_pos);
+      /* Fall through */
     case DDL_DROP_PHASE_RESET:
       /* We have already logged all previous drop's. Clear the query */
       recovery_state.drop_table.length(recovery_state.drop_table_init_length);
@@ -3097,24 +3092,40 @@ bool ddl_log_rename_view(THD *thd, DDL_LOG_STATE *ddl_state,
    is in original delete order.
 */
 
-bool ddl_log_drop_init(DDL_LOG_STATE *ddl_state,
-                       const LEX_CSTRING *db,
-                       const LEX_CSTRING *comment)
+static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
+                              const LEX_CSTRING *db,
+                              const LEX_CSTRING *comment)
 {
   DDL_LOG_ENTRY ddl_log_entry;
-  DBUG_ENTER("ddl_log_drop_file");
+  DBUG_ENTER("ddl_log_drop_init");
 
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
 
   ddl_log_entry.action_type=  DDL_LOG_DROP_INIT_ACTION;
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(db);
-  if (comment)
-    ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
+  ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
   ddl_log_entry.unique_id=    ddl_state->master_chain_pos;
+  if (ddl_state->skip_binlog)
+    ddl_log_entry.flags|=     DDL_LOG_FLAG_DROP_SKIP_BINLOG;
 
   DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
 }
 
+
+bool ddl_log_drop_table_init(THD *thd, DDL_LOG_STATE *ddl_state,
+                             const LEX_CSTRING *db,
+                             const LEX_CSTRING *comment,
+                             bool skip_binlog)
+{
+  ddl_state->skip_binlog= skip_binlog;
+  return ddl_log_drop_init(thd, ddl_state, db, comment);
+}
+
+bool ddl_log_drop_view_init(THD *thd, DDL_LOG_STATE *ddl_state,
+                            const LEX_CSTRING *db)
+{
+  return ddl_log_drop_init(thd, ddl_state, db, &empty_clex_str);
+}
 
 static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
                          ddl_log_action_code action_code,
@@ -3268,7 +3279,6 @@ bool ddl_log_create_table(THD *thd, DDL_LOG_STATE *ddl_state,
                           bool only_frm)
 {
   DDL_LOG_ENTRY ddl_log_entry;
-  DDL_LOG_MEMORY_ENTRY *log_entry;
   DBUG_ENTER("ddl_log_create_table");
 
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
@@ -3507,13 +3517,15 @@ err:
 }
 
 
-/**
-  Used for DROP action. When DDL recovery is executed if master_state chain is
-  open at the moment DDL_LOG_DROP_INIT_ACTION of this drop chain is executed the
-  drop chain will be closed without execution.
+/*
+   Link the ddl_log_state to another (master) chain. If the master
+   chain is active during DDL recovery, this event will not be executed.
+
+   This is used for DROP TABLE of the original table when
+   CREATE OR REPLACE ... is used.
 */
-void DDL_LOG_STATE::skip_if_open(DDL_LOG_STATE *master_state)
+void ddl_log_link_events(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state)
 {
   DBUG_ASSERT(master_state->execute_entry);
-  master_chain_pos= master_state->execute_entry->entry_pos;
+  state->master_chain_pos= master_state->execute_entry->entry_pos;
 }

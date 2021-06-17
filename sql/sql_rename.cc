@@ -246,7 +246,7 @@ do_rename_temporary(THD *thd, TABLE_LIST *ren_table, TABLE_LIST *new_table)
 */
 
 int
-mysql_check_rename(THD *thd, rename_param *param,
+rename_check(THD *thd, rename_param *param,
              TABLE_LIST *ren_table,
              const LEX_CSTRING *new_db,
              const LEX_CSTRING *new_table_name,
@@ -321,7 +321,7 @@ mysql_check_rename(THD *thd, rename_param *param,
 */
 
 bool
-mysql_do_rename(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
+rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
                 TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
                 bool skip_error, bool *force_if_exists)
 {
@@ -342,17 +342,8 @@ mysql_do_rename(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
     DBUG_RETURN(1);
 #endif
 
-  if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
-      thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)
-  {
-    if (wait_while_table_is_used(thd, ren_table->table, HA_EXTRA_NOT_USED))
-      DBUG_RETURN(!skip_error);
-    close_all_tables_for_name(thd, ren_table->table->s,
-                              HA_EXTRA_PREPARE_FOR_DROP, NULL);
-    ren_table->table= 0;
-  }
-  else
-    tdc_remove_table(thd, ren_table->db.str, ren_table->table_name.str);
+  // FIXME: close_or_remove_table()
+  tdc_remove_table(thd, ren_table->db.str, ren_table->table_name.str);
 
   if (hton != view_pseudo_hton)
   {
@@ -517,7 +508,7 @@ rename_tables(THD *thd, TABLE_LIST *table_list, DDL_LOG_STATE *ddl_log_state,
     {
       int error;
       rename_param param;
-      error= mysql_check_rename(thd, &param, ren_table, &new_table->db,
+      error= rename_check(thd, &param, ren_table, &new_table->db,
                           &new_table->table_name,
                           &new_table->alias, (skip_error || if_exists));
       if (error < 0)
@@ -525,7 +516,7 @@ rename_tables(THD *thd, TABLE_LIST *table_list, DDL_LOG_STATE *ddl_log_state,
       if (error > 0)
         goto revert_rename;
 
-      if (mysql_do_rename(thd, &param, ddl_log_state,
+      if (rename_do(thd, &param, ddl_log_state,
                           ren_table, &new_table->db,
                           skip_error, force_if_exists))
         goto revert_rename;

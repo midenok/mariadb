@@ -88,7 +88,6 @@ enum ddl_log_action_code
   DDL_LOG_CREATE_TRIGGER_ACTION=15,
   DDL_LOG_ALTER_TABLE_ACTION=16,
   DDL_LOG_STORE_QUERY_ACTION=17,
-  DDL_LOG_EXECUTE_ACTION=18,
   DDL_LOG_LAST_ACTION                          /* End marker */
 };
 
@@ -256,7 +255,6 @@ typedef struct st_ddl_log_state
   bool skip_binlog;
   ulonglong master_chain_pos;
   bool is_active() { return list != 0; }
-  void skip_if_open(st_ddl_log_state *master_state);
 } DDL_LOG_STATE;
 
 
@@ -299,9 +297,12 @@ bool ddl_log_rename_view(THD *thd, DDL_LOG_STATE *ddl_state,
                          const LEX_CSTRING *org_alias,
                          const LEX_CSTRING *new_db,
                          const LEX_CSTRING *new_alias);
-bool ddl_log_drop_init(DDL_LOG_STATE *ddl_state,
-                       const LEX_CSTRING *db,
-                       const LEX_CSTRING *comment);
+bool ddl_log_drop_table_init(THD *thd, DDL_LOG_STATE *ddl_state,
+                             const LEX_CSTRING *db,
+                             const LEX_CSTRING *comment,
+                             bool skip_binlog);
+bool ddl_log_drop_view_init(THD *thd, DDL_LOG_STATE *ddl_state,
+                            const LEX_CSTRING *db);
 bool ddl_log_drop_table(THD *thd, DDL_LOG_STATE *ddl_state,
                         handlerton *hton,
                         const LEX_CSTRING *path,
@@ -354,5 +355,6 @@ bool ddl_log_alter_table(THD *thd, DDL_LOG_STATE *ddl_state,
                          bool is_renamed);
 bool ddl_log_store_query(THD *thd, DDL_LOG_STATE *ddl_log_state,
                          const char *query, size_t length);
+void ddl_log_link_events(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state);
 extern mysql_mutex_t LOCK_gdl;
 #endif /* DDL_LOG_INCLUDED */

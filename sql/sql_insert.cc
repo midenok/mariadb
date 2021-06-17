@@ -4658,7 +4658,12 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
           !table->s->tmp_table)
       {
         thd->binlog_xid= thd->query_id;
-        /* Remember xid's for the case of row based logging */
+        /*
+           Remember xid's for the case of row based logging. Note that binary
+           log is not flushed until the end of statement, so it is OK to write it
+           now and if crash happens until we closed ddl_log_state_rm we won't see
+           CREATE OR REPLACE event in the binary log.
+         */
         ddl_log_update_xid(&ptr->ddl_log_state_create, thd->binlog_xid);
         if (ptr->ddl_log_state_rm.is_active() && !ptr->ddl_log_state_rm.skip_binlog)
           ddl_log_update_xid(&ptr->ddl_log_state_rm, thd->binlog_xid);
