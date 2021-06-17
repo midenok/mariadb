@@ -1513,6 +1513,13 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   {
     LEX_CSTRING *comment= &ddl_log_entry->tmp_name;
     ulonglong master_chain_pos= ddl_log_entry->unique_id;
+    /*
+      This drop table was depending on another chain and should only be executed
+      if the other chain is not active.
+      One such case is CREATE OR REPLACE TABLE ... which renamed the original table
+      and created this DROP TABLE event to be able to DROP the backup table if we
+      have a crash directly after closing of the CREATE event.
+    */
     if (master_chain_pos && is_execute_entry_active(master_chain_pos))
     {
       DBUG_ASSERT(ddl_log_entry->next_entry);
@@ -3273,30 +3280,9 @@ bool ddl_log_create_table(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.name=         *const_cast<LEX_CSTRING*>(table);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.flags=        only_frm ? DDL_LOG_FLAG_ONLY_FRM : 0;
+  ddl_log_entry.next_entry=   ddl_state->list ? ddl_state->list->entry_pos : 0;
 
-  if (!ddl_state->is_active())
-    DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
-
-  ddl_log_entry.next_entry= ddl_state->list->entry_pos;
-  mysql_mutex_lock(&LOCK_gdl);
-  if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
-    goto error;
-
-  if (update_next_entry_pos(ddl_state->execute_entry->entry_pos,
-                            log_entry->entry_pos))
-  {
-    ddl_log_release_memory_entry(log_entry);
-    goto error;
-  }
-  (void) ddl_log_sync_no_lock();
-
-  mysql_mutex_unlock(&LOCK_gdl);
-  add_log_entry(ddl_state, log_entry);
-  DBUG_RETURN(0);
-
-error:
-  mysql_mutex_unlock(&LOCK_gdl);
-  DBUG_RETURN(1);
+  DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
 }
 
 
