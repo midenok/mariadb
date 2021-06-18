@@ -1100,67 +1100,19 @@ static uint32 get_comment(THD *thd, uint32 comment_pos,
   return 0;
 }
 
-/**
-  Make user-friendly backup name and MDL-lock it exclusively. The backup name
-  consists of original name + $ suffix. If there is already a lock or existing
-  table, the suffix is incremented until there is free name slot.
-
-  Backup name consists of:
-
-    TMP_PREFIX TABLE_NAME_CUT $ [UNIQ]
-
-  Where:
-
-  TMP_PREFIX      Prefix of temporary name (#sql)
-  TABLE_NAME_CUT  Table name trimmed to NAME_LEN - 8 characters;
-  $               A dollar sign;
-  [UNIQ]          Uniqueness marker: 0 to 3 digits number for uniqueness.
-
-  @param  orig    Original table name
-  @param  res     Resulting table name
-
-  @retval  false  Success
-  @retval  true   Error
-*/
 
 static
 bool make_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
 {
   char res_name[NAME_LEN + 1];
-  static const LEX_CSTRING pre= { backup_file_prefix, strlen(backup_file_prefix) };
-  static const size_t name_trim= NAME_LEN - pre.length - 1 - 3;
-  strcpy(res_name, pre.str);
-  strncpy(res_name + pre.length, orig->table_name.str, name_trim);
-  size_t len= std::min(name_trim, orig->table_name.length + pre.length);
-  bzero(res_name + len, NAME_LEN - len + 1);
+
+  size_t len= my_snprintf(res_name, sizeof(res_name) - 1,
+                          backup_file_prefix "%lx-%llx", current_pid,
+                          thd->thread_id, orig->table_name.str);
+
   LEX_CSTRING n= { res_name, len };
-  for (int i= 0; i < 1000; ++i)
-  {
-    DBUG_ASSERT(strlen(res_name) == n.length);
-    if (!thd->mdl_context.is_lock_owner(MDL_key::TABLE, orig->db.str, res_name,
-                                        MDL_SHARED))
-    {
-      res->init_one_table(&orig->db, &n, &n, TL_WRITE);
-      if (thd->mdl_context.try_acquire_lock(&res->mdl_request))
-        return true;
-      if (res->mdl_request.ticket)
-      {
-        if (!ha_table_exists(thd, &res->db, &n))
-          break;
-        thd->mdl_context.set_lock_duration(res->mdl_request.ticket, MDL_EXPLICIT);
-        thd->mdl_context.release_lock(res->mdl_request.ticket);
-      }
-    }
-    n.length= sprintf(res_name + len, "-%d", i);
-    if (n.length < 1)
-      return true;
-    n.length+= len;
-  }
-  if (!res->mdl_request.ticket)
-    return true;
-  if (thd->mdl_context.upgrade_shared_lock(res->mdl_request.ticket, MDL_EXCLUSIVE,
-                                           thd->variables.lock_wait_timeout))
-    return true;
+  res->init_one_table(&orig->db, &n, &n, TL_WRITE);
+
   res->table_name.str= strmake_root(thd->mem_root,
                                     LEX_STRING_WITH_LEN(res->table_name));
   if (!res->table_name.str)
@@ -1481,7 +1433,8 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
       non_temp_tables_count++;
 
-      DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
+      DBUG_ASSERT(ddl_log_state_create ||
+                  thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
                                                  table_name.str, MDL_SHARED));
 
       alias= (lower_case_table_names == 2) ? table->alias : table_name;
@@ -1576,8 +1529,9 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       }
 
       /* Check that we have an exclusive lock on the table to be dropped. */
-      DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
-                                                table_name.str, MDL_EXCLUSIVE));
+      DBUG_ASSERT(ddl_log_state_create ||
+                  thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
+                                                 table_name.str, MDL_EXCLUSIVE));
 
       // Remove extension for delete
       *path_end= '\0';
