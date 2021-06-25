@@ -7496,7 +7496,6 @@ int handler::ha_write_row(const uchar *buf)
       DBUG_RETURN(error);
   }
 
-  /* Inserting the history row directly, check that ROW_START <= ROW_END */
   if (table->versioned() && !table->vers_write)
   {
     Field *row_start= table->vers_start_field();
@@ -7505,6 +7504,7 @@ int handler::ha_write_row(const uchar *buf)
     bitmap_set_bit(table->read_set, row_start->field_index);
     bitmap_set_bit(table->read_set, row_end->field_index);
 
+    /* Inserting the history row directly, check ROW_START <= ROW_END */
     if (!row_end->is_max() &&
         row_start->cmp(row_start->ptr, row_end->ptr) >= 0)
       DBUG_RETURN(HA_ERR_WRONG_ROW_END);

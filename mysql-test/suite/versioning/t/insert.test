@@ -86,15 +86,29 @@ drop table t2;
 --echo #
 set @@session.time_zone='+00:00';
 
-create table t1(x int) with system versioning;
+create table t1(x int primary key) with system versioning;
+create table t2(y int,
+  row_start timestamp(6) as row start invisible,
+  row_end timestamp(6) as row end invisible,
+  period for system_time (row_start, row_end))
+with system versioning;
 insert into t1(x) values (1);
+insert into t2(y) values (1);
 --error ER_BAD_FIELD_ERROR
 insert into t1(x, row_start, row_end) values (2, '1980-01-01 00:00:00', '1980-01-01 00:00:01');
+--error ER_WARNING_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN
+insert into t2(y, row_start, row_end) values (2, '1980-01-01 00:00:00', '1980-01-01 00:00:01');
 set @@system_versioning_insert_history= 1;
 --replace_result $default_engine DEFAULT_ENGINE
 show create table t1;
 insert into t1(x, row_start, row_end) values (3, '1980-01-01 00:00:00', '1980-01-01 00:00:01');
 update t1 set x= x + 1;
+--error ER_BAD_FIELD_ERROR
+update t1 set row_start= '1970-01-01 00:00:00';
+--error ER_WARNING_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN
+update t2 set row_start= '1970-01-01 00:00:00';
+insert t1 (x) values (2) on duplicate key update x= 3, row_end= '1970-01-01 00:00:00';
+select * from t1;
 # this should work, row_start/row_end must be mentioned explicitly:
 insert into t1 values (4);
 insert into t1 set x= 5, row_start= '1980-01-01 00:00:00', row_end= '1980-01-01 00:00:01';
