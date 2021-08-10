@@ -10016,6 +10016,7 @@ do_continue:;
       DBUG_RETURN(true);
     }
 
+    // FIXME: move to alter_partition_extract()
     if (alter_info->partition_flags & ALTER_PARTITION_EXTRACT)
     {
       LEX_CSTRING new_path= { alter_ctx.get_new_path(), 0 };
