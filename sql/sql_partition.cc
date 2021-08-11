@@ -6149,6 +6149,7 @@ static bool alter_partition_extract(ALTER_PARTITION_PARAM_TYPE *lpt)
                                                   lpt->table->s->db.str,
                                                   lpt->table->s->table_name.str,
                                                   MDL_EXCLUSIVE));
+
   char from_name[FN_REFLEN + 1], to_name[FN_REFLEN + 1];
   const char *path= lpt->table->s->path.str;
 
@@ -7420,7 +7421,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   }
   else if (alter_info->partition_flags & ALTER_PARTITION_EXTRACT)
   {
-    if (write_log_drop_shadow_frm(lpt) ||
+    if (part_extract_create_frm(lpt) ||
+        write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT_CRASH("crash_extract_partition_1") ||
         ERROR_INJECT_ERROR("fail_extract_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||

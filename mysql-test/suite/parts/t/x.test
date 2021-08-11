@@ -4,7 +4,6 @@
 
 # TODO:
 #
-# Add test cases from EXCHANGE: TRIGGER, GRANT
 # PS under SP under LOCK TABLES
 # Test complex table
 # EXTRACT is keyword, now table names cannot be called like that
