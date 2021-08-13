@@ -11935,7 +11935,7 @@ bool part_extract_create_frm(ALTER_PARTITION_PARAM_TYPE *lpt)
   create_info->alias= alter_ctx->table_name;
   thd->work_part_info= NULL;
   create_info->db_type= work_part_info->default_engine_type;
-  if (create_table_impl(thd, alter_ctx->ddl_log_state, (DDL_LOG_STATE*) 0,
+  if (create_table_impl(thd, lpt->part_info, (DDL_LOG_STATE*) 0,
                         alter_ctx->new_db, alter_ctx->new_name,
                         alter_ctx->new_db, alter_ctx->new_name, new_path,
                         thd->lex->create_info, create_info, lpt->alter_info,
@@ -11949,6 +11949,7 @@ bool part_extract_create_frm(ALTER_PARTITION_PARAM_TYPE *lpt)
   thd->work_part_info= work_part_info;
   create_info->db_type= db_type;
   reenable_binlog(thd);
+  lpt->part_info->extract_frm_created();
   debug_crash_here("ddl_log_alter_partition_after_create_frm");
 
   TABLE_SHARE s;

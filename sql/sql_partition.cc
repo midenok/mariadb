@@ -6701,15 +6701,13 @@ static bool write_log_extract_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
   part_info->list= NULL;
   build_table_filename(path, sizeof(path) - 1, lpt->db.str, lpt->table_name.str, "", 0);
   build_table_shadow_filename(tmp_path, sizeof(tmp_path) - 1, lpt);
+
+  if (ddl_log_increment_phase(part_info->extract_frm->entry_pos))
+    goto error;
+  (void) ddl_log_sync();
+
   mysql_mutex_lock(&LOCK_gdl);
-  {
-    /* NOTE: this is just unconditional ddl_log_complete() */
-    DDL_LOG_STATE *frm_chain= lpt->alter_ctx->ddl_log_state;
-    DBUG_ASSERT(frm_chain->list);
-    DBUG_ASSERT(frm_chain->execute_entry);
-    ddl_log_disable_execute_entry(&frm_chain->execute_entry);
-    ddl_log_release_entries(frm_chain);
-  }
+
   if (write_log_extracted_partition(lpt, &next_entry, (const char*)path))
     goto error;
   if (write_log_replace_frm(lpt, next_entry, (const char*)tmp_path,
