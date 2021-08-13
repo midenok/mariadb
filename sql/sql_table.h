@@ -53,6 +53,7 @@ enum enum_explain_filename_mode
 #define WFRM_WRITE_SHADOW 1
 #define WFRM_INSTALL_SHADOW 2
 #define WFRM_KEEP_SHARE 4
+#define WFRM_WRITE_EXTRACTED 8
 
 /* Flags for conversion functions. */
 static const uint FN_FROM_IS_TMP=  1 << 0;

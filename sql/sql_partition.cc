@@ -7419,7 +7419,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   }
   else if (alter_info->partition_flags & ALTER_PARTITION_EXTRACT)
   {
-    if (part_extract_create_frm(lpt) ||
+    if (mysql_write_frm(lpt, WFRM_WRITE_EXTRACTED) ||
         write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT_CRASH("crash_extract_partition_1") ||
         ERROR_INJECT_ERROR("fail_extract_partition_1") ||

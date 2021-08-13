@@ -704,6 +704,19 @@ uint build_table_shadow_filename(char *buff, size_t bufflen,
     tables since it only handles partitioned data if it exists.
 */
 
+// FIXME: remove
+static
+int create_table_impl(THD *thd,
+                      DDL_LOG_STATE *ddl_log_state_create,
+                      DDL_LOG_STATE *ddl_log_state_rm,
+                      const LEX_CSTRING &orig_db,
+                      const LEX_CSTRING &orig_table_name,
+                      const LEX_CSTRING &db, const LEX_CSTRING &table_name,
+                      const LEX_CSTRING &path, const DDL_options_st options,
+                      HA_CREATE_INFO *create_info, Alter_info *alter_info,
+                      int create_table_mode, bool *is_trans, KEY **key_info,
+                      uint *key_count, LEX_CUSTRING *frm);
+
 bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 {
   /*
@@ -777,6 +790,58 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
       goto end;
     }
   }
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+  if (flags & WFRM_WRITE_EXTRACTED)
+  {
+    THD *thd= lpt->thd;
+    Alter_table_ctx *alter_ctx= lpt->alter_ctx;
+    HA_CREATE_INFO *create_info= lpt->create_info;
+    LEX_CUSTRING frm= {0,0};
+    KEY *key_info;
+    uint key_count;
+
+
+    LEX_CSTRING new_path= { alter_ctx->get_new_path(), 0 };
+    partition_info *work_part_info= thd->work_part_info;
+    handlerton *db_type= create_info->db_type;
+    new_path.length= strlen(new_path.str);
+    tmp_disable_binlog(thd);
+    create_info->alias= alter_ctx->table_name;
+    thd->work_part_info= NULL;
+    create_info->db_type= work_part_info->default_engine_type;
+    if (create_table_impl(thd, lpt->part_info, (DDL_LOG_STATE*) 0,
+                          alter_ctx->new_db, alter_ctx->new_name,
+                          alter_ctx->new_db, alter_ctx->new_name, new_path,
+                          thd->lex->create_info, create_info, lpt->alter_info,
+                          C_ALTER_TABLE_FRM_ONLY, NULL,
+                          &key_info, &key_count, &frm))
+    {
+      thd->work_part_info= work_part_info;
+      create_info->db_type= db_type;
+      DBUG_RETURN(true);
+    }
+    thd->work_part_info= work_part_info;
+    create_info->db_type= db_type;
+    reenable_binlog(thd);
+    lpt->part_info->extract_frm_created();
+    debug_crash_here("ddl_log_alter_partition_after_create_frm");
+
+    TABLE_SHARE s;
+    init_tmp_table_share(thd, &s, alter_ctx->new_db.str, 0,
+                        alter_ctx->new_name.str, new_path.str);
+
+    s.frm_image= &frm;
+
+    if (s.write_frm_image(frm.str, frm.length))
+    {
+      my_free((void *)frm.str);
+      DBUG_RETURN(true);
+    }
+    debug_crash_here("ddl_log_alter_partition_after_write_frm");
+    my_free((void *)frm.str);
+    DBUG_RETURN(false);
+  }
+#endif /* WITH_PARTITION_STORAGE_ENGINE */
   if (flags & WFRM_INSTALL_SHADOW)
   {
 #ifdef WITH_PARTITION_STORAGE_ENGINE
@@ -11915,56 +11980,3 @@ wsrep_error_label:
   DBUG_RETURN(true);
 #endif
 }
-
-#ifdef WITH_PARTITION_STORAGE_ENGINE
-bool part_extract_create_frm(ALTER_PARTITION_PARAM_TYPE *lpt)
-{
-  THD *thd= lpt->thd;
-  Alter_table_ctx *alter_ctx= lpt->alter_ctx;
-  HA_CREATE_INFO *create_info= lpt->create_info;
-  LEX_CUSTRING frm= {0,0};
-  KEY *key_info;
-  uint key_count;
-
-
-  LEX_CSTRING new_path= { alter_ctx->get_new_path(), 0 };
-  partition_info *work_part_info= thd->work_part_info;
-  handlerton *db_type= create_info->db_type;
-  new_path.length= strlen(new_path.str);
-  tmp_disable_binlog(thd);
-  create_info->alias= alter_ctx->table_name;
-  thd->work_part_info= NULL;
-  create_info->db_type= work_part_info->default_engine_type;
-  if (create_table_impl(thd, lpt->part_info, (DDL_LOG_STATE*) 0,
-                        alter_ctx->new_db, alter_ctx->new_name,
-                        alter_ctx->new_db, alter_ctx->new_name, new_path,
-                        thd->lex->create_info, create_info, lpt->alter_info,
-                        C_ALTER_TABLE_FRM_ONLY, NULL,
-                        &key_info, &key_count, &frm))
-  {
-    thd->work_part_info= work_part_info;
-    create_info->db_type= db_type;
-    return true;
-  }
-  thd->work_part_info= work_part_info;
-  create_info->db_type= db_type;
-  reenable_binlog(thd);
-  lpt->part_info->extract_frm_created();
-  debug_crash_here("ddl_log_alter_partition_after_create_frm");
-
-  TABLE_SHARE s;
-  init_tmp_table_share(thd, &s, alter_ctx->new_db.str, 0,
-                       alter_ctx->new_name.str, new_path.str);
-
-  s.frm_image= &frm;
-
-  if (s.write_frm_image(frm.str, frm.length))
-  {
-    my_free((void *)frm.str);
-    return true;
-  }
-  debug_crash_here("ddl_log_alter_partition_after_write_frm");
-  my_free((void *)frm.str);
-  return false;
-}
-#endif /* WITH_PARTITION_STORAGE_ENGINE */
