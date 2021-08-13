@@ -704,19 +704,11 @@ uint build_table_shadow_filename(char *buff, size_t bufflen,
     tables since it only handles partitioned data if it exists.
 */
 
-// FIXME: remove
-static
-int create_table_impl(THD *thd,
-                      DDL_LOG_STATE *ddl_log_state_create,
-                      DDL_LOG_STATE *ddl_log_state_rm,
-                      const LEX_CSTRING &orig_db,
-                      const LEX_CSTRING &orig_table_name,
-                      const LEX_CSTRING &db, const LEX_CSTRING &table_name,
-                      const LEX_CSTRING &path, const DDL_options_st options,
-                      HA_CREATE_INFO *create_info, Alter_info *alter_info,
-                      int create_table_mode, bool *is_trans, KEY **key_info,
-                      uint *key_count, LEX_CUSTRING *frm);
 
+/*
+  TODO: Partitioning atomic DDL refactoring: WFRM_WRITE_SHADOW and
+  WFRM_WRITE_EXTRACTED should be merged with create_table_impl(frm_only == true).
+*/
 bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 {
   /*
@@ -796,52 +788,69 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     THD *thd= lpt->thd;
     Alter_table_ctx *alter_ctx= lpt->alter_ctx;
     HA_CREATE_INFO *create_info= lpt->create_info;
-    LEX_CUSTRING frm= {0,0};
-    KEY *key_info;
-    uint key_count;
-
 
     LEX_CSTRING new_path= { alter_ctx->get_new_path(), 0 };
     partition_info *work_part_info= thd->work_part_info;
     handlerton *db_type= create_info->db_type;
+    DBUG_ASSERT(lpt->table->part_info);
+    DBUG_ASSERT(lpt->table->part_info == lpt->part_info);
+    handler *file=  ((ha_partition *) (lpt->table->file))->get_child_handlers()[0];
+    DBUG_ASSERT(file);
     new_path.length= strlen(new_path.str);
-    tmp_disable_binlog(thd);
+    strxnmov(frm_name, sizeof(frm_name), new_path.str, reg_ext, NullS);
     create_info->alias= alter_ctx->table_name;
     thd->work_part_info= NULL;
     create_info->db_type= work_part_info->default_engine_type;
-    if (create_table_impl(thd, lpt->part_info, (DDL_LOG_STATE*) 0,
-                          alter_ctx->new_db, alter_ctx->new_name,
-                          alter_ctx->new_db, alter_ctx->new_name, new_path,
-                          thd->lex->create_info, create_info, lpt->alter_info,
-                          C_ALTER_TABLE_FRM_ONLY, NULL,
-                          &key_info, &key_count, &frm))
+    /* NOTE: partitioned temporary tables are not supported. */
+    DBUG_ASSERT(!create_info->tmp_table());
+    if (ddl_log_create_table(thd, lpt->part_info, create_info->db_type,
+                             &new_path, &alter_ctx->new_db, &alter_ctx->new_name,
+                             true))
     {
-      thd->work_part_info= work_part_info;
-      create_info->db_type= db_type;
-      DBUG_RETURN(true);
+      DBUG_RETURN(TRUE);
     }
+
+    debug_crash_here("ddl_log_create_before_create_frm");
+    if (mysql_prepare_create_table(thd, create_info, lpt->alter_info,
+                                   &lpt->db_options, file,
+                                   &lpt->key_info_buffer, &lpt->key_count,
+                                   C_ALTER_TABLE, alter_ctx->new_db,
+                                   alter_ctx->new_name))
+    {
+      DBUG_RETURN(TRUE);
+    }
+
+    lpt->create_info->table_options= lpt->db_options;
+    LEX_CUSTRING frm= build_frm_image(thd, alter_ctx->new_name,
+                                      create_info,
+                                      lpt->alter_info->create_list,
+                                      lpt->key_count, lpt->key_info_buffer,
+                                      file);
+    if (unlikely(!frm.str))
+    {
+      DBUG_RETURN(TRUE);
+    }
+
     thd->work_part_info= work_part_info;
     create_info->db_type= db_type;
-    reenable_binlog(thd);
+
     lpt->part_info->extract_frm_created();
     debug_crash_here("ddl_log_alter_partition_after_create_frm");
 
-    TABLE_SHARE s;
-    init_tmp_table_share(thd, &s, alter_ctx->new_db.str, 0,
-                        alter_ctx->new_name.str, new_path.str);
-
-    s.frm_image= &frm;
-
-    if (s.write_frm_image(frm.str, frm.length))
+    error= writefile(frm_name, alter_ctx->new_db.str, alter_ctx->new_name.str,
+                     create_info->tmp_table(), frm.str, frm.length);
+    my_free((void *) frm.str);
+    if (unlikely(error))
     {
-      my_free((void *)frm.str);
-      DBUG_RETURN(true);
+      DBUG_RETURN(TRUE);
     }
+
     debug_crash_here("ddl_log_alter_partition_after_write_frm");
-    my_free((void *)frm.str);
     DBUG_RETURN(false);
   }
-#endif /* WITH_PARTITION_STORAGE_ENGINE */
+#else /* !WITH_PARTITION_STORAGE_ENGINE */
+  DBUG_ASSERT(!(flags & WFRM_WRITE_EXTRACTED));
+#endif /* !WITH_PARTITION_STORAGE_ENGINE */
   if (flags & WFRM_INSTALL_SHADOW)
   {
 #ifdef WITH_PARTITION_STORAGE_ENGINE

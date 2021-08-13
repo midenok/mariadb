@@ -6,6 +6,7 @@
 #
 # PS under SP under LOCK TABLES
 # Test complex table
+# Test temporary table
 # EXTRACT is keyword, now table names cannot be called like that
 # Rename EXTRACT to EXPORT or something else?
 
