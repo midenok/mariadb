@@ -4,11 +4,12 @@
 
 # TODO:
 #
-# PS under SP under LOCK TABLES
-# Test complex table
-# Test temporary table
 # EXTRACT is keyword, now table names cannot be called like that
 # Rename EXTRACT to EXPORT or something else?
+
+create or replace table t1 (x int);
+--error ER_PARTITION_MGMT_ON_NONPARTITIONED
+alter table t1 extract partition p1 as table tp1;
 
 create or replace table t1 (x int)
 partition by hash(x) partitions 2;
@@ -35,6 +36,12 @@ partition by range(x) (
   partition p1 values less than (10));
 --error ER_DROP_LAST_PARTITION
 alter table t1 extract partition p1 as table tp1;
+
+--error ER_FEATURE_NOT_SUPPORTED_WITH_PARTITIONING
+create or replace temporary table t1 (x int)
+partition by range(x) (
+  partition p0 values less than (10),
+  partition pn values less than maxvalue);
 
 if ($MTR_COMBINATION_RANGE)
 {
@@ -256,12 +263,14 @@ call sp;
 call sp;
 drop procedure sp;
 
---echo # LOCK TABLES, SP
+--echo # LOCK TABLES, PS, SP
 create or replace procedure sp()
 alter table t1 extract partition p4 as table tp4;
 lock tables t1 write;
-call sp;
-# TODO: don't unlock here
+prepare stmt from 'call sp';
+execute stmt;
+
+# TODO: don't unlock here (see above TODO)
 unlock tables;
 --replace_result $engine X ' PAGE_CHECKSUM=1' ''
 show create table tp4;
@@ -272,9 +281,10 @@ select * from t1 order by x;
 drop table tp4;
 lock tables t1 write;
 --error ER_DROP_PARTITION_NON_EXISTENT
-call sp;
+execute stmt;
 --error ER_DROP_PARTITION_NON_EXISTENT
 call sp;
+drop prepare stmt;
 unlock tables;
 drop procedure sp;
 unlock tables;
@@ -364,6 +374,40 @@ create or replace table t1(x int) with system versioning
 partition by system_time limit 1 partitions 3;
 
 alter table t1 extract partition p1 as table tp1;
+--replace_result $engine X ' PAGE_CHECKSUM=1' ''
+show create table tp1;
+--replace_result $engine X ' PAGE_CHECKSUM=1' ''
+show create table t1;
+
+drop tables t1, tp1;
+
+--echo # Complex table
+create or replace table t1 (
+  x int primary key auto_increment,
+  t timestamp(6) default '2001-11-11 11:11:11',
+  b blob(4096) compressed null,
+  c varchar(1033) character set utf8 not null,
+  u int,
+  unique key (x, u),
+  m enum('a', 'b', 'c') not null default 'a' comment 'absolute',
+  i1 tinyint, i2 smallint, i3 bigint,
+  index three(i1, i2, i3),
+  v1 timestamp(6) generated always as (t + interval 1 day),
+  v2 timestamp(6) generated always as (t + interval 1 month) stored,
+  s timestamp(6) as row start,
+  e timestamp(6) as row end,
+  period for system_time (s, e),
+  ps date, pe date,
+  period for app_time (ps, pe),
+  constraint check_constr check (u > -1))
+with system versioning default charset=ucs2
+partition by range(x) (
+  partition p0 values less than (10),
+  partition p1 values less than (20),
+  partition pn values less than maxvalue);
+
+alter table t1 extract partition p1 as table tp1;
+
 --replace_result $engine X ' PAGE_CHECKSUM=1' ''
 show create table tp1;
 --replace_result $engine X ' PAGE_CHECKSUM=1' ''
