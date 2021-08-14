@@ -7232,6 +7232,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     struct st_ddl_log_memory_entry *frm_log_entry;
 
     Make it stored and used in DDL_LOG_STATE like it was done in MDEV-17567.
+    This requires mysql_write_frm() refactoring (see comment there).
   */
 
   /* Set-up struct used to write frm files */
