@@ -67,6 +67,18 @@ let $insert_statement= insert into t1 values (2), (12), (22), (32), (42), (52);
 let $fail_statement= alter table t1 extract partition p2 as table tp2;
 
 set @save_dbug=@@debug_dbug;
+set session debug_dbug="+d,fail_create_before_create_frm";
+--source suite/parts/inc/partition_fail.inc
+set session debug_dbug=@save_dbug;
+set session debug_dbug="+d,fail_alter_partition_after_write_frm";
+--source suite/parts/inc/partition_fail.inc
+set session debug_dbug=@save_dbug;
+set session debug_dbug="+d,error_extract_partition_00";
+--source suite/parts/inc/partition_fail.inc
+#set session debug_dbug=@save_dbug;
+#set session debug_dbug="+d,fail_extract_partition_01";
+#--source suite/parts/inc/partition_fail.inc
+set session debug_dbug=@save_dbug;
 set session debug_dbug="+d,fail_extract_partition_1";
 --source suite/parts/inc/partition_fail.inc
 set session debug_dbug=@save_dbug;
@@ -89,5 +101,9 @@ set session debug_dbug="+d,fail_extract_partition_8";
 --source suite/parts/inc/partition_fail.inc
 set session debug_dbug=@save_dbug;
 set session debug_dbug="+d,fail_extract_partition_9";
+--echo # Already finished DDL logging, so tp2 now exists:
 --source suite/parts/inc/partition_fail.inc
 set session debug_dbug=@save_dbug;
+show create table tp2;
+select * from tp2;
+drop table tp2;

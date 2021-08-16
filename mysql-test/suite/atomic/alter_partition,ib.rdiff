@@ -102,85 +102,73 @@
  t1.frm
  t1.par
  Table	Create Table
-@@ -139,15 +121,12 @@
+@@ -139,12 +121,9 @@
  12
  22
  # CRASH POINT: crash_extract_partition_4
 -t1#P#p0.MYD
 -t1#P#p0.MYI
+-t1#P#p1.MYD
+-t1#P#p1.MYI
 -t1#P#pn.MYD
 -t1#P#pn.MYI
 +t1#P#p0.ibd
++t1#P#p1.ibd
 +t1#P#pn.ibd
  t1.frm
  t1.par
--tp1.MYD
--tp1.MYI
- tp1.frm
-+tp1.ibd
- master-bin.000002	#	Query	#	#	use `test`; ALTER TABLE t1 EXTRACT PARTITION p1 AS TABLE tp1
  Table	Create Table
- t1	CREATE TABLE `t1` (
-@@ -166,15 +145,12 @@
- x
+@@ -160,12 +139,9 @@
  12
+ 22
  # CRASH POINT: crash_extract_partition_5
 -t1#P#p0.MYD
 -t1#P#p0.MYI
+-t1#P#p1.MYD
+-t1#P#p1.MYI
 -t1#P#pn.MYD
 -t1#P#pn.MYI
 +t1#P#p0.ibd
++t1#P#p1.ibd
 +t1#P#pn.ibd
  t1.frm
  t1.par
--tp1.MYD
--tp1.MYI
- tp1.frm
-+tp1.ibd
- master-bin.000002	#	Query	#	#	use `test`; ALTER TABLE t1 EXTRACT PARTITION p1 AS TABLE tp1
  Table	Create Table
- t1	CREATE TABLE `t1` (
-@@ -193,15 +169,12 @@
- x
+@@ -181,12 +157,9 @@
  12
+ 22
  # CRASH POINT: crash_extract_partition_7
 -t1#P#p0.MYD
 -t1#P#p0.MYI
+-t1#P#p1.MYD
+-t1#P#p1.MYI
 -t1#P#pn.MYD
 -t1#P#pn.MYI
 +t1#P#p0.ibd
++t1#P#p1.ibd
 +t1#P#pn.ibd
  t1.frm
  t1.par
--tp1.MYD
--tp1.MYI
- tp1.frm
-+tp1.ibd
- master-bin.000002	#	Query	#	#	use `test`; ALTER TABLE t1 EXTRACT PARTITION p1 AS TABLE tp1
  Table	Create Table
- t1	CREATE TABLE `t1` (
-@@ -220,15 +193,12 @@
- x
+@@ -202,12 +175,9 @@
  12
+ 22
  # CRASH POINT: crash_extract_partition_8
 -t1#P#p0.MYD
 -t1#P#p0.MYI
+-t1#P#p1.MYD
+-t1#P#p1.MYI
 -t1#P#pn.MYD
 -t1#P#pn.MYI
 +t1#P#p0.ibd
++t1#P#p1.ibd
 +t1#P#pn.ibd
  t1.frm
  t1.par
--tp1.MYD
--tp1.MYI
- tp1.frm
-+tp1.ibd
- master-bin.000002	#	Query	#	#	use `test`; ALTER TABLE t1 EXTRACT PARTITION p1 AS TABLE tp1
  Table	Create Table
- t1	CREATE TABLE `t1` (
-@@ -247,15 +217,12 @@
- x
+@@ -223,15 +193,12 @@
  12
+ 22
  # CRASH POINT: crash_extract_partition_9
 -t1#P#p0.MYD
 -t1#P#p0.MYI

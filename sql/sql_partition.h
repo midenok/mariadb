@@ -282,6 +282,10 @@ bool verify_data_with_partition(TABLE *table, TABLE *part_table,
 bool compare_partition_options(HA_CREATE_INFO *table_create_info,
                                partition_element *part_elem);
 bool partition_key_modified(TABLE *table, const MY_BITMAP *fields);
+bool write_log_replace_frm(ALTER_PARTITION_PARAM_TYPE *lpt,
+                            uint next_entry,
+                            const char *from_path,
+                            const char *to_path);
 #else
 #define partition_key_modified(X,Y) 0
 #endif

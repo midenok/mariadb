@@ -79,23 +79,8 @@ struct Vers_part_info : public Sql_alloc
   partition_element *hist_part;
 };
 
-struct part_info_ddl_log : public DDL_LOG_STATE
-{
-  DDL_LOG_MEMORY_ENTRY *extract_frm;
 
-  part_info_ddl_log() : extract_frm(NULL)
-  {
-    bzero((DDL_LOG_STATE *) this, sizeof(DDL_LOG_STATE));
-  }
-
-  void extract_frm_created()
-  {
-    DBUG_ASSERT(main_entry);
-    extract_frm= main_entry;
-  }
-};
-
-class partition_info : public part_info_ddl_log, public Sql_alloc
+class partition_info : public DDL_LOG_STATE, public Sql_alloc
 {
 public:
   /*
@@ -330,6 +315,7 @@ public:
     is_auto_partitioned(FALSE),
     has_null_value(FALSE), column_list(FALSE)
   {
+    bzero((DDL_LOG_STATE *) this, sizeof(DDL_LOG_STATE));
     all_fields_in_PF.clear_all();
     all_fields_in_PPF.clear_all();
     all_fields_in_SPF.clear_all();
