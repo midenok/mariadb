@@ -260,10 +260,8 @@ Alter_table_ctx::Alter_table_ctx()
     db(null_clex_str), table_name(null_clex_str), alias(null_clex_str),
     new_db(null_clex_str), new_name(null_clex_str), new_alias(null_clex_str),
     fk_error_if_delete_row(false), fk_error_id(NULL),
-    fk_error_table(NULL)
-#ifdef DBUG_ASSERT_EXISTS
-    , tmp_table(false)
-#endif
+    fk_error_table(NULL),
+    tmp_table(false)
 {
 }
 
@@ -439,6 +437,7 @@ bool Sql_cmd_alter_table::execute(THD *thd)
     as for RENAME TO, as being done by SQLCOM_RENAME_TABLE
   */
   if ((alter_info.partition_flags & ALTER_PARTITION_DROP) ||
+      (alter_info.partition_flags & ALTER_PARTITION_EXTRACT) ||
       (alter_info.flags & ALTER_RENAME))
     priv_needed|= DROP_ACL;
 
