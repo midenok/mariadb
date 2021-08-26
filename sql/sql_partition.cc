@@ -4875,7 +4875,8 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
        ALTER_PARTITION_COALESCE |
        ALTER_PARTITION_REORGANIZE |
        ALTER_PARTITION_TABLE_REORG |
-       ALTER_PARTITION_REBUILD))
+       ALTER_PARTITION_REBUILD |
+       ALTER_PARTITION_ADD_FROM_TABLE))
   {
     /*
       You can't add column when we are doing alter related to partition
@@ -5079,7 +5080,8 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
         goto err;
       }
     }
-    if (alter_info->partition_flags & ALTER_PARTITION_ADD)
+    if ((alter_info->partition_flags & ALTER_PARTITION_ADD) ||
+        (alter_info->partition_flags & ALTER_PARTITION_ADD_FROM_TABLE))
     {
       if (*fast_alter_table && thd->locked_tables_mode)
       {
@@ -7221,6 +7223,176 @@ bool log_partition_alter_to_ddl_log(ALTER_PARTITION_PARAM_TYPE *lpt)
 }
 
 
+extern bool move_table_to_partition(ALTER_PARTITION_PARAM_TYPE *lpt);
+
+
+/**
+  Check that definition of a table specified in the clause FROM of
+  the statement ALTER TABLE <tablename> ADD PARTITION ... FROM <from_table>
+  fit with definition of a partition being added and every row stored in
+  the table <from_table> conform with partition's expression. On return from
+  the function an actual name of a file corresponding to the partition
+  is stored in the buffer  part_file_name_buf.
+
+  @param lpt  Structure containing parameters required for checking
+  @param[in,out] part_file_name_buf  Buffer for storing a partition name
+  @param part_file_name_buf_sz  Size of buffer for storing a partition name
+  @param part_file_name_len  Length of partition prefix stored in the buffer
+                             on invocation of function
+
+  @return false on success, true on error
+*/
+
+static bool check_table_data_fit_new_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
+{
+  THD *thd= lpt->thd;
+  TABLE *table_to= lpt->table_list->table;
+  TABLE *table_from= lpt->table_list->next_local->table;
+
+  DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE,
+                                                  table_to->s->db.str,
+                                                  table_to->s->table_name.str,
+                                                  MDL_EXCLUSIVE));
+
+  DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE,
+                                                  table_from->s->db.str,
+                                                  table_from->s->table_name.str,
+                                                  MDL_EXCLUSIVE));
+
+  uint32 new_part_id;
+  partition_element *part_elem;
+  // FIXME: really?
+  const char* partition_name=
+    thd->lex->part_info->curr_part_elem->partition_name;
+
+  part_elem= table_to->part_info->get_part_elem(partition_name,
+                                                nullptr, 0, &new_part_id);
+  if (unlikely(!part_elem))
+    return true;
+
+  if (unlikely(new_part_id == NOT_A_PARTITION_ID))
+  {
+    DBUG_ASSERT(table_to->part_info->is_sub_partitioned());
+    my_error(ER_PARTITION_INSTEAD_OF_SUBPARTITION, MYF(0));
+    return true;
+  }
+
+  if (verify_data_with_partition(table_from, table_to, new_part_id))
+  {
+    return true;
+  }
+
+  return false;
+}
+
+
+/**
+  Check whether metadata of a partitioned table and a being moved to partition
+  are equal
+
+  @para[in, out] lpt  Struct containing parameters required for handling of
+                    the statement ALTER TABLE
+
+  @return false on ok (tables metadata are equal),
+          true on error (tables metadata are different)
+*/
+
+static bool compare_tables_metadata(ALTER_PARTITION_PARAM_TYPE *lpt)
+{
+  TABLE *part_table= lpt->table_list->table;
+  TABLE *table= lpt->table_list->next_local->table;
+  bool metadata_equal;
+  HA_CREATE_INFO *part_create_info= lpt->create_info;
+
+  handlerton *db_type= part_create_info->db_type;
+  part_create_info->db_type= part_table->part_info->default_engine_type;
+
+  if (mysql_compare_tables(table, lpt->alter_info, part_create_info,
+                          &metadata_equal))
+
+  {
+    part_create_info->db_type= db_type;
+    my_error(ER_TABLES_DIFFERENT_METADATA, MYF(0));
+    return true;
+  }
+
+  part_create_info->db_type= db_type;
+
+  DEBUG_SYNC(lpt->thd, "swap_partition_after_compare_tables");
+  if (!metadata_equal)
+  {
+    my_error(ER_TABLES_DIFFERENT_METADATA, MYF(0));
+    return true;
+  }
+  DBUG_ASSERT(table->s->db_create_options ==
+              part_table->s->db_create_options);
+  DBUG_ASSERT(table->s->db_options_in_use ==
+              part_table->s->db_options_in_use);
+
+  if (table->s->avg_row_length != part_create_info->avg_row_length)
+  {
+    my_error(ER_PARTITION_EXCHANGE_DIFFERENT_OPTION, MYF(0),
+            "AVG_ROW_LENGTH");
+    return true;
+  }
+
+  if (table->s->db_create_options != part_create_info->table_options)
+  {
+    my_error(ER_PARTITION_EXCHANGE_DIFFERENT_OPTION, MYF(0),
+            "TABLE OPTION");
+    return true;
+  }
+
+  if (table->s->table_charset != part_table->s->table_charset)
+  {
+    my_error(ER_PARTITION_EXCHANGE_DIFFERENT_OPTION, MYF(0),
+            "CHARACTER SET");
+    return true;
+  }
+
+  return false;
+}
+
+
+/**
+  For the statement is ALTER TABLE ... ADD PARTITION... FROM <tbl_name>
+  check that partition metadata is compatible with table definition and
+  partition type supported for moving table to partition.
+
+  @param lpt  Structure containing parameters required for handling of
+              the statement ALTER TABLE
+
+  @return false on success, true on failure
+*/
+
+static bool check_table_and_partition_compatibility(
+  ALTER_PARTITION_PARAM_TYPE *lpt)
+{
+  partition_info* tab_part_info= lpt->table->part_info;
+  DBUG_ASSERT((lpt->alter_info->partition_flags &
+               ALTER_PARTITION_ADD_FROM_TABLE));
+  if (tab_part_info->part_type != RANGE_PARTITION &&
+      tab_part_info->part_type != LIST_PARTITION)
+  {
+    /*
+        ALTER TABLE ... ADD PARTITION ... FROM TABLE is not compatible with
+        partition methods other RANGE and LIST.
+     */
+    my_error(ER_PARTITION_METHOD_NOT_COMPATIBLE_WITH_ADD_FROM_TABLE,
+             MYF(0), (tab_part_info->part_type == HASH_PARTITION ?
+                 "HASH": "VERSIONING"));
+    return true;
+  }
+
+  if (compare_tables_metadata(lpt))
+    return true;
+
+  if (check_table_data_fit_new_partition(lpt))
+    return true;
+
+  return false;
+}
+
 
 /**
   Actually perform the change requested by ALTER TABLE of partitions
@@ -7497,10 +7669,64 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     if (alter_partition_lock_handling(lpt))
       goto err;
   }
+  else if ((alter_info->partition_flags & ALTER_PARTITION_ADD_FROM_TABLE))
+  {
+    TABLE *table_from= table_list->next_local->table;
+
+    if (write_log_drop_shadow_frm(lpt) ||
+        ERROR_INJECT_CRASH("crash_add_partition_from_1") ||
+        ERROR_INJECT_ERROR("fail_add_partition_from_1") ||
+        mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
+        ERROR_INJECT_CRASH("crash_add_partition_from_2") ||
+        ERROR_INJECT_ERROR("fail_add_partition_from_2") ||
+        wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
+        wait_while_table_is_used(thd, table_from,
+                                 HA_EXTRA_PREPARE_FOR_RENAME) ||
+
+        ERROR_INJECT_CRASH("crash_add_partition_from_3") ||
+        ERROR_INJECT_ERROR("fail_add_partition_from_3") ||
+        write_log_add_change_partition(lpt) ||
+        ERROR_INJECT_CRASH("crash_add_partition_from_4") ||
+        ERROR_INJECT_ERROR("fail_add_partition_from_4") ||
+        mysql_change_partitions(lpt) ||
+        ERROR_INJECT_CRASH("crash_add_partition_from_5") ||
+        ERROR_INJECT_ERROR("fail_add_partition_from_5") ||
+        alter_close_table(lpt) ||
+        ERROR_INJECT_CRASH("crash_add_partition_from_6") ||
+        ERROR_INJECT_ERROR("fail_add_partition_from_6") ||
+        check_table_and_partition_compatibility(lpt) ||
+        move_table_to_partition(lpt) ||
+        ERROR_INJECT_CRASH("crash_add_partition_from_7") ||
+        ERROR_INJECT_ERROR("fail_add_partition_from_7") ||
+        write_log_rename_frm(lpt) ||
+        (action_completed= TRUE, FALSE) ||
+        ERROR_INJECT_CRASH("crash_add_partition_from_8") ||
+        ERROR_INJECT_ERROR("fail_add_partition_from_8") ||
+        (frm_install= TRUE, FALSE) ||
+        mysql_write_frm(lpt, WFRM_INSTALL_SHADOW) ||
+        log_partition_alter_to_ddl_log(lpt) ||
+        (frm_install= FALSE, FALSE) ||
+        ERROR_INJECT_CRASH("crash_add_partition_from_9") ||
+        ERROR_INJECT_ERROR("fail_add_partition_from_9") ||
+        (write_log_completed(lpt, FALSE), FALSE) ||
+        ((!thd->lex->no_write_to_binlog) &&
+            (write_bin_log(thd, FALSE,
+                           thd->query(), thd->query_length()), FALSE)) ||
+                           ERROR_INJECT_CRASH("crash_add_partition_from_10") ||
+                           ERROR_INJECT_ERROR("fail_add_partition_from_10"))
+    {
+      handle_alter_part_error(lpt, action_completed, FALSE, frm_install);
+      goto err;
+    }
+    if (alter_partition_lock_handling(lpt))
+      goto err;
+
+  }
   else if ((alter_info->partition_flags & ALTER_PARTITION_ADD) &&
            (part_info->part_type == RANGE_PARTITION ||
             part_info->part_type == LIST_PARTITION))
   {
+    DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_ADD_FROM_TABLE));
     /*
       ADD RANGE/LIST PARTITIONS
       In this case there are no tuples removed and no tuples are added.
