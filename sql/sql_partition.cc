@@ -5432,7 +5432,7 @@ that are reorganised.
       } while (++part_count < tab_part_info->num_parts);
       if (num_parts_found != num_parts_dropped)
       {
-        my_error(ER_DROP_PARTITION_NON_EXISTENT, MYF(0), cmd);
+        my_error(ER_PARTITION_DOES_NOT_EXIST, MYF(0));
         goto err;
       }
       if (table->file->is_fk_defined_on_table_or_index(MAX_KEY))
@@ -5447,7 +5447,7 @@ that are reorganised.
       if ((alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT) &&
           tab_part_info->is_sub_partitioned())
       {
-        my_error(ER_PARTITION_EXTRACT_SUBPARTITIONED, MYF(0));
+        my_error(ER_PARTITION_CONVERT_SUBPARTITIONED, MYF(0));
         goto err;
       }
     }
@@ -5457,7 +5457,7 @@ that are reorganised.
                                 tab_part_info->default_engine_type);
       if (set_part_state(alter_info, tab_part_info, PART_CHANGED))
       {
-        my_error(ER_DROP_PARTITION_NON_EXISTENT, MYF(0), "REBUILD");
+        my_error(ER_PARTITION_DOES_NOT_EXIST, MYF(0));
         goto err;
       }
       if (!(*fast_alter_table))
@@ -5733,7 +5733,7 @@ the generated partition syntax in a correct manner.
         } while (++part_count < tab_part_info->num_parts);
         if (drop_count != num_parts_reorged)
         {
-          my_error(ER_DROP_PARTITION_NON_EXISTENT, MYF(0), "REORGANIZE");
+          my_error(ER_PARTITION_DOES_NOT_EXIST, MYF(0));
           goto err;
         }
         tab_part_info->num_parts= check_total_partitions;

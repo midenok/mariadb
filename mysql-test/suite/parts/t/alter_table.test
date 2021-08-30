@@ -61,9 +61,9 @@ partition by range(x)
 subpartition by hash(x) subpartitions 3 (
   partition p1 values less than (10),
   partition pn values less than maxvalue);
---error ER_PARTITION_EXTRACT_SUBPARTITIONED
+--error ER_PARTITION_CONVERT_SUBPARTITIONED
 alter table t1 convert partition p1 to table p1;
---error ER_DROP_PARTITION_NON_EXISTENT
+--error ER_PARTITION_DOES_NOT_EXIST
 alter table t1 convert partition p1sp0 to table p1;
 
 create or replace table t1 (x int)
@@ -110,9 +110,9 @@ insert tp2 values (88);
 --error ER_PARSE_ERROR
 alter table t1 convert partition p2 to table tp2, drop partition p3;
 # TODO: probably no need in such specific codes, should be ER_PARTITION_NON_EXISTENT
---error ER_DROP_PARTITION_NON_EXISTENT
+--error ER_PARTITION_DOES_NOT_EXIST
 alter table t1 convert partition p00 to table tp00;
-# Better error here is ER_DROP_PARTITION_NON_EXISTENT,
+# Better error here is ER_PARTITION_DOES_NOT_EXIST,
 # but mysql_alter_table() works checks new table before anything else.
 # So, looks like no big reason to change anything here.
 --error ER_TABLE_EXISTS_ERROR
@@ -186,9 +186,9 @@ select * from tp5;
 show create table t1;
 select * from t1 order by x;
 drop table tp5;
---error ER_DROP_PARTITION_NON_EXISTENT
+--error ER_PARTITION_DOES_NOT_EXIST
 execute stmt;
---error ER_DROP_PARTITION_NON_EXISTENT
+--error ER_PARTITION_DOES_NOT_EXIST
 execute stmt;
 drop prepare stmt;
 

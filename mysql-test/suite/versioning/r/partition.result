@@ -251,7 +251,7 @@ t1	CREATE TABLE `t1` (
  PARTITION BY SYSTEM_TIME LIMIT 2
 PARTITIONS 3
 alter table t1 drop partition non_existent;
-ERROR HY000: Error in list of partitions to DROP
+ERROR HY000: Partition does not exist
 insert into t1 values (1), (2), (3), (4), (5), (6);
 select * from t1 partition (pn);
 x
@@ -1347,9 +1347,9 @@ x
 53
 drop table tp3;
 call sp;
-ERROR HY000: Error in list of partitions to EXTRACT
+ERROR HY000: Partition does not exist
 call sp;
-ERROR HY000: Error in list of partitions to EXTRACT
+ERROR HY000: Partition does not exist
 drop procedure sp;
 # LOCK TABLES, PS, SP
 create or replace procedure sp()
@@ -1383,9 +1383,9 @@ x
 drop table tp4;
 lock tables t1 write;
 execute stmt;
-ERROR HY000: Error in list of partitions to EXTRACT
+ERROR HY000: Partition does not exist
 call sp;
-ERROR HY000: Error in list of partitions to EXTRACT
+ERROR HY000: Partition does not exist
 drop prepare stmt;
 unlock tables;
 drop procedure sp;

@@ -228,7 +228,7 @@ partition by system_time limit 2 partitions 3;
 --replace_result $default_engine DEFAULT_ENGINE
 show create table t1;
 
---error ER_DROP_PARTITION_NON_EXISTENT
+--error ER_PARTITION_DOES_NOT_EXIST
 alter table t1 drop partition non_existent;
 
 insert into t1 values (1), (2), (3), (4), (5), (6);
@@ -1119,9 +1119,9 @@ select * from tp3;
 show create table t1;
 select * from t1 order by x;
 drop table tp3;
---error ER_DROP_PARTITION_NON_EXISTENT
+--error ER_PARTITION_DOES_NOT_EXIST
 call sp;
---error ER_DROP_PARTITION_NON_EXISTENT
+--error ER_PARTITION_DOES_NOT_EXIST
 call sp;
 drop procedure sp;
 
@@ -1142,9 +1142,9 @@ show create table t1;
 select * from t1 order by x;
 drop table tp4;
 lock tables t1 write;
---error ER_DROP_PARTITION_NON_EXISTENT
+--error ER_PARTITION_DOES_NOT_EXIST
 execute stmt;
---error ER_DROP_PARTITION_NON_EXISTENT
+--error ER_PARTITION_DOES_NOT_EXIST
 call sp;
 drop prepare stmt;
 unlock tables;
