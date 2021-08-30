@@ -4860,7 +4860,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
   if (alter_info->partition_flags &
       (ALTER_PARTITION_ADD |
        ALTER_PARTITION_DROP |
-       ALTER_PARTITION_EXTRACT |
+       ALTER_PARTITION_CONVERT_OUT |
        ALTER_PARTITION_COALESCE |
        ALTER_PARTITION_REORGANIZE |
        ALTER_PARTITION_TABLE_REORG |
@@ -5357,10 +5357,10 @@ that are reorganised.
       }
     }
     else if ((alter_info->partition_flags & ALTER_PARTITION_DROP) |
-             (alter_info->partition_flags & ALTER_PARTITION_EXTRACT))
+             (alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT))
     {
       const char * const cmd=
-        (alter_info->partition_flags & ALTER_PARTITION_EXTRACT) ?
+        (alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT) ?
           "EXTRACT" : "DROP";
       /*
         Drop a partition from a range partition and list partitioning is
@@ -5440,11 +5440,11 @@ that are reorganised.
         my_error(ER_ROW_IS_REFERENCED, MYF(0));
         goto err;
       }
-      DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_EXTRACT) ||
+      DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT) ||
                   num_parts_dropped == 1);
       /* NOTE: num_parts is used in generate_partition_syntax() */
       tab_part_info->num_parts-= num_parts_dropped;
-      if ((alter_info->partition_flags & ALTER_PARTITION_EXTRACT) &&
+      if ((alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT) &&
           tab_part_info->is_sub_partitioned())
       {
         my_error(ER_PARTITION_EXTRACT_SUBPARTITIONED, MYF(0));
@@ -7418,7 +7418,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     if (alter_partition_lock_handling(lpt))
       goto err;
   }
-  else if (alter_info->partition_flags & ALTER_PARTITION_EXTRACT)
+  else if (alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT)
   {
     if (mysql_write_frm(lpt, WFRM_WRITE_EXTRACTED) ||
         write_log_drop_shadow_frm(lpt) ||

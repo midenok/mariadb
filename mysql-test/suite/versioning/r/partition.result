@@ -1274,7 +1274,7 @@ partition p5 values less than (50),
 partition pn values less than maxvalue);
 insert into t1 values (2), (12), (22), (32), (42), (52);
 update t1 set x= x + 1;
-alter table t1 extract partition p2 as table tp2;
+alter table t1 convert partition p2 to table tp2;
 show create table tp2;
 Table	Create Table
 tp2	CREATE TABLE `tp2` (
@@ -1319,7 +1319,7 @@ x
 53
 # SP
 create or replace procedure sp()
-alter table t1 extract partition p3 as table tp3;
+alter table t1 convert partition p3 to table tp3;
 call sp;
 show create table tp3;
 Table	Create Table
@@ -1353,7 +1353,7 @@ ERROR HY000: Error in list of partitions to EXTRACT
 drop procedure sp;
 # LOCK TABLES, PS, SP
 create or replace procedure sp()
-alter table t1 extract partition p4 as table tp4;
+alter table t1 convert partition p4 to table tp4;
 lock tables t1 write;
 prepare stmt from 'call sp';
 execute stmt;
@@ -1406,9 +1406,9 @@ update t1 set x= x + 1 where x = 22;
 select * from t1 partition (p1);
 x
 12
-alter table t1 extract partition pn as table tp1;
+alter table t1 convert partition pn to table tp1;
 ERROR HY000: Wrong partitions for `t1`: must have at least one HISTORY and exactly one last CURRENT
-alter table t1 extract partition p1 as table tp1;
+alter table t1 convert partition p1 to table tp1;
 show create table tp1;
 Table	Create Table
 tp1	CREATE TABLE `tp1` (
@@ -1472,11 +1472,11 @@ x
 select * from t1 partition (p2);
 x
 22
-alter table t1 extract partition p1 as table tp1;
+alter table t1 convert partition p1 to table tp1;
 ERROR HY000: Can only drop oldest partitions when rotating by INTERVAL
-alter table t1 extract partition p0 as table tp0;
-alter table t1 extract partition p1 as table tp1;
-alter table t1 extract partition p2 as table tp2;
+alter table t1 convert partition p0 to table tp0;
+alter table t1 convert partition p1 to table tp1;
+alter table t1 convert partition p2 to table tp2;
 ERROR HY000: Wrong partitions for `t1`: must have at least one HISTORY and exactly one last CURRENT
 show create table tp0;
 Table	Create Table
@@ -1530,7 +1530,7 @@ drop tables t1, tp0, tp1;
 # System-versioned tables (implicit)
 create or replace table t1(x int) with system versioning
 partition by system_time limit 1 partitions 3;
-alter table t1 extract partition p1 as table tp1;
+alter table t1 convert partition p1 to table tp1;
 show create table tp1;
 Table	Create Table
 tp1	CREATE TABLE `tp1` (
@@ -1569,7 +1569,7 @@ partition by range(x) (
 partition p0 values less than (10),
 partition p1 values less than (20),
 partition pn values less than maxvalue);
-alter table t1 extract partition p1 as table tp1;
+alter table t1 convert partition p1 to table tp1;
 show create table tp1;
 Table	Create Table
 tp1	CREATE TABLE `tp1` (

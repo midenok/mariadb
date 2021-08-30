@@ -7619,15 +7619,15 @@ alter_commands:
               MYSQL_YYABORT;
             Lex->alter_info.partition_flags|= ALTER_PARTITION_EXCHANGE;
           }
-        | EXTRACT_SYM PARTITION_SYM alt_part_name_item
-          AS TABLE_SYM table_ident have_partitioning
+        | CONVERT_SYM PARTITION_SYM alt_part_name_item
+          TO_SYM TABLE_SYM table_ident have_partitioning
           {
             if (Lex->stmt_alter_table($6))
               MYSQL_YYABORT;
             Lex->m_sql_cmd= new (thd->mem_root) Sql_cmd_alter_table();
             if (unlikely(Lex->m_sql_cmd == NULL))
               MYSQL_YYABORT;
-            Lex->alter_info.partition_flags|= ALTER_PARTITION_EXTRACT;
+            Lex->alter_info.partition_flags|= ALTER_PARTITION_CONVERT_OUT;
           }
         ;
 

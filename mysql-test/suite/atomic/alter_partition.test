@@ -58,7 +58,7 @@ let $crash_points='ddl_log_create_before_create_frm',
 #let $crash_points= 'crash_extract_partition_8';
 
 let $statement_count= 1;
-let $statements= 'ALTER TABLE t1 EXTRACT PARTITION p1 AS TABLE tp1';
+let $statements= 'ALTER TABLE t1 CONVERT PARTITION p1 TO TABLE tp1';
 
 #let $statement_count=1;
 #let $statements='CREATE OR REPLACE TABLE t1 SELECT * from const_table';

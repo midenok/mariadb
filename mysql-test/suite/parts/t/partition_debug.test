@@ -64,7 +64,7 @@ let $create_statement= create or replace table t1 (x int primary key)
     partition pn values less than maxvalue);
 
 let $insert_statement= insert into t1 values (2), (12), (22), (32), (42), (52);
-let $fail_statement= alter table t1 extract partition p2 as table tp2;
+let $fail_statement= alter table t1 convert partition p2 to table tp2;
 
 set @save_dbug=@@debug_dbug;
 set session debug_dbug="+d,fail_create_before_create_frm";
