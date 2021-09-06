@@ -1,2 +1,2 @@
-# The goal of including this file is to enable lcase_names
-# combinations (see include/lcase_name.combinations)
+# The goal of including this file is to test with different
+# lower_case_table_names modes (see include/lcase_name.combinations)
