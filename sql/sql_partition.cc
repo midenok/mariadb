@@ -6243,6 +6243,7 @@ static bool write_log_delete_frm(ALTER_PARTITION_PARAM_TYPE *lpt,
 {
   DDL_LOG_ENTRY ddl_log_entry;
   DDL_LOG_MEMORY_ENTRY *log_entry;
+  DBUG_ENTER("write_log_delete_frm");
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
   ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
   ddl_log_entry.next_entry= lpt->part_info->list ? lpt->part_info->list->entry_pos : 0;
@@ -6252,10 +6253,10 @@ static bool write_log_delete_frm(ALTER_PARTITION_PARAM_TYPE *lpt,
 
   if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
   {
-    return true;
+    DBUG_RETURN(true);
   }
   ddl_log_add_entry(lpt->part_info, log_entry);
-  return false;
+  DBUG_RETURN(false);
 }
 
 
@@ -6283,6 +6284,7 @@ bool write_log_replace_frm(ALTER_PARTITION_PARAM_TYPE *lpt,
 {
   DDL_LOG_ENTRY ddl_log_entry;
   DDL_LOG_MEMORY_ENTRY *log_entry;
+  DBUG_ENTER("write_log_replace_frm");
 
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
   ddl_log_entry.action_type= DDL_LOG_REPLACE_ACTION;
@@ -6293,10 +6295,10 @@ bool write_log_replace_frm(ALTER_PARTITION_PARAM_TYPE *lpt,
 
   if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
   {
-    return true;
+    DBUG_RETURN(true);
   }
   ddl_log_add_entry(lpt->part_info, log_entry);
-  return false;
+  DBUG_RETURN(false);
 }
 
 
