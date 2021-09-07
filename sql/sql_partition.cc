@@ -4876,7 +4876,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
        ALTER_PARTITION_REORGANIZE |
        ALTER_PARTITION_TABLE_REORG |
        ALTER_PARTITION_REBUILD |
-       ALTER_PARTITION_ADD_FROM_TABLE))
+       ALTER_PARTITION_CONVERT_IN))
   {
     /*
       You can't add column when we are doing alter related to partition
@@ -5080,8 +5080,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
         goto err;
       }
     }
-    if ((alter_info->partition_flags & ALTER_PARTITION_ADD) ||
-        (alter_info->partition_flags & ALTER_PARTITION_ADD_FROM_TABLE))
+    if ((alter_info->partition_flags & ALTER_PARTITION_ADD))
     {
       if (*fast_alter_table && thd->locked_tables_mode)
       {
@@ -7207,7 +7206,7 @@ bool log_partition_alter_to_ddl_log(ALTER_PARTITION_PARAM_TYPE *lpt)
 }
 
 
-extern bool move_table_to_partition(ALTER_PARTITION_PARAM_TYPE *lpt);
+extern bool alter_partition_convert_in(ALTER_PARTITION_PARAM_TYPE *lpt);
 
 
 /**
@@ -7349,21 +7348,19 @@ static bool compare_tables_metadata(ALTER_PARTITION_PARAM_TYPE *lpt)
   @return false on success, true on failure
 */
 
-static bool check_table_and_partition_compatibility(
-  ALTER_PARTITION_PARAM_TYPE *lpt)
+static bool check_structures(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
-  partition_info* tab_part_info= lpt->table->part_info;
-  DBUG_ASSERT((lpt->alter_info->partition_flags &
-               ALTER_PARTITION_ADD_FROM_TABLE));
-  if (tab_part_info->part_type != RANGE_PARTITION &&
-      tab_part_info->part_type != LIST_PARTITION)
+  partition_info* part_info= lpt->table->part_info;
+  DBUG_ASSERT((lpt->alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN));
+  if (part_info->part_type != RANGE_PARTITION &&
+      part_info->part_type != LIST_PARTITION)
   {
     /*
         ALTER TABLE ... ADD PARTITION ... FROM TABLE is not compatible with
         partition methods other RANGE and LIST.
      */
     my_error(ER_PARTITION_METHOD_NOT_COMPATIBLE_WITH_ADD_FROM_TABLE,
-             MYF(0), (tab_part_info->part_type == HASH_PARTITION ?
+             MYF(0), (part_info->part_type == HASH_PARTITION ?
                  "HASH": "VERSIONING"));
     return true;
   }
@@ -7663,7 +7660,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     if (alter_partition_lock_handling(lpt))
       goto err;
   }
-  else if ((alter_info->partition_flags & ALTER_PARTITION_ADD_FROM_TABLE))
+  else if ((alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN))
   {
     TABLE *table_from= table_list->next_local->table;
 
@@ -7688,8 +7685,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         alter_close_table(lpt) ||
         ERROR_INJECT_CRASH("crash_add_partition_from_6") ||
         ERROR_INJECT_ERROR("fail_add_partition_from_6") ||
-        check_table_and_partition_compatibility(lpt) ||
-        move_table_to_partition(lpt) ||
+        check_structures(lpt) ||
+        alter_partition_convert_in(lpt) ||
         ERROR_INJECT_CRASH("crash_add_partition_from_7") ||
         ERROR_INJECT_ERROR("fail_add_partition_from_7") ||
         write_log_rename_frm(lpt) ||
@@ -7720,7 +7717,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
            (part_info->part_type == RANGE_PARTITION ||
             part_info->part_type == LIST_PARTITION))
   {
-    DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_ADD_FROM_TABLE));
+    DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN));
     /*
       ADD RANGE/LIST PARTITIONS
       In this case there are no tuples removed and no tuples are added.

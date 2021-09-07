@@ -1018,7 +1018,7 @@ static void finalize_ddl_log_entry(DDL_LOG_MEMORY_ENTRY *log_entry,
   @return false on success, true on error
 */
 
-bool move_table_to_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
+bool alter_partition_convert_in(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
   char part_file_name[2*FN_REFLEN+1];
   THD *thd= lpt->thd;
@@ -1081,17 +1081,13 @@ bool move_table_to_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
       mysql_mutex_unlock(&LOCK_gdl);
     }
   );
-  DBUG_EXECUTE_IF("move_partition_fail_1", return true;);
-  DBUG_EXECUTE_IF("move_partition_abort_1", DBUG_SUICIDE(););
+
   if (unlikely(ddl_log_write_entry(&move_entry, &log_entry)))
   {
     my_error(ER_DDL_LOG_ERROR, MYF(0));
     return true;
   }
 
-  DBUG_EXECUTE_IF("move_partition_fail_2",
-                  ddl_log_release_memory_entry(log_entry); return true;);
-  DBUG_EXECUTE_IF("move_partition_abort_2", DBUG_SUICIDE(););
   if (unlikely(ddl_log_write_execute_entry(log_entry->entry_pos,
                                            &exec_log_entry)))
   {
@@ -1118,12 +1114,6 @@ bool move_table_to_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
     }
   );
 
-  DBUG_EXECUTE_IF("move_partition_fail_3",
-                  my_error(ER_ERROR_ON_RENAME, MYF(0),
-                           from_file_name, part_file_name, 0);
-                  return true;);
-  DBUG_EXECUTE_IF("move_partition_abort_3", DBUG_SUICIDE(););
-
   if (unlikely(file->delete_table(part_file_name)))
   {
     my_error(ER_ERROR_ON_RENAME, MYF(0), from_file_name,
@@ -1131,22 +1121,11 @@ bool move_table_to_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
     return true;
   }
 
-  DBUG_EXECUTE_IF("move_partition_fail_4",
-                  my_error(ER_DDL_LOG_ERROR, MYF(0));
-                  return true;);
-  DBUG_EXECUTE_IF("move_partition_abort_4", DBUG_SUICIDE(););
-
   if (unlikely(ddl_log_increment_phase(log_entry->entry_pos)))
   {
     my_error(ER_DDL_LOG_ERROR, MYF(0));
     return true;
   }
-
-  DBUG_EXECUTE_IF("move_partition_fail_5",
-                  my_error(ER_ERROR_ON_RENAME, MYF(0),
-                           from_file_name, part_file_name, 0);
-                  return true;);
-  DBUG_EXECUTE_IF("move_partition_abort_5", DBUG_SUICIDE(););
 
   close_all_tables_for_name(thd, table_from->table->s,
                             HA_EXTRA_PREPARE_FOR_RENAME, nullptr);
@@ -1158,9 +1137,6 @@ bool move_table_to_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
     return true;
   }
 
-  DBUG_EXECUTE_IF("move_partition_fail_6",
-                  my_error(ER_DDL_LOG_ERROR, MYF(0));
-                  return true;);
   if (unlikely(ddl_log_increment_phase(log_entry->entry_pos)))
   {
     my_error(ER_DDL_LOG_ERROR, MYF(0));
@@ -1173,13 +1149,6 @@ bool move_table_to_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
     return true;
   }
 
-  /* The move is complete and ddl_log is deactivated */
-  DBUG_EXECUTE_IF("exchange_partition_fail_9",
-                  my_error(ER_DDL_LOG_ERROR, MYF(0));
-                  return true;);
-  DBUG_EXECUTE_IF("exchange_partition_abort_9", DBUG_SUICIDE(););
-
-  /* all OK */
   return false;
 }
 
