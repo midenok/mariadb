@@ -788,7 +788,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     }
   }
 #ifdef WITH_PARTITION_STORAGE_ENGINE
-  if (flags & WFRM_WRITE_EXTRACTED)
+  if (flags & WFRM_WRITE_CONVERTED_OUT)
   {
     THD *thd= lpt->thd;
     Alter_table_ctx *alter_ctx= lpt->alter_ctx;
@@ -802,7 +802,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     handler *file=  ((ha_partition *) (lpt->table->file))->get_child_handlers()[0];
     DBUG_ASSERT(file);
     new_path.length= strlen(new_path.str);
-    strxnmov(frm_name, sizeof(frm_name), new_path.str, reg_ext, NullS);
+    strxnmov(frm_name, sizeof(frm_name) - 1, new_path.str, reg_ext, NullS);
     create_info->alias= alter_ctx->table_name;
     thd->work_part_info= NULL;
     create_info->db_type= work_part_info->default_engine_type;
@@ -812,9 +812,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
                              &new_path, &alter_ctx->new_db, &alter_ctx->new_name,
                              true) ||
         ERROR_INJECT_ERROR("fail_create_before_create_frm"))
-    {
       DBUG_RETURN(TRUE);
-    }
 
     debug_crash_here("ddl_log_create_before_create_frm");
     if (mysql_prepare_create_table(thd, create_info, lpt->alter_info,
@@ -822,9 +820,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
                                    &lpt->key_info_buffer, &lpt->key_count,
                                    C_ALTER_TABLE, alter_ctx->new_db,
                                    alter_ctx->new_name))
-    {
       DBUG_RETURN(TRUE);
-    }
 
     lpt->create_info->table_options= lpt->db_options;
     LEX_CUSTRING frm= build_frm_image(thd, alter_ctx->new_name,
@@ -833,9 +829,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
                                       lpt->key_count, lpt->key_info_buffer,
                                       file);
     if (unlikely(!frm.str))
-    {
       DBUG_RETURN(TRUE);
-    }
 
     thd->work_part_info= work_part_info;
     create_info->db_type= db_type;

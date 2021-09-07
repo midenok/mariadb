@@ -11234,22 +11234,22 @@ void LEX::stmt_deallocate_prepare(const Lex_ident_sys_st &ident)
 }
 
 
-bool LEX::stmt_alter_table(Table_ident *t)
+bool LEX::stmt_alter_table(Table_ident *table)
 {
   DBUG_ASSERT(sql_command == SQLCOM_ALTER_TABLE);
   DBUG_ASSERT(!m_sql_cmd);
-  first_select_lex()->db= t->db;
+  first_select_lex()->db= table->db;
   if (first_select_lex()->db.str == NULL &&
       copy_db_to(&first_select_lex()->db))
     return true;
-  if (unlikely(check_table_name(t->table.str, t->table.length,
+  if (unlikely(check_table_name(table->table.str, table->table.length,
                                 false)) ||
-      (t->db.str && unlikely(check_db_name((LEX_STRING*) &t->db))))
+      (table->db.str && unlikely(check_db_name((LEX_STRING*) &table->db))))
   {
-    my_error(ER_WRONG_TABLE_NAME, MYF(0), t->table.str);
+    my_error(ER_WRONG_TABLE_NAME, MYF(0), table->table.str);
     return true;
   }
-  name= t->table;
+  name= table->table;
   return false;
 }
 

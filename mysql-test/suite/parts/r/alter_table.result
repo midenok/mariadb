@@ -50,7 +50,7 @@ partition pn values less than maxvalue);
 alter table t1 convert partition p1 to table p1;
 ERROR HY000: Convert partition is not supported for subpartitioned table.
 alter table t1 convert partition p1sp0 to table p1;
-ERROR HY000: Partition does not exist
+ERROR HY000: Wrong partition name or partition list
 create or replace table t1 (x int)
 partition by range(x) (
 partition p1 values less than (10));
@@ -75,7 +75,7 @@ insert tp2 values (88);
 alter table t1 convert partition p2 to table tp2, drop partition p3;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ' drop partition p3' at line 1
 alter table t1 convert partition p00 to table tp00;
-ERROR HY000: Partition does not exist
+ERROR HY000: Wrong partition name or partition list
 alter table t1 convert partition p00 to table tp2;
 ERROR 42S01: Table 'tp2' already exists
 alter table t1 convert partition p2 to table tp2;
@@ -202,9 +202,9 @@ x
 52
 drop table tp5;
 execute stmt;
-ERROR HY000: Partition does not exist
+ERROR HY000: Wrong partition name or partition list
 execute stmt;
-ERROR HY000: Partition does not exist
+ERROR HY000: Wrong partition name or partition list
 drop prepare stmt;
 # Privileges
 create user alan;

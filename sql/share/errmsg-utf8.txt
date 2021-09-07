@@ -5904,7 +5904,7 @@ ER_PARTITION_MGMT_ON_NONPARTITIONED
 ER_FEATURE_NOT_SUPPORTED_WITH_PARTITIONING
         eng "Partitioned tables do not support %s"
 ER_PARTITION_DOES_NOT_EXIST
-        eng "Partition does not exist"
+        eng "Wrong partition name or partition list"
 ER_DROP_LAST_PARTITION
         eng "Cannot remove all partitions, use DROP TABLE instead"
         ger "Es lassen sich nicht sämtliche Partitionen löschen, benutzen Sie statt dessen DROP TABLE"

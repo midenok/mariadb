@@ -12,9 +12,12 @@ flush tables;
 end $
 # QUERY: ALTER TABLE t1 CONVERT PARTITION p1 TO TABLE tp1
 # CRASH POINT: ddl_log_create_before_create_frm
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -30,9 +33,12 @@ x
 12
 22
 # CRASH POINT: ddl_log_alter_partition_after_create_frm
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -48,9 +54,12 @@ x
 12
 22
 # CRASH POINT: ddl_log_alter_partition_after_write_frm
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -66,9 +75,12 @@ x
 12
 22
 # CRASH POINT: crash_extract_partition_1
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -84,9 +96,12 @@ x
 12
 22
 # CRASH POINT: crash_extract_partition_2
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -102,9 +117,12 @@ x
 12
 22
 # CRASH POINT: crash_extract_partition_3
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -120,9 +138,12 @@ x
 12
 22
 # CRASH POINT: crash_extract_partition_4
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -138,9 +159,12 @@ x
 12
 22
 # CRASH POINT: crash_extract_partition_5
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -156,9 +180,12 @@ x
 12
 22
 # CRASH POINT: crash_extract_partition_6
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -174,9 +201,12 @@ x
 12
 22
 # CRASH POINT: crash_extract_partition_7
-t1#P#p0.ibd
-t1#P#p1.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
 Table	Create Table
@@ -192,12 +222,15 @@ x
 12
 22
 # CRASH POINT: crash_extract_partition_8
-t1#P#p0.ibd
-t1#P#pn.ibd
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#pn.MYD
+t1#P#pn.MYI
 t1.frm
 t1.par
+tp1.MYD
+tp1.MYI
 tp1.frm
-tp1.ibd
 #sql-backup-t1.frm
 #sql-backup-t1.par
 master-bin.000001	#	Query	#	#	use `test`; ALTER TABLE t1 CONVERT PARTITION p1 TO TABLE tp1
