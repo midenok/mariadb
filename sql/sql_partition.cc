@@ -6441,14 +6441,22 @@ static bool write_log_changed_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
     FALSE                    Success
 */
 
+enum log_action_enum
+{
+  ACT_DROP = 0,
+  ACT_CONVERT_IN,
+  ACT_CONVERT_OUT
+};
+
 static bool log_drop_or_convert_action(ALTER_PARTITION_PARAM_TYPE *lpt,
                                            uint *next_entry,
                                            const char *path,
                                            const char *from_name,
-                                           bool temp_list)
+                                           bool temp_list,
+                                           const log_action_enum convert_action)
 {
   DDL_LOG_ENTRY ddl_log_entry;
-  const bool convert_action= (from_name != NULL);
+  DBUG_ASSERT(convert_action == ACT_DROP || (from_name != NULL));
   partition_info *part_info= lpt->part_info;
   DDL_LOG_MEMORY_ENTRY *log_entry;
   char tmp_path[FN_REFLEN + 1];
@@ -6520,9 +6528,18 @@ static bool log_drop_or_convert_action(ALTER_PARTITION_PARAM_TYPE *lpt,
                                   part_elem->partition_name, name_variant,
                                   TRUE))
           DBUG_RETURN(TRUE);
-        ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
-        if (convert_action)
-          ddl_log_entry.from_name= { from_name, strlen(from_name) };
+        switch (convert_action)
+        {
+          case ACT_CONVERT_OUT:
+            ddl_log_entry.from_name= { from_name, strlen(from_name) };
+            /* fall through */
+          case ACT_DROP:
+            ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
+            break;
+          case ACT_CONVERT_IN:
+            ddl_log_entry.name= { from_name, strlen(from_name) };
+            ddl_log_entry.from_name= { tmp_path, strlen(tmp_path) };
+        }
         if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
         {
           DBUG_RETURN(TRUE);
@@ -6543,7 +6560,7 @@ static bool write_log_dropped_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
                                          const char *path,
                                          bool temp_list)
 {
-  return log_drop_or_convert_action(lpt, next_entry, path, NULL, temp_list);
+  return log_drop_or_convert_action(lpt, next_entry, path, NULL, temp_list, ACT_DROP);
 }
 
 inline
@@ -6555,7 +6572,7 @@ static bool write_log_convert_out_partition(ALTER_PARTITION_PARAM_TYPE *lpt,
   build_table_filename(from_name, sizeof(from_name) - 1, lpt->alter_ctx->new_db.str,
                        lpt->alter_ctx->new_name.str, "", 0);
   DDL_LOG_MEMORY_ENTRY *main_entry= lpt->part_info->main_entry;
-  bool res= log_drop_or_convert_action(lpt, next_entry, path, from_name, false);
+  bool res= log_drop_or_convert_action(lpt, next_entry, path, from_name, false, ACT_CONVERT_OUT);
   /*
     NOTE: main_entry is "drop shadow frm", we have to keep it like this,
     because partitioning crash-safety disables it at install shadow FRM phase
@@ -7574,40 +7591,44 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       goto err;
 
     if (write_log_drop_shadow_frm(lpt) ||
-        ERROR_INJECT_CRASH("crash_add_partition_from_1") ||
-        ERROR_INJECT_ERROR("fail_add_partition_from_1") ||
+        ERROR_INJECT_CRASH("crash_convert_partition_1") ||
+        ERROR_INJECT_ERROR("fail_convert_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
-        ERROR_INJECT_CRASH("crash_add_partition_from_2") ||
-        ERROR_INJECT_ERROR("fail_add_partition_from_2") ||
+        ERROR_INJECT_CRASH("crash_convert_partition_2") ||
+        ERROR_INJECT_ERROR("fail_convert_partition_2") ||
         write_log_add_change_partition(lpt) ||
-        ERROR_INJECT_CRASH("crash_add_partition_from_4") ||
-        ERROR_INJECT_ERROR("fail_add_partition_from_4") ||
+        ERROR_INJECT_CRASH("crash_convert_partition_3") ||
+        ERROR_INJECT_ERROR("fail_convert_partition_3") ||
         mysql_change_partitions(lpt) ||
-        ERROR_INJECT_CRASH("crash_add_partition_from_5") ||
-        ERROR_INJECT_ERROR("fail_add_partition_from_5") ||
+        ERROR_INJECT_CRASH("crash_convert_partition_4") ||
+        ERROR_INJECT_ERROR("fail_convert_partition_5") ||
         alter_close_table(lpt) ||
-        ERROR_INJECT_CRASH("crash_add_partition_from_6") ||
-        ERROR_INJECT_ERROR("fail_add_partition_from_6") ||
+        write_log_convert_out_partition(lpt) ||
+        ERROR_INJECT_CRASH("crash_convert_partition_5") ||
+        ERROR_INJECT_ERROR("fail_convert_partition_5") ||
         alter_partition_convert_in(lpt) ||
-        ERROR_INJECT_CRASH("crash_add_partition_from_7") ||
-        ERROR_INJECT_ERROR("fail_add_partition_from_7") ||
-        write_log_rename_frm(lpt) ||
-        (action_completed= TRUE, FALSE) ||
-        ERROR_INJECT_CRASH("crash_add_partition_from_8") ||
-        ERROR_INJECT_ERROR("fail_add_partition_from_8") ||
-        (frm_install= TRUE, FALSE) ||
-        mysql_write_frm(lpt, WFRM_INSTALL_SHADOW) ||
+        ERROR_INJECT_CRASH("crash_convert_partition_6") ||
+        ERROR_INJECT_ERROR("fail_convert_partition_6") ||
+        (frm_install= true, false) ||
+        mysql_write_frm(lpt, WFRM_INSTALL_SHADOW|WFRM_BACKUP_ORIGINAL) ||
         log_partition_alter_to_ddl_log(lpt) ||
-        (frm_install= FALSE, FALSE) ||
-        ERROR_INJECT_CRASH("crash_add_partition_from_9") ||
-        ERROR_INJECT_ERROR("fail_add_partition_from_9") ||
-        (write_log_completed(lpt, FALSE), FALSE) ||
+        (frm_install= false, false) ||
+        ERROR_INJECT_CRASH("crash_convert_partition_7") ||
+        ERROR_INJECT_ERROR("fail_convert_partition_7") ||
         ((!thd->lex->no_write_to_binlog) &&
-            (write_bin_log(thd, FALSE,
-                           thd->query(), thd->query_length()), FALSE)) ||
-                           ERROR_INJECT_CRASH("crash_add_partition_from_10") ||
-                           ERROR_INJECT_ERROR("fail_add_partition_from_10"))
+          (thd->binlog_xid= thd->query_id,
+          ddl_log_update_xid(lpt->part_info, thd->binlog_xid),
+          write_bin_log(thd, false,
+                        thd->query(), thd->query_length()),
+          thd->binlog_xid= 0)) ||
+        ERROR_INJECT_CRASH("crash_convert_partition_8") ||
+        ERROR_INJECT_ERROR("fail_extract_partition_8") ||
+        (ddl_log_complete(lpt->part_info), false) ||
+        mysql_write_frm(lpt, WFRM_DROP_BACKUP) ||
+        ERROR_INJECT_CRASH("crash_convert_partition_9") ||
+        ERROR_INJECT_ERROR("fail_extract_partition_9"))
     {
+      (void) ddl_log_revert(thd, lpt->part_info);
       handle_alter_part_error(lpt, action_completed, FALSE, frm_install);
       goto err;
     }
