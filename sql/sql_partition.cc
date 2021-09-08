@@ -5082,6 +5082,13 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
     }
     if ((alter_info->partition_flags & ALTER_PARTITION_ADD))
     {
+      if ((alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN) &&
+          !(tab_part_info->part_type == RANGE_PARTITION ||
+            tab_part_info->part_type == LIST_PARTITION))
+      {
+        my_error(ER_ONLY_ON_RANGE_LIST_PARTITION, MYF(0), "CONVERT TABLE TO");
+        goto err;
+      }
       if (*fast_alter_table && thd->locked_tables_mode)
       {
         MEM_ROOT *old_root= thd->mem_root;
@@ -7338,8 +7345,7 @@ static bool compare_tables_metadata(ALTER_PARTITION_PARAM_TYPE *lpt)
 
 
 /**
-  For the statement is ALTER TABLE ... ADD PARTITION... FROM <tbl_name>
-  check that partition metadata is compatible with table definition and
+  Check that partition metadata is compatible with table definition and
   partition type supported for moving table to partition.
 
   @param lpt  Structure containing parameters required for handling of
@@ -7350,20 +7356,7 @@ static bool compare_tables_metadata(ALTER_PARTITION_PARAM_TYPE *lpt)
 
 static bool check_structures(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
-  partition_info* part_info= lpt->table->part_info;
   DBUG_ASSERT((lpt->alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN));
-  if (part_info->part_type != RANGE_PARTITION &&
-      part_info->part_type != LIST_PARTITION)
-  {
-    /*
-        ALTER TABLE ... ADD PARTITION ... FROM TABLE is not compatible with
-        partition methods other RANGE and LIST.
-     */
-    my_error(ER_PARTITION_METHOD_NOT_COMPATIBLE_WITH_ADD_FROM_TABLE,
-             MYF(0), (part_info->part_type == HASH_PARTITION ?
-                 "HASH": "VERSIONING"));
-    return true;
-  }
 
   if (compare_tables_metadata(lpt))
     return true;
