@@ -7642,6 +7642,10 @@ alter_commands:
               MYSQL_YYABORT;
 
             lex->part_info->num_parts= 1;
+            /*
+              OR-ed with ALTER_PARTITION_ADD because too many checks of
+              ALTER_PARTITION_ADD required.
+            */
             lex->alter_info.partition_flags|= ALTER_PARTITION_ADD |
                                               ALTER_PARTITION_CONVERT_IN;
           }
