@@ -7637,6 +7637,13 @@ alter_commands:
                                                             MDL_SHARED_NO_WRITE))
               MYSQL_YYABORT;
 
+            /*
+              This will appear as (new_db, new_name) in alter_ctx.
+              new_db will be IX-locked and new_name X-locked.
+            */
+            lex->first_select_lex()->db= $3->db;
+            lex->name= $3->table;
+
             lex->part_info= new (thd->mem_root) partition_info();
             if (unlikely(!lex->part_info))
               MYSQL_YYABORT;
