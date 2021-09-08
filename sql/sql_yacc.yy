@@ -7643,6 +7643,9 @@ alter_commands:
             */
             lex->first_select_lex()->db= $3->db;
             lex->name= $3->table;
+            if (lex->first_select_lex()->db.str == NULL &&
+                lex->copy_db_to(&lex->first_select_lex()->db))
+              MYSQL_YYABORT;
 
             lex->part_info= new (thd->mem_root) partition_info();
             if (unlikely(!lex->part_info))

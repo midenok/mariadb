@@ -6564,15 +6564,20 @@ static bool write_log_dropped_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
 }
 
 inline
-static bool write_log_convert_out_partition(ALTER_PARTITION_PARAM_TYPE *lpt,
-                                           uint *next_entry,
-                                           const char *path)
+static bool write_log_convert_partition(ALTER_PARTITION_PARAM_TYPE *lpt,
+                                        uint *next_entry,
+                                        const char *path)
 {
-  char from_name[FN_REFLEN + 1];
-  build_table_filename(from_name, sizeof(from_name) - 1, lpt->alter_ctx->new_db.str,
+  char other_table[FN_REFLEN + 1];
+  const auto f= lpt->alter_info->partition_flags;
+  DBUG_ASSERT((f & ALTER_PARTITION_CONVERT_IN) || (f & ALTER_PARTITION_CONVERT_OUT));
+  const log_action_enum convert_action= (f & ALTER_PARTITION_CONVERT_IN) ?
+                                          ACT_CONVERT_IN : ACT_CONVERT_OUT;
+  build_table_filename(other_table, sizeof(other_table) - 1, lpt->alter_ctx->new_db.str,
                        lpt->alter_ctx->new_name.str, "", 0);
   DDL_LOG_MEMORY_ENTRY *main_entry= lpt->part_info->main_entry;
-  bool res= log_drop_or_convert_action(lpt, next_entry, path, from_name, false, ACT_CONVERT_OUT);
+  bool res= log_drop_or_convert_action(lpt, next_entry, path, other_table,
+                                       false, convert_action);
   /*
     NOTE: main_entry is "drop shadow frm", we have to keep it like this,
     because partitioning crash-safety disables it at install shadow FRM phase
@@ -6749,7 +6754,7 @@ error:
 }
 
 
-static bool write_log_convert_out_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
+static bool write_log_convert_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
   partition_info *part_info= lpt->part_info;
   char tmp_path[FN_REFLEN + 1];
@@ -6761,7 +6766,7 @@ static bool write_log_convert_out_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
 
   mysql_mutex_lock(&LOCK_gdl);
 
-  if (write_log_convert_out_partition(lpt, &next_entry, (const char*)path))
+  if (write_log_convert_partition(lpt, &next_entry, (const char*)path))
     goto error;
   DBUG_ASSERT(next_entry == part_info->list->entry_pos);
   if (ddl_log_write_execute_entry(part_info->list->entry_pos,
@@ -7540,7 +7545,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
         ERROR_INJECT_CRASH("crash_convert_partition_3") ||
         ERROR_INJECT_ERROR("fail_extract_partition_3") ||
-        write_log_convert_out_partition(lpt) ||
+        write_log_convert_partition(lpt) ||
         ERROR_INJECT_CRASH("crash_convert_partition_4") ||
         ERROR_INJECT_ERROR("fail_extract_partition_4") ||
         alter_close_table(lpt) ||
@@ -7601,9 +7606,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT_ERROR("fail_convert_partition_3") ||
         mysql_change_partitions(lpt) ||
         ERROR_INJECT_CRASH("crash_convert_partition_4") ||
-        ERROR_INJECT_ERROR("fail_convert_partition_5") ||
+        ERROR_INJECT_ERROR("fail_convert_partition_4") ||
         alter_close_table(lpt) ||
-        write_log_convert_out_partition(lpt) ||
+        write_log_convert_partition(lpt) ||
         ERROR_INJECT_CRASH("crash_convert_partition_5") ||
         ERROR_INJECT_ERROR("fail_convert_partition_5") ||
         alter_partition_convert_in(lpt) ||
