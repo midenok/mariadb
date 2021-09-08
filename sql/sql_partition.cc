@@ -7215,14 +7215,9 @@ bool log_partition_alter_to_ddl_log(ALTER_PARTITION_PARAM_TYPE *lpt)
 
 extern bool alter_partition_convert_in(ALTER_PARTITION_PARAM_TYPE *lpt);
 
-
 /**
-  Check that definition of a table specified in the clause FROM of
-  the statement ALTER TABLE <tablename> ADD PARTITION ... FROM <from_table>
-  fit with definition of a partition being added and every row stored in
-  the table <from_table> conform with partition's expression. On return from
-  the function an actual name of a file corresponding to the partition
-  is stored in the buffer  part_file_name_buf.
+  Check that definition of source table fits definition of partition being
+  added and every row stored in the table conforms partition's expression.
 
   @param lpt  Structure containing parameters required for checking
   @param[in,out] part_file_name_buf  Buffer for storing a partition name
@@ -7233,8 +7228,12 @@ extern bool alter_partition_convert_in(ALTER_PARTITION_PARAM_TYPE *lpt);
   @return false on success, true on error
 */
 
-static bool check_table_data_fit_new_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
+static bool check_table_data(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
+  /*
+     TODO: if destination is partitioned by range(X) and source is indexed by X
+     then just get min(X) and max(X) from index.
+  */
   THD *thd= lpt->thd;
   TABLE *table_to= lpt->table_list->table;
   TABLE *table_from= lpt->table_list->next_local->table;
@@ -7251,10 +7250,7 @@ static bool check_table_data_fit_new_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
 
   uint32 new_part_id;
   partition_element *part_elem;
-  // FIXME: really?
-  const char* partition_name=
-    thd->lex->part_info->curr_part_elem->partition_name;
-
+  const char* partition_name= thd->lex->part_info->curr_part_elem->partition_name;
   part_elem= table_to->part_info->get_part_elem(partition_name,
                                                 nullptr, 0, &new_part_id);
   if (unlikely(!part_elem))
@@ -7287,7 +7283,7 @@ static bool check_table_data_fit_new_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
           true on error (tables metadata are different)
 */
 
-static bool compare_tables_metadata(ALTER_PARTITION_PARAM_TYPE *lpt)
+static bool compare_metadata(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
   TABLE *part_table= lpt->table_list->table;
   TABLE *table= lpt->table_list->next_local->table;
@@ -7339,30 +7335,6 @@ static bool compare_tables_metadata(ALTER_PARTITION_PARAM_TYPE *lpt)
             "CHARACTER SET");
     return true;
   }
-
-  return false;
-}
-
-
-/**
-  Check that partition metadata is compatible with table definition and
-  partition type supported for moving table to partition.
-
-  @param lpt  Structure containing parameters required for handling of
-              the statement ALTER TABLE
-
-  @return false on success, true on failure
-*/
-
-static bool check_structures(ALTER_PARTITION_PARAM_TYPE *lpt)
-{
-  DBUG_ASSERT((lpt->alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN));
-
-  if (compare_tables_metadata(lpt))
-    return true;
-
-  if (check_table_data_fit_new_partition(lpt))
-    return true;
 
   return false;
 }
@@ -7657,18 +7629,18 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   {
     TABLE *table_from= table_list->next_local->table;
 
+    if (wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
+        wait_while_table_is_used(thd, table_from, HA_EXTRA_PREPARE_FOR_RENAME) ||
+        compare_metadata(lpt) ||
+        check_table_data(lpt))
+      goto err;
+
     if (write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT_CRASH("crash_add_partition_from_1") ||
         ERROR_INJECT_ERROR("fail_add_partition_from_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
         ERROR_INJECT_CRASH("crash_add_partition_from_2") ||
         ERROR_INJECT_ERROR("fail_add_partition_from_2") ||
-        wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
-        wait_while_table_is_used(thd, table_from,
-                                 HA_EXTRA_PREPARE_FOR_RENAME) ||
-
-        ERROR_INJECT_CRASH("crash_add_partition_from_3") ||
-        ERROR_INJECT_ERROR("fail_add_partition_from_3") ||
         write_log_add_change_partition(lpt) ||
         ERROR_INJECT_CRASH("crash_add_partition_from_4") ||
         ERROR_INJECT_ERROR("fail_add_partition_from_4") ||
@@ -7678,7 +7650,6 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         alter_close_table(lpt) ||
         ERROR_INJECT_CRASH("crash_add_partition_from_6") ||
         ERROR_INJECT_ERROR("fail_add_partition_from_6") ||
-        check_structures(lpt) ||
         alter_partition_convert_in(lpt) ||
         ERROR_INJECT_CRASH("crash_add_partition_from_7") ||
         ERROR_INJECT_ERROR("fail_add_partition_from_7") ||
