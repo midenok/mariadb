@@ -194,10 +194,10 @@ static bool check_exchange_partition(TABLE *table, TABLE *part_table)
   @param part_table Partitioned table.
   @param part_elem  Partition element to use for partition specific compare.
 */
-static bool compare_table_with_partition(THD *thd, TABLE *table,
-                                         TABLE *part_table,
-                                         partition_element *part_elem,
-                                         uint part_id)
+bool compare_table_with_partition(THD *thd, TABLE *table,
+                                  TABLE *part_table,
+                                  partition_element *part_elem,
+                                  uint part_id)
 {
   HA_CREATE_INFO table_create_info, part_create_info;
   Alter_info part_alter_info;
@@ -294,7 +294,7 @@ static bool compare_table_with_partition(THD *thd, TABLE *table,
     The workaround is to use REORGANIZE PARTITION to rewrite
     the frm file and then use EXCHANGE PARTITION when they are the same.
   */
-  if (compare_partition_options(&table_create_info, part_elem))
+  if (part_elem && compare_partition_options(&table_create_info, part_elem))
     DBUG_RETURN(TRUE);
 
   DBUG_RETURN(FALSE);

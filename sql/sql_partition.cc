@@ -7273,74 +7273,6 @@ static bool check_table_data(ALTER_PARTITION_PARAM_TYPE *lpt)
 
 
 /**
-  Check whether metadata of a partitioned table and a being moved to partition
-  are equal
-
-  @para[in, out] lpt  Struct containing parameters required for handling of
-                    the statement ALTER TABLE
-
-  @return false on ok (tables metadata are equal),
-          true on error (tables metadata are different)
-*/
-
-static bool compare_metadata(ALTER_PARTITION_PARAM_TYPE *lpt)
-{
-  TABLE *part_table= lpt->table_list->table;
-  TABLE *table= lpt->table_list->next_local->table;
-  bool metadata_equal;
-  HA_CREATE_INFO *part_create_info= lpt->create_info;
-
-  handlerton *db_type= part_create_info->db_type;
-  part_create_info->db_type= part_table->part_info->default_engine_type;
-
-  if (mysql_compare_tables(table, lpt->alter_info, part_create_info,
-                          &metadata_equal))
-
-  {
-    part_create_info->db_type= db_type;
-    my_error(ER_TABLES_DIFFERENT_METADATA, MYF(0));
-    return true;
-  }
-
-  part_create_info->db_type= db_type;
-
-  DEBUG_SYNC(lpt->thd, "swap_partition_after_compare_tables");
-  if (!metadata_equal)
-  {
-    my_error(ER_TABLES_DIFFERENT_METADATA, MYF(0));
-    return true;
-  }
-  DBUG_ASSERT(table->s->db_create_options ==
-              part_table->s->db_create_options);
-  DBUG_ASSERT(table->s->db_options_in_use ==
-              part_table->s->db_options_in_use);
-
-  if (table->s->avg_row_length != part_create_info->avg_row_length)
-  {
-    my_error(ER_PARTITION_EXCHANGE_DIFFERENT_OPTION, MYF(0),
-            "AVG_ROW_LENGTH");
-    return true;
-  }
-
-  if (table->s->db_create_options != part_create_info->table_options)
-  {
-    my_error(ER_PARTITION_EXCHANGE_DIFFERENT_OPTION, MYF(0),
-            "TABLE OPTION");
-    return true;
-  }
-
-  if (table->s->table_charset != part_table->s->table_charset)
-  {
-    my_error(ER_PARTITION_EXCHANGE_DIFFERENT_OPTION, MYF(0),
-            "CHARACTER SET");
-    return true;
-  }
-
-  return false;
-}
-
-
-/**
   Actually perform the change requested by ALTER TABLE of partitions
   previously prepared.
 
@@ -7631,7 +7563,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
 
     if (wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
         wait_while_table_is_used(thd, table_from, HA_EXTRA_PREPARE_FOR_RENAME) ||
-        compare_metadata(lpt) ||
+        compare_table_with_partition(thd, table_from, table, NULL, 0) ||
         check_table_data(lpt))
       goto err;
 
