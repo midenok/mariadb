@@ -991,22 +991,6 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd)
 }
 
 
-// FIXME: replace with ddl_log_complete()
-static void finalize_ddl_log_entry(DDL_LOG_MEMORY_ENTRY *log_entry,
-                                   DDL_LOG_MEMORY_ENTRY **exec_log_entry)
-{
-  (void) ddl_log_execute_entry(current_thd, log_entry->entry_pos);
-  mysql_mutex_lock(&LOCK_gdl);
-  /* mark the execute log entry done */
-  (void) ddl_log_disable_execute_entry(exec_log_entry);
-  /* release the execute log entry */
-  ddl_log_release_memory_entry(*exec_log_entry);
-  /* release the action log entry */
-  ddl_log_release_memory_entry(log_entry);
-  mysql_mutex_unlock(&LOCK_gdl);
-}
-
-
 /**
   Move a table specified by the clause FROM <table_name> of the statement
   ALTER TABLE ... ADD PARTITION ... FROM <table_name> to the new partition.
@@ -1024,10 +1008,6 @@ bool alter_partition_convert_in(ALTER_PARTITION_PARAM_TYPE *lpt)
   THD *thd= lpt->thd;
   const char *path= lpt->table_list->table->s->path.str;
   TABLE_LIST *table_from= lpt->table_list->next_local;
-  LEX_CSTRING &path_from= table_from->table->s->path;
-  char frm_from[FN_REFLEN + 1];
-  memcpy(frm_from, LEX_STRING_WITH_LEN(path_from));
-  strmov(frm_from + path_from.length, reg_ext);
 
   const char *partition_name=
     thd->lex->part_info->curr_part_elem->partition_name;
@@ -1045,87 +1025,12 @@ bool alter_partition_convert_in(ALTER_PARTITION_PARAM_TYPE *lpt)
                        table_from->table_name.str,
                        "", 0);
 
-  handler *file_ptr=
-      get_new_handler(nullptr, thd->mem_root,
-                      table_from->table->file->ht);
+  handler *file_ptr= get_new_handler(nullptr, thd->mem_root,
+                                     table_from->table->file->ht);
   if (unlikely(!file_ptr))
     return true;
 
-  /*
-    Install the guard object to delete a pointer to the class handler on return
-    from this function.
-  */
   std::unique_ptr<handler> file(file_ptr);
-
-  DDL_LOG_ENTRY move_entry;
-  DDL_LOG_MEMORY_ENTRY *log_entry= nullptr;
-  DDL_LOG_MEMORY_ENTRY *exec_log_entry= nullptr;
-
-  bzero(&move_entry, sizeof(move_entry));
-  move_entry.action_type=  DDL_LOG_RENAME_ACTION;
-  lex_string_set(&move_entry.name, part_file_name);
-  lex_string_set(&move_entry.from_name, from_file_name);
-  lex_string_set(&move_entry.handler_name,
-                 ha_resolve_storage_engine_name(
-                   table_from->table->file->ht));
-  move_entry.phase= EXCH_PHASE_NAME_TO_TEMP;
-
-  mysql_mutex_lock(&LOCK_gdl);
-
-  /*
-    Install the guard object to release LOCK_gdl on any return from the current
-    function that could be happened before this lock explicitly released
-  */
-  auto lock_gdl_unlocker = make_scope_exit(
-    []() {
-      mysql_mutex_unlock(&LOCK_gdl);
-    }
-  );
-
-  if (unlikely(ddl_log_write_entry(&move_entry, &log_entry)))
-  {
-    my_error(ER_DDL_LOG_ERROR, MYF(0));
-    return true;
-  }
-
-  if (unlikely(ddl_log_write_execute_entry(log_entry->entry_pos,
-                                           &exec_log_entry)))
-  {
-    my_error(ER_DDL_LOG_ERROR, MYF(0));
-    ddl_log_release_memory_entry(log_entry);
-    return true;
-  }
-
-  mysql_mutex_unlock(&LOCK_gdl);
-  /*
-    Since the global mutex LOCK_gd has just been release, turn off
-    its guard object to avoid double releasing of the lock.
-  */
-  lock_gdl_unlocker.release();
-
-  /*
-    Install the guard object to finalize ddl log entry on return from
-    the current function
-  */
-  auto ddl_lock_finalizer = make_scope_exit(
-    [log_entry, &exec_log_entry]()
-    {
-      finalize_ddl_log_entry(log_entry, &exec_log_entry);
-    }
-  );
-
-  if (unlikely(file->delete_table(part_file_name)))
-  {
-    my_error(ER_ERROR_ON_RENAME, MYF(0), from_file_name,
-             part_file_name, my_errno);
-    return true;
-  }
-
-  if (unlikely(ddl_log_increment_phase(log_entry->entry_pos)))
-  {
-    my_error(ER_DDL_LOG_ERROR, MYF(0));
-    return true;
-  }
 
   close_all_tables_for_name(thd, table_from->table->s,
                             HA_EXTRA_PREPARE_FOR_RENAME, nullptr);
@@ -1134,18 +1039,6 @@ bool alter_partition_convert_in(ALTER_PARTITION_PARAM_TYPE *lpt)
   {
     my_error(ER_ERROR_ON_RENAME, MYF(0), from_file_name,
              part_file_name, my_errno);
-    return true;
-  }
-
-  if (unlikely(ddl_log_increment_phase(log_entry->entry_pos)))
-  {
-    my_error(ER_DDL_LOG_ERROR, MYF(0));
-    return true;
-  }
-
-  if (mysql_file_delete(key_file_frm, frm_from,
-                        MYF(MY_WME | MY_IGNORE_ENOENT)))
-  {
     return true;
   }
 
