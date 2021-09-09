@@ -788,7 +788,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     }
   }
 #ifdef WITH_PARTITION_STORAGE_ENGINE
-  if (flags & WFRM_WRITE_CONVERTED_OUT)
+  if (flags & WFRM_WRITE_CONVERTED_TO)
   {
     THD *thd= lpt->thd;
     Alter_table_ctx *alter_ctx= lpt->alter_ctx;
@@ -877,24 +877,9 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
                                                           CHF_RENAME_FLAG))
       DBUG_RETURN(TRUE);
   }
-  else if (flags & WFRM_DROP_BACKUP)
-  {
-    build_table_filename(path, sizeof(path) - 1, lpt->db.str,
-                         lpt->table_name.str, "", 0);
-    strxnmov(frm_name, sizeof(frm_name), path, reg_ext, NullS);
-
-    build_table_shadow_filename(bak_path, sizeof(bak_path) - 1, lpt, true);
-    strxmov(bak_frm_name, bak_path, reg_ext, NullS);
-
-    (void) mysql_file_delete(key_file_frm, bak_frm_name, MYF(MY_WME));
-    (void) lpt->table->file->ha_create_partitioning_metadata(
-      bak_path, NULL, CHF_DELETE_FLAG);
-    DBUG_RETURN(false);
-  }
 #else /* !WITH_PARTITION_STORAGE_ENGINE */
   DBUG_ASSERT(!(flags & WFRM_WRITE_EXTRACTED));
   DBUG_ASSERT(!(flags & WFRM_BACKUP_ORIGINAL));
-  DBUG_ASSERT(!(flags & WFRM_DROP_BACKUP));
 #endif /* !WITH_PARTITION_STORAGE_ENGINE */
   if (flags & WFRM_INSTALL_SHADOW)
   {

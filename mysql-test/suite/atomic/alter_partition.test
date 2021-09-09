@@ -40,7 +40,7 @@ if ($MTR_COMBINATION_MIX)
 
 let $MYSQLD_DATADIR= `SELECT @@datadir`;
 
-let $crash_count= 11;
+let $crash_count= 12;
 let $crash_points='ddl_log_create_before_create_frm',
                   'ddl_log_alter_partition_after_create_frm',
                   'ddl_log_alter_partition_after_write_frm',
@@ -54,25 +54,29 @@ let $crash_points='ddl_log_create_before_create_frm',
                   'crash_convert_partition_8',
                   'crash_convert_partition_9';
 
-#let $crash_count= 1;
-#let $crash_points= 'crash_convert_partition_8';
+let $crash_count= 1;
+let $crash_points= 'crash_convert_partition_8';
+
+let $statement_count= 2;
+let $statements= 'ALTER TABLE t1 CONVERT PARTITION p1 TO TABLE tp1',
+                 'ALTER TABLE t1 CONVERT TABLE tp2 TO PARTITION p2 values less than (40)';
 
 let $statement_count= 1;
-let $statements= 'ALTER TABLE t1 CONVERT PARTITION p1 TO TABLE tp1';
-
-#let $statement_count=1;
-#let $statements='CREATE OR REPLACE TABLE t1 SELECT * from const_table';
+let $statements= 'ALTER TABLE t1 CONVERT TABLE tp2 TO PARTITION p2 values less than (40)';
 
 --delimiter $
 create or replace procedure prepare_table()
 begin
   create or replace table t1 (x int)
-  with system versioning
   partition by range(x) (
     partition p0 values less than (10),
     partition p1 values less than (20),
-    partition pn values less than maxvalue);
+    partition pn values less than (30));
   insert into t1 values (2), (12), (22);
+
+  create or replace table tp2 (x int);
+  insert into tp2 values (32), (39);
+
   flush tables;
 end $
 --delimiter ;
@@ -106,7 +110,6 @@ while ($r < $statement_count)
     --source $binlog_format
 
     RESET MASTER;
-    --echo # CRASH POINT: $crash
     --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
     --disable_reconnect
     --eval set @@debug_dbug="+d,$crash",@debug_crash_counter=1
@@ -121,7 +124,11 @@ while ($r < $statement_count)
 
     if ($error == 0)
     {
-      --echo # No crash!
+      --echo # NO CRASH: $crash
+    }
+    if ($error)
+    {
+      --echo # CRASH: $crash
     }
     # Check which tables still exists
     --replace_result MAI MYI MAD MYD
@@ -146,6 +153,11 @@ while ($r < $statement_count)
     show create table tp1;
     --error 0, ER_NO_SUCH_TABLE
     select * from tp1;
+    --replace_result $default_engine DEFAULT_ENGINE ' PAGE_CHECKSUM=1' ''
+    --error 0, ER_NO_SUCH_TABLE
+    show create table tp2;
+    --error 0, ER_NO_SUCH_TABLE
+    select * from tp2;
     # Drop the tables. The warnings will show what was dropped
     --disable_warnings
     drop table t1;

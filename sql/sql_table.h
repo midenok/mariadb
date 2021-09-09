@@ -64,9 +64,10 @@ enum enum_explain_filename_mode
 #define WFRM_WRITE_SHADOW 1
 #define WFRM_INSTALL_SHADOW 2
 #define WFRM_KEEP_SHARE 4
-#define WFRM_WRITE_CONVERTED_OUT 8
+#define WFRM_WRITE_CONVERTED_TO 8
 #define WFRM_BACKUP_ORIGINAL 16
 #define WFRM_DROP_BACKUP 32
+#define WFRM_DROP_CONVERTED_FROM 64
 
 /* Flags for conversion functions. */
 static const uint FN_FROM_IS_TMP=  1 << 0;
