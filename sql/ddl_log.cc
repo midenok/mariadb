@@ -407,6 +407,19 @@ static bool update_unique_id(uint entry_pos, ulonglong id)
 }
 
 
+static bool update_tmp_name(uint entry_pos, LEX_CSTRING *tmp_name)
+{
+  DBUG_ENTER("update_tmp_name");
+
+  DBUG_RETURN(mysql_file_pwrite(global_ddl_log.file_id, (uchar *) tmp_name->str,
+                                tmp_name->length,
+                                global_ddl_log.io_size * entry_pos +
+                                DDL_LOG_TMP_NAME_POS,
+                                MYF(MY_WME | MY_NABP)) ||
+              ddl_log_sync_file());
+}
+
+
 /*
   Disable an execute entry
 
@@ -2283,6 +2296,19 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     recovery_state.query.qs_append(&ddl_log_entry->extra_name);
     break;
   }
+  case DDL_LOG_CLOSE_IF_ACTIVE_ACTION:
+  {
+    const uint master_chain_pos= (uint) ddl_log_entry->unique_id;
+    DBUG_ASSERT(master_chain_pos);
+    /* This action does not make sense without succeeding actions. */
+    DBUG_ASSERT(ddl_log_entry->next_entry);
+    if (is_execute_entry_active(master_chain_pos))
+    {
+      error= disable_execute_entry(ddl_log_entry->next_entry);
+        break;
+    }
+    break;
+  }
   default:
     DBUG_ASSERT(0);
     break;
@@ -2973,6 +2999,16 @@ bool ddl_log_update_unique_id(DDL_LOG_STATE *state, ulonglong id)
   /* The following may not be true in case of temporary tables */
   if (likely(state->list))
     DBUG_RETURN(update_unique_id(state->main_entry->entry_pos, id));
+  DBUG_RETURN(0);
+}
+
+
+bool ddl_log_update_tmp_name(DDL_LOG_STATE *state, LEX_CSTRING tmp_name)
+{
+  DBUG_ENTER("ddl_log_update_tmp_name");
+  /* The following may not be true in case of temporary tables */
+  if (likely(state->list))
+    DBUG_RETURN(update_tmp_name(state->execute_entry->entry_pos, &tmp_name));
   DBUG_RETURN(0);
 }
 

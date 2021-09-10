@@ -352,5 +352,6 @@ bool ddl_log_store_query(THD *thd, DDL_LOG_STATE *ddl_log_state,
                          const char *query, size_t length);
 bool ddl_log_close_if_active(DDL_LOG_STATE *ddl_state,
                              DDL_LOG_STATE *master_state);
+bool ddl_log_update_tmp_name(DDL_LOG_STATE *state, LEX_CSTRING tmp_name);
 extern mysql_mutex_t LOCK_gdl;
 #endif /* DDL_LOG_INCLUDED */

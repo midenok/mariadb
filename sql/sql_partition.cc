@@ -6580,30 +6580,31 @@ static bool write_log_drop_shadow_frm(ALTER_PARTITION_PARAM_TYPE *lpt,
                                       DDL_LOG_STATE *state= NULL,
                                       uint flags= 0)
 {
-  partition_info *part_info= lpt->part_info;
+  if (!state)
+    state= lpt->part_info;
   DDL_LOG_MEMORY_ENTRY *log_entry;
   char path[FN_REFLEN + 1];
   DBUG_ENTER("write_log_drop_shadow_frm");
   const bool drop_backup= (flags & WFRM_DROP_BACKUP);
 
-  DBUG_ASSERT(!drop_backup || !part_info->is_active());
+  DBUG_ASSERT(!drop_backup || !state->is_active());
 
   build_table_shadow_filename(path, sizeof(path) - 1, lpt, drop_backup);
   mysql_mutex_lock(&LOCK_gdl);
   if (write_log_delete_frm(lpt, (const char*)path))
     goto error;
 
-  log_entry= part_info->list;
+  log_entry= state->list;
   if (ddl_log_write_execute_entry(log_entry->entry_pos,
-                                  &part_info->execute_entry))
+                                  &state->execute_entry))
     goto error;
   mysql_mutex_unlock(&LOCK_gdl);
   DBUG_RETURN(FALSE);
 
 error:
-  release_part_info_log_entries(part_info->list);
+  release_part_info_log_entries(state->list);
   mysql_mutex_unlock(&LOCK_gdl);
-  part_info->list= NULL;
+  state->list= NULL;
   my_error(ER_DDL_LOG_ERROR, MYF(0));
   DBUG_RETURN(TRUE);
 }
@@ -7390,7 +7391,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       We insert Error injections at all places where it could be interesting
       to test if recovery is properly done.
     */
-    if (write_log_drop_shadow_frm(lpt, lpt->part_info) ||
+    if (write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT_CRASH("crash_drop_partition_1") ||
         ERROR_INJECT_ERROR("fail_drop_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
@@ -7435,7 +7436,10 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     DDL_LOG_STATE cleanup_chain;
     bzero(&cleanup_chain, sizeof(cleanup_chain));
 
+    LEX_CSTRING x= {"a", 1};
+
     if (mysql_write_frm(lpt, WFRM_WRITE_CONVERTED_TO) ||
+        ddl_log_update_tmp_name(lpt->part_info, x) ||
         write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT_CRASH("crash_convert_partition_1") ||
         ERROR_INJECT_ERROR("fail_convert_partition_1") ||
@@ -7454,7 +7458,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         alter_partition_convert_out(lpt) ||
         ERROR_INJECT_CRASH("crash_convert_partition_6") ||
         ERROR_INJECT_ERROR("fail_convert_partition_6") ||
-//         ddl_log_close_if_active(&cleanup_chain, part_info) ||
+        ddl_log_close_if_active(&cleanup_chain, part_info) ||
+        write_log_drop_shadow_frm(lpt, &cleanup_chain, WFRM_DROP_BACKUP) ||
         (frm_install= true, false) ||
         mysql_write_frm(lpt, WFRM_INSTALL_SHADOW|WFRM_BACKUP_ORIGINAL) ||
         log_partition_alter_to_ddl_log(lpt) ||
@@ -7470,16 +7475,16 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT_CRASH("crash_convert_partition_8") ||
         ERROR_INJECT_ERROR("fail_convert_partition_8") ||
         (ddl_log_complete(lpt->part_info), false) ||
-        write_log_drop_shadow_frm(lpt, lpt->part_info, WFRM_DROP_BACKUP) ||
         ERROR_INJECT_CRASH("crash_convert_partition_9") ||
         ERROR_INJECT_ERROR("fail_convert_partition_9"))
     {
+      ddl_log_complete(&cleanup_chain);
       (void) ddl_log_revert(thd, lpt->part_info);
       handle_alter_part_error(lpt, true, true, frm_install);
       goto err;
     }
     /* Drop backup frm */
-    (void) ddl_log_revert(thd, lpt->part_info);
+    (void) ddl_log_revert(thd, &cleanup_chain);
     if (alter_partition_lock_handling(lpt))
       goto err;
   }
