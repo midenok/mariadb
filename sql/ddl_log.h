@@ -88,6 +88,7 @@ enum ddl_log_action_code
   DDL_LOG_CREATE_TRIGGER_ACTION=15,
   DDL_LOG_ALTER_TABLE_ACTION=16,
   DDL_LOG_STORE_QUERY_ACTION=17,
+  DDL_LOG_CLOSE_IF_ACTIVE_ACTION=18,
   DDL_LOG_LAST_ACTION                          /* End marker */
 };
 
@@ -349,5 +350,7 @@ bool ddl_log_alter_table(THD *thd, DDL_LOG_STATE *ddl_state,
                          bool is_renamed);
 bool ddl_log_store_query(THD *thd, DDL_LOG_STATE *ddl_log_state,
                          const char *query, size_t length);
+bool ddl_log_close_if_active(DDL_LOG_STATE *ddl_state,
+                             DDL_LOG_STATE *master_state);
 extern mysql_mutex_t LOCK_gdl;
 #endif /* DDL_LOG_INCLUDED */

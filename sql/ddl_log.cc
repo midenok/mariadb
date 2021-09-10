@@ -3528,3 +3528,22 @@ err:
   mysql_mutex_unlock(&LOCK_gdl);
   DBUG_RETURN(1);
 }
+
+
+/*
+  Close this chain if master_state chain is not closed.
+*/
+
+bool ddl_log_close_if_active(DDL_LOG_STATE *ddl_state,
+                             DDL_LOG_STATE *master_state)
+{
+  DBUG_ASSERT(master_state->execute_entry);
+
+  DDL_LOG_ENTRY ddl_log_entry;
+  DBUG_ENTER("ddl_log_close_if_active");
+
+  bzero(&ddl_log_entry, sizeof(ddl_log_entry));
+  ddl_log_entry.action_type= DDL_LOG_CLOSE_IF_ACTIVE_ACTION;
+  ddl_log_entry.unique_id= master_state->execute_entry->entry_pos;
+  DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
+}

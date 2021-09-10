@@ -6577,6 +6577,7 @@ static bool write_log_convert_out_partition(ALTER_PARTITION_PARAM_TYPE *lpt,
 */
 
 static bool write_log_drop_shadow_frm(ALTER_PARTITION_PARAM_TYPE *lpt,
+                                      DDL_LOG_STATE *state= NULL,
                                       uint flags= 0)
 {
   partition_info *part_info= lpt->part_info;
@@ -7389,7 +7390,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       We insert Error injections at all places where it could be interesting
       to test if recovery is properly done.
     */
-    if (write_log_drop_shadow_frm(lpt) ||
+    if (write_log_drop_shadow_frm(lpt, lpt->part_info) ||
         ERROR_INJECT_CRASH("crash_drop_partition_1") ||
         ERROR_INJECT_ERROR("fail_drop_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
@@ -7431,6 +7432,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   }
   else if (alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT)
   {
+    DDL_LOG_STATE cleanup_chain;
+    bzero(&cleanup_chain, sizeof(cleanup_chain));
+
     if (mysql_write_frm(lpt, WFRM_WRITE_CONVERTED_TO) ||
         write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT_CRASH("crash_convert_partition_1") ||
@@ -7450,6 +7454,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         alter_partition_convert_out(lpt) ||
         ERROR_INJECT_CRASH("crash_convert_partition_6") ||
         ERROR_INJECT_ERROR("fail_convert_partition_6") ||
+//         ddl_log_close_if_active(&cleanup_chain, part_info) ||
         (frm_install= true, false) ||
         mysql_write_frm(lpt, WFRM_INSTALL_SHADOW|WFRM_BACKUP_ORIGINAL) ||
         log_partition_alter_to_ddl_log(lpt) ||
@@ -7465,7 +7470,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT_CRASH("crash_convert_partition_8") ||
         ERROR_INJECT_ERROR("fail_convert_partition_8") ||
         (ddl_log_complete(lpt->part_info), false) ||
-        write_log_drop_shadow_frm(lpt, WFRM_DROP_BACKUP) ||
+        write_log_drop_shadow_frm(lpt, lpt->part_info, WFRM_DROP_BACKUP) ||
         ERROR_INJECT_CRASH("crash_convert_partition_9") ||
         ERROR_INJECT_ERROR("fail_convert_partition_9"))
     {
