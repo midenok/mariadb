@@ -57,7 +57,7 @@ let $crash_points='ddl_log_create_before_create_frm',
 #let $crash_count= 1;
 #let $crash_points= 'crash_convert_partition_8';
 
-let $statement_count= 1;
+let $statement_count= 2;
 let $statements= 'ALTER TABLE t1 CONVERT PARTITION p1 TO TABLE tp1',
                  'ALTER TABLE t1 CONVERT TABLE tp2 TO PARTITION p2 values less than (40)';
 
