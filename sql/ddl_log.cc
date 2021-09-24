@@ -90,7 +90,8 @@ const char *ddl_log_action_name[DDL_LOG_LAST_ACTION]=
   "rename table", "rename view",
   "initialize drop table", "drop table",
   "drop view", "drop trigger", "drop db", "create table", "create view",
-  "delete tmp file", "create trigger", "alter table", "store query"
+  "delete tmp file", "create trigger", "alter table", "store query",
+  "link chains"
 };
 
 /* Number of phases per entry */
@@ -101,7 +102,7 @@ const uchar ddl_log_entry_phases[DDL_LOG_LAST_ACTION]=
   (uchar) DDL_DROP_PHASE_END, 1, 1,
   (uchar) DDL_DROP_DB_PHASE_END, (uchar) DDL_CREATE_TABLE_PHASE_END,
   (uchar) DDL_CREATE_VIEW_PHASE_END, 0, (uchar) DDL_CREATE_TRIGGER_PHASE_END,
-  DDL_ALTER_TABLE_PHASE_END, 1
+  DDL_ALTER_TABLE_PHASE_END, 1, 0
 };
 
 
@@ -2283,6 +2284,16 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     recovery_state.query.qs_append(&ddl_log_entry->extra_name);
     break;
   }
+  case DDL_LOG_LINK_CHAINS_ACTION:
+  {
+    const uint master_chain_pos= (uint) ddl_log_entry->unique_id;
+    if (master_chain_pos && is_execute_entry_active(master_chain_pos))
+    {
+      DBUG_ASSERT(ddl_log_entry->next_entry);
+      error= disable_execute_entry(ddl_log_entry->next_entry);
+    }
+    break;
+  }
   default:
     DBUG_ASSERT(0);
     break;
@@ -3527,4 +3538,70 @@ err:
   */
   mysql_mutex_unlock(&LOCK_gdl);
   DBUG_RETURN(1);
+}
+
+
+/*
+  Log an delete frm file
+*/
+
+/*
+  TODO: Partitioning atomic DDL refactoring: this should be replaced with
+        ddl_log_create_table().
+*/
+bool ddl_log_delete_frm(DDL_LOG_STATE *ddl_state, uint flags, const char *to_path)
+{
+  DDL_LOG_ENTRY ddl_log_entry;
+  DDL_LOG_MEMORY_ENTRY *log_entry;
+  DBUG_ENTER("ddl_log_delete_frm");
+  bzero(&ddl_log_entry, sizeof(ddl_log_entry));
+  const bool drop_backup= (flags & WFRM_BACKUP_ORIGINAL);
+  ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
+  // FIXME: replace drop_backup by checking DDL_LOG_LINK_CHAINS_ACTION
+  ddl_log_entry.next_entry= (!drop_backup && ddl_state->list) ? ddl_state->list->entry_pos : 0;
+
+  lex_string_set(&ddl_log_entry.handler_name, reg_ext);
+  lex_string_set(&ddl_log_entry.name, to_path);
+
+  mysql_mutex_assert_owner(&LOCK_gdl);
+  if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
+    DBUG_RETURN(1);
+
+  if (drop_backup)
+  {
+    (void) ddl_log_sync_no_lock();
+    if (update_next_entry_pos(ddl_state->list->entry_pos,
+                              log_entry->entry_pos))
+    {
+      ddl_log_release_memory_entry(log_entry);
+      DBUG_RETURN(1);
+    }
+
+    log_entry->next_active_log_entry= ddl_state->list->next_active_log_entry;
+    ddl_state->list->next_active_log_entry= log_entry;
+  }
+  else
+    ddl_log_add_entry(ddl_state, log_entry);
+  DBUG_RETURN(0);
+}
+
+
+
+/*
+   Link the ddl_log_state to another (master) chain. If the master
+   chain is active during DDL recovery this chain is not executed.
+*/
+bool ddl_log_link_chains(DDL_LOG_STATE *state, DDL_LOG_STATE *master_chain)
+{
+  DBUG_ASSERT(master_chain->execute_entry);
+  DDL_LOG_ENTRY ddl_log_entry;
+  DBUG_ENTER("ddl_log_link_chains");
+
+  bzero(&ddl_log_entry, sizeof(ddl_log_entry));
+
+  ddl_log_entry.action_type=  DDL_LOG_LINK_CHAINS_ACTION;
+  ddl_log_entry.next_entry=   state->list ? state->list->entry_pos : 0;
+  ddl_log_entry.unique_id=    master_chain->execute_entry->entry_pos;
+
+  DBUG_RETURN(ddl_log_write(state, &ddl_log_entry));
 }
