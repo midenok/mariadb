@@ -1,8 +1,8 @@
 --source include/have_partition.inc
 --source include/have_debug.inc
 --source include/have_sequence.inc
---source include/have_innodb.inc
 --source include/binlog_combinations.inc
+--source include/have_binlog_format_row_or_statement.inc
 --source include/not_valgrind.inc
 
 let $default_engine=InnoDB;
@@ -26,10 +26,6 @@ if ($MTR_COMBINATION_STMT)
 if ($MTR_COMBINATION_ROW)
 {
   let $binlog_format=include/set_binlog_format_row.sql;
-}
-if ($MTR_COMBINATION_MIX)
-{
-  --skip same as stmt
 }
 
 --disable_query_log

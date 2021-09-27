@@ -7614,16 +7614,8 @@ alter_commands:
           TO_SYM TABLE_SYM table_ident have_partitioning
           {
             LEX *lex= Lex;
-            lex->first_select_lex()->db= $6->db;
-            if (lex->first_select_lex()->db.str == NULL &&
-                lex->copy_db_to(&lex->first_select_lex()->db))
+            if (Lex->stmt_alter_table($6))
               MYSQL_YYABORT;
-            if (unlikely(check_table_name($6->table.str,$6->table.length,
-                                          FALSE)) ||
-                ($6->db.str && unlikely(check_db_name((LEX_STRING*) &$6->db))))
-              my_yyabort_error((ER_WRONG_TABLE_NAME, MYF(0), $6->table.str));
-            lex->name= $6->table;
-
             lex->m_sql_cmd= new (thd->mem_root) Sql_cmd_alter_table();
             if (unlikely(lex->m_sql_cmd == NULL))
               MYSQL_YYABORT;

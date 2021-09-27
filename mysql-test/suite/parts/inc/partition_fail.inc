@@ -5,10 +5,7 @@
 --let $dbug_flag= `select @@session.debug_dbug`
 --echo # $dbug_flag: State before failure
 --replace_result #p# #P# #sp# #SP#
-if (!$DATADIR)
-{
-  --let $DATADIR= `SELECT @@datadir;`
-}
+--let $DATADIR= `select @@datadir`
 --list_files $DATADIR/test
 SHOW CREATE TABLE t1;
 --sorted_result

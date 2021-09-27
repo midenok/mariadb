@@ -5458,6 +5458,7 @@ that are reorganised.
       if ((alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT) &&
           tab_part_info->is_sub_partitioned())
       {
+        // TODO technically this can be converted to a *partitioned* table
         my_error(ER_PARTITION_CONVERT_SUBPARTITIONED, MYF(0));
         goto err;
       }
@@ -5804,7 +5805,7 @@ the generated partition syntax in a correct manner.
         goto err;
       }
     }
-  } // ADD, DROP, COALESCE, REORGANIZE, TABLE_REORG, REBUILD
+  } // ADD, DROP, COALESCE, REORGANIZE, TABLE_REORG, REBUILD, CONVERT
   else
   {
     /*
@@ -6434,10 +6435,8 @@ static bool write_log_changed_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
 */
 
 static bool log_drop_or_convert_action(ALTER_PARTITION_PARAM_TYPE *lpt,
-                                           uint *next_entry,
-                                           const char *path,
-                                           const char *from_name,
-                                           bool temp_list)
+                                       uint *next_entry, const char *path,
+                                       const char *from_name, bool temp_list)
 {
   DDL_LOG_ENTRY ddl_log_entry;
   const bool convert_action= (from_name != NULL);
@@ -6531,8 +6530,7 @@ static bool log_drop_or_convert_action(ALTER_PARTITION_PARAM_TYPE *lpt,
 
 inline
 static bool write_log_dropped_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
-                                         uint *next_entry,
-                                         const char *path,
+                                         uint *next_entry, const char *path,
                                          bool temp_list)
 {
   return log_drop_or_convert_action(lpt, next_entry, path, NULL, temp_list);
@@ -6540,8 +6538,7 @@ static bool write_log_dropped_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
 
 inline
 static bool write_log_convert_out_partition(ALTER_PARTITION_PARAM_TYPE *lpt,
-                                           uint *next_entry,
-                                           const char *path)
+                                           uint *next_entry, const char *path)
 {
   char from_name[FN_REFLEN + 1];
   build_table_filename(from_name, sizeof(from_name) - 1, lpt->alter_ctx->new_db.str,
@@ -7459,11 +7456,10 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT_CRASH("crash_convert_partition_8") ||
         ERROR_INJECT_ERROR("fail_convert_partition_8") ||
         ((!thd->lex->no_write_to_binlog) &&
-          (thd->binlog_xid= thd->query_id,
-          ddl_log_update_xid(lpt->part_info, thd->binlog_xid),
-          write_bin_log(thd, false,
-                        thd->query(), thd->query_length()),
-          thd->binlog_xid= 0)) ||
+          ((thd->binlog_xid= thd->query_id),
+           ddl_log_update_xid(lpt->part_info, thd->binlog_xid),
+           write_bin_log(thd, false, thd->query(), thd->query_length()),
+           (thd->binlog_xid= 0))) ||
         (ddl_log_complete(lpt->part_info), false) ||
         /*
           TODO:
@@ -7473,8 +7469,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
              This requires ddl log file extension or store entry_pos into some
              string field of execute entry: name, tmp_name, etc. These are
              not used now for execute entry.
-          2. Log WFRM_DROP_BACKUP into separate "cleanup" chain and execute it only
-             if the main chain is closed. That must be logged before
+          2. Log WFRM_DROP_BACKUP into separate "cleanup" chain and execute it
+             only if the main chain is closed. That must be logged before
              WFRM_BACKUP_ORIGINAL is done.
 
         */
