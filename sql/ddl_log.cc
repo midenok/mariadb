@@ -77,6 +77,8 @@
 #define DDL_LOG_MAGIC_LENGTH 4
 /* How many times to try to execute a ddl log entry that causes crashes */
 #define DDL_LOG_MAX_RETRY 3
+#define DDL_LOG_RETRY_MASK 0xFF
+#define DDL_LOG_RETRY_BITS 8
 
 uchar ddl_log_file_magic[]=
 { (uchar) 254, (uchar) 254, (uchar) 11, (uchar) 2 };
@@ -155,7 +157,7 @@ mysql_mutex_t LOCK_gdl;
 #define DDL_LOG_XID_POS 10
 /* Used to store unique uuid from the .frm file */
 #define DDL_LOG_UUID_POS 18
-/* ID_POS can be used to store something unique, like file size (4 bytes) */
+/* ID_POS can be used to store something unique, like file size (8 bytes) */
 #define DDL_LOG_ID_POS DDL_LOG_UUID_POS + MY_UUID_SIZE
 #define DDL_LOG_END_POS DDL_LOG_ID_POS + 8
 
@@ -2509,6 +2511,7 @@ bool ddl_log_write_entry(DDL_LOG_ENTRY *ddl_log_entry,
 
   @param first_entry               First entry in linked list of entries
                                    to execute.
+  @param cond_entry                Check and don't execute if cond_entry is active
   @param[in,out] active_entry      Entry to execute, 0 = NULL if the entry
                                    is written first time and needs to be
                                    returned. In this case the entry written
@@ -2519,6 +2522,7 @@ bool ddl_log_write_entry(DDL_LOG_ENTRY *ddl_log_entry,
 */
 
 bool ddl_log_write_execute_entry(uint first_entry,
+                                 uint cond_entry,
                                  DDL_LOG_MEMORY_ENTRY **active_entry)
 {
   uchar *file_entry_buf= global_ddl_log.file_entry_buf;
@@ -2535,6 +2539,7 @@ bool ddl_log_write_execute_entry(uint first_entry,
 
   file_entry_buf[DDL_LOG_ENTRY_TYPE_POS]= (uchar)DDL_LOG_EXECUTE_CODE;
   int4store(file_entry_buf + DDL_LOG_NEXT_ENTRY_POS, first_entry);
+  int8store(file_entry_buf + DDL_LOG_ID_POS, (cond_entry << DDL_LOG_RETRY_BITS));
 
   if (!(*active_entry))
   {
@@ -2757,13 +2762,13 @@ int ddl_log_execute_recovery()
       recovery_state.xid= ddl_log_entry.xid;
 
       /* purecov: begin tested */
-      if (ddl_log_entry.unique_id > DDL_LOG_MAX_RETRY)
+      if ((ddl_log_entry.unique_id & DDL_LOG_RETRY_MASK) > DDL_LOG_MAX_RETRY)
       {
         error= -1;
         continue;
       }
       update_unique_id(i, ++ddl_log_entry.unique_id);
-      if (ddl_log_entry.unique_id > DDL_LOG_MAX_RETRY)
+      if ((ddl_log_entry.unique_id & DDL_LOG_RETRY_MASK) > DDL_LOG_MAX_RETRY)
       {
         sql_print_error("DDL_LOG: Aborting executing entry %u after %llu "
                         "retries", i, ddl_log_entry.unique_id);
@@ -2771,6 +2776,15 @@ int ddl_log_execute_recovery()
         continue;
       }
       /* purecov: end tested */
+
+      uint cond_entry= (uint)(ddl_log_entry.unique_id >> DDL_LOG_RETRY_BITS);
+
+      if (cond_entry && is_execute_entry_active(cond_entry))
+      {
+        if (disable_execute_entry(i))
+          error= -1;
+        continue;
+      }
 
       if (ddl_log_execute_entry_no_lock(thd, ddl_log_entry.next_entry))
       {
