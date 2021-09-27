@@ -6534,15 +6534,14 @@ static bool write_log_drop_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
   char path[FN_REFLEN + 1];
   DBUG_ENTER("write_log_drop_frm");
   DDL_LOG_STATE *drop_chain= lpt->part_info;
-  const bool drop_backup= (flags & WFRM_BACKUP_ORIGINAL);
 
-  build_table_shadow_filename(path, sizeof(path) - 1, lpt, drop_backup);
+  build_table_shadow_filename(path, sizeof(path) - 1, lpt,
+                              (flags & WFRM_BACKUP_ORIGINAL));
   mysql_mutex_lock(&LOCK_gdl);
-  if (ddl_log_delete_frm(drop_chain, flags, (const char*)path))
+  if (ddl_log_delete_frm(drop_chain, (const char*)path))
     goto error;
 
-  if (!drop_backup &&
-      ddl_log_write_execute_entry(drop_chain->list->entry_pos,
+  if (ddl_log_write_execute_entry(drop_chain->list->entry_pos,
                                   &drop_chain->execute_entry))
     goto error;
   mysql_mutex_unlock(&LOCK_gdl);
