@@ -844,14 +844,16 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 
     DBUG_RETURN(false);
   }
+  if (flags & (WFRM_BACKUP_ORIGINAL | WFRM_DROP_BACKUP))
+  {
+    build_table_shadow_filename(bak_path, sizeof(bak_path) - 1, lpt, true);
+    strxmov(bak_frm_name, bak_path, reg_ext, NullS);
+  }
   if (flags & WFRM_BACKUP_ORIGINAL)
   {
     build_table_filename(path, sizeof(path) - 1, lpt->db.str,
                          lpt->table_name.str, "", 0);
     strxnmov(frm_name, sizeof(frm_name), path, reg_ext, NullS);
-
-    build_table_shadow_filename(bak_path, sizeof(bak_path) - 1, lpt, true);
-    strxmov(bak_frm_name, bak_path, reg_ext, NullS);
 
     DDL_LOG_MEMORY_ENTRY *main_entry= part_info->main_entry;
     mysql_mutex_lock(&LOCK_gdl);
@@ -871,6 +873,10 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     if (lpt->table->file->ha_create_partitioning_metadata(bak_path, path,
                                                           CHF_RENAME_FLAG))
       DBUG_RETURN(TRUE);
+  }
+  if (flags & WFRM_DROP_BACKUP)
+  {
+    error= mysql_file_delete(key_file_frm, bak_path, MYF(MY_WME));
   }
 #else /* !WITH_PARTITION_STORAGE_ENGINE */
   DBUG_ASSERT(!(flags & WFRM_WRITE_EXTRACTED));

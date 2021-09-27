@@ -3528,3 +3528,48 @@ err:
   mysql_mutex_unlock(&LOCK_gdl);
   DBUG_RETURN(1);
 }
+
+
+/*
+  Log an delete frm file
+*/
+
+/*
+  TODO: Partitioning atomic DDL refactoring: this should be replaced with
+        ddl_log_create_table().
+*/
+bool ddl_log_delete_frm(DDL_LOG_STATE *ddl_state, uint flags, const char *to_path)
+{
+  DDL_LOG_ENTRY ddl_log_entry;
+  DDL_LOG_MEMORY_ENTRY *log_entry;
+  DBUG_ENTER("ddl_log_delete_frm");
+  bzero(&ddl_log_entry, sizeof(ddl_log_entry));
+  const bool drop_backup= (flags & WFRM_BACKUP_ORIGINAL);
+  ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
+  // FIXME: replace drop_backup by checking DDL_LOG_LINK_CHAINS_ACTION
+  ddl_log_entry.next_entry= (!drop_backup && ddl_state->list) ? ddl_state->list->entry_pos : 0;
+
+  lex_string_set(&ddl_log_entry.handler_name, reg_ext);
+  lex_string_set(&ddl_log_entry.name, to_path);
+
+  mysql_mutex_assert_owner(&LOCK_gdl);
+  if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
+    DBUG_RETURN(1);
+
+  if (drop_backup)
+  {
+    (void) ddl_log_sync_no_lock();
+    if (update_next_entry_pos(ddl_state->list->entry_pos,
+                              log_entry->entry_pos))
+    {
+      ddl_log_release_memory_entry(log_entry);
+      DBUG_RETURN(1);
+    }
+
+    log_entry->next_active_log_entry= ddl_state->list->next_active_log_entry;
+    ddl_state->list->next_active_log_entry= log_entry;
+  }
+  else
+    ddl_log_add_entry(ddl_state, log_entry);
+  DBUG_RETURN(0);
+}

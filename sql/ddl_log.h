@@ -349,5 +349,6 @@ bool ddl_log_alter_table(THD *thd, DDL_LOG_STATE *ddl_state,
                          bool is_renamed);
 bool ddl_log_store_query(THD *thd, DDL_LOG_STATE *ddl_log_state,
                          const char *query, size_t length);
+bool ddl_log_delete_frm(DDL_LOG_STATE *ddl_state, uint flags, const char *to_path);
 extern mysql_mutex_t LOCK_gdl;
 #endif /* DDL_LOG_INCLUDED */
