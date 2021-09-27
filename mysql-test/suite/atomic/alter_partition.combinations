@@ -1,3 +1,6 @@
-[ib]
+[innodb]
+innodb
+
 [myisam]
+
 [aria]

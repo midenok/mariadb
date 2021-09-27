@@ -799,7 +799,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     handlerton *db_type= create_info->db_type;
     DBUG_ASSERT(lpt->table->part_info);
     DBUG_ASSERT(lpt->table->part_info == part_info);
-    handler *file=  ((ha_partition *) (lpt->table->file))->get_child_handlers()[0];
+    handler *file= ((ha_partition *)(lpt->table->file))->get_child_handlers()[0];
     DBUG_ASSERT(file);
     new_path.length= strlen(new_path.str);
     strxnmov(frm_name, sizeof(frm_name) - 1, new_path.str, reg_ext, NullS);
@@ -808,9 +808,8 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     create_info->db_type= work_part_info->default_engine_type;
     /* NOTE: partitioned temporary tables are not supported. */
     DBUG_ASSERT(!create_info->tmp_table());
-    if (ddl_log_create_table(thd, part_info, create_info->db_type,
-                             &new_path, &alter_ctx->new_db, &alter_ctx->new_name,
-                             true) ||
+    if (ddl_log_create_table(thd, part_info, create_info->db_type, &new_path,
+                             &alter_ctx->new_db, &alter_ctx->new_name, true) ||
         ERROR_INJECT_ERROR("fail_create_before_create_frm"))
       DBUG_RETURN(TRUE);
 
@@ -823,8 +822,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
       DBUG_RETURN(TRUE);
 
     lpt->create_info->table_options= lpt->db_options;
-    LEX_CUSTRING frm= build_frm_image(thd, alter_ctx->new_name,
-                                      create_info,
+    LEX_CUSTRING frm= build_frm_image(thd, alter_ctx->new_name, create_info,
                                       lpt->alter_info->create_list,
                                       lpt->key_count, lpt->key_info_buffer,
                                       file);
@@ -839,8 +837,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     error= writefile(frm_name, alter_ctx->new_db.str, alter_ctx->new_name.str,
                      create_info->tmp_table(), frm.str, frm.length);
     my_free((void *) frm.str);
-    if (unlikely(error) ||
-        ERROR_INJECT_ERROR("fail_alter_partition_after_write_frm"))
+    if (unlikely(error) || ERROR_INJECT_ERROR("fail_alter_partition_after_write_frm"))
     {
       mysql_file_delete(key_file_frm, frm_name, MYF(0));
       DBUG_RETURN(TRUE);
