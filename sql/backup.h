@@ -44,4 +44,5 @@ bool backup_reset_alter_copy_lock(THD *thd);
 bool backup_lock(THD *thd, TABLE_LIST *table);
 void backup_unlock(THD *thd);
 void backup_log_ddl(const backup_log_info *info);
+bool backup_log_started();
 #endif /* BACKUP_INCLUDED */

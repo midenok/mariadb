@@ -75,15 +75,15 @@ let $crash_points='ddl_log_replace_after_rename_table',
                   'ddl_log_replace_before_remove_backup',
                   'ddl_log_replace_after_remove_backup';
 
-#let $crash_count=2;
-#let $crash_points='ddl_log_create_after_prepare_eof', 'ddl_log_create_after_binlog';
+let $crash_count=1;
+let $crash_points='ddl_log_replace_after_rename_table';
 
 let $statement_count=3;
 let $statements='CREATE OR REPLACE TABLE t1 (new int)',
                 'CREATE OR REPLACE TABLE t1 LIKE const_table',
                 'CREATE OR REPLACE TABLE t1 SELECT * from const_table';
 
-#let $statement_count=1;
+let $statement_count=1;
 #let $statements='CREATE OR REPLACE TABLE t1 SELECT * from const_table';
 
 create table const_table (new int, b int) engine=myisam;
@@ -120,6 +120,10 @@ while ($r < $statement_count)
 
     --source $binlog_format
 
+    --connect con1,localhost,root
+    BACKUP STAGE START;
+    --connection default
+
     RESET MASTER;
     --echo # CRASH POINT: $crash
     --exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
@@ -134,10 +138,14 @@ while ($r < $statement_count)
     --disable_query_log
     --eval set @@debug_dbug="$old_debug"
 
+    --source include/print_ddl_log.inc
+    --disconnect con1
+
     if ($error == 0)
     {
       --echo # No crash!
     }
+
     # Check which tables still exists
     --list_files $MYSQLD_DATADIR/test t*
     --list_files $MYSQLD_DATADIR/test *sql*

@@ -488,6 +488,13 @@ static bool start_ddl_logging()
   DBUG_RETURN(backup_log < 0);
 }
 
+
+bool backup_log_started()
+{
+  return backup_log >= 0;
+}
+
+
 static void stop_ddl_logging()
 {
   mysql_mutex_lock(&LOCK_backup_log);

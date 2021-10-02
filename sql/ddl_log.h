@@ -174,6 +174,7 @@ enum enum_ddl_log_alter_table_phase {
 #define DDL_LOG_FLAG_ALTER_PARTITION      (1 << 4)
 #define DDL_LOG_FLAG_DROP_SKIP_BINLOG     (1 << 5)
 #define DDL_LOG_FLAG_TMP_TABLE            (1 << 6)
+#define DDL_LOG_FLAG_LOG_CREATE           (1 << 7)
 
 /*
   Setting ddl_log_entry.phase to this has the same effect as setting

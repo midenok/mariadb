@@ -1478,6 +1478,23 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       else
       {
         param.rename_flags= FN_TO_IS_TMP;
+
+        if (backup_log_started())
+        {
+          backup_log_info ddl_log;
+          bzero(&ddl_log, sizeof(ddl_log));
+          ddl_log.query= { C_STRING_WITH_LEN("DROP") };
+          if ((ddl_log.org_partitioned= (partition_engine_name.str != 0)))
+            ddl_log.org_storage_engine_name= partition_engine_name;
+          else
+            lex_string_set(&ddl_log.org_storage_engine_name,
+                          ha_resolve_storage_engine_name(hton));
+          ddl_log.org_database=     table->db;
+          ddl_log.org_table=        table->table_name;
+          ddl_log.org_table_id=     version;
+          backup_log_ddl(&ddl_log);
+        }
+
         if (close_or_remove_table(thd, table) ||
             rename_do(thd, &param, ddl_log_state_create, table,
                       &table->db, false, &force_if_exists))
@@ -1485,6 +1502,9 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
           error= 1;
           goto err;
         }
+
+        if (backup_log_started())
+          ddl_log_add_flag(ddl_log_state_create, DDL_LOG_FLAG_LOG_CREATE);
         debug_crash_here("ddl_log_replace_after_rename_table");
         table_name= t.table_name;
         /* alias holds original table name, table_name holds lowercase name */

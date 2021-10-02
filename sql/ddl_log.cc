@@ -1467,6 +1467,39 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         rename_in_stat_tables(thd, ddl_log_entry, 0);
       }
 
+      if (ddl_log_entry->flags & DDL_LOG_FLAG_LOG_CREATE)
+      {
+        LEX_CUSTRING version;
+        LEX_CSTRING partition_engine_name= {NULL, 0};
+        char engine_buf[NAME_CHAR_LEN + 1];
+        LEX_CSTRING engine= { engine_buf, 0 };
+
+        (void) build_table_filename(to_path, sizeof(to_path) - 1,
+                                    ddl_log_entry->db.str, ddl_log_entry->name.str,
+                                    reg_ext, 0);
+        Table_type type= dd_frm_type(thd, to_path, &engine, &partition_engine_name,
+                                     &version);
+        if (type != TABLE_TYPE_NORMAL)
+        {
+          DBUG_ASSERT(type != TABLE_TYPE_NORMAL);
+        }
+        else
+        {
+          backup_log_info ddl_log;
+          bzero(&ddl_log, sizeof(ddl_log));
+          ddl_log.query= { C_STRING_WITH_LEN("CREATE") };
+          ddl_log.org_partitioned= (partition_engine_name.length > 0);
+          if (ddl_log.org_partitioned)
+            ddl_log.org_storage_engine_name= partition_engine_name;
+          else
+            ddl_log.org_storage_engine_name= ddl_log_entry->handler_name;
+          ddl_log.org_database=     ddl_log_entry->db;
+          ddl_log.org_table=        ddl_log_entry->name;
+          ddl_log.org_table_id=     version;
+          backup_log_ddl(&ddl_log);
+        }
+      }
+
       /* disable the entry and sync */
       (void) update_phase(entry_pos, DDL_LOG_FINAL_PHASE);
       break;
