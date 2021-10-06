@@ -1442,23 +1442,23 @@ EXPLAIN SELECT MIN(d) FROM t1 where b=2 and c=3  group by a	{
                   "considered_access_paths": [
                     {
                       "access_type": "index_merge",
-                      "resulting_rows": 8,
-                      "cost": 2.2,
+                      "resulting_rows": 7,
+                      "cost": 2.4,
                       "chosen": true,
                       "use_tmp_table": true
                     }
                   ],
                   "chosen_access_method": {
                     "type": "index_merge",
-                    "records": 8,
-                    "cost": 2.2,
+                    "records": 7,
+                    "cost": 2.4,
                     "uses_join_buffering": false
                   }
                 },
-                "rows_for_plan": 8,
+                "rows_for_plan": 7,
                 "cost_for_plan": 3.8,
-                "cost_for_sorting": 8,
-                "estimated_join_cardinality": 8
+                "cost_for_sorting": 7,
+                "estimated_join_cardinality": 7
               }
             ]
           },

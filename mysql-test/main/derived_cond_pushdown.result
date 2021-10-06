@@ -17243,7 +17243,7 @@ EXPLAIN
             "key_length": "5",
             "used_key_parts": ["a"],
             "rows": 8,
-            "filtered": 100,
+            "filtered": 87.5,
             "using_index_for_group_by": true
           }
         }

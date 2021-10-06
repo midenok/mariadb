@@ -1333,6 +1333,7 @@ public:
       index only access for it is stored in index_only_costs[i]
     */
     double      index_only_cost;
+    bool        first_key_part_has_only_one_value;
   } *opt_range;
   /* 
      Bitmaps of key parts that =const for the duration of join execution. If
@@ -1719,6 +1720,19 @@ public:
   {
     DBUG_ASSERT(s && s->versioned);
     return field[s->vers.end_fieldno];
+  }
+
+  void set_cond_selectivity(double selectivity)
+  {
+    DBUG_ASSERT(selectivity >= 0.0 && selectivity <= 1.0);
+    cond_selectivity= selectivity;
+    DBUG_PRINT("info", ("cond_selectivity: %g", cond_selectivity));
+  }
+  void multiply_cond_selectivity(double selectivity)
+  {
+    DBUG_ASSERT(selectivity >= 0.0 && selectivity <= 1.0);
+    cond_selectivity*= selectivity;
+    DBUG_PRINT("info", ("cond_selectivity: %g", cond_selectivity));
   }
 
   ulonglong vers_start_id() const;
