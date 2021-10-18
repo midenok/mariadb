@@ -2579,12 +2579,6 @@ row_upd_sec_step(
 	if (node->state == UPD_NODE_UPDATE_ALL_SEC
 	    || row_upd_changes_ord_field_binary(node->index, node->update,
 						thr, node->row, node->ext)) {
-
-		if (node->index->vers_fulltext()
-		    && node->row->fields[node->table->vers_end]
-			.vers_history_row()) {
-			return DB_SUCCESS;
-		}
 		return(row_upd_sec_index_entry(node, thr));
 	}
 

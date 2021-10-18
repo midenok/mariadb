@@ -1187,10 +1187,6 @@ struct dict_index_t{
 	bool
 	vers_history_row(const rec_t* rec, bool &history_row);
 
-  /** @return true if table is system versioned and the index is
-  FTS_DOC_ID_INDEX */
-  bool vers_fulltext() const;
-
   /** Assign the number of new column to be added as a part
   of the index
   @param        n_vcol  number of virtual columns to be added */
@@ -2155,25 +2151,6 @@ inline bool dict_index_t::is_corrupted() const
 			     || (type & DICT_CORRUPT)
 			     || (table && table->corrupted));
 }
-
-/** @return true if table is system versioned and the index is
-FTS_DOC_ID_INDEX */
-inline bool dict_index_t::vers_fulltext() const
-{
-  /*
-      Unique indexes with system versioning must contain the row_end column.
-      The only exception is a hidden FTS_DOC_ID_INDEX that InnoDB may create
-      on a hidden or user-created FTS_DOC_ID column.
-  */
-  if ((type & DICT_UNIQUE) && n_uniq == 1 && table->versioned())
-  {
-    ut_ad(!strcmp(name, FTS_DOC_ID_INDEX_NAME));
-    ut_ad(!strcmp(fields[0].name, FTS_DOC_ID_COL_NAME));
-    return true;
-  }
-  return false;
-};
-
 
 /*******************************************************************//**
 Initialise the table lock list. */

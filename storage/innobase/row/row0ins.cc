@@ -3587,7 +3587,8 @@ row_ins_get_row_from_select(
 inline
 bool ins_node_t::vers_history_row() const
 {
-	ut_ad(table->versioned());
+	if (!table->versioned())
+		return false;
 	dfield_t* row_end = dtuple_get_nth_field(row, table->vers_end);
 	return row_end->vers_history_row();
 }
@@ -3639,15 +3640,23 @@ row_ins(
 		   FTS_DOC_ID is created on every fulltext UPDATE, so holding only
 		   FTS_DOC_ID for history is enough.
 		*/
+		const unsigned type = index->type;
 		if (index->type & DICT_FTS) {
-		} else if (!(index->vers_fulltext()
-			     && node->vers_history_row())) {
+		} else if (!(type & DICT_UNIQUE) || index->n_uniq > 1
+			   || !node->vers_history_row()) {
 
 			dberr_t err = row_ins_index_entry_step(node, thr);
 
 			if (err != DB_SUCCESS) {
 				DBUG_RETURN(err);
 			}
+		} else {
+			/* Unique indexes with system versioning must contain
+			the version end column. The only exception is a hidden
+			FTS_DOC_ID_INDEX that InnoDB may create on a hidden or
+			user-created FTS_DOC_ID column. */
+			ut_ad(!strcmp(index->name, FTS_DOC_ID_INDEX_NAME));
+			ut_ad(!strcmp(index->fields[0].name, FTS_DOC_ID_COL_NAME));
 		}
 
 		node->index = dict_table_get_next_index(node->index);
