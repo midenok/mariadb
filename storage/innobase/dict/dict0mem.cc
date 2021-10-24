@@ -1561,3 +1561,49 @@ dict_index_t::vers_history_row(
 	}
 	return(error);
 }
+
+/* @return TRX_ID for inserted secondary index row */
+trx_id_t dict_index_t::sec_rec_get_trx_id(const rec_t *rec)
+{
+  dict_index_t *clust_index= dict_table_get_first_index(table);
+  ut_ad(this != clust_index);
+
+  mtr_t mtr;
+  mtr.start();
+
+  rec_t *clust_rec=
+      row_get_clust_rec(BTR_SEARCH_LEAF, rec, this, &clust_index, &mtr);
+  rec_offs offsets_[REC_OFFS_NORMAL_SIZE];
+  rec_offs *clust_offs= offsets_;
+  rec_offs_init(offsets_);
+  mem_heap_t *heap= NULL;
+
+  if (clust_rec)
+  {
+    clust_offs=
+        rec_get_offsets(clust_rec, clust_index, clust_offs,
+                        clust_index->n_core_fields, ULINT_UNDEFINED, &heap);
+  }
+  else
+  {
+    ib::error() << "foreign constraints: secondary index is out of "
+                   "sync";
+    ut_ad(!"secondary index is out of sync");
+    return TRX_ID_MAX;
+  }
+
+  ulint trx_id_len;
+  const byte *trx_id= rec_get_nth_field(clust_rec, clust_offs,
+                                        clust_index->n_uniq, &trx_id_len);
+  ut_ad(trx_id_len == DATA_TRX_ID_LEN);
+
+  trx_id_t res= trx_read_trx_id(trx_id);
+
+  mtr.commit();
+  if (heap)
+  {
+    mem_heap_free(heap);
+  }
+
+  return res;
+}

@@ -10025,7 +10025,7 @@ innobase_fts_create_doc_id_key(
 	doc_id_t	temp_doc_id;
 	dfield_t*	dfield = dtuple_get_nth_field(tuple, 0);
 
-	ut_a(dict_index_get_n_unique(index) == 1);
+	ut_a(dict_index_get_n_unique(index) == index->fts_n_uniq());
 
 	dtuple_set_n_fields(tuple, index->n_fields);
 	dict_index_copy_types(tuple, index, index->n_fields);

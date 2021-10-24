@@ -1926,9 +1926,19 @@ fts_create_common_tables(
 		goto func_exit;
 	}
 
-	index = dict_mem_index_create(table, FTS_DOC_ID_INDEX_NAME,
-				      DICT_UNIQUE, 1);
-	dict_mem_index_add_field(index, FTS_DOC_ID_COL_NAME, 0);
+	if (table->versioned())
+	{
+		index = dict_mem_index_create(table, FTS_DOC_ID_INDEX_NAME,
+					      DICT_UNIQUE, 2);
+		dict_mem_index_add_field(index, FTS_DOC_ID_COL_NAME, 0);
+		dict_mem_index_add_field(index, table->cols[table->vers_end].name(*table), 0);
+	}
+	else
+	{
+		index = dict_mem_index_create(table, FTS_DOC_ID_INDEX_NAME,
+					      DICT_UNIQUE, 1);
+		dict_mem_index_add_field(index, FTS_DOC_ID_COL_NAME, 0);
+	}
 
 	op = trx_get_dict_operation(trx);
 

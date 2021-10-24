@@ -1211,6 +1211,12 @@ struct dict_index_t{
     return 0;
   }
 
+  /* @return TRX_ID for inserted secondary index row */
+  trx_id_t sec_rec_get_trx_id(const rec_t *rec);
+
+  /* @return number of unique columns for FTS_DOC_ID index */
+  ulint fts_n_uniq() const;
+
 #ifdef BTR_CUR_HASH_ADAPT
   /** @return a clone of this */
   dict_index_t* clone() const;
@@ -2222,6 +2228,13 @@ inline void dict_stats_empty_defrag_stats(dict_index_t* index)
 	index->stat_defrag_modified_counter = 0;
 	index->stat_defrag_n_page_split = 0;
 }
+
+/* @return number of unique columns for FTS_DOC_ID index */
+inline ulint dict_index_t::fts_n_uniq() const
+{
+  return table->versioned() ? 2 : 1;
+}
+
 
 #include "dict0mem.ic"
 

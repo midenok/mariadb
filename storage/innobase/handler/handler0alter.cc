@@ -2795,7 +2795,7 @@ innobase_fts_check_doc_id_index(
 		}
 
 		if (!dict_index_is_unique(index)
-		    || dict_index_get_n_unique(index) > 1
+		    || dict_index_get_n_unique(index) != index->fts_n_uniq()
 		    || strcmp(index->name, FTS_DOC_ID_INDEX_NAME)) {
 			return(FTS_INCORRECT_DOC_ID_INDEX);
 		}

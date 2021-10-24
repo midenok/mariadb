@@ -2180,9 +2180,21 @@ row_ins_scan_sec_index_for_duplicate(
 		if (cmp == 0) {
 			if (row_ins_dupl_error_with_rec(rec, entry,
 							index, offsets)) {
-				err = DB_DUPLICATE_KEY;
 
 				thr_get_trx(thr)->error_info = index;
+
+				if (index->table->versioned()
+				    && entry->vers_history_row()) {
+
+					if (thr_get_trx(thr)->id
+					    == index->sec_rec_get_trx_id(rec)) {
+
+						err = DB_FOREIGN_DUPLICATE_KEY;
+						goto end_scan;
+					}
+				}
+
+				err = DB_DUPLICATE_KEY;
 
 				/* If the duplicate is on hidden FTS_DOC_ID,
 				state so in the error log */
