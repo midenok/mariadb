@@ -2168,7 +2168,6 @@ end_of_index:
 			const dfield_t* dfield = dtuple_get_nth_field(
 				row, new_table->vers_end);
 			history_row = dfield->vers_history_row();
-			add_doc_id = false;
 		}
 
 		for (ulint i = 0; i < n_nonnull; i++) {
@@ -2200,7 +2199,7 @@ end_of_index:
 		}
 
 		/* Get the next Doc ID */
-		if (add_doc_id) {
+		if (add_doc_id && !history_row) {
 			doc_id++;
 		} else {
 			doc_id = 0;
