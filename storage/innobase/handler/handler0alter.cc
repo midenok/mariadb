@@ -4116,7 +4116,8 @@ created_clustered:
 		index->fields[0].prefix_len = 0;
 		index->fields[0].is_v_col = false;
 		if (nfields == 2) {
-			index->fields[1].col_no = altered_table->s->row_end_field;
+			index->fields[1].col_no = altered_table->s
+							->vers.end_fieldno;
 			index->fields[1].prefix_len = 0;
 			index->fields[1].is_v_col = false;
 		}
