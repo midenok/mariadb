@@ -492,6 +492,7 @@ row_merge_buf_redundant_convert(
 @param[in,out]	v_heap		heap memory to process data for virtual column
 @param[in,out]	my_table	mysql table object
 @param[in]	trx		transaction object
+@param[in]	history_row	row is historical
 @return number of rows added, 0 if out of space */
 static
 ulint
@@ -508,7 +509,8 @@ row_merge_buf_add(
 	dberr_t*		err,
 	mem_heap_t**		v_heap,
 	TABLE*			my_table,
-	trx_t*			trx)
+	trx_t*			trx,
+	const bool		history_row)
 {
 	ulint			i;
 	const dict_index_t*	index;
@@ -567,6 +569,7 @@ error:
 		/* Process the Doc ID column */
 		if (!v_col && *doc_id
 		    && col->ind == index->table->fts->doc_col) {
+			ut_ad(!history_row);
 			fts_write_doc_id((byte*) &write_doc_id, *doc_id);
 
 			/* Note: field->data now points to a value on the
@@ -617,7 +620,7 @@ error:
 
 
 			/* Tokenize and process data for FTS */
-			if (index->type & DICT_FTS) {
+			if (!history_row && (index->type & DICT_FTS)) {
 				fts_doc_item_t*	doc_item;
 				byte*		value;
 				void*		ptr;
@@ -1722,6 +1725,7 @@ row_merge_read_clustered_index(
 	char			new_sys_trx_end[8];
 	byte			any_autoinc_data[8] = {0};
 	bool			vers_update_trt = false;
+	bool			history_row = false;
 
 	DBUG_ENTER("row_merge_read_clustered_index");
 
@@ -2200,6 +2204,12 @@ end_of_index:
 					   row_heap);
 		ut_ad(row);
 
+		if (new_table->versioned()) {
+			const dfield_t* dfield = dtuple_get_nth_field(
+				row, new_table->vers_end);
+			history_row = dfield->vers_history_row();
+		}
+
 		for (ulint i = 0; i < n_nonnull; i++) {
 			dfield_t*	field	= &row->fields[nonnull[i]];
 
@@ -2229,6 +2239,7 @@ end_of_index:
 
 		/* Get the next Doc ID */
 		if (add_doc_id) {
+			ut_ad(!history_row);
 			doc_id++;
 		} else {
 			doc_id = 0;
@@ -2263,13 +2274,6 @@ end_of_index:
 
 			ut_ad(add_autoinc
 			      < dict_table_get_n_user_cols(new_table));
-
-			bool history_row = false;
-			if (new_table->versioned()) {
-				const dfield_t* dfield = dtuple_get_nth_field(
-				    row, new_table->vers_end);
-				history_row = dfield->vers_history_row();
-			}
 
 			dfield_t* dfield = dtuple_get_nth_field(row,
 								add_autoinc);
@@ -2393,7 +2397,8 @@ write_buffers:
 					buf, fts_index, old_table, new_table,
 					psort_info, row, ext, &doc_id,
 					conv_heap, &err,
-					&v_heap, eval_table, trx)))) {
+					&v_heap, eval_table, trx,
+					history_row)))) {
 
 				/* If we are creating FTS index,
 				a single row can generate more
@@ -2720,7 +2725,8 @@ write_buffers:
 						buf, fts_index, old_table,
 						new_table, psort_info, row, ext,
 						&doc_id, conv_heap,
-						&err, &v_heap, eval_table, trx)))) {
+						&err, &v_heap, eval_table, trx,
+						history_row)))) {
                                         /* An empty buffer should have enough
                                         room for at least one record. */
 					ut_ad(err == DB_COMPUTE_VALUE_FAILED
