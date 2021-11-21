@@ -5098,10 +5098,10 @@ bool select_create::send_eof()
   {
     create_table= orig_table;
     create_info->table= NULL;
+    table->file->ha_reset();
     thd->drop_temporary_table(table, NULL, false);
     table= NULL;
   }
-
 
   /*
     Do an implicit commit at end of statement for non-temporary
@@ -5337,7 +5337,7 @@ void select_create::abort_result_set()
     {
       (void) table->file->ha_external_lock(thd, F_UNLCK);
       (void) mysql_trans_commit_alter_copy_data(thd);
-      (void) thd->drop_temporary_table(table, NULL, false);
+      (void) thd->drop_temporary_table(table, NULL, true);
     }
     else
       drop_open_table(thd, table, &create_table->db, &create_table->table_name);
