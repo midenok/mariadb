@@ -1,0 +1,22 @@
+--source include/have_innodb.inc
+connect (con1,localhost,root,,);
+backup stage start;
+connection default;
+
+create table t2 (new int, b int) engine=aria;
+insert into t2 values (1, 1), (2, 2);
+alter table t2 force, algorithm=copy;
+create table t1 (x int);
+lock tables t1 write, t2 write;
+create or replace table t1 (y int);
+show create table t1;
+set @@default_storage_engine= aria;
+create or replace table t1 like t2;
+show create table t1;
+create or replace table t1 (z int);
+create or replace table t1 select * from t2;
+--source include/print_ddl_log.inc
+show create table t2;
+unlock tables;
+drop tables if exists t1, t2;
+disconnect con1;
