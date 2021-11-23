@@ -135,6 +135,13 @@ public:
   char   current_db[NAME_LEN];
   uint   execute_entry_pos;
   ulonglong xid;
+  void free()
+  {
+    drop_table.free();
+    drop_view.free();
+    query.free();
+    db.free();
+  }
 };
 
 static st_global_ddl_log global_ddl_log;
@@ -455,7 +462,7 @@ bool ddl_log_disable_execute_entry(DDL_LOG_MEMORY_ENTRY **active_entry)
 static bool is_execute_entry_active(uint entry_pos)
 {
   uchar buff[1];
-  DBUG_ENTER("disable_execute_entry");
+  DBUG_ENTER("is_execute_entry_active");
 
   if (mysql_file_pread(global_ddl_log.file_id, buff, sizeof(buff),
                        global_ddl_log.io_size * entry_pos +
@@ -1296,14 +1303,14 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   ddl_log_error_handler no_such_table_handler;
   uint entry_pos= ddl_log_entry->entry_pos;
   int error;
+  uint flags;
   bool frm_action= FALSE;
   DBUG_ENTER("ddl_log_execute_action");
 
   mysql_mutex_assert_owner(&LOCK_gdl);
   DBUG_PRINT("ddl_log",
-             ("pos: %u=>%u->%u  type: %u  action: %u (%s) phase: %u  "
+             ("pos: %u->%u  type: %u  action: %u (%s) phase: %u  "
               "handler: '%s'  name: '%s'  from_name: '%s'  tmp_name: '%s'",
-              recovery_state.execute_entry_pos,
               ddl_log_entry->entry_pos,
               ddl_log_entry->next_entry,
               (uint) ddl_log_entry->entry_type,
@@ -1569,28 +1576,41 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         break;
       /* Fall through */
     case DDL_DROP_PHASE_TRIGGER:
+      /*
+        Note: frm is already deleted and build_table_filename() will not detect
+        FN_IS_TMP flag.
+      */
+      flags= (ddl_log_entry->flags & DDL_LOG_FLAG_TMP_TABLE) ? FN_IS_TMP : 0;
+
       Table_triggers_list::drop_all_triggers(thd, &db, &table,
-                                             MYF(MY_WME | MY_IGNORE_ENOENT));
+                                             MYF(MY_WME | MY_IGNORE_ENOENT),
+                                             flags);
       if (increment_phase(entry_pos))
         break;
       /* Fall through */
     case DDL_DROP_PHASE_BINLOG:
-      if (strcmp(recovery_state.current_db, db.str))
+      // FIXME: is DDL_LOG_FLAG_DROP_SKIP_BINLOG required?
+      if (!(ddl_log_entry->flags & DDL_LOG_FLAG_DROP_SKIP_BINLOG))
       {
-        append_identifier(thd, &recovery_state.drop_table, &db);
-        recovery_state.drop_table.append('.');
-      }
-      append_identifier(thd, &recovery_state.drop_table, &table);
-      recovery_state.drop_table.append(',');
-      /* We don't increment phase as we want to retry this in case of crash */
+        if (strcmp(recovery_state.current_db, db.str))
+        {
+          append_identifier(thd, &recovery_state.drop_table, &db);
+          recovery_state.drop_table.append('.');
+        }
+        append_identifier(thd, &recovery_state.drop_table, &table);
+        recovery_state.drop_table.append(',');
+        /* We don't increment phase as we want to retry this in case of crash */
 
-      if (ddl_log_drop_to_binary_log(thd, ddl_log_entry,
-                                     &recovery_state.drop_table))
-      {
-        if (increment_phase(entry_pos))
-          break;
+        if (ddl_log_drop_to_binary_log(thd, ddl_log_entry,
+                                      &recovery_state.drop_table))
+        {
+          if (increment_phase(entry_pos))
+            break;
+        }
+        break;
       }
-      break;
+      (void) increment_phase(entry_pos);
+      /* Fall through */
     case DDL_DROP_PHASE_RESET:
       /* We have already logged all previous drop's. Clear the query */
       recovery_state.drop_table.length(recovery_state.drop_table_init_length);
@@ -1765,31 +1785,6 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     }
     strxnmov(to_path, sizeof(to_path)-1, path.str, reg_ext, NullS);
     mysql_file_delete(key_file_frm, to_path, MYF(MY_WME|MY_IGNORE_ENOENT));
-    if (ddl_log_entry->phase == DDL_CREATE_TABLE_PHASE_LOG)
-    {
-      /*
-        The server logged CREATE TABLE ... SELECT into binary log
-        before crashing. As the commit failed and we have delete the
-        table above, we have now to log the DROP of the created table.
-      */
-
-      String *query= &recovery_state.drop_table;
-      query->length(0);
-      query->append(STRING_WITH_LEN("DROP TABLE IF EXISTS "));
-      append_identifier(thd, query, &db);
-      query->append('.');
-      append_identifier(thd, query, &table);
-      query->append(&end_comment);
-
-      if (mysql_bin_log.is_open())
-      {
-        mysql_mutex_unlock(&LOCK_gdl);
-        (void) thd->binlog_query(THD::STMT_QUERY_TYPE,
-                                 query->ptr(), query->length(),
-                                 TRUE, FALSE, FALSE, 0);
-        mysql_mutex_lock(&LOCK_gdl);
-      }
-    }
     (void) update_phase(entry_pos, DDL_LOG_FINAL_PHASE);
     error= 0;
     break;
@@ -2431,6 +2426,7 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry)
     read_entry= ddl_log_entry.next_entry;
   } while (read_entry);
 
+  recovery_state.free(); // FIXME: is this correct?
   free_root(&mem_root, MYF(0));
   DBUG_RETURN(FALSE);
 }
@@ -2545,7 +2541,7 @@ bool ddl_log_write_execute_entry(uint first_entry,
 
   file_entry_buf[DDL_LOG_ENTRY_TYPE_POS]= (uchar)DDL_LOG_EXECUTE_CODE;
   int4store(file_entry_buf + DDL_LOG_NEXT_ENTRY_POS, first_entry);
-  int8store(file_entry_buf + DDL_LOG_ID_POS, (cond_entry << DDL_LOG_RETRY_BITS));
+  int8store(file_entry_buf + DDL_LOG_ID_POS, ((ulonglong)cond_entry << DDL_LOG_RETRY_BITS));
 
   if (!(*active_entry))
   {
@@ -2761,7 +2757,7 @@ int ddl_log_execute_recovery()
     if (ddl_log_entry.entry_type == DDL_LOG_EXECUTE_CODE)
     {
       /*
-        Remeber information about executive ddl log entry,
+        Remember information about executive ddl log entry,
         used for binary logging during recovery
       */
       recovery_state.execute_entry_pos= i;
@@ -3042,6 +3038,7 @@ static bool ddl_log_write(DDL_LOG_STATE *ddl_state,
   mysql_mutex_lock(&LOCK_gdl);
   error= ((ddl_log_write_entry(ddl_log_entry, &log_entry)) ||
           ddl_log_write_execute_entry(log_entry->entry_pos,
+                                      ddl_state->master_chain_pos,
                                       &ddl_state->execute_entry));
   mysql_mutex_unlock(&LOCK_gdl);
   if (error)
@@ -3121,16 +3118,16 @@ bool ddl_log_rename_view(THD *thd, DDL_LOG_STATE *ddl_state,
 */
 
 static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
-                              ddl_log_action_code action_code,
                               const LEX_CSTRING *db,
                               const LEX_CSTRING *comment)
 {
   DDL_LOG_ENTRY ddl_log_entry;
-  DBUG_ENTER("ddl_log_drop_file");
+  DBUG_ENTER("ddl_log_drop_init");
 
   bzero(&ddl_log_entry, sizeof(ddl_log_entry));
 
-  ddl_log_entry.action_type=  action_code;
+  ddl_log_entry.action_type=  DDL_LOG_DROP_INIT_ACTION;
+  ddl_log_entry.next_entry=   ddl_state->list ? ddl_state->list->entry_pos : 0;
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(db);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(comment);
 
@@ -3140,17 +3137,17 @@ static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
 
 bool ddl_log_drop_table_init(THD *thd, DDL_LOG_STATE *ddl_state,
                              const LEX_CSTRING *db,
-                             const LEX_CSTRING *comment)
+                             const LEX_CSTRING *comment,
+                             bool skip_binlog)
 {
-  return ddl_log_drop_init(thd, ddl_state, DDL_LOG_DROP_INIT_ACTION,
-                           db, comment);
+  ddl_state->skip_binlog= skip_binlog;
+  return ddl_log_drop_init(thd, ddl_state, db, comment);
 }
 
 bool ddl_log_drop_view_init(THD *thd, DDL_LOG_STATE *ddl_state,
                             const LEX_CSTRING *db)
 {
-  return ddl_log_drop_init(thd, ddl_state, DDL_LOG_DROP_INIT_ACTION,
-                           db, &empty_clex_str);
+  return ddl_log_drop_init(thd, ddl_state, db, &empty_clex_str);
 }
 
 
@@ -3186,6 +3183,15 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.name=         *const_cast<LEX_CSTRING*>(table);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.phase=        (uchar) phase;
+  if (ddl_state->skip_binlog)
+  {
+    ddl_log_entry.flags= DDL_LOG_FLAG_DROP_SKIP_BINLOG;
+    ddl_state->flags|= DDL_LOG_FLAG_DROP_SKIP_BINLOG;
+  }
+  if (ddl_state->list->next_active_log_entry)
+  {
+    ddl_log_entry.next_entry= ddl_state->list->next_active_log_entry->entry_pos;
+  }
 
   mysql_mutex_lock(&LOCK_gdl);
   if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
@@ -3324,6 +3330,7 @@ bool ddl_log_create_table(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.name=         *const_cast<LEX_CSTRING*>(table);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.flags=        only_frm ? DDL_LOG_FLAG_ONLY_FRM : 0;
+  ddl_log_entry.next_entry=   ddl_state->list ? ddl_state->list->entry_pos : 0;
 
   DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
 }
@@ -3576,4 +3583,18 @@ bool ddl_log_delete_frm(DDL_LOG_STATE *ddl_state, const char *to_path)
 
   ddl_log_add_entry(ddl_state, log_entry);
   DBUG_RETURN(0);
+}
+
+
+/*
+   Link the ddl_log_state to another (master) chain. If the master
+   chain is active during DDL recovery, this event will not be executed.
+
+   This is used for DROP TABLE of the original table when
+   CREATE OR REPLACE ... is used.
+*/
+void ddl_log_link_events(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state)
+{
+  DBUG_ASSERT(master_state->execute_entry);
+  state->master_chain_pos= master_state->execute_entry->entry_pos;
 }
