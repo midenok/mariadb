@@ -77,7 +77,7 @@ let $crash_points='ddl_log_replace_after_log_rename',
                   'ddl_log_replace_after_remove_backup';
 
 #let $crash_count=1;
-#let $crash_points='ddl_log_replace_after_remove_backup';
+#let $crash_points='ddl_log_create_after_prepare_eof';
 
 let $statement_count=3;
 let $statements='CREATE OR REPLACE TABLE t1 (new int)',
@@ -87,9 +87,8 @@ let $statements='CREATE OR REPLACE TABLE t1 (new int)',
 #let $statement_count=1;
 #let $statements='CREATE OR REPLACE TABLE t1 SELECT * from const_table';
 
-# FIXME: const_table for several engines?
-create table const_table (new int, b int) engine=myisam;
-insert into const_table values (1,1),(2,2);
+create table const_table (new int, b int);
+insert into const_table values (1, 1), (2, 2);
 flush tables;
 
 let $old_debug=`select @@debug_dbug`;
