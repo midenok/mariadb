@@ -4223,7 +4223,11 @@ bool select_insert::prepare_eof()
       thd->clear_error();
     else
       errcode= query_error_code(thd, killed_status == NOT_KILLED);
-    res= thd->binlog_query(THD::ROW_QUERY_TYPE,
+    /*
+      TODO: that should be always STMT_QUERY_TYPE
+      (see TODO in select_create::prepare::MY_HOOKS::do_postlock() below)
+    */
+    res= thd->binlog_query((atomic_replace ? THD::STMT_QUERY_TYPE : THD::ROW_QUERY_TYPE),
                            thd->query(), thd->query_length(),
                            trans_table, FALSE, FALSE, errcode);
     if (res > 0)
@@ -5069,7 +5073,7 @@ bool select_create::send_eof()
     }
 
     create_info->table= orig_table->table;
-    if (create_table_exists(thd, orig_table->db, orig_table->table_name, *create_info,
+    if (create_table_handle_exists(thd, orig_table->db, orig_table->table_name, *create_info,
                             create_info, result))
     {
       abort_result_set();
@@ -5218,9 +5222,7 @@ bool select_create::send_eof()
     (as the query was logged before commit!)
   */
   debug_crash_here("ddl_log_create_after_binlog");
-  ddl_log_complete(&ddl_log_state_create);
-  debug_crash_here("ddl_log_replace_before_remove_backup");
-  if (ddl_log_revert(thd, &ddl_log_state_rm))
+  if (create_info->finalize_ddl(thd))
   {
     if (atomic_replace)
     {
@@ -5231,8 +5233,6 @@ bool select_create::send_eof()
     abort_result_set();
     DBUG_RETURN(true);
   }
-  debug_crash_here("ddl_log_replace_after_remove_backup");
-  debug_crash_here("ddl_log_create_log_complete");
 
   /*
     exit_done must only be set after last potential call to

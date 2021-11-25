@@ -4,8 +4,9 @@
 --source include/log_bin.inc
 --source include/not_valgrind.inc
 
+--disable_query_log
 let $default_engine=InnoDB;
-let $extra_option=;
+let $EXTRA_OPTION=;
 let $save_debug=`select @@debug_dbug`;
 let $show_error=0;
 let $drop_error=0;
@@ -17,18 +18,22 @@ if ($MTR_COMBINATION_MYISAM)
 if ($MTR_COMBINATION_ARIA)
 {
   let $default_engine=Aria;
-  let $extra_option=transactional=1;
+  let $EXTRA_OPTION=transactional=1;
+  call mtr.add_suppression("Checking table");
+  call mtr.add_suppression("marked as crashed");
 }
 if ($MTR_COMBINATION_ARIA_NOTRANS)
 {
   let $default_engine=Aria;
   # FIXME: extra option not used
-  let $extra_option=transactional=0;
+  let $EXTRA_OPTION=transactional=0;
+  call mtr.add_suppression("Checking table");
+  call mtr.add_suppression("marked as crashed");
 }
 if ($MTR_COMBINATION_EXPENSIVE_RENAME)
 {
   let $default_engine=Aria;
-  let $extra_option=transactional=0;
+  let $EXTRA_OPTION=transactional=0;
   let $show_error=0, ER_NO_SUCH_TABLE;
   let $drop_error=0, ER_BAD_TABLE_ERROR;
   set @@debug_dbug="+d,ddl_log_expensive_rename";
@@ -48,6 +53,7 @@ if ($MTR_COMBINATION_MIX)
 }
 
 --eval set @@default_storage_engine=$default_engine
+--enable_query_log
 
 # Put entry_pos into higher position, so drop chain executes before create chain
 create table t1 (c int);
@@ -62,8 +68,8 @@ drop table t1;
 
 let $MYSQLD_DATADIR= `SELECT @@datadir`;
 
-let $crash_count=12;
-let $crash_points='ddl_log_replace_after_log_rename',
+let $crash_count=11;
+let $crash_points='ddl_log_create_after_log_rename',
                   'ddl_log_create_before_create_frm',
                   'ddl_log_create_before_create_table',
                   'ddl_log_create_after_create_table',
@@ -72,12 +78,11 @@ let $crash_points='ddl_log_replace_after_log_rename',
                   'ddl_log_create_before_binlog',
                   'ddl_log_create_after_prepare_eof',
                   'ddl_log_create_after_binlog',
-                  'ddl_log_create_log_complete',
-                  'ddl_log_replace_before_remove_backup',
-                  'ddl_log_replace_after_remove_backup';
+                  'ddl_log_create_before_remove_backup',
+                  'ddl_log_create_log_complete';
 
 #let $crash_count=1;
-#let $crash_points='ddl_log_create_after_prepare_eof';
+#let $crash_points='ddl_log_create_log_complete';
 
 let $statement_count=3;
 let $statements='CREATE OR REPLACE TABLE t1 (new int)',
@@ -101,8 +106,8 @@ let $r=0;
 while ($r < $statement_count)
 {
   inc $r;
-  let $statement=`select ELT($r, $statements)`;
-  --echo # QUERY: $statement
+  let $STATEMENT=`select ELT($r, $statements)`;
+  --echo # QUERY: $STATEMENT
 
   let $c=0;
   while ($c < $crash_count)
@@ -128,7 +133,7 @@ while ($r < $statement_count)
     --eval set @@debug_dbug="+d,$crash",@debug_crash_counter=1
     let $errno=0;
     --error 0,2013
-    --eval $statement;
+    --eval $STATEMENT $EXTRA_OPTION;
     let $error=$errno;
     --enable_reconnect
     --source include/wait_until_connected_again.inc
@@ -154,7 +159,7 @@ while ($r < $statement_count)
     --replace_result $default_engine DEFAULT_ENGINE ' PAGE_CHECKSUM=1' ''
     --error $show_error
     show create table t1;
-    if (`select locate('SELECT', '$statement')`)
+    if (`select locate('SELECT', '$STATEMENT')`)
     {
       --error $show_error
       select * from t1;

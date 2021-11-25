@@ -55,6 +55,7 @@ while ($e < $engine_count)
 
   if ($engine == "aria")
   {
+    # TODO: unused $extra_option
     let $extra_option=transactional=1;
   }
   if ($engine == "aria_notrans")

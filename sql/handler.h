@@ -2409,6 +2409,8 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
   bool
   handle_atomic_replace(THD *thd, const LEX_CSTRING &db, const LEX_CSTRING &table_name,
                         const DDL_options_st options);
+  bool
+  finalize_ddl(THD *thd);
 };
 
 

@@ -5,6 +5,8 @@
 --source include/have_innodb.inc
 --source include/have_metadata_lock_info.inc
 
+let $MYSQLD_DATADIR= `SELECT @@datadir`;
+
 #
 # Create help table
 #
@@ -598,3 +600,26 @@ create or replace table t1 (old int);
 --error ER_TRG_DOES_NOT_EXIST
 show create trigger a;
 drop table t1;
+--echo # Foreign keys
+--list_files $MYSQLD_DATADIR/test *sql*
+create table t1 (x int primary key, y int) engine innodb;
+create table t2 (x int references t1(x)) engine innodb;
+--error ER_ROW_IS_REFERENCED_2
+create or replace table t1 (x int primary key);
+--list_files $MYSQLD_DATADIR/test *sql*
+--error ER_ROW_IS_REFERENCED_2
+create or replace table t1 (x int primary key);
+create table t3 (x int);
+--error ER_ROW_IS_REFERENCED_2
+create or replace table t1 like t3;
+--list_files $MYSQLD_DATADIR/test *sql*
+--error ER_ROW_IS_REFERENCED_2
+create or replace table t1 like t3;
+--error ER_ROW_IS_REFERENCED_2
+create or replace table t1 select * from t3;
+--error ER_ROW_IS_REFERENCED_2
+create or replace table t1 select * from t3;
+--list_files $MYSQLD_DATADIR/test *sql*
+
+show create table t1;
+drop tables t3, t2, t1;

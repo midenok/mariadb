@@ -220,11 +220,11 @@ bool check_engine(THD *, const char *, const char *, HA_CREATE_INFO *);
 
 bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig, TABLE_LIST *res);
 
-bool create_table_exists(THD *thd,
-                         const LEX_CSTRING &db,
-                         const LEX_CSTRING &table_name,
-                         const DDL_options_st options,
-                         HA_CREATE_INFO *create_info,
-                         int &error);
+bool create_table_handle_exists(THD *thd,
+                                const LEX_CSTRING &db,
+                                const LEX_CSTRING &table_name,
+                                const DDL_options_st options,
+                                HA_CREATE_INFO *create_info,
+                                int &error);
 
 #endif /* SQL_TABLE_INCLUDED */

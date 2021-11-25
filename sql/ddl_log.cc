@@ -107,6 +107,14 @@ const uchar ddl_log_entry_phases[DDL_LOG_LAST_ACTION]=
 };
 
 
+static char recover_query_string[]= "INTERNAL DDL LOG RECOVER IN PROGRESS";
+
+bool ddl_log_recovery(THD *thd)
+{
+  return thd->query() == recover_query_string;
+}
+
+
 struct st_global_ddl_log
 {
   uchar *file_entry_buf;
@@ -1302,7 +1310,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   handlerton *hton= 0;
   ddl_log_error_handler no_such_table_handler;
   uint entry_pos= ddl_log_entry->entry_pos;
-  int error;
+  int error= 0;
   uint flags;
   bool frm_action= FALSE;
   DBUG_ENTER("ddl_log_execute_action");
@@ -2291,11 +2299,16 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   }
 
 end:
-  delete file;
   /* We are only interested in errors that where not ignored */
-  if ((error= (no_such_table_handler.unhandled_errors > 0)))
-    my_errno= no_such_table_handler.first_error;
+  if (ddl_log_recovery(thd))
+  {
+    if ((error= (no_such_table_handler.unhandled_errors > 0)))
+      my_errno= no_such_table_handler.first_error;
+  }
+  else if (error && file)
+    file->print_error(error, MYF(0));
   thd->pop_internal_handler();
+  delete file;
   DBUG_RETURN(error);
 }
 
@@ -2395,6 +2408,7 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry)
   DDL_LOG_ENTRY ddl_log_entry;
   uint read_entry= first_entry;
   MEM_ROOT mem_root;
+  bool result= false;
   DBUG_ENTER("ddl_log_execute_entry_no_lock");
 
   mysql_mutex_assert_owner(&LOCK_gdl);
@@ -2416,11 +2430,15 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry)
       if (action_type >= DDL_LOG_LAST_ACTION)
         action_type= 0;
 
-      /* Write to error log and continue with next log entry */
-      sql_print_error("DDL_LOG: Got error %d when trying to execute action "
-                      "for entry %u of type '%s'",
-                      (int) my_errno, read_entry,
-                      ddl_log_action_name[action_type]);
+      if (ddl_log_recovery(thd))
+      {
+        /* Write to error log and continue with next log entry */
+        sql_print_error("DDL_LOG: Got error %d when trying to execute action "
+                        "for entry %u of type '%s'",
+                        (int) my_errno, read_entry,
+                        ddl_log_action_name[action_type]);
+      }
+      result= true;
       break;
     }
     read_entry= ddl_log_entry.next_entry;
@@ -2428,7 +2446,7 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry)
 
   recovery_state.free(); // FIXME: is this correct?
   free_root(&mem_root, MYF(0));
-  DBUG_RETURN(FALSE);
+  DBUG_RETURN(result);
 }
 
 
@@ -2716,7 +2734,6 @@ int ddl_log_execute_recovery()
   int error= 0;
   THD *thd, *original_thd;
   DDL_LOG_ENTRY ddl_log_entry;
-  static char recover_query_string[]= "INTERNAL DDL LOG RECOVER IN PROGRESS";
   DBUG_ENTER("ddl_log_execute_recovery");
 
   if (!global_ddl_log.backup_done && !global_ddl_log.created)

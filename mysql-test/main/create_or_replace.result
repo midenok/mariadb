@@ -798,3 +798,27 @@ create or replace table t1 (old int);
 show create trigger a;
 ERROR HY000: Trigger does not exist
 drop table t1;
+# Foreign keys
+create table t1 (x int primary key, y int) engine innodb;
+create table t2 (x int references t1(x)) engine innodb;
+create or replace table t1 (x int primary key);
+ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails
+create or replace table t1 (x int primary key);
+ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails
+create table t3 (x int);
+create or replace table t1 like t3;
+ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails
+create or replace table t1 like t3;
+ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails
+create or replace table t1 select * from t3;
+ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails
+create or replace table t1 select * from t3;
+ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `x` int(11) NOT NULL,
+  `y` int(11) DEFAULT NULL,
+  PRIMARY KEY (`x`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+drop tables t3, t2, t1;
