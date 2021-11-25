@@ -5461,6 +5461,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
     DBUG_ASSERT(!(create_info->options & HA_CREATE_TMP_ALTER));
     // FIXME: restore options?
     create_info->options|= HA_CREATE_TMP_ALTER;
+    new_table.mdl_request.duration= MDL_EXPLICIT;
     table= &new_table;
   }
 
@@ -5481,8 +5482,10 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
     if (create_table_exists(thd, orig_table->db, orig_table->table_name, local_create_info,
                             &local_create_info, res))
       goto err;
+    /*
+      NOTE: orig_table->table is reopened and now is the same share as new_table.
+    */
     local_create_info.table= 0;
-    table= orig_table;
   }
 
   DEBUG_SYNC(thd, "create_table_like_before_binlog");
@@ -5524,6 +5527,13 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
            5       any       shared Generated statement if the table
                                     was created if engine changed
            ==== ========= ========= ==============================
+
+        TODO: why this is in a separate branch? All logging should be done in single branch
+        (if (do_logging)), possibly moved out to a separate function. Along with backup logging,
+        XID update, etc. This branch is not properly tested now, AFAICS this is tested only
+        by rpl.create_or_replace2.
+
+        Why "generated statement" is needed? No explanation in this comment...
     */
     if (!(create_info->tmp_table()) || force_generated_create)
     {
@@ -5535,7 +5545,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
         query.length(0);  // Have to zero it since constructor doesn't
         Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN |
                                   MYSQL_OPEN_IGNORE_KILLED);
-        bool new_table= FALSE; // Whether newly created table is open.
+        bool opened_new_table= FALSE; // Whether newly created table is open.
 
         if (create_res != 0)
         {
@@ -5554,6 +5564,19 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
           save_open_strategy= table->open_strategy;
           table->open_strategy= TABLE_LIST::OPEN_NORMAL;
 
+          if (atomic_replace &&
+              thd->mdl_context.acquire_lock(&table->mdl_request,
+                                            thd->variables.lock_wait_timeout))
+          {
+            /*
+               NOTE: We acquire lock for temporary table just to make close_thread_table() happy.
+               We open it like a normal table because it's too complex to open it like tmp_table
+               here.
+            */
+            res= 1;
+            goto err;
+          }
+
           /*
             In order for show_create_table() to work we need to open
             destination table if it is not already open (i.e. if it
@@ -5570,7 +5593,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
             res= 1;
             goto err;
           }
-          new_table= TRUE;
+          opened_new_table= TRUE;
         }
         /*
           We have to re-test if the table was a view as the view may not
@@ -5593,18 +5616,37 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
           */
           create_info->used_fields|= HA_CREATE_USED_ENGINE;
 
+          if (atomic_replace)
+          {
+            DBUG_ASSERT(!table->schema_table);
+            table->table->s->table_name= orig_table->table_name;
+            table->table->alias.copy(LEX_STRING_WITH_LEN(orig_table->alias),
+                                     system_charset_info);
+          }
+
           int result __attribute__((unused))=
             show_create_table(thd, table, &query, create_info, WITH_DB_NAME);
 
           DBUG_ASSERT(result == 0); // show_create_table() always return 0
           do_logging= FALSE;
+          thd->binlog_xid= thd->query_id;
+
+          thd->binlog_xid= thd->query_id;
+          ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
+          if (ddl_log_state_rm.is_active() && !ddl_log_state_rm.skip_binlog)
+            ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
+          debug_crash_here("ddl_log_create_before_binlog");
+
           if (write_bin_log(thd, TRUE, query.ptr(), query.length()))
           {
             res= 1;
             goto err;
           }
 
-          if (new_table)
+          debug_crash_here("ddl_log_create_after_binlog");
+          thd->binlog_xid= 0;
+
+          if (opened_new_table)
           {
             DBUG_ASSERT(thd->open_tables == table->table);
             /*
@@ -5612,7 +5654,10 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
               (MYSQL_OPEN_GET_NEW_TABLE). Now we can close the table
               without risking to close some locked table.
             */
+            table->table->s->tdc->flushed= true;
             close_thread_table(thd, &thd->open_tables);
+            if (atomic_replace)
+              thd->mdl_context.release_lock(table->mdl_request.ticket);
           }
         }
       }
@@ -5655,14 +5700,16 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
       because of existing table when using "if exists".
     */
     DBUG_ASSERT((create_info->tmp_table()) || create_res < 0 ||
-                thd->mdl_context.is_lock_owner(MDL_key::TABLE, table->db.str,
-                                               table->table_name.str,
+                thd->mdl_context.is_lock_owner(MDL_key::TABLE, orig_table->db.str,
+                                               orig_table->table_name.str,
                                                MDL_EXCLUSIVE) ||
                 (thd->locked_tables_mode && pos_in_locked_tables &&
                  create_info->if_not_exists()));
   }
 
 err:
+  table= orig_table;
+
   if (do_logging)
   {
     thd->binlog_xid= thd->query_id;
