@@ -1795,7 +1795,7 @@ report_error:
         backup_log_info *d;
         DBUG_ASSERT(!atomic_replace || atomic_info);
         DBUG_ASSERT(!(atomic_replace && table_dropped));
-        if (atomic_info)
+        if (atomic_replace)
           d= &atomic_info->drop_entry;
         else
         {
