@@ -4223,7 +4223,11 @@ bool select_insert::prepare_eof()
       thd->clear_error();
     else
       errcode= query_error_code(thd, killed_status == NOT_KILLED);
-    res= thd->binlog_query(THD::ROW_QUERY_TYPE,
+    /*
+      TODO: that should be always STMT_QUERY_TYPE
+      (see TODO in select_create::prepare::MY_HOOKS::do_postlock() below)
+    */
+    res= thd->binlog_query((atomic_replace ? THD::STMT_QUERY_TYPE : THD::ROW_QUERY_TYPE),
                            thd->query(), thd->query_length(),
                            trans_table, FALSE, FALSE, errcode);
     if (res > 0)
@@ -4510,7 +4514,6 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
     DBUG_ASSERT(!create_info->tmp_table()); // FIXME: test
     if (make_tmp_name(thd, "create", create_table, &new_table))
       DBUG_RETURN(NULL);
-    new_table.mdl_request.duration= MDL_EXPLICIT;
     create_table_mode|= CREATE_TMP_TABLE;
     DBUG_ASSERT(!(create_info->options & HA_CREATE_TMP_ALTER));
     // FIXME: restore options?
@@ -4551,7 +4554,6 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
     */
     create_table->table= 0;
 
-#if 0
     if (atomic_replace)
     {
       char tmp_path[FN_REFLEN + 1];
@@ -4586,16 +4588,7 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
         }
       }
     }
-    else
-#else
-    if (atomic_replace &&
-        thd->mdl_context.acquire_lock(&new_table.mdl_request,
-                                      thd->variables.lock_wait_timeout))
-    {
-      goto err;
-    }
-#endif
-    if (!create_info->tmp_table())
+    else if (!create_info->tmp_table())
     {
       Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN);
       TABLE_LIST::enum_open_strategy save_open_strategy;
@@ -4619,7 +4612,6 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
     }
     else
     {
-      DBUG_ASSERT(!atomic_replace);
       /*
         The pointer to the newly created temporary table has been stored in
         table->create_info.
@@ -4655,15 +4647,6 @@ err:
     DBUG_RETURN(NULL);
   }
 
-  if (atomic_replace)
-  {
-    DBUG_ASSERT(!create_table->schema_table);
-    table->s->table_name.str= strmake_root(&table->s->mem_root,
-                                           LEX_STRING_WITH_LEN(orig_table->table_name));
-    table->s->table_name.length= orig_table->table_name.length;
-    table->alias.copy(LEX_STRING_WITH_LEN(orig_table->alias), system_charset_info);
-  }
-
   DEBUG_SYNC(thd,"create_table_select_before_lock");
 
   table->reginfo.lock_type=TL_WRITE;
@@ -4681,7 +4664,7 @@ err:
     since it won't wait for the table lock (we have exclusive metadata lock on
     the table) and thus can't get aborted.
   */
-  if ((/*!atomic_replace &&*/
+  if ((!atomic_replace &&
        unlikely(!((*lock)= mysql_lock_tables(thd, &table, 1, 0)))) ||
       hooks->postlock(&table, 1))
   {
@@ -5084,11 +5067,10 @@ bool select_create::send_eof()
 
   if (atomic_replace)
   {
-//     DBUG_ASSERT(table->s->tmp_table);
+    DBUG_ASSERT(table->s->tmp_table);
 
     int result;
     // FIXME: do this in abort_result_set()
-#if 0
     if (table->file->ha_index_or_rnd_end() ||
         table->file->ha_external_lock(thd, F_UNLCK) ||
         (!thd->slave_thread && ha_enable_transaction(thd, true)))
@@ -5096,7 +5078,6 @@ bool select_create::send_eof()
       abort_result_set();
       DBUG_RETURN(true);
     }
-#endif
 
     create_info->table= orig_table->table;
     if (create_table_handle_exists(thd, orig_table->db, orig_table->table_name, *create_info,
@@ -5149,10 +5130,10 @@ bool select_create::send_eof()
   else if (atomic_replace)
   {
     create_table= orig_table;
-//     create_info->table= NULL;
-//     table->file->ha_reset();
-//     thd->drop_temporary_table(table, NULL, false);
-//     table= NULL;
+    create_info->table= NULL;
+    table->file->ha_reset();
+    thd->drop_temporary_table(table, NULL, false);
+    table= NULL;
   }
 
   /*
@@ -5268,7 +5249,7 @@ bool select_create::send_eof()
 
   if (m_plock)
   {
-//     DBUG_ASSERT(!atomic_replace);
+    DBUG_ASSERT(!atomic_replace);
     MYSQL_LOCK *lock= *m_plock;
     *m_plock= NULL;
     m_plock= NULL;
@@ -5315,11 +5296,6 @@ bool select_create::send_eof()
       TABLE *table= pos_in_locked_tables->table;
       table->mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
     }
-  }
-
-  if (atomic_replace)
-  {
-    thd->mdl_context.release_lock(new_table.mdl_request.ticket);
   }
 
   send_ok_packet();
@@ -5392,7 +5368,6 @@ void select_create::abort_result_set()
       m_plock= NULL;
     }
 
-#if 0
     if (atomic_replace)
     {
       (void) table->file->ha_external_lock(thd, F_UNLCK);
@@ -5400,12 +5375,6 @@ void select_create::abort_result_set()
       (void) thd->drop_temporary_table(table, NULL, true);
     }
     else
-#else
-    if (atomic_replace)
-    {
-      thd->mdl_context.release_lock(new_table.mdl_request.ticket);
-    }
-#endif
       drop_open_table(thd, table, &create_table->db, &create_table->table_name);
     table=0;                                    // Safety
     if (thd->log_current_statement)
