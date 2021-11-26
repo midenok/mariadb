@@ -5,7 +5,11 @@ create or replace table t1 (a int, b int, key k (a), key k (b));
 ERROR 42000: Duplicate key name 'k'
 drop table t1;
 # Crash recovery
-create table const_table (new int, b int);
+Table	Create Table
+const_table	CREATE TABLE `const_table` (
+  `new` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 insert into const_table values (1, 1), (2, 2);
 flush tables;
 # QUERY: CREATE OR REPLACE TABLE t1 (new int)

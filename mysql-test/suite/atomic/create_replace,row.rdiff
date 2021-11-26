@@ -1,6 +1,6 @@
 --- create_replace.result
 +++ create_replace,row.reject
-@@ -364,21 +364,15 @@
+@@ -343,21 +343,15 @@
  # CRASH POINT: ddl_log_create_after_prepare_eof
  t1.MAD
  t1.MAI

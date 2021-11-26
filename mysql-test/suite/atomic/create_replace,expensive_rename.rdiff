@@ -1,11 +1,6 @@
 --- create_replace.result
 +++ create_replace,expensive_rename.reject
-@@ -1,3 +1,4 @@
-+set @@debug_dbug="+d,ddl_log_expensive_rename";
- set @@default_storage_engine=Aria;
- create table t1 (c int);
- create or replace table t1 (a int, b int, key k (a), key k (b));
-@@ -11,60 +12,28 @@
+@@ -14,60 +14,28 @@
  flush tables;
  # QUERY: CREATE OR REPLACE TABLE t1 (new int)
  # CRASH POINT: ddl_log_create_after_log_rename
@@ -73,7 +68,7 @@
  # CRASH POINT: ddl_log_create_after_send_data
  # No crash!
  t1.MAD
-@@ -77,16 +46,8 @@
+@@ -80,16 +48,8 @@
  ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # CRASH POINT: ddl_log_create_before_binlog
@@ -91,7 +86,7 @@
  # CRASH POINT: ddl_log_create_after_prepare_eof
  # No crash!
  t1.MAD
-@@ -130,60 +91,29 @@
+@@ -133,60 +93,29 @@
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # QUERY: CREATE OR REPLACE TABLE t1 LIKE const_table
  # CRASH POINT: ddl_log_create_after_log_rename
@@ -160,7 +155,7 @@
  # CRASH POINT: ddl_log_create_after_send_data
  # No crash!
  t1.MAD
-@@ -197,16 +127,8 @@
+@@ -200,16 +129,8 @@
  ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # CRASH POINT: ddl_log_create_before_binlog
@@ -178,7 +173,7 @@
  # CRASH POINT: ddl_log_create_after_prepare_eof
  # No crash!
  t1.MAD
-@@ -254,89 +176,38 @@
+@@ -257,89 +178,38 @@
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # QUERY: CREATE OR REPLACE TABLE t1 SELECT * from const_table
  # CRASH POINT: ddl_log_create_after_log_rename
@@ -281,7 +276,7 @@
  # CRASH POINT: ddl_log_create_after_prepare_eof
  t1.MAD
  t1.MAI
-@@ -347,10 +218,6 @@
+@@ -350,10 +220,6 @@
    `new` int(11) DEFAULT NULL,
    `b` int(11) DEFAULT NULL
  ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
