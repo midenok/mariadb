@@ -4223,11 +4223,7 @@ bool select_insert::prepare_eof()
       thd->clear_error();
     else
       errcode= query_error_code(thd, killed_status == NOT_KILLED);
-    /*
-      TODO: that should be always STMT_QUERY_TYPE
-      (see TODO in select_create::prepare::MY_HOOKS::do_postlock() below)
-    */
-    res= thd->binlog_query((atomic_replace ? THD::STMT_QUERY_TYPE : THD::ROW_QUERY_TYPE),
+    res= thd->binlog_query(THD::ROW_QUERY_TYPE,
                            thd->query(), thd->query_length(),
                            trans_table, FALSE, FALSE, errcode);
     if (res > 0)
@@ -4779,7 +4775,8 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
         ddl_log_update_xid(&ptr->ddl_log_state_create, thd->binlog_xid);
         if (ptr->ddl_log_state_rm.is_active() && !ptr->ddl_log_state_rm.skip_binlog)
           ddl_log_update_xid(&ptr->ddl_log_state_rm, thd->binlog_xid);
-        return binlog_show_create_table(thd, *tables, ptr->create_info);
+        error= binlog_show_create_table(thd, *tables, ptr->create_info);
+        return error;
       }
       return 0;
     }
