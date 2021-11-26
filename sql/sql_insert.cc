@@ -4235,6 +4235,11 @@ bool select_insert::prepare_eof()
       table->file->ha_release_auto_increment();
       DBUG_RETURN(true);
     }
+    /*
+      TODO: bad check !table->s->tmp_table in case of atomic_replace.
+      The better check is create_info->tmp_table(). The even better is to update
+      binary_logged in do_postlock() for RBR.
+    */
     binary_logged= res == 0 || !table->s->tmp_table;
   }
   table->s->table_creation_was_logged|= binary_logged;
@@ -4566,7 +4571,7 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
 
           This needs to be done before external_lock.
         */
-        if (ha_enable_transaction(thd, false))
+        if (!thd->slave_thread && ha_enable_transaction(thd, false))
         {
           create_table->table= 0;
           goto err;
@@ -4576,7 +4581,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
         {
           // FIXME: test
           /* Undo call to mysql_trans_prepare_alter_copy_data() */
-          ha_enable_transaction(thd, true);
+          if (!thd->slave_thread)
+            ha_enable_transaction(thd, true);
           create_table->table= 0;
           goto err;
         }
@@ -4658,9 +4664,9 @@ err:
     since it won't wait for the table lock (we have exclusive metadata lock on
     the table) and thus can't get aborted.
   */
-  if (!atomic_replace &&
-      unlikely(!((*lock)= mysql_lock_tables(thd, &table, 1, 0)) ||
-               hooks->postlock(&table, 1)))
+  if ((!atomic_replace &&
+       unlikely(!((*lock)= mysql_lock_tables(thd, &table, 1, 0)))) ||
+      hooks->postlock(&table, 1))
   {
     /* purecov: begin tested */
     /*
@@ -4687,7 +4693,7 @@ err:
   }
   // FIXME: check ORIG name is locked so it won't be created by anyone else
   table->s->table_creation_was_logged= save_table_creation_was_logged;
-  if (!table->s->tmp_table)
+  if (!create_info->tmp_table())
     table->file->prepare_for_row_logging();
 
   /*
@@ -4743,10 +4749,9 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
     virtual int do_postlock(TABLE **tables, uint count)
     {
       /*
-         TODO: why row binlogging is done here at stage of
-         create_table_from_items() while statement binlogging is done at stage
-         of send_eof()? To avoid business-logic discrepancies both logging
-         types should be done at send_eof(), i.e. when select_insert succeeded.
+         NOTE: for row format CREATE TABLE must be logged before row data.
+
+         TODO: Remove creepy TABLEOP_HOOKS interface?
       */
       int error;
       THD *thd= const_cast<THD*>(ptr->get_thd());
@@ -4761,9 +4766,8 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
       if (unlikely(error))
         return error;
 
-      TABLE const *const table = *tables;
       if (thd->is_current_stmt_binlog_format_row() &&
-          !table->s->tmp_table)
+          !ptr->create_info->tmp_table())
       {
         thd->binlog_xid= thd->query_id;
         /*
@@ -4931,6 +4935,9 @@ static int binlog_show_create_table(THD *thd, TABLE *table,
                             create_info, WITH_DB_NAME);
   DBUG_ASSERT(result == 0); /* show_create_table() always return 0 */
 
+  /*
+    TODO (optimization): why it does show_create_table() even if !mysql_bin_log.is_open()?
+  */
   if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
   {
     int errcode= query_error_code(thd, thd->killed == NOT_KILLED);
@@ -5066,7 +5073,7 @@ bool select_create::send_eof()
     // FIXME: do this in abort_result_set()
     if (table->file->ha_index_or_rnd_end() ||
         table->file->ha_external_lock(thd, F_UNLCK) ||
-        ha_enable_transaction(thd, true))
+        (!thd->slave_thread && ha_enable_transaction(thd, true)))
     {
       abort_result_set();
       DBUG_RETURN(true);

@@ -5645,9 +5645,11 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
           if (atomic_replace)
           {
             DBUG_ASSERT(!table->schema_table);
-            table->table->s->table_name= orig_table->table_name;
+            table->table->s->table_name.str= strmake_root(&table->table->s->mem_root,
+                                                          LEX_STRING_WITH_LEN(orig_table->table_name));
+            table->table->s->table_name.length= orig_table->table_name.length;
             table->table->alias.copy(LEX_STRING_WITH_LEN(orig_table->alias),
-                                     system_charset_info);
+                                        system_charset_info);
           }
 
           int result __attribute__((unused))=
