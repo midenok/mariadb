@@ -338,7 +338,7 @@
  Table	Create Table
  t1	CREATE TABLE `t1` (
    `old` int(11) DEFAULT NULL
-@@ -341,27 +312,19 @@
+@@ -341,28 +312,24 @@
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  a	INSERT	t1	set @s= 1	BEFORE						
  # CRASH POINT: ddl_log_create_after_prepare_eof
@@ -368,29 +368,47 @@
 -t1.MAD
 -t1.MAI
  t1.frm
+-master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 +t1.ibd
- master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
++master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE `t1` (
++  `new` int(11) DEFAULT NULL,
++  `b` int(11) DEFAULT NULL
++)
++master-bin.000001	#	Annotate_rows	#	#	CREATE OR REPLACE TABLE t1 SELECT * from const_table
  Table	Create Table
  t1	CREATE TABLE `t1` (
-@@ -373,9 +336,8 @@
+   `new` int(11) DEFAULT NULL,
+@@ -373,10 +340,13 @@
  2	2
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # CRASH POINT: ddl_log_create_before_remove_backup
 -t1.MAD
 -t1.MAI
  t1.frm
+-master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 +t1.ibd
- master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
++master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE `t1` (
++  `new` int(11) DEFAULT NULL,
++  `b` int(11) DEFAULT NULL
++)
++master-bin.000001	#	Annotate_rows	#	#	CREATE OR REPLACE TABLE t1 SELECT * from const_table
  Table	Create Table
  t1	CREATE TABLE `t1` (
-@@ -387,9 +349,8 @@
+   `new` int(11) DEFAULT NULL,
+@@ -387,10 +357,13 @@
  2	2
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # CRASH POINT: ddl_log_create_log_complete
 -t1.MAD
 -t1.MAI
  t1.frm
+-master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 +t1.ibd
- master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
++master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE `t1` (
++  `new` int(11) DEFAULT NULL,
++  `b` int(11) DEFAULT NULL
++)
++master-bin.000001	#	Annotate_rows	#	#	CREATE OR REPLACE TABLE t1 SELECT * from const_table
  Table	Create Table
  t1	CREATE TABLE `t1` (
+   `new` int(11) DEFAULT NULL,

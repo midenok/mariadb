@@ -6922,6 +6922,8 @@ bool ha_show_status(THD *thd, handlerton *db_type, enum ha_stat_type stat)
   RETURN VALUE
     0  No binary logging in row format
     1  Row needs to be logged
+
+  TODO: remove needless proxy
 */
 
 bool handler::check_table_binlog_row_based()
@@ -6988,7 +6990,7 @@ int handler::binlog_log_row(TABLE *table,
   DBUG_ENTER("binlog_log_row");
 
   if (!thd->binlog_table_maps &&
-      thd->binlog_write_table_maps())
+      thd->binlog_write_table_maps(table))
     DBUG_RETURN(HA_ERR_RBR_LOGGING_FAILED);
 
   error= (*log_func)(thd, table, row_logging_has_trans,

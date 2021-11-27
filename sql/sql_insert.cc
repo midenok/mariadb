@@ -4232,7 +4232,7 @@ bool select_insert::prepare_eof()
       DBUG_RETURN(true);
     }
     /*
-      TODO: bad check !table->s->tmp_table in case of atomic_replace.
+      FIXME: bad check !table->s->tmp_table in case of atomic_replace.
       The better check is create_info->tmp_table(). The even better is to update
       binary_logged in do_postlock() for RBR.
     */
@@ -4354,6 +4354,12 @@ void select_insert::abort_result_set()
           res= thd->binlog_query(THD::ROW_QUERY_TYPE, thd->query(),
                                  thd->query_length(),
                                  transactional_table, FALSE, FALSE, errcode);
+
+          /*
+            FIXME: bad check !table->s->tmp_table in case of atomic_replace.
+            The better check is create_info->tmp_table(). The even better is to update
+            binary_logged in do_postlock() for RBR.
+          */
           binary_logged= res == 0 || !table->s->tmp_table;
         }
 	if (changed)
@@ -4562,26 +4568,26 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
       if (create_table->table)
       {
         /*
-          Turn off recovery logging since rollback of create table is to
-          delete the new table so there is no need to log the changes to it.
+          NOTE: Aria tables require table locking to work in transactional mode.
+          Since we don't lock our temporary table we get problems with unproperly
+          initialized transactional mode: seg-fault while accessing uninitialized
+          trn member (reproduced by atomic.create_replace,aria,stmt).
 
-          This needs to be done before external_lock.
+          This hack disables logging for Aria table (that is not needed anyway for
+          a temporary table).
         */
-        if (!thd->slave_thread && ha_enable_transaction(thd, false))
-        {
-          create_table->table= 0;
-          goto err;
-        }
-
+        bool on_save= thd->transaction->on;
+        thd->transaction->on= false;
         if (create_table->table->file->ha_external_lock(thd, F_WRLCK))
         {
           // FIXME: test
-          /* Undo call to mysql_trans_prepare_alter_copy_data() */
-          if (!thd->slave_thread)
-            ha_enable_transaction(thd, true);
           create_table->table= 0;
+          thd->transaction->on= on_save;
           goto err;
         }
+
+        thd->transaction->on= on_save;
+        create_table->table->s->can_do_row_logging= 1;
       }
     }
     else if (!create_info->tmp_table())
@@ -5067,10 +5073,9 @@ bool select_create::send_eof()
     DBUG_ASSERT(table->s->tmp_table);
 
     int result;
-    // FIXME: do this in abort_result_set()
+    // FIXME: do this in abort_result_set() as well
     if (table->file->ha_index_or_rnd_end() ||
-        table->file->ha_external_lock(thd, F_UNLCK) ||
-        (!thd->slave_thread && ha_enable_transaction(thd, true)))
+        table->file->ha_external_lock(thd, F_UNLCK))
     {
       abort_result_set();
       DBUG_RETURN(true);
@@ -5368,7 +5373,6 @@ void select_create::abort_result_set()
     if (atomic_replace)
     {
       (void) table->file->ha_external_lock(thd, F_UNLCK);
-      (void) mysql_trans_commit_alter_copy_data(thd);
       (void) thd->drop_temporary_table(table, NULL, true);
     }
     else

@@ -2886,7 +2886,7 @@ public:
   bool prepare_handlers_for_update(uint flag);
   bool binlog_write_annotated_row(Log_event_writer *writer);
   void binlog_prepare_for_row_logging();
-  bool binlog_write_table_maps();
+  bool binlog_write_table_maps(TABLE *cur_table);
   bool binlog_write_table_map(TABLE *table, bool with_annotate);
   static void binlog_prepare_row_images(TABLE* table);
 
