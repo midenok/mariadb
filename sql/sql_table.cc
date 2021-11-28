@@ -4332,18 +4332,24 @@ bool HA_CREATE_INFO::finalize_ddl(THD *thd)
   }
   debug_crash_here("ddl_log_create_before_remove_backup");
   /* NOTE: holds "drop old table; rename tmp table"  */
-  result= ddl_log_revert(thd, ddl_log_state_rm);
+  result= ddl_log_revert(thd, ddl_log_state_rm, true);
   if (result && ddl_log_state_create->is_active())
   {
     /* In case roll forward fails we must roll back to drop tmp table */
     mysql_mutex_lock(&LOCK_gdl);
     ddl_log_write_execute_entry(ddl_log_state_create->list->entry_pos, 0,
                                 &ddl_log_state_create->execute_entry);
-      mysql_mutex_unlock(&LOCK_gdl);
+    mysql_mutex_unlock(&LOCK_gdl);
     (void) ddl_log_revert(thd, ddl_log_state_create);
   }
   else
-    ddl_log_complete(ddl_log_state_create);
+  {
+    mysql_mutex_lock(&LOCK_gdl);
+    ddl_log_release_entries(ddl_log_state_create);
+    mysql_mutex_unlock(&LOCK_gdl);
+    ddl_log_state_create->list= 0;
+
+  }
   debug_crash_here("ddl_log_create_log_complete");
   return result;
 }

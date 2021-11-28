@@ -107,14 +107,6 @@ const uchar ddl_log_entry_phases[DDL_LOG_LAST_ACTION]=
 };
 
 
-static char recover_query_string[]= "INTERNAL DDL LOG RECOVER IN PROGRESS";
-
-bool ddl_log_recovery(THD *thd)
-{
-  return thd->query() == recover_query_string;
-}
-
-
 struct st_global_ddl_log
 {
   uchar *file_entry_buf;
@@ -1302,7 +1294,8 @@ static void rename_in_stat_tables(THD *thd, DDL_LOG_ENTRY *ddl_log_entry,
 */
 
 static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
-                                  DDL_LOG_ENTRY *ddl_log_entry)
+                                  DDL_LOG_ENTRY *ddl_log_entry,
+                                  bool report_error)
 {
   LEX_CSTRING handler_name;
   handler *file= NULL;
@@ -1335,7 +1328,8 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     DBUG_RETURN(FALSE);
 
   handler_name=    ddl_log_entry->handler_name;
-  thd->push_internal_handler(&no_such_table_handler);
+  if (!report_error)
+    thd->push_internal_handler(&no_such_table_handler);
 
   if (!strcmp(ddl_log_entry->handler_name.str, reg_ext))
     frm_action= TRUE;
@@ -1389,24 +1383,28 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   /* fall through */
   case DDL_LOG_RENAME_ACTION:
   {
-    error= TRUE;
     if (frm_action)
     {
       strxmov(to_path, ddl_log_entry->name.str, reg_ext, NullS);
       strxmov(from_path, ddl_log_entry->from_name.str, reg_ext, NullS);
-      (void) mysql_file_rename(key_file_frm, from_path, to_path, MYF(MY_WME));
+      error= mysql_file_rename(key_file_frm, from_path, to_path, MYF(MY_WME));
 #ifdef WITH_PARTITION_STORAGE_ENGINE
       strxmov(to_path, ddl_log_entry->name.str, PAR_EXT, NullS);
       strxmov(from_path, ddl_log_entry->from_name.str, PAR_EXT, NullS);
-      (void) mysql_file_rename(key_file_partition_ddl_log, from_path, to_path,
+      int err2= mysql_file_rename(key_file_partition_ddl_log, from_path, to_path,
                                MYF(MY_WME));
+      if (!error)
+        error= err2;
 #endif
     }
     else
-      (void) file->ha_rename_table(ddl_log_entry->from_name.str,
+      error= file->ha_rename_table(ddl_log_entry->from_name.str,
                                    ddl_log_entry->name.str);
     if (increment_phase(entry_pos))
+    {
+      error= -1;
       break;
+    }
     break;
   }
   case DDL_LOG_EXCHANGE_ACTION:
@@ -2299,15 +2297,27 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   }
 
 end:
-  /* We are only interested in errors that where not ignored */
-  if (ddl_log_recovery(thd))
+  if (report_error)
   {
+    if (error && file)
+    {
+      TABLE_SHARE share;
+      bzero(&share, sizeof(share));
+      share.db=               ddl_log_entry->db;
+      share.table_name=       ddl_log_entry->name;
+      share.normalized_path=  ddl_log_entry->tmp_name;
+      /* TODO: make TABLE_SHARE-independent handler::print_error()? */
+      file->change_table_ptr(NULL, &share);
+      file->print_error(error, MYF(0));
+    }
+  }
+  else
+  {
+    /* We are only interested in errors that where not ignored */
     if ((error= (no_such_table_handler.unhandled_errors > 0)))
       my_errno= no_such_table_handler.first_error;
+    thd->pop_internal_handler();
   }
-  else if (error && file)
-    file->print_error(error, MYF(0));
-  thd->pop_internal_handler();
   delete file;
   DBUG_RETURN(error);
 }
@@ -2403,7 +2413,7 @@ void ddl_log_release_memory_entry(DDL_LOG_MEMORY_ENTRY *log_entry)
     @retval FALSE              Success
 */
 
-static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry)
+static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry, bool report_error)
 {
   DDL_LOG_ENTRY ddl_log_entry;
   uint read_entry= first_entry;
@@ -2424,13 +2434,13 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry)
     DBUG_ASSERT(ddl_log_entry.entry_type == DDL_LOG_ENTRY_CODE ||
                 ddl_log_entry.entry_type == DDL_LOG_IGNORE_ENTRY_CODE);
 
-    if (ddl_log_execute_action(thd, &mem_root, &ddl_log_entry))
+    if (ddl_log_execute_action(thd, &mem_root, &ddl_log_entry, report_error))
     {
       uint action_type= ddl_log_entry.action_type;
       if (action_type >= DDL_LOG_LAST_ACTION)
         action_type= 0;
 
-      if (ddl_log_recovery(thd))
+      if (!report_error)
       {
         /* Write to error log and continue with next log entry */
         sql_print_error("DDL_LOG: Got error %d when trying to execute action "
@@ -2652,7 +2662,7 @@ bool ddl_log_execute_entry(THD *thd, uint first_entry)
   DBUG_ENTER("ddl_log_execute_entry");
 
   mysql_mutex_lock(&LOCK_gdl);
-  error= ddl_log_execute_entry_no_lock(thd, first_entry);
+  error= ddl_log_execute_entry_no_lock(thd, first_entry, false);
   mysql_mutex_unlock(&LOCK_gdl);
   DBUG_RETURN(error);
 }
@@ -2734,6 +2744,7 @@ int ddl_log_execute_recovery()
   int error= 0;
   THD *thd, *original_thd;
   DDL_LOG_ENTRY ddl_log_entry;
+  static char recover_query_string[]= "INTERNAL DDL LOG RECOVER IN PROGRESS";
   DBUG_ENTER("ddl_log_execute_recovery");
 
   if (!global_ddl_log.backup_done && !global_ddl_log.created)
@@ -2805,7 +2816,7 @@ int ddl_log_execute_recovery()
         continue;
       }
 
-      if (ddl_log_execute_entry_no_lock(thd, ddl_log_entry.next_entry))
+      if (ddl_log_execute_entry_no_lock(thd, ddl_log_entry.next_entry, false))
       {
         /* Real unpleasant scenario but we have to continue anyway  */
         error= -1;
@@ -2943,7 +2954,7 @@ void ddl_log_complete(DDL_LOG_STATE *state)
   This is called for failed rename table, create trigger or drop trigger.
 */
 
-bool ddl_log_revert(THD *thd, DDL_LOG_STATE *state)
+bool ddl_log_revert(THD *thd, DDL_LOG_STATE *state, bool report_error)
 {
   bool res= 0;
   DBUG_ENTER("ddl_log_revert");
@@ -2954,7 +2965,7 @@ bool ddl_log_revert(THD *thd, DDL_LOG_STATE *state)
   mysql_mutex_lock(&LOCK_gdl);
   if (likely(state->execute_entry))
   {
-    res= ddl_log_execute_entry_no_lock(thd, state->list->entry_pos);
+    res= ddl_log_execute_entry_no_lock(thd, state->list->entry_pos, report_error);
     ddl_log_disable_execute_entry(&state->execute_entry);
   }
   ddl_log_release_entries(state);
