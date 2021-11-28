@@ -4543,6 +4543,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
   */
 
   if (!mysql_create_table_no_lock(thd,
+                                  &orig_table->db,
+                                  &orig_table->table_name,
                                   &create_table->db,
                                   &create_table->table_name,
                                   create_info, alter_info, NULL,

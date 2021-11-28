@@ -102,6 +102,8 @@ bool add_keyword_to_query(THD *thd, String *result, const LEX_CSTRING *keyword,
 #define CREATE_ASSISTED   4
 
 int mysql_create_table_no_lock(THD *thd,
+                               const LEX_CSTRING *orig_db,
+                               const LEX_CSTRING *orig_table_name,
                                const LEX_CSTRING *db,
                                const LEX_CSTRING *table_name,
                                Table_specification_st *create_info,

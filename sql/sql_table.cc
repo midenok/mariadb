@@ -4690,7 +4690,7 @@ int create_table_impl(THD *thd,
     if (!frm_only)
     {
       debug_crash_here("ddl_log_create_before_create_table");
-      if (ha_create_table(thd, path.str, db.str, table_name.str, create_info,
+      if (ha_create_table(thd, path.str, orig_db.str, orig_table_name.str, create_info,
                           frm, 0))
       {
         file->ha_create_partitioning_metadata(path.str, NULL, CHF_DELETE_FLAG);
@@ -4751,9 +4751,13 @@ err:
     2 error; Don't log create statement
     0 ok
     -1 Table was used with IF NOT EXISTS and table existed (warning, not error)
+
+  TODO: orig_db, orig_table_name, db, table_name should be moved to create_info
 */
 
 int mysql_create_table_no_lock(THD *thd,
+                               const LEX_CSTRING *orig_db,
+                               const LEX_CSTRING *orig_table_name,
                                const LEX_CSTRING *db,
                                const LEX_CSTRING *table_name,
                                Table_specification_st *create_info,
@@ -4792,7 +4796,7 @@ int mysql_create_table_no_lock(THD *thd,
   }
   lex_string_set3(&cpath, path, path_length);
 
-  res= create_table_impl(thd, *db, *table_name, *db, *table_name, cpath,
+  res= create_table_impl(thd, *orig_db, *orig_table_name, *db, *table_name, cpath,
                          *create_info, create_info,
                          alter_info, create_table_mode,
                          is_trans, &not_used_1, &not_used_2, frm);
@@ -4925,7 +4929,10 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
     create_table= &new_table;
   }
 
-  if (mysql_create_table_no_lock(thd, &create_table->db,
+  if (mysql_create_table_no_lock(thd,
+                                 &orig_table->db,
+                                 &orig_table->table_name,
+                                 &create_table->db,
                                  &create_table->table_name, create_info,
                                  alter_info,
                                  &is_trans, create_table_mode,
@@ -5493,6 +5500,8 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
 
   res= ((create_res=
          mysql_create_table_no_lock(thd,
+                                    &orig_table->db,
+                                    &orig_table->table_name,
                                     &table->db, &table->table_name,
                                     &local_create_info, &local_alter_info,
                                     &is_trans, create_table_mode,
