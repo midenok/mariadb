@@ -1088,7 +1088,7 @@ static handler *create_handler(THD *thd, MEM_ROOT *mem_root,
   like connect, needs the .frm file to exists to be able to do an rename.
 */
 
-static void execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
+static int execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
                                  const LEX_CSTRING *from_db,
                                  const LEX_CSTRING *from_table,
                                  const LEX_CSTRING *to_db,
@@ -1097,6 +1097,7 @@ static void execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
                                  char *from_path, char *to_path)
 {
   uint to_length=0, fr_length=0;
+  int err;
   DBUG_ENTER("execute_rename_table");
 
   if (file->needs_lower_case_filenames())
@@ -1111,12 +1112,12 @@ static void execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
   {
     fr_length= build_table_filename(from_path, FN_REFLEN,
                                     from_db->str, from_table->str, "",
-                                    flags & FN_TO_IS_TMP);
+                                    flags & FN_FROM_IS_TMP);
     to_length= build_table_filename(to_path, FN_REFLEN,
                                     to_db->str, to_table->str, "",
                                     flags & FN_TO_IS_TMP);
   }
-  file->ha_rename_table(from_path, to_path);
+  err= file->ha_rename_table(from_path, to_path);
   if (file->needs_lower_case_filenames())
   {
     /*
@@ -1137,7 +1138,7 @@ static void execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
   }
   if (!access(from_path, F_OK))
     (void) mysql_file_rename(key_file_frm, from_path, to_path, MYF(MY_WME));
-  DBUG_VOID_RETURN;
+  DBUG_RETURN(err);
 }
 
 
@@ -1472,11 +1473,11 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     /* fall through */
     case DDL_RENAME_PHASE_TABLE:
       /* Restore frm and table to original names */
-      execute_rename_table(ddl_log_entry, file,
-                           &ddl_log_entry->db, &ddl_log_entry->name,
-                           &ddl_log_entry->from_db, &ddl_log_entry->from_name,
-                           0,
-                           from_path, to_path);
+      flags= report_error ? FN_FROM_IS_TMP : 0;
+      error= execute_rename_table(ddl_log_entry, file,
+                                  &ddl_log_entry->db, &ddl_log_entry->name,
+                                  &ddl_log_entry->from_db, &ddl_log_entry->from_name,
+                                  flags, from_path, to_path);
 
       if (ddl_log_entry->flags & DDL_LOG_FLAG_UPDATE_STAT)
       {

@@ -5503,7 +5503,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
     create_table_mode|= CREATE_TMP_TABLE;
     DBUG_ASSERT(!(create_info->options & HA_CREATE_TMP_ALTER));
     // FIXME: restore options?
-    create_info->options|= HA_CREATE_TMP_ALTER;
+    local_create_info.options|= HA_CREATE_TMP_ALTER;
     new_table.mdl_request.duration= MDL_EXPLICIT;
     table= &new_table;
   }

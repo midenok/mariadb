@@ -1,6 +1,6 @@
 --- create_replace.result
 +++ create_replace,row.reject
-@@ -343,26 +343,24 @@
+@@ -343,22 +343,24 @@
  # CRASH POINT: ddl_log_create_after_prepare_eof
  t1.MAD
  t1.MAI
@@ -13,10 +13,6 @@
 -  `b` int(11) DEFAULT NULL
 +  `old` int(11) DEFAULT NULL
  ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
--Warnings:
--Error	145	Table './test/t1' is marked as crashed and should be repaired
--Warning	1034	1 client is using or hasn't closed the table properly
--Note	1034	Table is fixed
 -new	b
 -1	1
 -2	2
@@ -36,7 +32,7 @@
  Table	Create Table
  t1	CREATE TABLE `t1` (
    `new` int(11) DEFAULT NULL,
-@@ -376,7 +374,11 @@
+@@ -372,7 +374,11 @@
  t1.MAD
  t1.MAI
  t1.frm
@@ -49,7 +45,7 @@
  Table	Create Table
  t1	CREATE TABLE `t1` (
    `new` int(11) DEFAULT NULL,
-@@ -390,7 +392,11 @@
+@@ -386,7 +392,11 @@
  t1.MAD
  t1.MAI
  t1.frm

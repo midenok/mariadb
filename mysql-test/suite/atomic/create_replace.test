@@ -163,9 +163,15 @@ while ($r < $statement_count)
       --source include/show_binlog_events.inc
     }
 
+    if ($default_engine == Aria)
+    {
+      # Again we suppress 'marked as crashed', it works differently in --ps
+      --disable_warnings
+    }
     --replace_result $default_engine DEFAULT_ENGINE ' PAGE_CHECKSUM=1' '' ' TRANSACTIONAL=0' ''
     --error $show_error
     show create table t1;
+    --enable_warnings
     if (`select locate('SELECT', '$STATEMENT')`)
     {
       --error $show_error

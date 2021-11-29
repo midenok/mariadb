@@ -330,16 +330,7 @@
  t1.frm
  master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
  Table	Create Table
-@@ -350,17 +350,13 @@
-   `new` int(11) DEFAULT NULL,
-   `b` int(11) DEFAULT NULL
- ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
--Warnings:
--Error	145	Table './test/t1' is marked as crashed and should be repaired
--Warning	1034	1 client is using or hasn't closed the table properly
--Note	1034	Table is fixed
- new	b
- 1	1
+@@ -355,8 +355,8 @@
  2	2
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # CRASH POINT: ddl_log_create_after_binlog
@@ -350,7 +341,7 @@
  t1.frm
  master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
  Table	Create Table
-@@ -373,8 +369,8 @@
+@@ -369,8 +369,8 @@
  2	2
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # CRASH POINT: ddl_log_create_before_remove_backup
@@ -361,7 +352,7 @@
  t1.frm
  master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
  Table	Create Table
-@@ -387,8 +383,8 @@
+@@ -383,8 +383,8 @@
  2	2
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # CRASH POINT: ddl_log_create_log_complete

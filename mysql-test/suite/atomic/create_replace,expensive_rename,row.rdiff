@@ -173,7 +173,7 @@
  # CRASH POINT: ddl_log_create_after_prepare_eof
  # No crash!
  t1.MAD
-@@ -257,112 +178,54 @@
+@@ -257,108 +178,54 @@
  Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
  # QUERY: CREATE OR REPLACE TABLE t1 SELECT * from const_table
  # CRASH POINT: ddl_log_create_after_log_rename
@@ -287,10 +287,6 @@
 -  `new` int(11) DEFAULT NULL,
 -  `b` int(11) DEFAULT NULL
 -) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
--Warnings:
--Error	145	Table './test/t1' is marked as crashed and should be repaired
--Warning	1034	1 client is using or hasn't closed the table properly
--Note	1034	Table is fixed
 -new	b
 -1	1
 -2	2
@@ -309,7 +305,7 @@
  Table	Create Table
  t1	CREATE TABLE `t1` (
    `new` int(11) DEFAULT NULL,
-@@ -376,7 +239,11 @@
+@@ -372,7 +239,11 @@
  t1.MAD
  t1.MAI
  t1.frm
@@ -322,7 +318,7 @@
  Table	Create Table
  t1	CREATE TABLE `t1` (
    `new` int(11) DEFAULT NULL,
-@@ -390,7 +257,11 @@
+@@ -386,7 +257,11 @@
  t1.MAD
  t1.MAI
  t1.frm
