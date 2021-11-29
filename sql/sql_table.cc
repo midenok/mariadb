@@ -1543,7 +1543,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     if (!table_count++)
     {
       LEX_CSTRING comment= {comment_start, (size_t) comment_len};
-      if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment, atomic_replace))
+      if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
       {
         error= 1;
         goto err;
@@ -5680,7 +5680,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
 
           thd->binlog_xid= thd->query_id;
           ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
-          if (ddl_log_state_rm.is_active() && !ddl_log_state_rm.skip_binlog)
+          if (ddl_log_state_rm.is_active() && !atomic_replace)
             ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
           debug_crash_here("ddl_log_create_before_binlog");
 
@@ -5761,7 +5761,7 @@ err:
   {
     thd->binlog_xid= thd->query_id;
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
-    if (ddl_log_state_rm.is_active() && !ddl_log_state_rm.skip_binlog)
+    if (ddl_log_state_rm.is_active() && !atomic_replace)
       ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
     debug_crash_here("ddl_log_create_before_binlog");
     if (res && create_info->table_was_deleted)

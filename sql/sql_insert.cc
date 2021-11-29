@@ -4784,7 +4784,8 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
            CREATE OR REPLACE event in the binary log.
          */
         ddl_log_update_xid(&ptr->ddl_log_state_create, thd->binlog_xid);
-        if (ptr->ddl_log_state_rm.is_active() && !ptr->ddl_log_state_rm.skip_binlog)
+        if (ptr->ddl_log_state_rm.is_active() &&
+            !ptr->create_info->is_atomic_replace())
           ddl_log_update_xid(&ptr->ddl_log_state_rm, thd->binlog_xid);
         error= binlog_show_create_table(thd, *tables, ptr->create_info);
         return error;
@@ -5101,8 +5102,7 @@ bool select_create::send_eof()
     thd->binlog_xid= thd->query_id;
     /* Remember xid's for the case of row based logging */
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
-    // FIXME: replace skip_binlog with is_atomic_replace()
-    if (ddl_log_state_rm.is_active() && !ddl_log_state_rm.skip_binlog)
+    if (ddl_log_state_rm.is_active() && !atomic_replace)
       ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
   }
 

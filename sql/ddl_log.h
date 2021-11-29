@@ -172,8 +172,7 @@ enum enum_ddl_log_alter_table_phase {
   engine is not changed
 */
 #define DDL_LOG_FLAG_ALTER_PARTITION      (1 << 4)
-#define DDL_LOG_FLAG_DROP_SKIP_BINLOG     (1 << 5)
-#define DDL_LOG_FLAG_TMP_TABLE            (1 << 6)
+#define DDL_LOG_FLAG_TMP_TABLE            (1 << 5)
 
 /*
   Setting ddl_log_entry.phase to this has the same effect as setting
@@ -249,11 +248,6 @@ typedef struct st_ddl_log_state
   */
   DDL_LOG_MEMORY_ENTRY *main_entry;
   uint16 flags;                                 /* Cache for flags */
-  /*
-    Don't log DROP to binlog and tell the upper level that it must skip
-    updating XID. HTON_EXPENSIVE_RENAME engines have this flag false.
-  */
-  bool skip_binlog;
   ulonglong master_chain_pos;
   bool is_active() { return list != 0; }
 } DDL_LOG_STATE;
@@ -307,8 +301,7 @@ bool ddl_log_rename_view(THD *thd, DDL_LOG_STATE *ddl_state,
                          const LEX_CSTRING *new_alias);
 bool ddl_log_drop_table_init(THD *thd, DDL_LOG_STATE *ddl_state,
                              const LEX_CSTRING *db,
-                             const LEX_CSTRING *comment,
-                             bool skip_binlog= false);
+                             const LEX_CSTRING *comment);
 bool ddl_log_drop_view_init(THD *thd, DDL_LOG_STATE *ddl_state,
                             const LEX_CSTRING *db);
 bool ddl_log_drop_table(THD *thd, DDL_LOG_STATE *ddl_state,

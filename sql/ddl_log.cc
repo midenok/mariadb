@@ -1595,28 +1595,22 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         break;
       /* Fall through */
     case DDL_DROP_PHASE_BINLOG:
-      // FIXME: is DDL_LOG_FLAG_DROP_SKIP_BINLOG required?
-      if (!(ddl_log_entry->flags & DDL_LOG_FLAG_DROP_SKIP_BINLOG))
+      if (strcmp(recovery_state.current_db, db.str))
       {
-        if (strcmp(recovery_state.current_db, db.str))
-        {
-          append_identifier(thd, &recovery_state.drop_table, &db);
-          recovery_state.drop_table.append('.');
-        }
-        append_identifier(thd, &recovery_state.drop_table, &table);
-        recovery_state.drop_table.append(',');
-        /* We don't increment phase as we want to retry this in case of crash */
-
-        if (ddl_log_drop_to_binary_log(thd, ddl_log_entry,
-                                      &recovery_state.drop_table))
-        {
-          if (increment_phase(entry_pos))
-            break;
-        }
-        break;
+        append_identifier(thd, &recovery_state.drop_table, &db);
+        recovery_state.drop_table.append('.');
       }
-      (void) increment_phase(entry_pos);
-      /* Fall through */
+      append_identifier(thd, &recovery_state.drop_table, &table);
+      recovery_state.drop_table.append(',');
+      /* We don't increment phase as we want to retry this in case of crash */
+
+      if (ddl_log_drop_to_binary_log(thd, ddl_log_entry,
+                                     &recovery_state.drop_table))
+      {
+        if (increment_phase(entry_pos))
+          break;
+      }
+      break;
     case DDL_DROP_PHASE_RESET:
       /* We have already logged all previous drop's. Clear the query */
       recovery_state.drop_table.length(recovery_state.drop_table_init_length);
@@ -3165,10 +3159,8 @@ static bool ddl_log_drop_init(THD *thd, DDL_LOG_STATE *ddl_state,
 
 bool ddl_log_drop_table_init(THD *thd, DDL_LOG_STATE *ddl_state,
                              const LEX_CSTRING *db,
-                             const LEX_CSTRING *comment,
-                             bool skip_binlog)
+                             const LEX_CSTRING *comment)
 {
-  ddl_state->skip_binlog= skip_binlog;
   return ddl_log_drop_init(thd, ddl_state, db, comment);
 }
 
@@ -3211,11 +3203,6 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.name=         *const_cast<LEX_CSTRING*>(table);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.phase=        (uchar) phase;
-  if (ddl_state->skip_binlog)
-  {
-    ddl_log_entry.flags= DDL_LOG_FLAG_DROP_SKIP_BINLOG;
-    ddl_state->flags|= DDL_LOG_FLAG_DROP_SKIP_BINLOG;
-  }
   if (ddl_state->list->next_active_log_entry)
   {
     ddl_log_entry.next_entry= ddl_state->list->next_active_log_entry->entry_pos;
