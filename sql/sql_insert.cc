@@ -4606,7 +4606,6 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
       */
       if (open_table(thd, create_table, &ot_ctx))
       {
-        // FIXME: is it needed now? This should be deleted by ddl_log_state_create
         quick_rm_table(thd, create_info->db_type, &create_table->db,
                        table_case_name(create_info, &create_table->table_name),
                        0);
@@ -4695,7 +4694,11 @@ err:
     DBUG_RETURN(NULL);
     /* purecov: end */
   }
-  // FIXME: check ORIG name is locked so it won't be created by anyone else
+  DBUG_ASSERT(create_info->tmp_table() ||
+              thd->mdl_context.is_lock_owner(MDL_key::TABLE,
+                                             orig_table->db.str,
+                                             orig_table->table_name.str,
+                                             MDL_SHARED));
   table->s->table_creation_was_logged= save_table_creation_was_logged;
   if (!create_info->tmp_table())
     table->file->prepare_for_row_logging();
@@ -5075,7 +5078,6 @@ bool select_create::send_eof()
     DBUG_ASSERT(table->s->tmp_table);
 
     int result;
-    // FIXME: do this in abort_result_set() as well
     if (table->file->ha_index_or_rnd_end() ||
         table->file->ha_external_lock(thd, F_UNLCK))
     {

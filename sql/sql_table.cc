@@ -4955,7 +4955,6 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
 
   if (atomic_replace)
   {
-    // FIXME: is it needed (looks like it is NULL)?
     create_info->table= orig_table->table;
     if (create_table_handle_exists(thd, orig_table->db, orig_table->table_name, *create_info, create_info,
                             result))
