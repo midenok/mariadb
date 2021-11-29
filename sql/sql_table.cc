@@ -2993,6 +2993,11 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
                  ER_THD(thd, ER_KEY_REF_DO_NOT_MATCH_TABLE_REF));
 	DBUG_RETURN(TRUE);
       }
+      if (create_info->tmp_name &&
+          !lex_string_cmp(table_alias_charset, &table_name, &fk_key->ref_table))
+      {
+        fk_key->ref_table= create_info->tmp_name->table_name;
+      }
       continue;
     }
     (*key_count)++;

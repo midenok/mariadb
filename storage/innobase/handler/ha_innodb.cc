@@ -12197,10 +12197,11 @@ create_table_info_t::create_foreign_keys()
 		dict_table_t* table_to_alter;
 		mem_heap_t*   heap = mem_heap_create(10000);
 		ulint	      highest_id_so_far;
+		DBUG_ASSERT(!m_create_info->tmp_name);
 		char*	      n = dict_get_referenced_table(
 			name, LEX_STRING_WITH_LEN(m_form->s->db),
 			LEX_STRING_WITH_LEN(m_form->s->table_name),
-			&table_to_alter, heap, cs);
+			&table_to_alter, heap, cs, false);
 
 		/* Starting from 4.0.18 and 4.1.2, we generate foreign key id's
 		in the format databasename/tablename_ibfk_[number], where
@@ -12391,7 +12392,8 @@ create_table_info_t::create_foreign_keys()
 		foreign->referenced_table_name = dict_get_referenced_table(
 			name, LEX_STRING_WITH_LEN(fk->ref_db),
 			LEX_STRING_WITH_LEN(fk->ref_table),
-			&foreign->referenced_table, foreign->heap, cs);
+			&foreign->referenced_table, foreign->heap, cs,
+			m_create_info->tmp_name != NULL);
 
 		if (!foreign->referenced_table_name) {
 			return (DB_OUT_OF_MEMORY);
