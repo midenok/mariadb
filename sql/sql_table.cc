@@ -5040,21 +5040,7 @@ err:
     ddl_log_complete(&ddl_log_state_rm);
   }
   else
-  {
-    /*
-      Atomic replace algorithm:
-
-      1. (C) Write DDL_LOG_CREATE_TABLE_ACTION of TMP table (drops TMP table);
-      2. Create new table as TMP;
-      3. Do everything with TMP (like insert data);
-      4. (D) Write DDL_LOG_RENAME_TABLE_ACTION from ORIG to TMP (replays TMP -> ORIG);
-      5. (D) Write DDL_LOG_DROP_ACTION of ORIG;
-      6. (C) close chain;
-      7. (D) replay chain
-    */
-
     result= create_info->finalize_ddl(thd);
-  }
 
   /*
     Check if we are doing CREATE OR REPLACE TABLE under LOCK TABLES
