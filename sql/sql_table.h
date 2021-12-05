@@ -18,11 +18,34 @@
 #define SQL_TABLE_INCLUDED
 
 #include <my_sys.h>                             // pthread_mutex_t
+#include "log.h"
+#include "mysqld_error.h"
 #include "m_string.h"                           // LEX_CUSTRING
 
-#define ERROR_INJECT(code) \
-  ((DBUG_IF("crash_" code) && (DBUG_SUICIDE(), 0)) || \
-   (DBUG_IF("fail_" code) && (my_error(ER_UNKNOWN_ERROR, MYF(0)), 1)))
+#ifndef DBUG_OFF
+inline bool _error_inject(const char *crash_kw, const char *fail_kw)
+{
+  if (DBUG_IF(crash_kw))
+  {
+    sql_print_error("Crashing at %s", crash_kw);
+    DBUG_SUICIDE();
+    return false;
+  }
+  if (DBUG_IF(fail_kw))
+  {
+    sql_print_error("Failing at %s", fail_kw);
+    my_error(ER_UNKNOWN_ERROR, MYF(0));
+    return true;
+  }
+  DBUG_PRINT("ddl_log", ("Passing %s", fail_kw));
+  return false;
+}
+#define ERROR_INJECT(code) (_error_inject("crash_" code, "fail_" code))
+#define CRASH_INJECT(code) (_error_inject("crash_" code, "crash_" code))
+#else
+#define ERROR_INJECT(code) false
+#define CRASH_INJECT(code) false
+#endif
 
 class Alter_info;
 class Alter_table_ctx;
@@ -126,8 +149,8 @@ bool mysql_prepare_alter_table(THD *thd, TABLE *table,
                                HA_CREATE_INFO *create_info,
                                Alter_info *alter_info,
                                Alter_table_ctx *alter_ctx);
-bool mysql_trans_prepare_alter_copy_data(THD *thd);
-bool mysql_trans_commit_alter_copy_data(THD *thd);
+int mysql_trans_prepare_alter_copy_data(THD *thd);
+int mysql_trans_commit_alter_copy_data(THD *thd, bool rollback);
 bool mysql_alter_table(THD *thd, const LEX_CSTRING *new_db,
                        const LEX_CSTRING *new_name,
                        HA_CREATE_INFO *create_info,

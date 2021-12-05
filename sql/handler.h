@@ -448,7 +448,6 @@ enum chf_create_flags {
 */
 #define HA_PARTITION_FUNCTION_SUPPORTED         (1UL << 12)
 #define HA_FAST_CHANGE_PARTITION                (1UL << 13)
-#define HA_PARTITION_ONE_PHASE                  (1UL << 14)
 
 /* operations for disable/enable indexes */
 #define HA_KEY_SWITCH_NONUNIQ      0
@@ -3620,15 +3619,6 @@ public:
   int ha_create_partitioning_metadata(const char *name, const char *old_name,
                                       chf_create_flags action_flag);
 
-  int ha_change_partitions(HA_CREATE_INFO *create_info,
-                           const char *path,
-                           ulonglong * const copied,
-                           ulonglong * const deleted,
-                           const uchar *pack_frm_data,
-                           size_t pack_frm_len);
-  int ha_drop_partitions(const char *path);
-  int ha_rename_partitions(const char *path);
-
   void adjust_next_insert_id_after_explicit_value(ulonglong nr);
   int update_auto_increment();
   virtual void print_error(int error, myf errflag);
@@ -5135,17 +5125,6 @@ public:
                                            chf_create_flags action_flag)
   { return FALSE; }
 
-  virtual int change_partitions(HA_CREATE_INFO *create_info,
-                                const char *path,
-                                ulonglong * const copied,
-                                ulonglong * const deleted,
-                                const uchar *pack_frm_data,
-                                size_t pack_frm_len)
-  { return HA_ERR_WRONG_COMMAND; }
-  virtual int drop_partitions(const char *path)
-  { return HA_ERR_WRONG_COMMAND; }
-  virtual int rename_partitions(const char *path)
-  { return HA_ERR_WRONG_COMMAND; }
   virtual bool set_ha_share_ref(Handler_share **arg_ha_share)
   {
     DBUG_ASSERT(!ha_share);
