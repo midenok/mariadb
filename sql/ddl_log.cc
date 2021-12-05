@@ -1334,8 +1334,9 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
 
   mysql_mutex_assert_owner(&LOCK_gdl);
   DBUG_PRINT("ddl_log",
-             ("pos: %u->%u  type: %u  action: %u (%s) phase: %u  "
+             ("pos: %u=>%u->%u  type: %u  action: %u (%s) phase: %u  "
               "handler: '%s'  name: '%s'  from_name: '%s'  tmp_name: '%s'",
+              execute_entry,
               ddl_log_entry->entry_pos,
               ddl_log_entry->next_entry,
               (uint) ddl_log_entry->entry_type,

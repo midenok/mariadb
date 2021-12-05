@@ -855,7 +855,8 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 
     DDL_LOG_MEMORY_ENTRY *main_entry= part_info->main_entry;
     mysql_mutex_lock(&LOCK_gdl);
-    if (write_log_replace_frm(lpt, part_info->list->entry_pos,
+    // FIXME: now this is rename
+    if (write_log_replace_frm(lpt,
                               (const char*) bak_path,
                               (const char*) path) ||
         ddl_log_write_execute_entry(part_info->list->entry_pos, 0,
@@ -953,8 +954,8 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 
 err:
 #ifdef WITH_PARTITION_STORAGE_ENGINE
-    ddl_log_increment_phase(part_info->main_entry->entry_pos);
-    part_info->main_entry= NULL;
+    ddl_log_increment_phase(lpt->drop_shadow_frm->entry_pos);
+    lpt->drop_shadow_frm= NULL;
     (void) ddl_log_sync();
 #endif
     ;
