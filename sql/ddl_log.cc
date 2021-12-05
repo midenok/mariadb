@@ -1331,6 +1331,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   if (!report_error)
     thd->push_internal_handler(&no_such_table_handler);
 
+  // FIXME: avoid frm_action, use full file names with extensions.
   if (!strcmp(ddl_log_entry->handler_name.str, reg_ext))
     frm_action= TRUE;
   else if (ddl_log_entry->handler_name.length)
@@ -1361,6 +1362,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       }
       else
       {
+        // FIXME: use DDL_LOG_DROP_TABLE_ACTION instead
         if (unlikely((error= hton->drop_table(hton, ddl_log_entry->name.str))))
         {
           if (!non_existing_table_error(error))
@@ -1398,6 +1400,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
 #endif
     }
     else
+      // FIXME: Use DDL_LOG_RENAME_TABLE_ACTION
       error= file->ha_rename_table(ddl_log_entry->from_name.str,
                                    ddl_log_entry->name.str);
     if (increment_phase(entry_pos))
