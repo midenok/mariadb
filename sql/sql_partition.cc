@@ -6642,12 +6642,12 @@ static bool write_log_convert_partition(ALTER_PARTITION_PARAM_TYPE *lpt,
 */
 
 static bool write_log_drop_frm(ALTER_PARTITION_PARAM_TYPE *lpt,
-                               DDL_LOG_STATE *drop_chain)
+                               DDL_LOG_STATE *drop_chain,
+                               bool drop_backup)
 {
   char path[FN_REFLEN + 1];
   DBUG_ENTER("write_log_drop_frm");
   const DDL_LOG_STATE *main_chain= lpt->part_info;
-  const bool drop_backup= (drop_chain != main_chain);
 
   build_table_shadow_filename(path, sizeof(path) - 1, lpt, drop_backup);
   mysql_mutex_lock(&LOCK_gdl);
@@ -6684,7 +6684,7 @@ error:
 static inline
 bool write_log_drop_shadow_frm(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
-  return write_log_drop_frm(lpt, lpt->part_info);
+  return write_log_drop_frm(lpt, lpt->part_info, false);
 }
 
 
@@ -6751,18 +6751,14 @@ error:
     install the shadow frm file and remove the old frm file.
 */
 
-static bool write_log_drop_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
+static bool write_log_drop_partition(ALTER_PARTITION_PARAM_TYPE *lpt, DDL_LOG_STATE *cleanup_chain)
 {
   partition_info *part_info= lpt->part_info;
-  DDL_LOG_MEMORY_ENTRY *log_entry;
-  DDL_LOG_MEMORY_ENTRY *exec_log_entry= part_info->execute_entry;
   char tmp_path[FN_REFLEN + 1];
   char path[FN_REFLEN + 1];
   uint next_entry= 0;
-  DDL_LOG_MEMORY_ENTRY *old_first_log_entry= part_info->list;
   DBUG_ENTER("write_log_drop_partition");
 
-  part_info->list= NULL;
   build_table_filename(path, sizeof(path) - 1, lpt->db.str, lpt->table_name.str, "", 0);
   build_table_shadow_filename(tmp_path, sizeof(tmp_path) - 1, lpt);
   mysql_mutex_lock(&LOCK_gdl);
@@ -6772,20 +6768,16 @@ static bool write_log_drop_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
   if (write_log_replace_frm(lpt, next_entry, (const char*)tmp_path,
                             (const char*)path))
     goto error;
-  log_entry= part_info->list;
-  part_info->main_entry= log_entry;
-  if (ddl_log_write_execute_entry(log_entry->entry_pos,
-                                  &exec_log_entry))
+  if (ddl_log_write_execute_entry(part_info->list->entry_pos,
+                                  cleanup_chain->execute_entry->entry_pos,
+                                  &part_info->execute_entry))
     goto error;
-  release_part_info_log_entries(old_first_log_entry);
   mysql_mutex_unlock(&LOCK_gdl);
   DBUG_RETURN(FALSE);
 
 error:
   release_part_info_log_entries(part_info->list);
   mysql_mutex_unlock(&LOCK_gdl);
-  part_info->list= old_first_log_entry;
-  part_info->main_entry= NULL;
   my_error(ER_DDL_LOG_ERROR, MYF(0));
   DBUG_RETURN(TRUE);
 }
@@ -7475,93 +7467,42 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   }
   else if (alter_info->partition_flags & ALTER_PARTITION_DROP)
   {
-    /*
-      Now after all checks and setting state on dropped partitions we can
-      start the actual dropping of the partitions.
+    DDL_LOG_STATE cleanup_chain;
+    bzero(&cleanup_chain, sizeof(cleanup_chain));
 
-      Drop partition is actually two things happening. The first is that
-      a lot of records are deleted. The second is that the behaviour of
-      subsequent updates and writes and deletes will change. The delete
-      part can be handled without any particular high lock level by
-      transactional engines whereas non-transactional engines need to
-      ensure that this change is done with an exclusive lock on the table.
-      The second part, the change of partitioning does however require
-      an exclusive lock to install the new partitioning as one atomic
-      operation. If this is not the case, it is possible for two
-      transactions to see the change in a different order than their
-      serialisation order. Thus we need an exclusive lock for both
-      transactional and non-transactional engines.
-
-      For LIST partitions it could be possible to avoid the exclusive lock
-      (and for RANGE partitions if they didn't rearrange range definitions
-      after a DROP PARTITION) if one ensured that failed accesses to the
-      dropped partitions was aborted for sure (thus only possible for
-      transactional engines).
-
-      0) Write an entry that removes the shadow frm file if crash occurs 
-      1) Write the new frm file as a shadow frm
-      2) Get an exclusive metadata lock on the table (waits for all active
-         transactions using this table). This ensures that we
-         can release all other locks on the table and since no one can open
-         the table, there can be no new threads accessing the table. They
-         will be hanging on this exclusive lock.
-      3) Write the ddl log to ensure that the operation is completed
-         even in the presence of a MySQL Server crash (the log is executed
-         before any other threads are started, so there are no locking issues).
-      4) Close the table that have already been opened but didn't stumble on
-         the abort locked previously. This is done as part of the
-         alter_close_table call.
-      5) Old place for binary logging
-      6) Install the previously written shadow frm file
-      7) Prepare handlers for drop of partitions
-      8) Drop the partitions
-      9) Remove entries from ddl log
-      10) Reopen table if under lock tables
-      11) Write the bin log
-          Unfortunately the writing of the binlog is not synchronised with
-          other logging activities. So no matter in which order the binlog
-          is written compared to other activities there will always be cases
-          where crashes make strange things occur. In this placement it can
-          happen that the ALTER TABLE DROP PARTITION gets performed in the
-          master but not in the slaves if we have a crash, after writing the
-          ddl log but before writing the binlog. A solution to this would
-          require writing the statement first in the ddl log and then
-          when recovering from the crash read the binlog and insert it into
-          the binlog if not written already.
-      12) Complete query
-
-      We insert Error injections at all places where it could be interesting
-      to test if recovery is properly done.
-    */
-    if (write_log_drop_shadow_frm(lpt) ||
+    if (write_log_drop_frm(lpt, &cleanup_chain, false) ||
         ERROR_INJECT("drop_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
         ERROR_INJECT("drop_partition_2") ||
         wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
         ERROR_INJECT("drop_partition_3") ||
-        write_log_drop_partition(lpt) ||
+        write_log_drop_partition(lpt, &cleanup_chain) ||
         (action_completed= TRUE, FALSE) ||
         ERROR_INJECT("drop_partition_4") ||
         alter_close_table(lpt) ||
         ERROR_INJECT("drop_partition_5") ||
-        ERROR_INJECT("drop_partition_6") ||
-        (frm_install= TRUE, FALSE) ||
-        mysql_write_frm(lpt, WFRM_INSTALL_SHADOW) ||
         log_partition_alter_to_ddl_log(lpt) ||
-        (frm_install= FALSE, FALSE) ||
-        ERROR_INJECT("drop_partition_7") ||
-        mysql_drop_partitions(lpt) ||
-        ERROR_INJECT("drop_partition_8") ||
-        (write_log_completed(lpt, FALSE), FALSE) ||
+        ERROR_INJECT("drop_partition_6") ||
         ((!thd->lex->no_write_to_binlog) &&
-         (write_bin_log(thd, FALSE,
-                        thd->query(), thd->query_length()), FALSE)) ||
-        ERROR_INJECT("drop_partition_9"))
+          ((thd->binlog_xid= thd->query_id),
+           ddl_log_update_xid(lpt->part_info, thd->binlog_xid),
+           write_bin_log(thd, false, thd->query(), thd->query_length()),
+           (thd->binlog_xid= 0))) ||
+        ERROR_INJECT("drop_partition_7"))
     {
+      ddl_log_complete(lpt->part_info);
+      (void) ddl_log_revert(thd, &cleanup_chain);
+      // FIXME: is this needed?
       handle_alter_part_error(lpt, action_completed, TRUE, frm_install);
       goto err;
     }
-    if (alter_partition_lock_handling(lpt))
+
+    ddl_log_complete(&cleanup_chain);
+    ERROR_INJECT("drop_partition_8");
+    (void) ddl_log_revert(thd, lpt->part_info);
+
+    if (alter_partition_lock_handling(lpt) ||
+        ERROR_INJECT("convert_partition_9"))
       goto err;
   }
   else if (alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT)
@@ -7583,7 +7524,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("convert_partition_6") ||
         alter_partition_convert_out(lpt) ||
         ERROR_INJECT("convert_partition_7") ||
-        write_log_drop_frm(lpt, &chain_drop_backup) ||
+        write_log_drop_frm(lpt, &chain_drop_backup, true) ||
         mysql_write_frm(lpt, WFRM_INSTALL_SHADOW|WFRM_BACKUP_ORIGINAL) ||
         log_partition_alter_to_ddl_log(lpt) ||
         ERROR_INJECT("convert_partition_8") ||
@@ -7631,7 +7572,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         alter_partition_convert_in(lpt) ||
         ERROR_INJECT("convert_partition_7") ||
         (frm_install= true, false) ||
-        write_log_drop_frm(lpt, &chain_drop_backup) ||
+        write_log_drop_frm(lpt, &chain_drop_backup, true) ||
         mysql_write_frm(lpt, WFRM_INSTALL_SHADOW|WFRM_BACKUP_ORIGINAL) ||
         log_partition_alter_to_ddl_log(lpt) ||
         (frm_install= false, false) ||
