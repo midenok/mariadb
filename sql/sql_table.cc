@@ -4336,7 +4336,7 @@ bool HA_CREATE_INFO::finalize_ddl(THD *thd)
   }
   debug_crash_here("ddl_log_create_before_remove_backup");
   /* NOTE: holds "drop old table; rename tmp table"  */
-  result= ddl_log_revert(thd, ddl_log_state_rm, true);
+  result= ddl_log_revert(thd, ddl_log_state_rm, DDL_LOG_ERR_REPORT);
   if (result && ddl_log_state_create->is_active())
   {
     /* In case roll forward fails we must roll back to drop tmp table */
