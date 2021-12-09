@@ -254,6 +254,14 @@ typedef struct st_ddl_log_state
 } DDL_LOG_STATE;
 
 
+enum ddl_log_error_mode
+{
+  DDL_LOG_ERR_IGNORE= 0,
+  DDL_LOG_ERR_REPORT,
+  DDL_LOG_ERR_ROLLBACK
+};
+
+
 /* These functions are for recovery */
 bool ddl_log_initialize();
 void ddl_log_release();
@@ -276,7 +284,7 @@ bool ddl_log_disable_execute_entry(DDL_LOG_MEMORY_ENTRY **active_entry);
 
 void ddl_log_complete(DDL_LOG_STATE *ddl_log_state);
 bool ddl_log_revert(THD *thd, DDL_LOG_STATE *ddl_log_state,
-                    bool report_error= false);
+                    ddl_log_error_mode error_mode= DDL_LOG_ERR_IGNORE);
 
 bool ddl_log_update_phase(DDL_LOG_STATE *entry, uchar phase);
 bool ddl_log_add_flag(DDL_LOG_STATE *entry, uint16 flag);

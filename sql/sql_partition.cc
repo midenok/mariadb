@@ -6475,8 +6475,8 @@ public:
       return true;
 
     ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
-    ddl_log_entry.name= { from_name, strlen(from_name) };
     ddl_log_entry.from_name= { tmp_path, strlen(tmp_path) };
+    ddl_log_entry.name= { from_name, strlen(from_name) };
 
     if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
       return true;
@@ -6503,8 +6503,8 @@ public:
       return true;
 
     ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
-    ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
     ddl_log_entry.from_name= { from_name, strlen(from_name) };
+    ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
 
     if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
       return true;
@@ -6538,14 +6538,26 @@ public:
     if (Alter_partition_action::process_partition(part_elem))
       return true;
 
-    ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
-    ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
+    // FIXME: remove this fork
+    if (part_elem->part_state == PART_TO_BE_DROPPED)
+    {
+      ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
+      ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
 
-    if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
-      return true;
-    *next_entry= log_entry->entry_pos;
-    part_elem->log_entry= log_entry;
-    ddl_log_add_entry(part_info, log_entry);
+      if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
+        return true;
+      *next_entry= log_entry->entry_pos;
+      ddl_log_add_entry(part_info, log_entry);        }
+    else
+    {
+      ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
+      ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
+
+      if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
+        return true;
+      *next_entry= log_entry->entry_pos;
+      ddl_log_add_entry(part_info, log_entry);
+    }
 
     return false;
   }
