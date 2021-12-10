@@ -6395,18 +6395,21 @@ protected:
   DDL_LOG_ENTRY ddl_log_entry;
 
   DDL_LOG_MEMORY_ENTRY *log_entry;
-  char tmp_path[FN_REFLEN + 1];
-  char from_name[FN_REFLEN + 1];
+  char part_name[FN_REFLEN + 1];
+  char new_name[FN_REFLEN + 1];
   List<partition_element> *parts;
 
 public:
+  uint phase;
+
   Alter_partition_action(ALTER_PARTITION_PARAM_TYPE *lpt,
                          uint *next_entry, const char *path,
                          List<partition_element> *reorg_parts) :
                          ALTER_PARTITION_PARAM_TYPE(*lpt),
                             next_entry(next_entry),
                             path(path),
-                            parts(reorg_parts ? reorg_parts : &lpt->part_info->partitions)
+                            parts(reorg_parts ? reorg_parts : &lpt->part_info->partitions),
+                            phase(0)
   {
     bzero(&ddl_log_entry, sizeof(ddl_log_entry));
   }
@@ -6445,7 +6448,7 @@ public:
     ddl_log_entry.next_entry= *next_entry;
     lex_string_set(&ddl_log_entry.handler_name,
                     ha_resolve_storage_engine_name(part_elem->engine_type));
-    if (create_partition_name(tmp_path, sizeof(tmp_path), path,
+    if (create_partition_name(part_name, sizeof(part_name), path,
                               part_elem->partition_name, name_variant,
                               true /* translate */))
       return true;
@@ -6461,22 +6464,22 @@ public:
   Action_convert_in(ALTER_PARTITION_PARAM_TYPE *lpt, uint *next_entry, const char *path) :
                     Alter_partition_action(lpt, next_entry, path, NULL)
   {
-    build_table_filename(from_name, sizeof(from_name) - 1, lpt->alter_ctx->new_db.str,
+    build_table_filename(new_name, sizeof(new_name) - 1, lpt->alter_ctx->new_db.str,
                         lpt->alter_ctx->new_name.str, "", 0);
     name_variant= NORMAL_PART_NAME;
   }
 
   bool process_partition(partition_element *part_elem)
   {
-    DBUG_ASSERT(from_name);
+    DBUG_ASSERT(new_name);
     DBUG_ASSERT(part_elem->part_state == PART_TO_BE_ADDED);
 
     if (Alter_partition_action::process_partition(part_elem))
       return true;
 
     ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
-    ddl_log_entry.from_name= { tmp_path, strlen(tmp_path) };
-    ddl_log_entry.name= { from_name, strlen(from_name) };
+    ddl_log_entry.from_name= { part_name, strlen(part_name) };
+    ddl_log_entry.name= { new_name, strlen(new_name) };
 
     if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
       return true;
@@ -6496,15 +6499,15 @@ public:
 
   bool process_partition(partition_element *part_elem)
   {
-    DBUG_ASSERT(from_name);
+    DBUG_ASSERT(new_name);
     DBUG_ASSERT(part_elem->part_state == PART_TO_BE_DROPPED);
 
     if (Alter_partition_action::process_partition(part_elem))
       return true;
 
     ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
-    ddl_log_entry.from_name= { from_name, strlen(from_name) };
-    ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
+    ddl_log_entry.from_name= { new_name, strlen(new_name) };
+    ddl_log_entry.name= { part_name, strlen(part_name) };
 
     if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
       return true;
@@ -6541,8 +6544,25 @@ public:
     // FIXME: remove this fork
     if (part_elem->part_state == PART_TO_BE_DROPPED)
     {
-      ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
-      ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
+      DBUG_ASSERT(name_variant == NORMAL_PART_NAME);
+
+      if (create_partition_name(new_name, sizeof(new_name), path,
+                                part_elem->partition_name, TEMP_PART_NAME,
+                                true /* translate */))
+        return true;
+
+      if (phase == 0)
+      {
+        ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
+        ddl_log_entry.name= { new_name, strlen(new_name) };
+      }
+      else
+      {
+        DBUG_ASSERT(phase == 1);
+        ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
+        ddl_log_entry.from_name= { part_name, strlen(part_name) };
+        ddl_log_entry.name= { new_name, strlen(new_name) };
+      }
 
       if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
         return true;
@@ -6551,7 +6571,7 @@ public:
     else
     {
       ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
-      ddl_log_entry.name= { tmp_path, strlen(tmp_path) };
+      ddl_log_entry.name= { part_name, strlen(part_name) };
 
       if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
         return true;
@@ -6604,7 +6624,12 @@ static bool write_log_dropped_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
                                          uint *next_entry, const char *path,
                                          bool reorg_parts)
 {
+  bool res;
   Action_drop act(lpt, next_entry, path, reorg_parts ? &lpt->part_info->temp_partitions : NULL);
+  res= act.iterate();
+  if (res || reorg_parts)
+    return res;
+  act.phase++;
   return act.iterate();
 }
 
@@ -7511,7 +7536,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
 
     ddl_log_complete(&cleanup_chain);
     ERROR_INJECT("drop_partition_8");
-    (void) ddl_log_revert(thd, lpt->part_info);
+    (void) ddl_log_revert(thd, lpt->part_info, DDL_LOG_ERR_ROLLBACK);
 
     if (alter_partition_lock_handling(lpt) ||
         ERROR_INJECT("convert_partition_9"))

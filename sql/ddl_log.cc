@@ -189,7 +189,8 @@ mysql_mutex_t LOCK_gdl;
 #define DDL_LOG_HEADER_SIZE 4+2+2+1
 
 static bool ddl_log_write(DDL_LOG_STATE *ddl_state,
-                          DDL_LOG_ENTRY *ddl_log_entry);
+                          DDL_LOG_ENTRY *ddl_log_entry,
+                          bool lock= true);
 
 /**
   Sync the ddl log file.
@@ -1416,7 +1417,10 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     if (!error && rollback_chain)
     {
       std::swap(ddl_log_entry->from_name, ddl_log_entry->name);
-      error= ddl_log_write(rollback_chain, ddl_log_entry);
+      /* NOTE: ddl_log_entry contains pointers to global DDL log structures */
+      ddl_log_entry->from_name= thd->strmake_lex_cstring(ddl_log_entry->from_name);
+      ddl_log_entry->name= thd->strmake_lex_cstring(ddl_log_entry->name);
+      error= ddl_log_write(rollback_chain, ddl_log_entry, false);
     }
 
     break;
@@ -2318,6 +2322,11 @@ end:
       file->change_table_ptr(NULL, &share);
       file->print_error(error, MYF(0));
     }
+    if (error && error_mode == DDL_LOG_ERR_ROLLBACK)
+    {
+      // FIXME: test (touch last TMP name before ALTER and then see what happens)
+      (void) ddl_log_revert(thd, rollback_chain, DDL_LOG_ERR_REPORT);
+    }
   }
   else
   {
@@ -3078,18 +3087,21 @@ bool ddl_log_update_xid(DDL_LOG_STATE *state, ulonglong xid)
 */
 
 static bool ddl_log_write(DDL_LOG_STATE *ddl_state,
-                          DDL_LOG_ENTRY *ddl_log_entry)
+                          DDL_LOG_ENTRY *ddl_log_entry,
+                          bool lock)
 {
   int error;
   DDL_LOG_MEMORY_ENTRY *log_entry;
   DBUG_ENTER("ddl_log_write");
 
-  mysql_mutex_lock(&LOCK_gdl);
+  if (lock)
+    mysql_mutex_lock(&LOCK_gdl);
   error= ((ddl_log_write_entry(ddl_log_entry, &log_entry)) ||
           ddl_log_write_execute_entry(log_entry->entry_pos,
                                       ddl_state->master_chain_pos,
                                       &ddl_state->execute_entry));
-  mysql_mutex_unlock(&LOCK_gdl);
+  if (lock)
+    mysql_mutex_unlock(&LOCK_gdl);
   if (error)
   {
     if (log_entry)
