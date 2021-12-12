@@ -293,6 +293,7 @@ bool ddl_log_disable_entry(DDL_LOG_STATE *state);
 bool ddl_log_increment_phase(uint entry_pos);
 void ddl_log_release_memory_entry(DDL_LOG_MEMORY_ENTRY *log_entry);
 bool ddl_log_sync();
+/* FIXME: used only in handle_alter_part_error(), deprecate */
 bool ddl_log_execute_entry(THD *thd, uint first_entry);
 
 void ddl_log_add_entry(DDL_LOG_STATE *state, DDL_LOG_MEMORY_ENTRY *log_entry);
