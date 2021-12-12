@@ -187,9 +187,9 @@ mysql_mutex_t LOCK_gdl;
 /* Sum of the above variables */
 #define DDL_LOG_HEADER_SIZE 4+2+2+1
 
-static bool ddl_log_write(DDL_LOG_STATE *ddl_state,
-                          DDL_LOG_ENTRY *ddl_log_entry,
-                          bool lock= true);
+static bool ddl_log_write_master(DDL_LOG_STATE *ddl_state,
+                                 DDL_LOG_ENTRY *ddl_log_entry,
+                                 uint slave_execute_entry);
 
 /**
   Sync the ddl log file.
@@ -1313,6 +1313,7 @@ static void rename_in_stat_tables(THD *thd, DDL_LOG_ENTRY *ddl_log_entry,
 
 static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
                                   DDL_LOG_ENTRY *ddl_log_entry,
+                                  uint execute_entry,
                                   ddl_log_error_mode error_mode,
                                   DDL_LOG_STATE *rollback_chain)
 {
@@ -1329,8 +1330,9 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
 
   mysql_mutex_assert_owner(&LOCK_gdl);
   DBUG_PRINT("ddl_log",
-             ("pos: %u->%u  type: %u  action: %u (%s) phase: %u  "
+             ("pos: %u=>%u->%u  type: %u  action: %u (%s) phase: %u  "
               "handler: '%s'  name: '%s'  from_name: '%s'  tmp_name: '%s'",
+              execute_entry,
               ddl_log_entry->entry_pos,
               ddl_log_entry->next_entry,
               (uint) ddl_log_entry->entry_type,
@@ -1392,7 +1394,11 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         break;
       error= 0;
       if (ddl_log_entry->action_type == DDL_LOG_DELETE_ACTION)
+      {
+        /* Drop action into roll-forward chain is prohibited. */
+        DBUG_ASSERT(!rollback_chain);
         break;
+      }
     }
   }
   DBUG_ASSERT(ddl_log_entry->action_type == DDL_LOG_REPLACE_ACTION);
@@ -1434,7 +1440,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       /* NOTE: ddl_log_entry contains pointers to global DDL log structures */
       ddl_log_entry->from_name= thd->strmake_lex_cstring(ddl_log_entry->from_name);
       ddl_log_entry->name= thd->strmake_lex_cstring(ddl_log_entry->name);
-      error= ddl_log_write(rollback_chain, ddl_log_entry, false);
+      error= ddl_log_write_master(rollback_chain, ddl_log_entry, execute_entry);
     }
 
     break;
@@ -1586,6 +1592,9 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     table=  ddl_log_entry->name;
     /* Note that path is without .frm extension */
     path=   ddl_log_entry->tmp_name;
+
+    /* Drop action into roll-forward chain is prohibited. */
+    DBUG_ASSERT(!rollback_chain);
 
     switch (ddl_log_entry->phase) {
     case DDL_DROP_PHASE_TABLE:
@@ -2445,6 +2454,7 @@ void ddl_log_release_memory_entry(DDL_LOG_MEMORY_ENTRY *log_entry)
 */
 
 static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry,
+                                          uint execute_entry,
                                           ddl_log_error_mode error_mode)
 {
   DDL_LOG_ENTRY ddl_log_entry;
@@ -2457,6 +2467,7 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry,
 
   if (error_mode == DDL_LOG_ERR_ROLLBACK)
   {
+    DBUG_ASSERT(execute_entry);
     rollback_chain= &rollback_chain_buf;
     bzero(rollback_chain, sizeof(rollback_chain_buf));
   }
@@ -2476,8 +2487,8 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry,
     DBUG_ASSERT(ddl_log_entry.entry_type == DDL_LOG_ENTRY_CODE ||
                 ddl_log_entry.entry_type == DDL_LOG_IGNORE_ENTRY_CODE);
 
-    if (ddl_log_execute_action(thd, &mem_root, &ddl_log_entry, error_mode,
-                               rollback_chain))
+    if (ddl_log_execute_action(thd, &mem_root, &ddl_log_entry, execute_entry,
+                               error_mode, rollback_chain))
     {
       uint action_type= ddl_log_entry.action_type;
       if (action_type >= DDL_LOG_LAST_ACTION)
@@ -2705,7 +2716,7 @@ bool ddl_log_execute_entry(THD *thd, uint first_entry)
   DBUG_ENTER("ddl_log_execute_entry");
 
   mysql_mutex_lock(&LOCK_gdl);
-  error= ddl_log_execute_entry_no_lock(thd, first_entry, DDL_LOG_ERR_IGNORE);
+  error= ddl_log_execute_entry_no_lock(thd, first_entry, 0, DDL_LOG_ERR_IGNORE);
   mysql_mutex_unlock(&LOCK_gdl);
   DBUG_RETURN(error);
 }
@@ -2857,7 +2868,7 @@ int ddl_log_execute_recovery()
         continue;
       }
 
-      if (ddl_log_execute_entry_no_lock(thd, ddl_log_entry.next_entry, DDL_LOG_ERR_IGNORE))
+      if (ddl_log_execute_entry_no_lock(thd, ddl_log_entry.next_entry, i, DDL_LOG_ERR_IGNORE))
       {
         /* Real unpleasant scenario but we have to continue anyway  */
         error= -1;
@@ -3007,6 +3018,7 @@ bool ddl_log_revert(THD *thd, DDL_LOG_STATE *state, ddl_log_error_mode error_mod
   if (likely(state->execute_entry))
   {
     res= ddl_log_execute_entry_no_lock(thd, state->list->entry_pos,
+                                       state->execute_entry->entry_pos,
                                        error_mode);
     ddl_log_disable_execute_entry(&state->execute_entry);
   }
@@ -3113,8 +3125,7 @@ bool ddl_log_update_xid(DDL_LOG_STATE *state, ulonglong xid)
 */
 
 static bool ddl_log_write(DDL_LOG_STATE *ddl_state,
-                          DDL_LOG_ENTRY *ddl_log_entry,
-                          bool lock)
+                          DDL_LOG_ENTRY *ddl_log_entry)
 {
   int error;
   DDL_LOG_MEMORY_ENTRY *log_entry;
@@ -3138,6 +3149,32 @@ static bool ddl_log_write(DDL_LOG_STATE *ddl_state,
   ddl_state->flags|= ddl_log_entry->flags;      // Update cache
   DBUG_RETURN(0);
 }
+
+
+// FIXME: merge with ddl_log_write()?
+static bool ddl_log_write_master(DDL_LOG_STATE *ddl_state,
+                                 DDL_LOG_ENTRY *ddl_log_entry,
+                                 uint slave_execute_entry)
+{
+  int error;
+  DDL_LOG_MEMORY_ENTRY *log_entry;
+  DBUG_ENTER("ddl_log_write_master");
+
+  error= ((ddl_log_write_entry(ddl_log_entry, &log_entry)) ||
+          ddl_log_write_execute_entry(log_entry->entry_pos,
+                                      ddl_state->master_chain_pos,
+                                      &ddl_state->execute_entry));
+  if (error)
+  {
+    if (log_entry)
+      ddl_log_release_memory_entry(log_entry);
+    DBUG_RETURN(1);
+  }
+  ddl_log_add_entry(ddl_state, log_entry);
+  ddl_state->flags|= ddl_log_entry->flags;      // Update cache
+  DBUG_RETURN(0);
+}
+
 
 
 /**
