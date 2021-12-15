@@ -191,6 +191,10 @@ static bool ddl_log_write_master(DDL_LOG_STATE *ddl_state,
                                  DDL_LOG_ENTRY *ddl_log_entry,
                                  uint slave_execute_entry);
 
+static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry,
+                                          uint execute_entry,
+                                          ddl_log_error_mode error_mode);
+
 /**
   Sync the ddl log file.
 
@@ -431,6 +435,7 @@ static bool update_master_entry(uint entry_pos, uint master_entry)
                                 MYF(MY_WME | MY_NABP)) ||
               ddl_log_sync_file());
 }
+
 
 /*
   Disable an execute entry
@@ -1315,7 +1320,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
                                   DDL_LOG_ENTRY *ddl_log_entry,
                                   uint execute_entry,
                                   ddl_log_error_mode error_mode,
-                                  DDL_LOG_STATE *rollback_chain)
+                                  DDL_LOG_STATE **rollback_chain)
 {
   LEX_CSTRING handler_name;
   handler *file= NULL;
@@ -1368,6 +1373,19 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   {
     if (ddl_log_entry->phase == 0)
     {
+      if (ddl_log_entry->action_type == DDL_LOG_DELETE_ACTION &&
+          *rollback_chain)
+      {
+        /*
+           Roll-forward main actions are done. Now it's time to cleanup temporary files,
+           so roll-back chain is not needed.
+        */
+        if ((*rollback_chain)->execute_entry)
+          ddl_log_disable_execute_entry(&(*rollback_chain)->execute_entry);
+        ddl_log_release_entries(*rollback_chain);
+        *rollback_chain= NULL;
+     }
+
       if (frm_action)
       {
         strxmov(to_path, ddl_log_entry->name.str, reg_ext, NullS);
@@ -1386,7 +1404,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         // FIXME: use DDL_LOG_DROP_TABLE_ACTION instead
         if (unlikely((error= hton->drop_table(hton, ddl_log_entry->name.str))))
         {
-          if (!non_existing_table_error(error))
+          if (error_mode || !non_existing_table_error(error))
             break;
         }
       }
@@ -1394,11 +1412,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         break;
       error= 0;
       if (ddl_log_entry->action_type == DDL_LOG_DELETE_ACTION)
-      {
-        /* Drop action into roll-forward chain is prohibited. */
-        DBUG_ASSERT(!rollback_chain);
         break;
-      }
     }
   }
   DBUG_ASSERT(ddl_log_entry->action_type == DDL_LOG_REPLACE_ACTION);
@@ -1434,13 +1448,21 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       break;
     }
 
-    if (!error && rollback_chain)
+    if (!error && rollback_chain && *rollback_chain)
     {
-      std::swap(ddl_log_entry->from_name, ddl_log_entry->name);
-      /* NOTE: ddl_log_entry contains pointers to global DDL log structures */
-      ddl_log_entry->from_name= thd->strmake_lex_cstring(ddl_log_entry->from_name);
-      ddl_log_entry->name= thd->strmake_lex_cstring(ddl_log_entry->name);
-      error= ddl_log_write_master(rollback_chain, ddl_log_entry, execute_entry);
+      DDL_LOG_ENTRY e;
+      bzero(&e, sizeof(e));
+
+      e.action_type=  ddl_log_entry->action_type;
+      e.next_entry=   (*rollback_chain)->list ? (*rollback_chain)->list->entry_pos : 0;
+      e.handler_name= thd->strmake_lex_cstring(ddl_log_entry->handler_name);
+      e.db=           thd->strmake_lex_cstring(ddl_log_entry->from_db);
+      e.name=         thd->strmake_lex_cstring(ddl_log_entry->from_name);
+      e.from_db=      thd->strmake_lex_cstring(ddl_log_entry->db);
+      e.from_name=    thd->strmake_lex_cstring(ddl_log_entry->name);
+      // e.phase=        DDL_RENAME_PHASE_TABLE;
+
+      error= ddl_log_write_master(*rollback_chain, &e, execute_entry);
     }
 
     break;
@@ -1593,8 +1615,17 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     /* Note that path is without .frm extension */
     path=   ddl_log_entry->tmp_name;
 
-    /* Drop action into roll-forward chain is prohibited. */
-    DBUG_ASSERT(!rollback_chain);
+    if (*rollback_chain)
+    {
+      /*
+          Roll-forward main actions are done. Now it's time to cleanup temporary files,
+          so roll-back chain is not needed.
+      */
+      if ((*rollback_chain)->execute_entry)
+        ddl_log_disable_execute_entry(&(*rollback_chain)->execute_entry);
+      ddl_log_release_entries(*rollback_chain);
+      *rollback_chain= NULL;
+    }
 
     switch (ddl_log_entry->phase) {
     case DDL_DROP_PHASE_TABLE:
@@ -1605,7 +1636,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         no_such_table_handler.only_ignore_non_existing_errors= 0;
         if (error)
         {
-          if (!non_existing_table_error(error))
+          if (error_mode || !non_existing_table_error(error))
             break;
           error= -1;
         }
@@ -2345,10 +2376,15 @@ end:
       file->change_table_ptr(NULL, &share);
       file->print_error(error, MYF(0));
     }
-    if (error && error_mode == DDL_LOG_ERR_ROLLBACK)
+    DDL_LOG_STATE *rollback;
+    if (error && error_mode == DDL_LOG_ERR_ROLLBACK &&
+        (rollback= *rollback_chain) && rollback->is_active() &&
+        rollback->execute_entry)
     {
-      // FIXME: test (touch last TMP name before ALTER and then see what happens)
-      (void) ddl_log_revert(thd, rollback_chain, DDL_LOG_ERR_REPORT);
+      (void) ddl_log_execute_entry_no_lock(thd, rollback->list->entry_pos,
+                                       rollback->execute_entry->entry_pos,
+                                       DDL_LOG_ERR_REPORT);
+      ddl_log_disable_execute_entry(&rollback->execute_entry);
     }
   }
   else
@@ -2488,7 +2524,7 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry,
                 ddl_log_entry.entry_type == DDL_LOG_IGNORE_ENTRY_CODE);
 
     if (ddl_log_execute_action(thd, &mem_root, &ddl_log_entry, execute_entry,
-                               error_mode, rollback_chain))
+                               error_mode, &rollback_chain))
     {
       uint action_type= ddl_log_entry.action_type;
       if (action_type >= DDL_LOG_LAST_ACTION)
@@ -3131,14 +3167,12 @@ static bool ddl_log_write(DDL_LOG_STATE *ddl_state,
   DDL_LOG_MEMORY_ENTRY *log_entry;
   DBUG_ENTER("ddl_log_write");
 
-  if (lock)
-    mysql_mutex_lock(&LOCK_gdl);
+  mysql_mutex_lock(&LOCK_gdl);
   error= ((ddl_log_write_entry(ddl_log_entry, &log_entry)) ||
           ddl_log_write_execute_entry(log_entry->entry_pos,
                                       ddl_state->master_chain_pos,
                                       &ddl_state->execute_entry));
-  if (lock)
-    mysql_mutex_unlock(&LOCK_gdl);
+  mysql_mutex_unlock(&LOCK_gdl);
   if (error)
   {
     if (log_entry)
@@ -3151,7 +3185,6 @@ static bool ddl_log_write(DDL_LOG_STATE *ddl_state,
 }
 
 
-// FIXME: merge with ddl_log_write()?
 static bool ddl_log_write_master(DDL_LOG_STATE *ddl_state,
                                  DDL_LOG_ENTRY *ddl_log_entry,
                                  uint slave_execute_entry)
@@ -3160,9 +3193,11 @@ static bool ddl_log_write_master(DDL_LOG_STATE *ddl_state,
   DDL_LOG_MEMORY_ENTRY *log_entry;
   DBUG_ENTER("ddl_log_write_master");
 
+  DBUG_ASSERT(ddl_state->master_chain_pos == 0);
+
   error= ((ddl_log_write_entry(ddl_log_entry, &log_entry)) ||
-          ddl_log_write_execute_entry(log_entry->entry_pos,
-                                      ddl_state->master_chain_pos,
+          update_master_entry(slave_execute_entry, log_entry->entry_pos) ||
+          ddl_log_write_execute_entry(log_entry->entry_pos, 0,
                                       &ddl_state->execute_entry));
   if (error)
   {
