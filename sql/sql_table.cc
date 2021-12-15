@@ -855,7 +855,8 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 
     DDL_LOG_MEMORY_ENTRY *main_entry= part_info->main_entry;
     mysql_mutex_lock(&LOCK_gdl);
-    if (write_log_replace_frm(lpt, part_info->list->entry_pos,
+    // FIXME: now this is rename
+    if (write_log_replace_frm(lpt,
                               (const char*) bak_path,
                               (const char*) path) ||
         ddl_log_write_execute_entry(part_info->list->entry_pos,
