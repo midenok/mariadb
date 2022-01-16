@@ -898,6 +898,7 @@ struct TABLE_SHARE
     Lex_ident name;
     Lex_ident constr_name;
     uint unique_keys;
+    uint end_key;
     Field *start_field(TABLE_SHARE *s) const
     {
       return s->field[start_fieldno];
@@ -946,6 +947,10 @@ struct TABLE_SHARE
     return field[period.end_fieldno];
   }
 
+private:
+  uint vers_find_end_key();
+
+public:
   /**
     Cache the checked structure of this table.
 

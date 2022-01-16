@@ -3180,6 +3180,8 @@ int TABLE_SHARE::init_from_binary_frm_image(THD *thd, bool write,
   }
 
   set_overlapped_keys();
+  if (versioned)
+    vers.end_key= vers_find_end_key();
 
   /* Handle virtual expressions */
   if (vcol_screen_length && share->frm_version >= FRM_VER_EXPRESSSIONS)
@@ -9009,6 +9011,25 @@ void TABLE::vers_update_end()
   if (vers_end_field()->store_timestamp(in_use->query_start(),
                                         in_use->query_start_sec_part()))
     DBUG_ASSERT(0);
+}
+
+
+uint TABLE_SHARE::vers_find_end_key()
+{
+  DBUG_ASSERT(versioned);
+  KEY *key;
+  uint k;
+  for (k= 0, key= key_info; k < keys; ++k, ++key)
+  {
+    if (key->user_defined_key_parts != 1 ||
+        key->usable_key_parts != 1 ||
+        key->ext_key_parts != 0 ||
+        key->is_ignored)
+      continue;
+    if (key->key_part->field->flags & VERS_ROW_END)
+      return k;
+  }
+  return MAX_KEY;
 }
 
 /**
