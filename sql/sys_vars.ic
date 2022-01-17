@@ -2716,9 +2716,9 @@ public:
     if (!res)
     {
       uint error;
-      var->save_result.timestamp.unix_time=
+      var->save_result.timestamp.sec=
               thd->variables.time_zone->TIME_to_gmt_sec(&ltime, &error);
-      var->save_result.timestamp.second_part= ltime.second_part;
+      var->save_result.timestamp.sec_part= ltime.second_part;
       res= error != 0;
     }
     return res;
@@ -2730,8 +2730,8 @@ private:
     if (var->value)
     {
       out->type       = SYSTEM_TIME_AS_OF;
-      out->unix_time  = var->save_result.timestamp.unix_time;
-      out->second_part= var->save_result.timestamp.second_part;
+      out->unix_time  = var->save_result.timestamp.sec;
+      out->second_part= var->save_result.timestamp.sec_part;
     }
     return 0;
   }

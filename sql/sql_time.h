@@ -32,6 +32,18 @@ typedef struct st_known_date_time_format KNOWN_DATE_TIME_FORMAT;
 #define WEEK_YEAR            2
 #define WEEK_FIRST_WEEKDAY   4
 
+/*
+  Structure for holding unix timestamp and high precision second part.
+
+  sec_part: HRTIME_RESOLUTION is 1 second (microseconds).
+*/
+struct my_time_hires
+{
+  my_time_t sec;
+  ulong sec_part;
+};
+
+
 ulong convert_period_to_month(ulong period);
 ulong convert_month_to_period(ulong month);
 void set_current_date(THD *thd, MYSQL_TIME *to);

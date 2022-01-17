@@ -1195,6 +1195,11 @@ public:
     return get_timestamp(ptr, sec_part);
   }
 
+  void get_timestamp(my_time_hires *t) const
+  {
+    t->sec= get_timestamp(ptr, &t->sec_part);
+  }
+
   virtual bool binary() const { return 1; }
   virtual bool zero_pack() const { return 1; }
   virtual enum ha_base_keytype key_type() const { return HA_KEYTYPE_BINARY; }
