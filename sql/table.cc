@@ -9032,6 +9032,22 @@ uint TABLE_SHARE::vers_find_end_key()
   return MAX_KEY;
 }
 
+bool TABLE::vers_find_min_max_stats()
+{
+  // See get_index_min_value(), get_index_max_value()
+  if (file->ha_index_init(s->vers.end_key, true))
+  {
+    // FIXME: handler error
+    return true;
+  }
+  if (file->ha_index_first(record[0]))
+  {
+    // FIXME: handler error
+    return true;
+  }
+  return false;
+}
+
 /**
    Reset markers that fields are being updated
 */

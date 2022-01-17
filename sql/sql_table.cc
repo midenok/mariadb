@@ -10190,6 +10190,7 @@ do_continue:;
   reenable_binlog(thd);
 
   debug_crash_here("ddl_log_alter_after_create_frm");
+  vers_min_max_stats();
 
   if (unlikely(error))
     goto err_cleanup;

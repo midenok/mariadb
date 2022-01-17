@@ -1776,6 +1776,8 @@ public:
     return field[s->period.end_fieldno];
   }
 
+  bool vers_find_min_max_stats();
+
 
   ulonglong vers_start_id() const;
   ulonglong vers_end_id() const;
