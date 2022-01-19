@@ -9023,7 +9023,6 @@ uint TABLE_SHARE::vers_find_end_key()
   {
     if (key->user_defined_key_parts != 1 ||
         key->usable_key_parts != 1 ||
-        key->ext_key_parts != 0 ||
         key->is_ignored)
       continue;
     if (key->key_part->field->flags & VERS_ROW_END)
@@ -9032,19 +9031,62 @@ uint TABLE_SHARE::vers_find_end_key()
   return MAX_KEY;
 }
 
-bool TABLE::vers_find_min_max_stats()
+bool TABLE::vers_find_min_max_stats(my_time_hires *row_end_min,
+                                    my_time_hires *row_end_max)
 {
-  // See get_index_min_value(), get_index_max_value()
-  if (file->ha_index_init(s->vers.end_key, true))
+  // FIXME: maybe use make_select()/check_quick()/init_read_record() (see mysql_delete())?
+  if (s->vers.end_key != MAX_KEY)
   {
-    // FIXME: handler error
-    return true;
+    file->ha_external_lock(in_use, F_RDLCK);
+    // See get_index_min_value(), get_index_max_value()
+    if (file->ha_index_init(s->vers.end_key, true))
+    {
+      // FIXME: handler error, unlock
+      return true;
+    }
+    if (file->ha_index_first(record[0]))
+    {
+      // FIXME: handler error, unlock
+      return true;
+    }
+    vers_end_field()->get_timestamp(row_end_min);
+    // FIXME: what about partitions?
+    if (file->ha_index_last(record[0]))
+    {
+      // FIXME: handler error, unlock
+      return true;
+    }
+    vers_end_field()->get_timestamp(row_end_max);
+    if (file->ha_index_end())
+    {
+      // FIXME: handler error, unlock
+      return true;
+    }
+    file->ha_external_unlock(in_use);
+//     return false;
   }
-  if (file->ha_index_first(record[0]))
+  // TODO: prune to first history partition for row_end_min and last for row_end_max?
+
+  int error;
+  THD *thd= in_use;
+#define newx new (thd->mem_root)
+  const LEX_CSTRING &fend= s->vers.end_field(s)->field_name;
+  Item *field_end=   newx Item_field(thd, thd->lex->current_context(),
+                                     s->db, s->table_name, thd->strmake_lex_cstring(fend));
+
+  Item *conds= newx Item_sum_min(thd, field_end);
+  SQL_SELECT *select= make_select(this, 0, 0, conds, (SORT_INFO*) 0, 0, &error);
+  if (unlikely(error))
+    return true;
+
+  covering_keys= s->keys_for_keyread;
+  if (select && select->check_quick(thd, false, 0))
   {
-    // FIXME: handler error
-    return true;
+    covering_keys.clear_all();
+    // FIXME: error?
+    return false;
   }
+  covering_keys.clear_all();
   return false;
 }
 

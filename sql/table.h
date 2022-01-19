@@ -1776,7 +1776,8 @@ public:
     return field[s->period.end_fieldno];
   }
 
-  bool vers_find_min_max_stats();
+  bool vers_find_min_max_stats(my_time_hires *row_end_min,
+                               my_time_hires *row_end_max);
 
 
   ulonglong vers_start_id() const;

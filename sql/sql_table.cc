@@ -10190,7 +10190,10 @@ do_continue:;
   reenable_binlog(thd);
 
   debug_crash_here("ddl_log_alter_after_create_frm");
-  vers_min_max_stats();
+  my_time_hires row_end_min;
+  my_time_hires row_end_max;
+  if (table->versioned())
+    table->vers_find_min_max_stats(&row_end_min, &row_end_max);
 
   if (unlikely(error))
     goto err_cleanup;
