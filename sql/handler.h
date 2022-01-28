@@ -35,6 +35,7 @@
 #include "sql_array.h"          /* Dynamic_array<> */
 #include "mdl.h"
 #include "vers_string.h"
+#include "backup.h"
 
 #include "sql_analyze_stmt.h" // for Exec_time_tracker 
 
@@ -1827,6 +1828,12 @@ handlerton *ha_default_tmp_handlerton(THD *thd);
 */
 #define HTON_REQUIRES_NOTIFY_TABLEDEF_CHANGED_AFTER_COMMIT (1 << 20)
 
+/*
+  Indicates that rename table is expensive operation.
+  When set atomic CREATE OR REPLACE TABLE is not used.
+*/
+#define HTON_EXPENSIVE_RENAME (1 << 21)
+
 class Ha_trx_info;
 
 struct THD_TRANS
@@ -2312,8 +2319,70 @@ struct Table_scope_and_contents_source_st:
   bool vers_check_system_fields(THD *thd, Alter_info *alter_info,
                                 const Lex_table_name &table_name,
                                 const Lex_table_name &db);
-
 };
+
+typedef struct st_ddl_log_state DDL_LOG_STATE;
+
+bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
+                   TABLE_LIST *res);
+
+struct Atomic_info
+{
+  /* NOTE: TABLE_LIST is not defined in handler.h */
+  TABLE_LIST *tmp_name;
+  TABLE_LIST *backup_name;
+  DDL_LOG_STATE *ddl_log_state_create;
+  DDL_LOG_STATE *ddl_log_state_rm;
+  handlerton *old_hton;
+  backup_log_info drop_entry;
+
+  Atomic_info()
+  {
+    bzero(this, sizeof(*this));
+  }
+
+  Atomic_info(DDL_LOG_STATE *ddl_log_state_rm)
+  {
+    bzero(this, sizeof(*this));
+    Atomic_info::ddl_log_state_rm= ddl_log_state_rm;
+  }
+};
+
+
+/*
+  mysql_create_table_no_lock can be called in one of the following
+  mutually exclusive situations:
+
+  - Just a normal ordinary CREATE TABLE statement that explicitly
+    defines the table structure.
+
+  - CREATE TABLE ... SELECT. It is special, because only in this case,
+    the list of fields is allowed to have duplicates, as long as one of the
+    duplicates comes from the select list, and the other doesn't. For
+    example in
+
+       CREATE TABLE t1 (a int(5) NOT NUL) SELECT b+10 as a FROM t2;
+
+    the list in alter_info->create_list will have two fields `a`.
+
+  - ALTER TABLE, that creates a temporary table #sql-xxx, which will be later
+    renamed to replace the original table.
+
+  - ALTER TABLE as above, but which only modifies the frm file, it only
+    creates an frm file for the #sql-xxx, the table in the engine is not
+    created.
+
+  - Assisted discovery, CREATE TABLE statement without the table structure.
+
+  These situations are distinguished by the following "create table mode"
+  values, except CREATE ... SELECT which is denoted by non-zero
+  Alter_info::select_field_count.
+*/
+
+#define C_ORDINARY_CREATE         0
+#define C_ALTER_TABLE             1
+#define C_ALTER_TABLE_FRM_ONLY    2
+#define C_ASSISTED_DISCOVERY      4
 
 
 /**
@@ -2322,7 +2391,8 @@ struct Table_scope_and_contents_source_st:
   parts are handled on the SQL level and are not needed on the handler level.
 */
 struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
-                       public Schema_specification_st
+                       public Schema_specification_st,
+                       public Atomic_info
 {
   /* TODO: remove after MDEV-20865 */
   Alter_info *alter_info;
@@ -2367,6 +2437,44 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
     else
       return table_options;
   }
+  bool is_atomic_replace_usable() const
+  {
+    return !tmp_table() && !sequence &&
+           !(db_type->flags & HTON_EXPENSIVE_RENAME) &&
+           !DBUG_IF("ddl_log_expensive_rename");
+  }
+  bool finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table);
+  void finalize_ddl(THD *thd, bool roll_back);
+
+  /**
+    Helper for making utility table names for atomic CREATE OR REPLACE.
+
+    Creates two temporary names: "create" (used for new table)
+    and "backup" (used for saving old table).
+
+    @param new_table[out]         Holds "create" name on return
+    @param backup_table[out]      Holds "backup" name on return
+    @param create_table[in/out]   Original table name, on output holds new name
+    @param create_table_mode[out] Create flags or-ed with C_ALTER_TABLE
+  */
+
+  bool make_tmp_table_list(THD *thd, TABLE_LIST *new_table,
+                           TABLE_LIST *backup_table,
+                           TABLE_LIST **create_table,
+                           int *create_table_mode)
+  {
+    if (make_tmp_name(thd, "create", *create_table, new_table))
+      return true;
+    if (make_tmp_name(thd, "backup", *create_table, backup_table))
+      return true;
+    (*create_table_mode)|= C_ALTER_TABLE;
+    DBUG_ASSERT(!(options & HA_CREATE_TMP_ALTER));
+    options|= HA_CREATE_TMP_ALTER;
+    tmp_name= new_table;
+    backup_name= backup_table;
+    *create_table= new_table;
+    return false;
+  }
 };
 
 
@@ -2398,6 +2506,10 @@ struct Table_specification_st: public HA_CREATE_INFO,
   {
     HA_CREATE_INFO::options= 0;
     DDL_options_st::init();
+  }
+  bool is_atomic_replace() const
+  {
+    return or_replace() && is_atomic_replace_usable();
   }
 };
 
@@ -2693,6 +2805,8 @@ typedef struct st_key_create_information
   The hooks are usually used for functions that does several things,
   e.g., create_table_from_items(), which both create a table and lock
   it.
+
+  TODO: Remove creepy TABLEOP_HOOKS interface?
  */
 class TABLEOP_HOOKS
 {
@@ -5280,7 +5394,8 @@ bool ha_table_exists(THD *thd, const LEX_CSTRING *db,
                      const LEX_CSTRING *table_name,
                      LEX_CUSTRING *table_version= 0,
                      LEX_CSTRING *partition_engine_name= 0,
-                     handlerton **hton= 0, bool *is_sequence= 0);
+                     handlerton **hton= 0, bool *is_sequence= 0,
+                     uint flags= 0);
 bool ha_check_if_updates_are_ignored(THD *thd, handlerton *hton,
                                      const char *op);
 #endif /* MYSQL_SERVER */

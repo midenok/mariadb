@@ -6151,7 +6151,7 @@ static my_bool discover_existence(THD *thd, plugin_ref plugin,
 bool ha_table_exists(THD *thd, const LEX_CSTRING *db,
                      const LEX_CSTRING *table_name, LEX_CUSTRING *table_id,
                      LEX_CSTRING *partition_engine_name,
-                     handlerton **hton, bool *is_sequence)
+                     handlerton **hton, bool *is_sequence, uint flags)
 {
   handlerton *dummy;
   bool dummy2;
@@ -6206,7 +6206,7 @@ retry_from_frm:
 #endif
   char path[FN_REFLEN + 1];
   size_t path_len = build_table_filename(path, sizeof(path) - 1,
-                                         db->str, table_name->str, "", 0);
+                                         db->str, table_name->str, "", flags);
   st_discover_existence_args args= {path, path_len, db->str, table_name->str, 0, true};
 
   if (file_ext_exists(path, path_len, reg_ext))
@@ -6987,8 +6987,7 @@ int handler::binlog_log_row(TABLE *table,
   THD *thd= table->in_use;
   DBUG_ENTER("binlog_log_row");
 
-  if (!thd->binlog_table_maps &&
-      thd->binlog_write_table_maps())
+  if (!thd->binlog_table_maps && thd->binlog_write_table_maps(table))
     DBUG_RETURN(HA_ERR_RBR_LOGGING_FAILED);
 
   error= (*log_func)(thd, table, row_logging_has_trans,
@@ -8744,8 +8743,8 @@ bool Table_period_info::check_field(const Create_field* f,
 }
 
 bool Table_scope_and_contents_source_st::check_fields(
-  THD *thd, Alter_info *alter_info,
-  const Lex_table_name &table_name, const Lex_table_name &db)
+    THD *thd, Alter_info *alter_info, const Lex_table_name &table_name,
+    const Lex_table_name &db)
 {
   return (vers_check_system_fields(thd, alter_info, table_name, db) ||
           check_period_fields(thd, alter_info));
