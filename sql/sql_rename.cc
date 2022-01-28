@@ -199,7 +199,7 @@ bool mysql_rename_tables(THD *thd, TABLE_LIST *table_list, bool silent,
   else
   {
     /* Revert the renames of normal tables with the help of the ddl log */
-    ddl_log_revert(thd, &ddl_log_state);
+    error|= ddl_log_revert(thd, &ddl_log_state);
   }
 
 err:
@@ -228,20 +228,6 @@ do_rename_temporary(THD *thd, TABLE_LIST *ren_table, TABLE_LIST *new_table)
 
 
 /**
-   Parameters for do_rename
-*/
-
-struct rename_param
-{
-  LEX_CSTRING old_alias, new_alias;
-  LEX_CUSTRING old_version;
-  handlerton *from_table_hton;
-};
-
-
-/**
-  check_rename()
-
   Check pre-conditions for rename
   - From table should exists
   - To table should not exists.
@@ -257,7 +243,7 @@ struct rename_param
   @retval <0  Can't do rename, but no error
 */
 
-static int
+int
 rename_check_preconditions(THD *thd, rename_param *param,
                            Table_name *ren_table,
                            const LEX_CSTRING *new_db,
@@ -283,7 +269,8 @@ rename_check_preconditions(THD *thd, rename_param *param,
 
   if (!ha_table_exists(thd, &ren_table->db, &param->old_alias,
                        &param->old_version, NULL,
-                       &param->from_table_hton, NULL, 0) ||
+                       &param->from_table_hton, NULL,
+                       (param->rename_flags & FN_FROM_IS_TMP)) ||
       !param->from_table_hton)
   {
     my_error(ER_NO_SUCH_TABLE, MYF(if_exists ? ME_NOTE : 0),
@@ -303,7 +290,8 @@ rename_check_preconditions(THD *thd, rename_param *param,
     DBUG_RETURN(-1);
   }
 
-  if (ha_table_exists(thd, new_db, &param->new_alias, NULL, NULL, NULL, NULL, 0))
+  if (ha_table_exists(thd, new_db, &param->new_alias, NULL, NULL, NULL, NULL,
+                      (param->rename_flags & FN_TO_IS_TMP)))
   {
     my_error(ER_TABLE_EXISTS_ERROR, MYF(0), param->new_alias.str);
     DBUG_RETURN(1);                     // This can't be skipped
@@ -316,7 +304,6 @@ rename_check_preconditions(THD *thd, rename_param *param,
   Rename a single table or a view
 
   SYNPOSIS
-    do_rename()
       thd               Thread handle
       ren_table         A table/view to be renamed
       new_db            The database to which the table to be moved to
@@ -333,7 +320,7 @@ rename_check_preconditions(THD *thd, rename_param *param,
     true      rename failed
 */
 
-static bool
+bool
 rename_table_and_triggers(THD *thd, rename_param *param,
                           DDL_LOG_STATE *ddl_log_state,
                           Table_name *ren_table, const LEX_CSTRING *new_db,
@@ -343,6 +330,7 @@ rename_table_and_triggers(THD *thd, rename_param *param,
   handlerton *hton;
   LEX_CSTRING *old_alias, *new_alias;
   TRIGGER_RENAME_PARAM rename_param;
+  rename_param.rename_flags= param->rename_flags;
   DBUG_ENTER("do_rename");
   DBUG_PRINT("enter", ("skip_error: %d", (int) skip_error));
 
@@ -350,15 +338,14 @@ rename_table_and_triggers(THD *thd, rename_param *param,
   new_alias= &param->new_alias;
   hton=      param->from_table_hton;
 
-  DBUG_ASSERT(!thd->locked_tables_mode);
-
 #ifdef WITH_WSREP
   if (WSREP(thd) && hton && hton != view_pseudo_hton &&
       !wsrep_should_replicate_ddl(thd, hton))
     DBUG_RETURN(1);
 #endif
 
-  tdc_remove_table(thd, ren_table->db.str, ren_table->table_name.str);
+  if (!(param->rename_flags & FN_FROM_IS_TMP))
+    tdc_remove_table(thd, ren_table->db.str, ren_table->table_name.str);
 
   if (hton != view_pseudo_hton)
   {
@@ -376,19 +363,23 @@ rename_table_and_triggers(THD *thd, rename_param *param,
 
     thd->replication_flags= 0;
 
-    if (ddl_log_rename_table(ddl_log_state, hton,
-                             &ren_table->db, old_alias, new_db, new_alias))
+    if (ddl_log_state &&
+        ddl_log_rename_table(ddl_log_state, hton,
+                             &ren_table->db, old_alias, new_db, new_alias,
+                             DDL_RENAME_PHASE_TABLE, 0))
       DBUG_RETURN(1);
 
     debug_crash_here("ddl_log_rename_before_rename_table");
     if (!(rc= mysql_rename_table(hton, &ren_table->db, old_alias,
-                                 new_db, new_alias, &param->old_version, 0)))
+                                 new_db, new_alias, &param->old_version,
+                                 param->rename_flags)))
     {
       /* Table rename succeded.
          It's safe to start recovery at rename trigger phase
       */
       debug_crash_here("ddl_log_rename_before_phase_trigger");
-      ddl_log_update_phase(ddl_log_state, DDL_RENAME_PHASE_TRIGGER);
+      if (ddl_log_state)
+        ddl_log_update_phase(ddl_log_state, DDL_RENAME_PHASE_TRIGGER);
 
       debug_crash_here("ddl_log_rename_before_rename_trigger");
 
@@ -401,10 +392,13 @@ rename_table_and_triggers(THD *thd, rename_param *param,
                                                        new_alias)))
       {
         debug_crash_here("ddl_log_rename_before_stat_tables");
-        (void) rename_table_in_stat_tables(thd, &ren_table->db,
-                                           &ren_table->table_name,
-                                           new_db, new_alias);
-        debug_crash_here("ddl_log_rename_after_stat_tables");
+        if (!(param->rename_flags & FN_IS_TMP))
+        {
+          (void) rename_table_in_stat_tables(thd, &ren_table->db,
+                                            &ren_table->table_name,
+                                            new_db, new_alias);
+          debug_crash_here("ddl_log_rename_after_stat_tables");
+        }
       }
       else
       {
@@ -419,7 +413,8 @@ rename_table_and_triggers(THD *thd, rename_param *param,
                                   &ren_table->db, old_alias, &param->old_version,
                                   NO_FK_CHECKS);
         debug_crash_here("ddl_log_rename_after_revert_rename_table");
-        ddl_log_disable_entry(ddl_log_state);
+        if (ddl_log_state)
+          ddl_log_disable_entry(ddl_log_state);
         debug_crash_here("ddl_log_rename_after_disable_entry");
       }
     }
@@ -440,6 +435,7 @@ rename_table_and_triggers(THD *thd, rename_param *param,
       DBUG_RETURN(1);
     }
 
+    DBUG_ASSERT(ddl_log_state);
     ddl_log_rename_view(ddl_log_state, &ren_table->db,
                         &ren_table->table_name, new_db, new_alias);
     debug_crash_here("ddl_log_rename_before_rename_view");

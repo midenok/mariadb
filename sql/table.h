@@ -75,6 +75,7 @@ typedef ulonglong nested_join_map;
 
 #define tmp_file_prefix "#sql"			/**< Prefix for tmp tables */
 #define tmp_file_prefix_length 4
+#define backup_file_prefix tmp_file_prefix "-backup-"
 #define TMP_TABLE_KEY_EXTRA 8
 
 /**
@@ -335,6 +336,7 @@ typedef struct st_grant_info
 
 enum tmp_table_type
 {
+  TMP_TABLE_ATOMIC_REPLACE= -1,
   NO_TMP_TABLE= 0, NON_TRANSACTIONAL_TMP_TABLE, TRANSACTIONAL_TMP_TABLE,
   INTERNAL_TMP_TABLE, SYSTEM_TMP_TABLE
 };
@@ -1784,6 +1786,7 @@ public:
   void vers_update_fields();
   void vers_update_end();
   void find_constraint_correlated_indexes();
+  bool referenced_by_foreign_table(THD *thd, FOREIGN_KEY_INFO *&fk_info) const;
 
 /** Number of additional fields used in versioned tables */
 #define VERSIONING_FIELDS 2
