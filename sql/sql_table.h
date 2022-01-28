@@ -26,6 +26,7 @@
 
 class Alter_info;
 class Alter_table_ctx;
+struct Atomic_info;
 class Column_definition;
 class Create_field;
 struct TABLE_LIST;
@@ -132,13 +133,14 @@ bool add_keyword_to_query(THD *thd, String *result, const LEX_CSTRING *keyword,
 #define C_ASSISTED_DISCOVERY      3
 
 int mysql_create_table_no_lock(THD *thd,
-                               DDL_LOG_STATE *ddl_log_state,
-                               DDL_LOG_STATE *ddl_log_state_rm,
+                               const LEX_CSTRING *orig_db,
+                               const LEX_CSTRING *orig_table_name,
                                const LEX_CSTRING *db,
                                const LEX_CSTRING *table_name,
                                Table_specification_st *create_info,
                                Alter_info *alter_info, bool *is_trans,
-                               int create_table_mode, TABLE_LIST *table);
+                               int create_table_mode, TABLE_LIST *table,
+                               LEX_CUSTRING *frm= NULL);
 
 handler *mysql_create_frm_image(THD *thd,
                                 const LEX_CSTRING &db,
@@ -191,7 +193,7 @@ bool mysql_rm_table(THD *thd,TABLE_LIST *tables, bool if_exists,
                     bool dont_log_query);
 int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
                             const LEX_CSTRING *db,
-                            DDL_LOG_STATE *ddl_log_state,
+                            Atomic_info *atomic_info,
                             bool if_exists,
                             bool drop_temporary, bool drop_view,
                             bool drop_sequence,
@@ -224,5 +226,13 @@ uint explain_filename(THD* thd, const char *from, char *to, uint to_length,
 extern MYSQL_PLUGIN_IMPORT const LEX_CSTRING primary_key_name;
 
 bool check_engine(THD *, const char *, const char *, HA_CREATE_INFO *);
+
+bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
+                   TABLE_LIST *res);
+
+bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
+                                const LEX_CSTRING &table_name,
+                                const DDL_options_st options,
+                                HA_CREATE_INFO *create_info, int &error);
 
 #endif /* SQL_TABLE_INCLUDED */

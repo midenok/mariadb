@@ -12186,6 +12186,7 @@ create_table_info_t::create_foreign_keys()
 	dict_foreign_set      local_fk_set;
 	dict_foreign_set_free local_fk_set_free(local_fk_set);
 	dberr_t		      error;
+	bool		      tmp_ref_table;
 	ulint		      number	      = 1;
 	static const unsigned MAX_COLS_PER_FK = 500;
 	const char*	      column_names[MAX_COLS_PER_FK];
@@ -12200,6 +12201,7 @@ create_table_info_t::create_foreign_keys()
 	const CHARSET_INFO*   cs	= thd_charset(m_thd);
 	const char*	      operation = "Create ";
 	const char*	      name	= m_table_name;
+	const char*	      basename;
 
 	enum_sql_command sqlcom = enum_sql_command(thd_sql_command(m_thd));
 
@@ -12207,10 +12209,11 @@ create_table_info_t::create_foreign_keys()
 		dict_table_t* table_to_alter;
 		mem_heap_t*   heap = mem_heap_create(10000);
 		ulint	      highest_id_so_far;
+		DBUG_ASSERT(!m_create_info->tmp_name);
 		char*	      n = dict_get_referenced_table(
 			name, LEX_STRING_WITH_LEN(m_form->s->db),
 			LEX_STRING_WITH_LEN(m_form->s->table_name),
-			&table_to_alter, heap, cs);
+			&table_to_alter, heap, cs, false);
 
 		/* Starting from 4.0.18 and 4.1.2, we generate foreign key id's
 		in the format databasename/tablename_ibfk_[number], where
@@ -12260,6 +12263,8 @@ create_table_info_t::create_foreign_keys()
 
 		return (DB_CANNOT_ADD_CONSTRAINT);
 	}
+
+	basename = table->name.basename();
 
 	while (Key* key = key_it++) {
 		if (key->type != Key::FOREIGN_KEY)
@@ -12398,10 +12403,17 @@ create_table_info_t::create_foreign_keys()
 		memcpy(foreign->foreign_col_names, column_names,
 		       i * sizeof(void*));
 
+		/* In case of self-ref when the table is temporary
+		ref_table is temporary too. We must skip charset conversion
+		in that case. */
+		tmp_ref_table = !strcmp(basename, fk->ref_table.str)
+			? (m_create_info->tmp_name != NULL) : false;
+
 		foreign->referenced_table_name = dict_get_referenced_table(
 			name, LEX_STRING_WITH_LEN(fk->ref_db),
 			LEX_STRING_WITH_LEN(fk->ref_table),
-			&foreign->referenced_table, foreign->heap, cs);
+			&foreign->referenced_table, foreign->heap, cs,
+			tmp_ref_table);
 
 		if (!foreign->referenced_table_name) {
 			return (DB_OUT_OF_MEMORY);
