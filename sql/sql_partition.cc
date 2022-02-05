@@ -6566,21 +6566,18 @@ public:
         ddl_log_entry.from_name= { part_name, strlen(part_name) };
         ddl_log_entry.name= { new_name, strlen(new_name) };
       }
-
-      if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
-        return true;
-      *next_entry= log_entry->entry_pos;
-      ddl_log_add_entry(part_info, log_entry);        }
+    }
     else
     {
       ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
       ddl_log_entry.name= { part_name, strlen(part_name) };
-
-      if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
-        return true;
-      *next_entry= log_entry->entry_pos;
-      ddl_log_add_entry(part_info, log_entry);
     }
+
+    if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
+      return true;
+    *next_entry= log_entry->entry_pos;
+    part_elem->log_entry= log_entry;
+    ddl_log_add_entry(part_info, log_entry);
 
     return false;
   }
@@ -6808,6 +6805,9 @@ static bool write_log_drop_partition(ALTER_PARTITION_PARAM_TYPE *lpt, DDL_LOG_ST
   mysql_mutex_lock(&LOCK_gdl);
   if (write_log_dropped_partitions(lpt, &next_entry, (const char*)path,
                                    FALSE))
+    goto error;
+
+  if (ddl_log_delete_frm(part_info, (const char*) bak_path))
     goto error;
   if (write_log_replace_frm(lpt, (const char*)tmp_path,
                             (const char*)path))
