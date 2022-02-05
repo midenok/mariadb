@@ -7068,10 +7068,37 @@ static bool alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt)
 
   if (lpt->table)
   {
-    /*
-      Remove all instances of the table and its locks and other resources.
-    */
-    close_all_tables_for_name(thd, lpt->table->s, HA_EXTRA_NOT_USED, NULL);
+    TABLE *table= lpt->table;
+    if (!thd->mdl_context.is_lock_owner(MDL_key::TABLE, lpt->db.str,
+                                        lpt->table_name.str,
+                                        MDL_EXCLUSIVE) &&
+        wait_while_table_is_used(thd, table, HA_EXTRA_FORCE_REOPEN))
+    {
+      /*
+        Did not succeed in getting exclusive access to the table.
+
+        Since we have altered a cached table object (and its part_info) we need
+        at least to remove this instance so it will not be reused.
+
+        Temporarily remove it from the locked table list, so that it will get
+        reopened.
+      */
+      thd->locked_tables_list.unlink_from_list(thd,
+                                              table->pos_in_locked_tables,
+                                              false);
+      /*
+        Make sure that the table is unlocked, closed and removed from
+        the table cache.
+      */
+      mysql_lock_remove(thd, thd->lock, table);
+      close_thread_table(thd, &thd->open_tables);
+      lpt->table_list->table= NULL;
+    }
+    else
+    {
+      /* Ensure the share is destroyed and reopened. */
+      close_all_tables_for_name(thd, table->s, HA_EXTRA_NOT_USED, NULL);
+    }
   }
   lpt->table= 0;
   lpt->table_list->table= 0;
@@ -7534,7 +7561,6 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
         ERROR_INJECT("drop_partition_3") ||
         write_log_drop_partition(lpt, &cleanup_chain) ||
-        (action_completed= TRUE, FALSE) ||
         ERROR_INJECT("drop_partition_4") ||
         alter_close_table(lpt) ||
         ERROR_INJECT("drop_partition_5") ||
@@ -7548,8 +7574,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     {
       ddl_log_complete(lpt->part_info);
       (void) ddl_log_revert(thd, &cleanup_chain);
-      // FIXME: is this needed?
-      handle_alter_part_error(lpt, action_completed, TRUE, frm_install);
+      (void) alter_partition_lock_handling(lpt);
       goto err;
     }
 
