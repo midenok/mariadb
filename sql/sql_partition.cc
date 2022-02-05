@@ -7516,8 +7516,16 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   else if (alter_info->partition_flags & ALTER_PARTITION_DROP)
   {
     DDL_LOG_STATE cleanup_chain;
-    bool res;
+    bool res= false;
     bzero(&cleanup_chain, sizeof(cleanup_chain));
+
+    /*
+       part_info chain contains roll forward actions,
+       cleanup_chain drops shadow frm.
+
+       If cleanup_chain is active part_info chain is not executed.
+       FIXME: what happens when cleanup_chain then part_info chain are executed?
+    */
 
     if (write_log_drop_frm(lpt, &cleanup_chain, false) ||
         ERROR_INJECT("drop_partition_1") ||
@@ -7534,10 +7542,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("drop_partition_6") ||
         ((!thd->lex->no_write_to_binlog) &&
           ((thd->binlog_xid= thd->query_id),
-           ddl_log_update_xid(lpt->part_info, thd->binlog_xid),
+           ddl_log_update_xid(&cleanup_chain, thd->binlog_xid),
            write_bin_log(thd, false, thd->query(), thd->query_length()),
-           (thd->binlog_xid= 0))) ||
-        ERROR_INJECT("drop_partition_7"))
+           (thd->binlog_xid= 0))))
     {
       ddl_log_complete(lpt->part_info);
       (void) ddl_log_revert(thd, &cleanup_chain);
@@ -7546,13 +7553,16 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       goto err;
     }
 
+    if (ERROR_INJECT("drop_partition_7"))
+      res= true;
     ddl_log_complete(&cleanup_chain);
-    ERROR_INJECT("drop_partition_8");
-    res= ddl_log_revert(thd, lpt->part_info, DDL_LOG_ERR_ROLLBACK);
+    if (ERROR_INJECT("drop_partition_8"))
+      res= true;
+    res|= ddl_log_revert(thd, lpt->part_info, DDL_LOG_ERR_ROLLBACK);
 
     if (alter_partition_lock_handling(lpt) ||
         res ||
-        ERROR_INJECT("convert_partition_9"))
+        ERROR_INJECT("drop_partition_9"))
       goto err;
   }
   else if (alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT)

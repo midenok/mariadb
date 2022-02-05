@@ -2,6 +2,8 @@
 # also using error injection to test recovery of failures.
 # uses $DATADIR and $engine
 
+--source include/log_bin.inc
+
 --echo #
 --echo # Bug#53676: Unexpected errors and possible table corruption on
 --echo # ADD PARTITION and LOCK TABLE

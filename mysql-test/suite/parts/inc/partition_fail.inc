@@ -1,5 +1,9 @@
 # Include file to decrease test code duplication
 
+RESET MASTER;
+let $keep_include_silent= 1;
+let $grep_script= ALTER;
+let $binlog_file=master-bin.000001;
 --eval $create_statement
 --eval $insert_statement
 --let $dbug_flag= `select @@session.debug_dbug`
@@ -19,8 +23,10 @@ SELECT * FROM t1;
 SHOW CREATE TABLE t1;
 --sorted_result
 SELECT * FROM t1;
+--source include/show_binlog_events.inc
 DROP TABLE t1;
 
+RESET MASTER;
 --eval $create_statement
 --eval $insert_statement
 --echo # $dbug_flag: BEFORE failure (under LOCK TABLE)
@@ -39,5 +45,6 @@ LOCK TABLE t1 WRITE;
 SHOW CREATE TABLE t1;
 --sorted_result
 SELECT * FROM t1;
+--source include/show_binlog_events.inc
 UNLOCK TABLES;
 DROP TABLE t1;
