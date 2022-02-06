@@ -6725,7 +6725,10 @@ error:
 static inline
 bool write_log_drop_shadow_frm(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
-  return write_log_drop_frm(lpt, lpt->part_info, false);
+  bool res= write_log_drop_frm(lpt, lpt->part_info, false);
+  if (!res)
+    lpt->drop_shadow_frm= lpt->part_info->main_entry;
+  return res;
 }
 
 
@@ -7015,7 +7018,7 @@ static void release_log_entries(partition_info *part_info)
   RETURN VALUES
     true on error
 */
-static bool alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt)
+static bool alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt, bool reopen= true)
 {
   THD *thd= lpt->thd;
 
@@ -7055,7 +7058,7 @@ static bool alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt)
   }
   lpt->table= 0;
   lpt->table_list->table= 0;
-  if (thd->locked_tables_mode)
+  if (reopen && thd->locked_tables_mode)
     return thd->locked_tables_list.reopen_tables(thd, false);
 
   return false;
@@ -7670,8 +7673,12 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("add_partition_10"))
     {
       ddl_log_complete(&chain_drop_backup);
-      (void) ddl_log_revert(thd, lpt->part_info);
-      (void) alter_partition_lock_handling(lpt);
+      DDL_LOG_STATE state= *lpt->part_info;
+      /* We may fail to drop partitions due to existing locking, so must unlock first */
+      (void) alter_partition_lock_handling(lpt, false);
+      (void) ddl_log_revert(thd, &state);
+      if (thd->locked_tables_mode)
+        (void) thd->locked_tables_list.reopen_tables(thd, false);
       goto err;
     }
     ddl_log_complete(lpt->part_info);

@@ -954,8 +954,8 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 
 err:
 #ifdef WITH_PARTITION_STORAGE_ENGINE
-    ddl_log_increment_phase(part_info->main_entry->entry_pos);
-    part_info->main_entry= NULL;
+    ddl_log_increment_phase(lpt->drop_shadow_frm->entry_pos);
+    lpt->drop_shadow_frm= NULL;
     (void) ddl_log_sync();
 #endif
     ;

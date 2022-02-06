@@ -23,6 +23,7 @@
 
 #include "sql_list.h"                           /* List */
 #include "table.h"                              /* TABLE_LIST */
+#include "ddl_log.h"
 
 class Alter_info;
 class Alter_table_ctx;
@@ -65,6 +66,7 @@ typedef struct st_lock_param_type
   uint key_count;
   uint db_options;
   size_t pack_frm_len;
+  DDL_LOG_MEMORY_ENTRY *drop_shadow_frm;
   // TODO: remove duplicate data: part_info can be accessed via table->part_info
   partition_info *part_info;
 } ALTER_PARTITION_PARAM_TYPE;
