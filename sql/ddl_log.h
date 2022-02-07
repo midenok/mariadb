@@ -258,6 +258,7 @@ enum ddl_log_error_mode
 {
   DDL_LOG_ERR_IGNORE= 0,
   DDL_LOG_ERR_REPORT,
+  DDL_LOG_ERR_WARN,
   DDL_LOG_ERR_ROLLBACK
 };
 

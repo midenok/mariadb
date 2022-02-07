@@ -32,3 +32,9 @@ SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,fail_add_partition_10";
 --source suite/parts/inc/partition_fail.inc
 SET SESSION debug_dbug=@save_dbug;
+SET SESSION debug_dbug="+d,fail_add_partition_11";
+--source suite/parts/inc/partition_fail.inc
+SET SESSION debug_dbug=@save_dbug;
+SET SESSION debug_dbug="+d,fail_add_partition_12";
+--source suite/parts/inc/partition_fail.inc
+SET SESSION debug_dbug=@save_dbug;

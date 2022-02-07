@@ -1404,7 +1404,11 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         if (unlikely((error= hton->drop_table(hton, ddl_log_entry->name.str))))
         {
           if (error_mode || !non_existing_table_error(error))
+          {
+            if (error_mode)
+              (void) increment_phase(entry_pos);
             break;
+          }
         }
       }
       if (increment_phase(entry_pos))
@@ -1531,7 +1535,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     /* fall through */
     case DDL_RENAME_PHASE_TABLE:
       /* Restore frm and table to original names */
-      flags= error_mode ? FN_FROM_IS_TMP : 0;
+      flags= error_mode ? FN_FROM_IS_TMP : 0; // FIXME: what is this?
       error= execute_rename_table(ddl_log_entry, file,
                                   &ddl_log_entry->db, &ddl_log_entry->name,
                                   &ddl_log_entry->from_db, &ddl_log_entry->from_name,
@@ -1636,7 +1640,11 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         if (error)
         {
           if (error_mode || !non_existing_table_error(error))
+          {
+            if (error_mode)
+              (void) increment_phase(entry_pos);
             break;
+          }
           error= -1;
         }
       }
@@ -2364,6 +2372,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
 end:
   if (error_mode)
   {
+    DDL_LOG_STATE *rollback;
     if (error && file)
     {
       TABLE_SHARE share;
@@ -2373,10 +2382,13 @@ end:
       share.normalized_path=  ddl_log_entry->tmp_name;
       /* TODO: make TABLE_SHARE-independent handler::print_error()? */
       file->change_table_ptr(NULL, &share);
-      file->print_error(error, MYF(0));
+      file->print_error(error, MYF(error_mode == DDL_LOG_ERR_WARN ? ME_WARNING : 0));
     }
-    DDL_LOG_STATE *rollback;
-    if (error && error_mode == DDL_LOG_ERR_ROLLBACK &&
+    if (error_mode == DDL_LOG_ERR_WARN)
+    {
+      error= 0;
+    }
+    else if (error && error_mode == DDL_LOG_ERR_ROLLBACK &&
         (rollback= *rollback_chain) && rollback->is_active() &&
         rollback->execute_entry)
     {

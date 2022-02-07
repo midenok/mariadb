@@ -18,6 +18,7 @@ SELECT * FROM t1;
 --eval $fail_statement
 --enable_abort_on_error
 --echo # $dbug_flag: AFTER failure
+show warnings;
 --replace_result #p# #P# #sp# #SP#
 --list_files $DATADIR/test
 SHOW CREATE TABLE t1;
@@ -40,6 +41,7 @@ LOCK TABLE t1 WRITE;
 --eval $fail_statement
 --enable_abort_on_error
 --echo # $dbug_flag: AFTER failure (under LOCK TABLE)
+show warnings;
 --replace_result #p# #P# #sp# #SP#
 --list_files $DATADIR/test
 SHOW CREATE TABLE t1;

@@ -7417,8 +7417,6 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   partition_info *part_info;
   ALTER_PARTITION_PARAM_TYPE lpt_obj;
   ALTER_PARTITION_PARAM_TYPE *lpt= &lpt_obj;
-  bool action_completed= FALSE;
-  bool frm_install= FALSE;
   MDL_ticket *mdl_ticket= table->mdl_ticket;
   /* option_bits is used to mark if we should log the query with IF EXISTS */
   ulonglong save_option_bits= thd->variables.option_bits;
@@ -7529,6 +7527,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
            (thd->binlog_xid= 0))))
     {
       ddl_log_complete(lpt->part_info);
+      // FIXME: DDL_LOG_ERR_WARN
       (void) ddl_log_revert(thd, &cleanup_chain);
       (void) alter_partition_lock_handling(lpt);
       goto err;
@@ -7578,11 +7577,12 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     {
       ddl_log_complete(&chain_drop_backup);
       (void) ddl_log_revert(thd, lpt->part_info);
-      // FIXME: replace with alter_partition_lock_handling()
+      // FIXME: replace with alter_partition_lock_handling() + DDL_LOG_ERR_WARN
       handle_alter_part_error(lpt, true, true, false);
       goto err;
     }
     ddl_log_complete(lpt->part_info);
+    // FIXME: make like in ADD PARTITION
     ERROR_INJECT("convert_partition_10");
     (void) ddl_log_revert(thd, &chain_drop_backup);
     if (alter_partition_lock_handling(lpt) ||
@@ -7613,11 +7613,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("convert_partition_6") ||
         alter_partition_convert_in(lpt) ||
         ERROR_INJECT("convert_partition_7") ||
-        (frm_install= true, false) ||
         write_log_drop_frm(lpt, &chain_drop_backup, true) ||
         mysql_write_frm(lpt, WFRM_INSTALL_SHADOW|WFRM_BACKUP_ORIGINAL) ||
         log_partition_alter_to_ddl_log(lpt) ||
-        (frm_install= false, false) ||
         ERROR_INJECT("convert_partition_8") ||
         ((!thd->lex->no_write_to_binlog) &&
           ((thd->binlog_xid= thd->query_id),
@@ -7628,11 +7626,12 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     {
       ddl_log_complete(&chain_drop_backup);
       (void) ddl_log_revert(thd, lpt->part_info);
-      // FIXME: replace with alter_partition_lock_handling()
+      // FIXME: replace with alter_partition_lock_handling() + DDL_LOG_ERR_WARN
       handle_alter_part_error(lpt, true, true, false);
       goto err;
     }
     ddl_log_complete(lpt->part_info);
+    // FIXME: make like in ADD PARTITION
     ERROR_INJECT("convert_partition_10");
     (void) ddl_log_revert(thd, &chain_drop_backup);
     if (alter_partition_lock_handling(lpt) ||
@@ -7644,6 +7643,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
             part_info->part_type == LIST_PARTITION))
   {
     DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN));
+    bool res= false;
     DDL_LOG_STATE chain_drop_backup;
     bzero(&chain_drop_backup, sizeof(chain_drop_backup));
 
@@ -7669,22 +7669,27 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
           ((thd->binlog_xid= thd->query_id),
            ddl_log_update_xid(lpt->part_info, thd->binlog_xid),
            write_bin_log(thd, false, thd->query(), thd->query_length()),
-           (thd->binlog_xid= 0))) ||
-        ERROR_INJECT("add_partition_10"))
+           (thd->binlog_xid= 0))))
     {
       ddl_log_complete(&chain_drop_backup);
       DDL_LOG_STATE state= *lpt->part_info;
       /* We may fail to drop partitions due to existing locking, so must unlock first */
       (void) alter_partition_lock_handling(lpt, false);
-      (void) ddl_log_revert(thd, &state);
+      (void) ddl_log_revert(thd, &state, DDL_LOG_ERR_WARN);
       if (thd->locked_tables_mode)
         (void) thd->locked_tables_list.reopen_tables(thd, false);
       goto err;
     }
+
+    if (ERROR_INJECT("add_partition_10"))
+      res= true;
     ddl_log_complete(lpt->part_info);
-    ERROR_INJECT("add_partition_11");
-    (void) ddl_log_revert(thd, &chain_drop_backup);
+    if (ERROR_INJECT("add_partition_11"))
+      res= true;
+    res|= ddl_log_revert(thd, &chain_drop_backup, DDL_LOG_ERR_WARN);
+
     if (alter_partition_lock_handling(lpt) ||
+        res ||
         ERROR_INJECT("add_partition_12"))
       goto err;
   }
@@ -7695,55 +7700,11 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       COALESCE PARTITION/
       REBUILD PARTITION/
       REORGANIZE PARTITION
- 
-      In this case all records are still around after the change although
-      possibly organised into new partitions, thus by ensuring that all
-      updates go to both the old and the new partitioning scheme we can
-      actually perform this operation lock-free. The only exception to
-      this is when REORGANIZE PARTITION adds/drops ranges. In this case
-      there needs to be an exclusive lock during the time when the range
-      changes occur.
-      This is only possible if the handler can ensure double-write for a
-      period. The double write will ensure that it doesn't matter where the
-      data is read from since both places are updated for writes. If such
-      double writing is not performed then it is necessary to perform the
-      change with the usual exclusive lock. With double writes it is even
-      possible to perform writes in parallel with the reorganisation of
-      partitions.
-
-      Without double write procedure we get the following procedure.
-      The only difference with using double write is that we can downgrade
-      the lock to TL_WRITE_ALLOW_WRITE. Double write in this case only
-      double writes from old to new. If we had double writing in both
-      directions we could perform the change completely without exclusive
-      lock for HASH partitions.
-      Handlers that perform double writing during the copy phase can actually
-      use a lower lock level. This can be handled inside store_lock in the
-      respective handler.
-
-      0) Write an entry that removes the shadow frm file if crash occurs.
-      1) Write the shadow frm file of new partitioning.
-      2) Log such that temporary partitions added in change phase are
-         removed in a crash situation.
-      3) Add the new partitions.
-         Copy from the reorganised partitions to the new partitions.
-      4) Get an exclusive metadata lock on the table (waits for all active
-         transactions using this table). This ensures that we
-         can release all other locks on the table and since no one can open
-         the table, there can be no new threads accessing the table. They
-         will be hanging on this exclusive lock.
-      5) Close the table.
-      6) Log that operation is completed and log all complete actions
-         needed to complete operation from here.
-      7) Old place for write bin log.
-      8) Prepare handlers for rename and delete of partitions.
-      9) Rename and drop the reorged partitions such that they are no
-         longer used and rename those added to their real new names.
-      10) Install the shadow frm file.
-      11) Reopen the table if under lock tables.
-      12) Write to binlog
-      13) Complete query.
     */
+    bool res= false;
+    DDL_LOG_STATE chain_drop_backup;
+    bzero(&chain_drop_backup, sizeof(chain_drop_backup));
+
     if (write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT("change_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
@@ -7757,28 +7718,40 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         alter_close_table(lpt) ||
         ERROR_INJECT("change_partition_6") ||
         write_log_final_change_partition(lpt) ||
-        (action_completed= TRUE, FALSE) ||
         ERROR_INJECT("change_partition_7") ||
+        mysql_write_frm(lpt, WFRM_INSTALL_SHADOW|WFRM_BACKUP_ORIGINAL) ||
         ERROR_INJECT("change_partition_8") ||
-        ((frm_install= TRUE), FALSE) ||
-        mysql_write_frm(lpt, WFRM_INSTALL_SHADOW) ||
         log_partition_alter_to_ddl_log(lpt) ||
-        (frm_install= FALSE, FALSE) ||
         ERROR_INJECT("change_partition_9") ||
         mysql_drop_partitions(lpt) ||
         ERROR_INJECT("change_partition_10") ||
         mysql_rename_partitions(lpt) ||
         ERROR_INJECT("change_partition_11") ||
-        (write_log_completed(lpt, FALSE), FALSE) ||
         ((!thd->lex->no_write_to_binlog) &&
-         (write_bin_log(thd, FALSE,
-                        thd->query(), thd->query_length()), FALSE)) ||
-        ERROR_INJECT("change_partition_12"))
+          ((thd->binlog_xid= thd->query_id),
+           ddl_log_update_xid(lpt->part_info, thd->binlog_xid),
+           write_bin_log(thd, false, thd->query(), thd->query_length()),
+           (thd->binlog_xid= 0))))
     {
-      handle_alter_part_error(lpt, action_completed, FALSE, frm_install);
+      ddl_log_complete(&chain_drop_backup);
+      DDL_LOG_STATE state= *lpt->part_info;
+      /* We may fail to drop partitions due to existing locking, so must unlock first */
+      (void) alter_partition_lock_handling(lpt, false);
+      (void) ddl_log_revert(thd, &state, DDL_LOG_ERR_WARN);
+      if (thd->locked_tables_mode)
+        (void) thd->locked_tables_list.reopen_tables(thd, false);
       goto err;
     }
-    if (alter_partition_lock_handling(lpt))
+    if (ERROR_INJECT("change_partition_12"))
+      res= true;
+    ddl_log_complete(lpt->part_info);
+    if (ERROR_INJECT("change_partition_13"))
+      res= true;
+    res|= ddl_log_revert(thd, &chain_drop_backup, DDL_LOG_ERR_WARN);
+
+    if (alter_partition_lock_handling(lpt) ||
+        res ||
+        ERROR_INJECT("change_partition_14"))
       goto err;
   }
   thd->variables.option_bits= save_option_bits;
