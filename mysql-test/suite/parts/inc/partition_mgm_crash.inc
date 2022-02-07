@@ -26,7 +26,7 @@ if ($do_crash)
 --source suite/parts/inc/partition_crash_add.inc
 }
 let $fail_statement= $crash_statement;
-if ($do_fail)
+if ($do_fail0)
 {
 --source suite/parts/inc/partition_fail_add.inc
 }
@@ -36,7 +36,7 @@ if ($do_crash)
 --source suite/parts/inc/partition_crash_drop.inc
 }
 let $fail_statement= $crash_statement;
-if ($do_fail)
+if ($do_fail0)
 {
 --source suite/parts/inc/partition_fail_drop.inc
 }
