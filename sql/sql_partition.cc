@@ -6545,33 +6545,32 @@ public:
     if (Alter_partition_action::process_partition(part_elem))
       return true;
 
-    // FIXME: remove this fork
-    if (part_elem->part_state == PART_TO_BE_DROPPED)
+    if (phase != DROP_ADDED_PARTS)
     {
+      DBUG_ASSERT(phase == DROP_BACKUPS || phase == RENAME_TO_BACKUPS);
+      DBUG_ASSERT(part_elem->part_state == PART_TO_BE_DROPPED);
       DBUG_ASSERT(name_variant == NORMAL_PART_NAME);
-
       if (create_partition_name(new_name, sizeof(new_name), path,
                                 part_elem->partition_name, TEMP_PART_NAME,
                                 true /* translate */))
         return true;
-
-      if (phase == DROP_BACKUPS)
-      {
-        ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
-        ddl_log_entry.name= { new_name, strlen(new_name) };
-      }
-      else
-      {
-        DBUG_ASSERT(phase == RENAME_TO_BACKUPS);
-        ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
-        ddl_log_entry.from_name= { part_name, strlen(part_name) };
-        ddl_log_entry.name= { new_name, strlen(new_name) };
-      }
     }
-    else
+
+    switch (phase)
     {
+    case DROP_BACKUPS:
+      ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
+      ddl_log_entry.name= { new_name, strlen(new_name) };
+      break;
+    case RENAME_TO_BACKUPS:
+      ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
+      ddl_log_entry.from_name= { part_name, strlen(part_name) };
+      ddl_log_entry.name= { new_name, strlen(new_name) };
+      break;
+    case DROP_ADDED_PARTS:
       ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
       ddl_log_entry.name= { part_name, strlen(part_name) };
+      break;
     }
 
     if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
@@ -6623,12 +6622,11 @@ bool Alter_partition_action::iterate()
 inline
 static bool write_log_dropped_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
                                          uint *next_entry, const char *path,
-                                         Action_drop::Mode mode)
+                                         Action_drop::Mode mode,
+                                         List<partition_element> *temp_partitions= NULL)
 {
   bool res;
-  Action_drop act(lpt, next_entry, path,
-                  lpt->alter_info->partition_flags & ALTER_PARTITION_REORGANIZE ?
-                    &lpt->part_info->temp_partitions : NULL);
+  Action_drop act(lpt, next_entry, path, temp_partitions);
   act.phase= mode;
   res= act.iterate();
   if (res || mode != Action_drop::DROP_BACKUPS)
@@ -6916,7 +6914,9 @@ static bool write_log_final_change_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
   if (write_log_changed_partitions(lpt, &next_entry, (const char*)path))
     goto error;
   if (write_log_dropped_partitions(lpt, &next_entry, (const char*)path,
-                                   Action_drop::DROP_ADDED_PARTS))
+                                   Action_drop::DROP_ADDED_PARTS,
+                                   lpt->alter_info->partition_flags & ALTER_PARTITION_REORGANIZE ?
+                                   &lpt->part_info->temp_partitions : NULL))
     goto error;
   // FIXME: now this is rename
   if (write_log_replace_frm(lpt, shadow_path, path))
