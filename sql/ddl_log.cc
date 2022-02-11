@@ -1472,7 +1472,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     /* fall through */
     case DDL_RENAME_PHASE_TABLE:
       /* Restore frm and table to original names */
-      flags= report_error ? FN_FROM_IS_TMP : 0;
+      flags= FN_FROM_IS_TMP; // archive-test_sql_discovery.discover
       error= execute_rename_table(ddl_log_entry, file,
                                   &ddl_log_entry->db, &ddl_log_entry->name,
                                   &ddl_log_entry->from_db, &ddl_log_entry->from_name,
