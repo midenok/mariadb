@@ -6297,7 +6297,8 @@ bool write_log_replace_frm(ALTER_PARTITION_PARAM_TYPE *lpt,
     the partition handler.
 */
 
-static bool write_log_changed_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
+// FIXME: remove
+static bool write_log_changed_partitions0(ALTER_PARTITION_PARAM_TYPE *lpt,
                                          uint *next_entry, const char *path)
 {
   DDL_LOG_ENTRY ddl_log_entry;
@@ -6382,6 +6383,7 @@ static bool write_log_changed_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
     }
   } while (++i < num_elements);
   DBUG_RETURN(FALSE);
+
 }
 
 
@@ -6412,13 +6414,26 @@ public:
   }
 
   virtual ~Alter_partition_action() {}
-
   bool iterate();
-
   virtual void set_name_variant(partition_element *) {}
+  virtual bool check_state(partition_element *part_elem)= 0;
 
-  bool process_subpartition(partition_element *part_elem, partition_element *sub_elem)
+  virtual bool process_partition(partition_element *part_elem)
   {
+    ddl_log_entry.next_entry= *next_entry;
+    lex_string_set(&ddl_log_entry.handler_name,
+                    ha_resolve_storage_engine_name(part_elem->engine_type));
+    if (create_partition_name(part_name, sizeof(part_name), path,
+                              part_elem->partition_name, name_variant,
+                              true /* translate */))
+      return true;
+
+    return false;
+  }
+
+  virtual bool process_subpartition(partition_element *part_elem, partition_element *sub_elem)
+  {
+    // FIXME: where it is tested?
     DDL_LOG_MEMORY_ENTRY *log_entry;
     char tmp_path[FN_REFLEN + 1];
 
@@ -6439,25 +6454,20 @@ public:
     ddl_log_add_entry(part_info, log_entry);
     return false;
   }
-
-  virtual bool process_partition(partition_element *part_elem)
-  {
-    ddl_log_entry.next_entry= *next_entry;
-    lex_string_set(&ddl_log_entry.handler_name,
-                    ha_resolve_storage_engine_name(part_elem->engine_type));
-    if (create_partition_name(part_name, sizeof(part_name), path,
-                              part_elem->partition_name, name_variant,
-                              true /* translate */))
-      return true;
-
-    return false;
-  }
 };
 
 
 class Action_convert_in : public Alter_partition_action
 {
 public:
+  bool check_state(partition_element *part_elem)
+  {
+    // FIXME: refine
+    return part_elem->part_state == PART_TO_BE_DROPPED ||
+           part_elem->part_state == PART_TO_BE_ADDED ||
+           part_elem->part_state == PART_CHANGED;
+  }
+
   Action_convert_in(ALTER_PARTITION_PARAM_TYPE *lpt, uint *next_entry, const char *path) :
                     Alter_partition_action(lpt, next_entry, path, NULL)
   {
@@ -6494,6 +6504,14 @@ class Action_convert_out : public Action_convert_in
 public:
   using Action_convert_in::Action_convert_in;
 
+  bool check_state(partition_element *part_elem)
+  {
+    // FIXME: refine
+    return part_elem->part_state == PART_TO_BE_DROPPED ||
+           part_elem->part_state == PART_TO_BE_ADDED ||
+           part_elem->part_state == PART_CHANGED;
+  }
+
   bool process_partition(partition_element *part_elem)
   {
     DBUG_ASSERT(new_name);
@@ -6528,6 +6546,14 @@ public:
   } phase;
 
   using Alter_partition_action::Alter_partition_action;
+
+  bool check_state(partition_element *part_elem)
+  {
+    // FIXME: refine
+    return part_elem->part_state == PART_TO_BE_DROPPED ||
+           part_elem->part_state == PART_TO_BE_ADDED ||
+           part_elem->part_state == PART_CHANGED;
+  }
 
   void set_name_variant(partition_element *part_elem)
   {
@@ -6584,6 +6610,91 @@ public:
 };
 
 
+/**
+  Change partition action (ADD HASH/COALESCE/REBUILD/REORGANIZE)
+*/
+
+class Action_change : public Alter_partition_action
+{
+public:
+  Action_change(ALTER_PARTITION_PARAM_TYPE *lpt, uint *next_entry, const char *path) :
+                Alter_partition_action(lpt, next_entry, path, NULL)
+  {
+  }
+
+  bool check_state(partition_element *part_elem)
+  {
+    return part_elem->part_state == PART_IS_CHANGED ||
+            (part_elem->part_state == PART_IS_ADDED &&
+              part_info->temp_partitions.elements);
+
+  }
+
+  bool process_partition(partition_element *part_elem)
+  {
+    char tmp_path[FN_REFLEN + 1];
+    char normal_path[FN_REFLEN + 1];
+
+    ddl_log_entry.next_entry= *next_entry;
+    lex_string_set(&ddl_log_entry.handler_name,
+                    ha_resolve_storage_engine_name(part_elem->engine_type));
+    if (create_partition_name(tmp_path, sizeof(tmp_path), path,
+                              part_elem->partition_name, TEMP_PART_NAME,
+                              TRUE) ||
+        create_partition_name(normal_path, sizeof(normal_path), path,
+                              part_elem->partition_name, NORMAL_PART_NAME,
+                              TRUE))
+      return true;
+    lex_string_set(&ddl_log_entry.name, normal_path);
+    lex_string_set(&ddl_log_entry.from_name, tmp_path);
+    if (part_elem->part_state == PART_IS_CHANGED)
+      ddl_log_entry.action_type= DDL_LOG_REPLACE_ACTION;
+    else
+      ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
+    if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
+      return true;
+    *next_entry= log_entry->entry_pos;
+    part_elem->log_entry= log_entry;
+    ddl_log_add_entry(part_info, log_entry);
+    return false;
+  }
+
+  bool process_subpartition(partition_element *part_elem, partition_element *sub_elem)
+  {
+    // FIXME: where it is tested?
+    char tmp_path[FN_REFLEN + 1];
+    char normal_path[FN_REFLEN + 1];
+
+    ddl_log_entry.next_entry= *next_entry;
+    lex_string_set(&ddl_log_entry.handler_name,
+                    ha_resolve_storage_engine_name(sub_elem->
+                                                  engine_type));
+    if (create_subpartition_name(tmp_path, sizeof(tmp_path), path,
+                                  part_elem->partition_name,
+                                  sub_elem->partition_name,
+                                  TEMP_PART_NAME) ||
+        create_subpartition_name(normal_path, sizeof(normal_path), path,
+                                  part_elem->partition_name,
+                                  sub_elem->partition_name,
+                                  NORMAL_PART_NAME))
+      return true;
+    lex_string_set(&ddl_log_entry.name, normal_path);
+    lex_string_set(&ddl_log_entry.from_name, tmp_path);
+    if (part_elem->part_state == PART_IS_CHANGED)
+      ddl_log_entry.action_type= DDL_LOG_REPLACE_ACTION;
+    else
+      ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
+    if (ddl_log_write_entry(&ddl_log_entry, &log_entry))
+      return true;
+
+    *next_entry= log_entry->entry_pos;
+    sub_elem->log_entry= log_entry;
+    ddl_log_add_entry(part_info, log_entry);
+    return false;
+  }
+};
+
+
 bool Alter_partition_action::iterate()
 {
   List_iterator<partition_element> part_it(*parts);
@@ -6591,9 +6702,7 @@ bool Alter_partition_action::iterate()
   partition_element *part_elem;
   while ((part_elem= part_it++))
   {
-    if (part_elem->part_state == PART_TO_BE_DROPPED ||
-        part_elem->part_state == PART_TO_BE_ADDED ||
-        part_elem->part_state == PART_CHANGED)
+    if (check_state(part_elem))
     {
       set_name_variant(part_elem);
       if (part_info->is_sub_partitioned())
@@ -6634,6 +6743,16 @@ static bool write_log_dropped_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
   act.phase= Action_drop::RENAME_TO_BACKUPS;
   return act.iterate();
 }
+
+
+inline
+static bool write_log_changed_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
+                                         uint *next_entry, const char *path)
+{
+  Action_change act(lpt, next_entry, path);
+  return act.iterate();
+}
+
 
 inline
 static bool write_log_convert_partition(ALTER_PARTITION_PARAM_TYPE *lpt,
@@ -7709,16 +7828,20 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("change_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
         ERROR_INJECT("change_partition_2") ||
+        /* Drop TMP partitions */
         write_log_add_change_partition(lpt) ||
         ERROR_INJECT("change_partition_3") ||
+        /* Add TMP partitions, fill with data */
         mysql_change_partitions(lpt) ||
         ERROR_INJECT("change_partition_4") ||
         wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
         ERROR_INJECT("change_partition_5") ||
         alter_close_table(lpt) ||
         ERROR_INJECT("change_partition_6") ||
+        /* Drop old partitions, rename TMP partitions */
         write_log_final_change_partition(lpt) ||
         ERROR_INJECT("change_partition_7") ||
+        write_log_drop_frm(lpt, &chain_drop_backup, true) ||
         mysql_write_frm(lpt, WFRM_INSTALL_SHADOW|WFRM_BACKUP_ORIGINAL) ||
         ERROR_INJECT("change_partition_8") ||
         log_partition_alter_to_ddl_log(lpt) ||
