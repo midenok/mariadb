@@ -6,7 +6,7 @@
 
 --disable_query_log
 let $default_engine=InnoDB;
-let $extra_option=;
+let $extra_option= '';
 let $save_debug=`select @@debug_dbug`;
 let $show_error=0;
 let $drop_error=0;
@@ -24,15 +24,14 @@ if ($MTR_COMBINATION_ARIA)
 if ($MTR_COMBINATION_ARIA_NOTRANS)
 {
   let $default_engine=Aria;
-  # FIXME: extra option not used
-  let $extra_option=transactional=0;
+  let $extra_option=' engine=aria,transactional=0';
   call mtr.add_suppression("Checking table");
   call mtr.add_suppression("marked as crashed");
 }
 if ($MTR_COMBINATION_EXPENSIVE_RENAME)
 {
   let $default_engine=Aria;
-  let $extra_option=transactional=0;
+  let $extra_option=' engine=aria,transactional=0';
   let $show_error=0, ER_NO_SUCH_TABLE;
   let $drop_error=0, ER_BAD_TABLE_ERROR;
   set @@debug_dbug="+d,ddl_log_expensive_rename";
@@ -85,15 +84,16 @@ let $crash_points='ddl_log_create_after_log_rename',
 #let $crash_points='ddl_log_create_log_complete';
 
 let $statement_count=3;
-let $statements='CREATE OR REPLACE TABLE t1 (new int)',
+let $statements='CREATE OR REPLACE TABLE t1 (new int) EXTRA_OPTION',
                 'CREATE OR REPLACE TABLE t1 LIKE const_table',
-                'CREATE OR REPLACE TABLE t1 SELECT * from const_table';
+                'CREATE OR REPLACE TABLE t1 EXTRA_OPTION SELECT * from const_table';
 
 #let $statement_count=1;
 #let $statements='CREATE OR REPLACE TABLE t1 SELECT * from const_table';
 
 --disable_query_log
-eval create table const_table (new int, b int) $extra_option;
+let create_const=`select REPLACE('create table const_table (new int, b int) EXTRA_OPTION', ' EXTRA_OPTION', $extra_option)`;
+eval $create_const;
 --replace_result $default_engine DEFAULT_ENGINE ' PAGE_CHECKSUM=1' '' ' TRANSACTIONAL=0' ''
 show create table const_table;
 --enable_query_log
@@ -110,11 +110,7 @@ let $r=0;
 while ($r < $statement_count)
 {
   inc $r;
-  let $STATEMENT=`select ELT($r, $statements)`;
-  if ($r == 0)
-  {
-    let $STATEMENT= $STATEMENT $extra_option;
-  }
+  let $STATEMENT=`select REPLACE(ELT($r, $statements), ' EXTRA_OPTION', $extra_option)`;
   --echo # QUERY: $STATEMENT
 
   let $c=0;
