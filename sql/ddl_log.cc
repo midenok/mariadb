@@ -1582,15 +1582,8 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         break;
       /* Fall through */
     case DDL_DROP_PHASE_TRIGGER:
-      /*
-        Note: frm is already deleted and build_table_filename() will not detect
-        FN_IS_TMP flag.
-      */
-      flags= (ddl_log_entry->flags & DDL_LOG_FLAG_TMP_TABLE) ? FN_IS_TMP : 0;
-
       Table_triggers_list::drop_all_triggers(thd, &db, &table,
-                                             MYF(MY_WME | MY_IGNORE_ENOENT),
-                                             flags);
+                                             MYF(MY_WME | MY_IGNORE_ENOENT));
       if (increment_phase(entry_pos))
         break;
       /* Fall through */
