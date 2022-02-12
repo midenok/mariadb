@@ -36,6 +36,7 @@ if ($MTR_COMBINATION_EXPENSIVE_RENAME)
   let $show_error=0, ER_NO_SUCH_TABLE;
   let $drop_error=0, ER_BAD_TABLE_ERROR;
   set @@debug_dbug="+d,ddl_log_expensive_rename";
+  call mtr.add_suppression("WARNING: 1 UNDO records skipped in UNDO phase;");
 }
 
 if ($MTR_COMBINATION_STMT)
