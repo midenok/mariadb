@@ -4208,9 +4208,6 @@ bool select_insert::prepare_eof()
   DBUG_ASSERT(trans_table || !changed || 
               thd->transaction->stmt.modified_non_trans_table);
 
-  if (close_table())
-    DBUG_RETURN(true);
-
   /*
     Write to binlog before commiting transaction.  No statement will
     be written by the binlog_query() below in RBR mode.  All the
@@ -4231,8 +4228,7 @@ bool select_insert::prepare_eof()
                            trans_table, FALSE, FALSE, errcode);
     if (res > 0)
     {
-      if (table)
-        table->file->ha_release_auto_increment();
+      table->file->ha_release_auto_increment();
       DBUG_RETURN(true);
     }
     /*
@@ -4242,16 +4238,12 @@ bool select_insert::prepare_eof()
     */
     binary_logged= res == 0 || !table->s->tmp_table;
   }
-  if (table)
-  {
-    table->s->table_creation_was_logged|= binary_logged;
-    table->file->ha_release_auto_increment();
-  }
+  table->s->table_creation_was_logged|= binary_logged;
+  table->file->ha_release_auto_increment();
 
   if (unlikely(error))
   {
-    if (table)
-      table->file->print_error(error,MYF(0));
+    table->file->print_error(error,MYF(0));
     DBUG_RETURN(true);
   }
 
@@ -4584,21 +4576,17 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
           This hack disables logging for Aria table (that is not needed anyway
           for a temporary table).
         */
-        const bool transaction= thd->transaction->on;
-        if (transaction)
-          ha_enable_transaction(thd, false);
+        bool on_save= thd->transaction->on;
         thd->transaction->on= false;
         if (create_table->table->file->ha_external_lock(thd, F_WRLCK))
         {
-          if (transaction)
-            ha_enable_transaction(thd, true);
           // FIXME: test
           create_table->table= 0;
+          thd->transaction->on= on_save;
           goto err;
         }
 
-        if (transaction)
-          ha_enable_transaction(thd, true);
+        thd->transaction->on= on_save;
         create_table->table->s->can_do_row_logging= 1;
       }
     }
@@ -5069,21 +5057,6 @@ void select_create::store_values(List<Item> &values)
 }
 
 
-bool select_create::close_table()
-{
-  bool res= false;
-  if (atomic_replace)
-  {
-    create_table= orig_table;
-    create_info->table= NULL;
-    table->file->ha_reset();
-    res= thd->drop_temporary_table(table, NULL, false);
-    if (!res)
-      table= NULL;
-  }
-  return res;
-}
-
 bool select_create::send_eof()
 {
   DBUG_ENTER("select_create::send_eof");
@@ -5158,20 +5131,14 @@ bool select_create::send_eof()
       thd->restore_tmp_table_share(saved_tmp_table_share);
     }
   }
-#if 0
   else if (atomic_replace)
   {
     create_table= orig_table;
     create_info->table= NULL;
-    debug_crash_here("ddl_log_create_after_prepare_eof2");
     table->file->ha_reset();
-    debug_crash_here("ddl_log_create_after_prepare_eof3");
     thd->drop_temporary_table(table, NULL, false);
-    debug_crash_here("ddl_log_create_after_prepare_eof4");
     table= NULL;
   }
-#endif
-
 
   /*
     Do an implicit commit at end of statement for non-temporary
