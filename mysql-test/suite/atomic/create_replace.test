@@ -80,16 +80,16 @@ let $crash_points='ddl_log_create_after_log_rename',
                   'ddl_log_create_before_remove_backup',
                   'ddl_log_create_log_complete';
 
-#let $crash_count=1;
-#let $crash_points='ddl_log_create_log_complete';
+let $crash_count=1;
+let $crash_points='ddl_log_create_after_prepare_eof4';
 
 let $statement_count=3;
 let $statements='CREATE OR REPLACE TABLE t1 (new int) EXTRA_OPTION',
                 'CREATE OR REPLACE TABLE t1 LIKE const_table',
                 'CREATE OR REPLACE TABLE t1 EXTRA_OPTION SELECT * from const_table';
 
-#let $statement_count=1;
-#let $statements='CREATE OR REPLACE TABLE t1 SELECT * from const_table';
+let $statement_count=1;
+let $statements='CREATE OR REPLACE TABLE t1 EXTRA_OPTION SELECT * from const_table';
 
 --disable_query_log
 let create_const=`select REPLACE('create table const_table (new int, b int) EXTRA_OPTION', ' EXTRA_OPTION', $extra_option)`;
