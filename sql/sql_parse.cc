@@ -8024,6 +8024,7 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
                                  0);
 
           int error __attribute__((unused));
+          DBUG_PRINT("QUERY", (thd->query()));
           error= mysql_execute_command(thd);
           MYSQL_QUERY_EXEC_DONE(error);
 	}

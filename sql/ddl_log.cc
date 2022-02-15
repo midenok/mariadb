@@ -1472,7 +1472,12 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     /* fall through */
     case DDL_RENAME_PHASE_TABLE:
       /* Restore frm and table to original names */
-      flags= FN_FROM_IS_TMP; // archive-test_sql_discovery.discover
+      // FIXME: check archive-test_sql_discovery.discover
+      flags= 0;
+      if (ddl_log_entry->flags & DDL_LOG_FLAG_FROM_IS_TMP)
+        flags|= FN_FROM_IS_TMP;
+      if (ddl_log_entry->flags & DDL_LOG_FLAG_TO_IS_TMP)
+        flags|= FN_TO_IS_TMP;
       error= execute_rename_table(ddl_log_entry, file,
                                   &ddl_log_entry->db, &ddl_log_entry->name,
                                   &ddl_log_entry->from_db, &ddl_log_entry->from_name,
@@ -3078,8 +3083,10 @@ bool ddl_log_rename_table(THD *thd, DDL_LOG_STATE *ddl_state,
                           const LEX_CSTRING *org_db,
                           const LEX_CSTRING *org_alias,
                           const LEX_CSTRING *new_db,
-                          const LEX_CSTRING *new_alias)
+                          const LEX_CSTRING *new_alias,
+                          uint16 flags)
 {
+  // TODO: thd is unused!
   DDL_LOG_ENTRY ddl_log_entry;
   DBUG_ENTER("ddl_log_rename_file");
 
@@ -3094,6 +3101,7 @@ bool ddl_log_rename_table(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(org_db);
   ddl_log_entry.from_name=    *const_cast<LEX_CSTRING*>(org_alias);
   ddl_log_entry.phase=        DDL_RENAME_PHASE_TABLE;
+  ddl_log_entry.flags=        flags;
 
   DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
 }
