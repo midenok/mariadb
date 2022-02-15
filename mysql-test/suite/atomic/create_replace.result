@@ -121,6 +121,27 @@ t1	CREATE TABLE `t1` (
   `new` int(11) DEFAULT NULL
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
+# CRASH POINT: ddl_log_create_after_remove_backup
+t1.MAD
+t1.MAI
+t1.frm
+master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `new` int(11) DEFAULT NULL
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
+# CRASH POINT: ddl_log_create_after_remove_backup_fk
+# No crash!
+t1.MAD
+t1.MAI
+t1.frm
+master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `new` int(11) DEFAULT NULL
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_log_complete
 t1.MAD
 t1.MAI
@@ -234,6 +255,29 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_before_remove_backup
+t1.MAD
+t1.MAI
+t1.frm
+master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 LIKE const_table
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `new` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
+# CRASH POINT: ddl_log_create_after_remove_backup
+t1.MAD
+t1.MAI
+t1.frm
+master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 LIKE const_table
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `new` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
+# CRASH POINT: ddl_log_create_after_remove_backup_fk
+# No crash!
 t1.MAD
 t1.MAI
 t1.frm
@@ -369,6 +413,35 @@ new	b
 2	2
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_before_remove_backup
+t1.MAD
+t1.MAI
+t1.frm
+master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `new` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+new	b
+1	1
+2	2
+Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
+# CRASH POINT: ddl_log_create_after_remove_backup
+t1.MAD
+t1.MAI
+t1.frm
+master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `new` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL
+) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
+new	b
+1	1
+2	2
+Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
+# CRASH POINT: ddl_log_create_after_remove_backup_fk
+# No crash!
 t1.MAD
 t1.MAI
 t1.frm

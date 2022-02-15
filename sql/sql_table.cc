@@ -4334,6 +4334,7 @@ HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
   return false;
 }
 
+#if 0
 bool HA_CREATE_INFO::finalize_ddl(THD *thd)
 {
   bool result;
@@ -4349,6 +4350,7 @@ bool HA_CREATE_INFO::finalize_ddl(THD *thd)
   result= ddl_log_revert(thd, ddl_log_state_rm, true);
   if (result && ddl_log_state_create->is_active())
   {
+    debug_crash_here("ddl_log_create_after_remove_backup_fk");
     /* In case roll forward fails we must roll back to drop tmp table */
     mysql_mutex_lock(&LOCK_gdl);
     ddl_log_write_execute_entry(ddl_log_state_create->list->entry_pos, 0,
@@ -4358,6 +4360,7 @@ bool HA_CREATE_INFO::finalize_ddl(THD *thd)
   }
   else
   {
+    debug_crash_here("ddl_log_create_after_remove_backup");
     mysql_mutex_lock(&LOCK_gdl);
     ddl_log_release_entries(ddl_log_state_create);
     mysql_mutex_unlock(&LOCK_gdl);
@@ -4366,6 +4369,43 @@ bool HA_CREATE_INFO::finalize_ddl(THD *thd)
   debug_crash_here("ddl_log_create_log_complete");
   return result;
 }
+#endif
+
+bool HA_CREATE_INFO::finalize_ddl(THD *thd)
+{
+  bool result;
+  if (ddl_log_state_create->execute_entry)
+  {
+    DBUG_ASSERT(ddl_log_state_create->is_active());
+    mysql_mutex_lock(&LOCK_gdl);
+    ddl_log_disable_execute_entry(&ddl_log_state_create->execute_entry);
+    mysql_mutex_unlock(&LOCK_gdl);
+  }
+  debug_crash_here("ddl_log_create_before_remove_backup");
+  /* NOTE: holds "drop old table; rename tmp table"  */
+  result= ddl_log_revert(thd, ddl_log_state_rm, true);
+  if (result && ddl_log_state_create->is_active())
+  {
+    debug_crash_here("ddl_log_create_after_remove_backup_fk");
+    /* In case roll forward fails we must roll back to drop tmp table */
+    mysql_mutex_lock(&LOCK_gdl);
+    ddl_log_write_execute_entry(ddl_log_state_create->list->entry_pos, 0,
+                                &ddl_log_state_create->execute_entry);
+    mysql_mutex_unlock(&LOCK_gdl);
+    (void) ddl_log_revert(thd, ddl_log_state_create);
+  }
+  else
+  {
+    debug_crash_here("ddl_log_create_after_remove_backup");
+    mysql_mutex_lock(&LOCK_gdl);
+    ddl_log_release_entries(ddl_log_state_create);
+    mysql_mutex_unlock(&LOCK_gdl);
+    ddl_log_state_create->list= 0;
+  }
+  debug_crash_here("ddl_log_create_log_complete");
+  return result;
+}
+
 
 bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
                                 const LEX_CSTRING &table_name,

@@ -67,7 +67,7 @@ drop table t1;
 
 let $MYSQLD_DATADIR= `SELECT @@datadir`;
 
-let $crash_count=11;
+let $crash_count=13;
 let $crash_points='ddl_log_create_after_log_rename',
                   'ddl_log_create_before_create_frm',
                   'ddl_log_create_before_create_table',
@@ -78,12 +78,14 @@ let $crash_points='ddl_log_create_after_log_rename',
                   'ddl_log_create_after_prepare_eof',
                   'ddl_log_create_after_binlog',
                   'ddl_log_create_before_remove_backup',
+                  'ddl_log_create_after_remove_backup',
+                  'ddl_log_create_after_remove_backup_fk',
                   'ddl_log_create_log_complete';
 
-#let $crash_count=1;
-#let $crash_points='ddl_log_create_log_complete';
+let $crash_count=1;
+let $crash_points='ddl_log_create_after_remove_backup_fk';
 
-let $statement_count=3;
+let $statement_count=1;
 let $statements='CREATE OR REPLACE TABLE t1 (new int) EXTRA_OPTION',
                 'CREATE OR REPLACE TABLE t1 LIKE const_table',
                 'CREATE OR REPLACE TABLE t1 EXTRA_OPTION SELECT * from const_table';
@@ -118,9 +120,14 @@ while ($r < $statement_count)
   {
     inc $c;
     let $crash=`select ELT($c, $crash_points)`;
-
+    
     --eval set @@default_storage_engine=$default_engine
     create or replace table t1 (old int);
+    if ($crash == 'ddl_log_create_after_remove_backup_fk')
+    {
+      create or replace table t1 (old int primary key, y int) engine innodb;
+      create table t2 (x int references t1(old)) engine innodb;
+    }
     create trigger a before insert on t1 for each row set @s= 1;
     flush tables;
     if (!$c)
@@ -178,6 +185,10 @@ while ($r < $statement_count)
     --replace_column 6 '' 7 '' 8 '' 9 '' 10 '' 11 ''
     show triggers;
     # Drop the tables. The warnings will show what was dropped
+    if ($crash == 'ddl_log_create_after_remove_backup_fk')
+    {
+      drop table t2;
+    }
     --disable_warnings
     --error $drop_error
     drop table t1;
