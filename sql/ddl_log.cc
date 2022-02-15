@@ -424,9 +424,9 @@ static bool update_master_entry(uint entry_pos, uint master_entry)
   DBUG_RETURN(mysql_file_pwrite(global_ddl_log.file_id, buff, sizeof(buff),
                                 global_ddl_log.io_size * entry_pos +
                                 DDL_LOG_MASTER_ENTRY_POS,
-                                MYF(MY_WME | MY_NABP)) ||
-              ddl_log_sync_file());
+                                MYF(MY_WME | MY_NABP)));
 }
+
 
 /*
   Disable an execute entry
@@ -1486,7 +1486,12 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     /* fall through */
     case DDL_RENAME_PHASE_TABLE:
       /* Restore frm and table to original names */
-      flags= FN_FROM_IS_TMP; // archive-test_sql_discovery.discover
+      // FIXME: check archive-test_sql_discovery.discover
+      flags= 0;
+      if (ddl_log_entry->flags & DDL_LOG_FLAG_FROM_IS_TMP)
+        flags|= FN_FROM_IS_TMP;
+      if (ddl_log_entry->flags & DDL_LOG_FLAG_TO_IS_TMP)
+        flags|= FN_TO_IS_TMP;
       error= execute_rename_table(ddl_log_entry, file,
                                   &ddl_log_entry->db, &ddl_log_entry->name,
                                   &ddl_log_entry->from_db, &ddl_log_entry->from_name,
@@ -3024,12 +3029,34 @@ bool ddl_log_update_unique_id(DDL_LOG_STATE *state, ulonglong id)
 bool ddl_log_update_master_entry(DDL_LOG_STATE *state, uint master_entry)
 {
   DBUG_ENTER("ddl_log_update_master_entry");
-  DBUG_PRINT("enter", ("id: %llu", master_entry));
+  DBUG_PRINT("enter", ("master: %llu", master_entry));
   /* The following may not be true in case of temporary tables */
   if (likely(state->list))
   {
     DBUG_ASSERT(state->execute_entry);
-    DBUG_RETURN(update_master_entry(state->execute_entry->entry_pos, master_entry));
+    state->master_chain_pos= master_entry;
+    DBUG_RETURN(update_master_entry(state->execute_entry->entry_pos, master_entry) ||
+                ddl_log_sync_file());
+  }
+  DBUG_RETURN(0);
+}
+
+
+bool ddl_log_swap_master(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state)
+{
+  DBUG_ENTER("ddl_log_swap_master");
+  /* The following may not be true in case of temporary tables */
+  if (state->list && master_state->list)
+  {
+    DBUG_ASSERT(state->execute_entry);
+    DBUG_ASSERT(master_state->execute_entry);
+    DBUG_ASSERT(master_state->master_chain_pos == state->execute_entry->entry_pos);
+    master_state->master_chain_pos= 0;
+    state->master_chain_pos= master_state->execute_entry->entry_pos;
+    DBUG_RETURN(update_master_entry(state->execute_entry->entry_pos,
+                                    state->master_chain_pos) ||
+                update_master_entry(master_state->execute_entry->entry_pos, 0) ||
+                ddl_log_sync_file());
   }
   DBUG_RETURN(0);
 }
@@ -3104,8 +3131,10 @@ bool ddl_log_rename_table(THD *thd, DDL_LOG_STATE *ddl_state,
                           const LEX_CSTRING *org_db,
                           const LEX_CSTRING *org_alias,
                           const LEX_CSTRING *new_db,
-                          const LEX_CSTRING *new_alias)
+                          const LEX_CSTRING *new_alias,
+                          uint16 flags)
 {
+  // TODO: thd is unused!
   DDL_LOG_ENTRY ddl_log_entry;
   DBUG_ENTER("ddl_log_rename_file");
 
@@ -3120,6 +3149,7 @@ bool ddl_log_rename_table(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(org_db);
   ddl_log_entry.from_name=    *const_cast<LEX_CSTRING*>(org_alias);
   ddl_log_entry.phase=        DDL_RENAME_PHASE_TABLE;
+  ddl_log_entry.flags=        flags;
 
   DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
 }

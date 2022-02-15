@@ -172,6 +172,8 @@ enum enum_ddl_log_alter_table_phase {
   engine is not changed
 */
 #define DDL_LOG_FLAG_ALTER_PARTITION      (1 << 4)
+#define DDL_LOG_FLAG_FROM_IS_TMP          (1 << 5)
+#define DDL_LOG_FLAG_TO_IS_TMP            (1 << 6)
 
 /*
   Setting ddl_log_entry.phase to this has the same effect as setting
@@ -281,6 +283,7 @@ bool ddl_log_update_phase(DDL_LOG_STATE *entry, uchar phase);
 bool ddl_log_add_flag(DDL_LOG_STATE *entry, uint16 flag);
 bool ddl_log_update_unique_id(DDL_LOG_STATE *state, ulonglong id);
 bool ddl_log_update_master_entry(DDL_LOG_STATE *state, uint master_entry);
+bool ddl_log_swap_master(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state);
 bool ddl_log_update_xid(DDL_LOG_STATE *state, ulonglong xid);
 bool ddl_log_disable_entry(DDL_LOG_STATE *state);
 bool ddl_log_increment_phase(uint entry_pos);
@@ -295,7 +298,8 @@ bool ddl_log_rename_table(THD *thd, DDL_LOG_STATE *ddl_state,
                           const LEX_CSTRING *org_db,
                           const LEX_CSTRING *org_alias,
                           const LEX_CSTRING *new_db,
-                          const LEX_CSTRING *new_alias);
+                          const LEX_CSTRING *new_alias,
+                          uint16 flags);
 bool ddl_log_rename_view(THD *thd, DDL_LOG_STATE *ddl_state,
                          const LEX_CSTRING *org_db,
                          const LEX_CSTRING *org_alias,
