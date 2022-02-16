@@ -4334,7 +4334,7 @@ HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
   return false;
 }
 
-#if 0
+// FIXME: remove
 bool HA_CREATE_INFO::finalize_ddl(THD *thd)
 {
   bool result;
@@ -4369,41 +4369,42 @@ bool HA_CREATE_INFO::finalize_ddl(THD *thd)
   debug_crash_here("ddl_log_create_log_complete");
   return result;
 }
-#endif
 
-bool HA_CREATE_INFO::finalize_ddl(THD *thd)
+bool HA_CREATE_INFO::finalize_ddl2(THD *thd)
 {
   bool result;
-  if (ddl_log_state_create->execute_entry)
-  {
-    DBUG_ASSERT(ddl_log_state_create->is_active());
-    mysql_mutex_lock(&LOCK_gdl);
-    ddl_log_disable_execute_entry(&ddl_log_state_create->execute_entry);
-    mysql_mutex_unlock(&LOCK_gdl);
-  }
   debug_crash_here("ddl_log_create_before_remove_backup");
+  ddl_log_swap_master(ddl_log_state_create, ddl_log_state_rm);
+  debug_crash_here("ddl_log_create_before_remove_backup2");
   /* NOTE: holds "drop old table; rename tmp table"  */
   result= ddl_log_revert(thd, ddl_log_state_rm, true);
-  if (result && ddl_log_state_create->is_active())
-  {
-    debug_crash_here("ddl_log_create_after_remove_backup_fk");
-    /* In case roll forward fails we must roll back to drop tmp table */
-    mysql_mutex_lock(&LOCK_gdl);
-    ddl_log_write_execute_entry(ddl_log_state_create->list->entry_pos, 0,
-                                &ddl_log_state_create->execute_entry);
-    mysql_mutex_unlock(&LOCK_gdl);
-    (void) ddl_log_revert(thd, ddl_log_state_create);
-  }
-  else
-  {
-    debug_crash_here("ddl_log_create_after_remove_backup");
-    mysql_mutex_lock(&LOCK_gdl);
-    ddl_log_release_entries(ddl_log_state_create);
-    mysql_mutex_unlock(&LOCK_gdl);
-    ddl_log_state_create->list= 0;
-  }
+  debug_crash_here("ddl_log_create_after_remove_backup");
+  ddl_log_complete(ddl_log_state_create);
   debug_crash_here("ddl_log_create_log_complete");
   return result;
+}
+
+static
+bool make_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
+{
+  char res_name[NAME_LEN + 1];
+
+  size_t len= my_snprintf(res_name, sizeof(res_name) - 1,
+                          backup_file_prefix "%lx-%llx", current_pid,
+                          thd->thread_id, orig->table_name.str);
+
+  LEX_CSTRING n= { res_name, len };
+  res->init_one_table(&orig->db, &n, &n, TL_WRITE);
+
+  res->table_name.str= strmake_root(thd->mem_root,
+                                    LEX_STRING_WITH_LEN(res->table_name));
+  if (!res->table_name.str)
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+  res->alias.str= res->table_name.str;
+  return false;
 }
 
 
@@ -5042,6 +5043,16 @@ err:
       DBUG_ASSERT(!atomic_replace);
       create_info->table->s->table_creation_was_logged= 1;
     }
+
+#if 0
+    make_backup_name();
+
+    if (ddl_log_rename_table(thd, ddl_log_state, hton,
+                             &ren_table->db, old_alias, new_db, new_alias))
+      DBUG_RETURN(1);
+#endif
+
+
     thd->binlog_xid= thd->query_id;
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
     if (!atomic_replace)

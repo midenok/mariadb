@@ -67,7 +67,7 @@ drop table t1;
 
 let $MYSQLD_DATADIR= `SELECT @@datadir`;
 
-let $crash_count=13;
+let $crash_count=14;
 let $crash_points='ddl_log_create_after_log_rename',
                   'ddl_log_create_before_create_frm',
                   'ddl_log_create_before_create_table',
@@ -78,6 +78,7 @@ let $crash_points='ddl_log_create_after_log_rename',
                   'ddl_log_create_after_prepare_eof',
                   'ddl_log_create_after_binlog',
                   'ddl_log_create_before_remove_backup',
+                  'ddl_log_create_before_remove_backup2',
                   'ddl_log_create_after_remove_backup',
                   'ddl_log_create_after_remove_backup_fk',
                   'ddl_log_create_log_complete';

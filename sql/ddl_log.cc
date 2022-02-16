@@ -424,9 +424,9 @@ static bool update_master_entry(uint entry_pos, uint master_entry)
   DBUG_RETURN(mysql_file_pwrite(global_ddl_log.file_id, buff, sizeof(buff),
                                 global_ddl_log.io_size * entry_pos +
                                 DDL_LOG_MASTER_ENTRY_POS,
-                                MYF(MY_WME | MY_NABP)) ||
-              ddl_log_sync_file());
+                                MYF(MY_WME | MY_NABP)));
 }
+
 
 /*
   Disable an execute entry
@@ -3024,12 +3024,34 @@ bool ddl_log_update_unique_id(DDL_LOG_STATE *state, ulonglong id)
 bool ddl_log_update_master_entry(DDL_LOG_STATE *state, uint master_entry)
 {
   DBUG_ENTER("ddl_log_update_master_entry");
-  DBUG_PRINT("enter", ("id: %llu", master_entry));
+  DBUG_PRINT("enter", ("master: %llu", master_entry));
   /* The following may not be true in case of temporary tables */
   if (likely(state->list))
   {
     DBUG_ASSERT(state->execute_entry);
-    DBUG_RETURN(update_master_entry(state->execute_entry->entry_pos, master_entry));
+    state->master_chain_pos= master_entry;
+    DBUG_RETURN(update_master_entry(state->execute_entry->entry_pos, master_entry) ||
+                ddl_log_sync_file());
+  }
+  DBUG_RETURN(0);
+}
+
+
+bool ddl_log_swap_master(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state)
+{
+  DBUG_ENTER("ddl_log_swap_master");
+  /* The following may not be true in case of temporary tables */
+  if (state->list && master_state->list)
+  {
+    DBUG_ASSERT(state->execute_entry);
+    DBUG_ASSERT(master_state->execute_entry);
+    DBUG_ASSERT(master_state->master_chain_pos == state->execute_entry->entry_pos);
+    master_state->master_chain_pos= 0;
+    state->master_chain_pos= master_state->execute_entry->entry_pos;
+    DBUG_RETURN(update_master_entry(state->execute_entry->entry_pos,
+                                    state->master_chain_pos) ||
+                update_master_entry(master_state->execute_entry->entry_pos, 0) ||
+                ddl_log_sync_file());
   }
   DBUG_RETURN(0);
 }

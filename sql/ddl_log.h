@@ -281,6 +281,7 @@ bool ddl_log_update_phase(DDL_LOG_STATE *entry, uchar phase);
 bool ddl_log_add_flag(DDL_LOG_STATE *entry, uint16 flag);
 bool ddl_log_update_unique_id(DDL_LOG_STATE *state, ulonglong id);
 bool ddl_log_update_master_entry(DDL_LOG_STATE *state, uint master_entry);
+bool ddl_log_swap_master(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state);
 bool ddl_log_update_xid(DDL_LOG_STATE *state, ulonglong xid);
 bool ddl_log_disable_entry(DDL_LOG_STATE *state);
 bool ddl_log_increment_phase(uint entry_pos);

@@ -2419,6 +2419,7 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
                              const LEX_CSTRING &table_name,
                              const DDL_options_st options);
   bool finalize_ddl(THD *thd);
+  bool finalize_ddl2(THD *thd);
   bool make_tmp_table_list(THD *thd, TABLE_LIST *new_table,
                            TABLE_LIST **create_table,
                            int *create_table_mode)
