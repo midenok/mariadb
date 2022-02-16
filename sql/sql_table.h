@@ -97,11 +97,6 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
 bool add_keyword_to_query(THD *thd, String *result, const LEX_CSTRING *keyword,
                           const LEX_CSTRING *add);
 
-#define CREATE_ORDINARY   0
-#define CREATE_TMP_TABLE  1
-#define CREATE_FRM_ONLY   2
-#define CREATE_ASSISTED   4
-
 int mysql_create_table_no_lock(THD *thd,
                                const LEX_CSTRING *orig_db,
                                const LEX_CSTRING *orig_table_name,
@@ -196,9 +191,6 @@ uint explain_filename(THD* thd, const char *from, char *to, uint to_length,
 extern MYSQL_PLUGIN_IMPORT const LEX_CSTRING primary_key_name;
 
 bool check_engine(THD *, const char *, const char *, HA_CREATE_INFO *);
-
-bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
-                   TABLE_LIST *res);
 
 bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
                                 const LEX_CSTRING &table_name,

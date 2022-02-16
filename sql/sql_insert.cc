@@ -4512,16 +4512,11 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
 
   if (atomic_replace)
   {
-    DBUG_ASSERT(!create_info->tmp_table()); // FIXME: test
-    if (make_tmp_name(thd, "create", create_table, &new_table))
+    if (create_info->make_tmp_table_list(thd, &new_table, &create_table,
+                                         &create_table_mode))
       DBUG_RETURN(NULL);
-    create_table_mode|= CREATE_TMP_TABLE;
-    DBUG_ASSERT(!(create_info->options & HA_CREATE_TMP_ALTER));
-    // FIXME: restore options?
-    create_info->options|= HA_CREATE_TMP_ALTER;
-    select_create::create_table= &new_table;
+
     select_insert::table_list= &new_table;
-    create_info->tmp_name= &new_table;
   }
 
   /*

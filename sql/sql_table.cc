@@ -4882,8 +4882,6 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
 
   bzero(&ddl_log_state_create, sizeof(ddl_log_state_create));
   bzero(&ddl_log_state_rm, sizeof(ddl_log_state_rm));
-  if (atomic_replace)
-    create_info->tmp_name= &new_table;
   create_info->ddl_log_state_create= &ddl_log_state_create;
   create_info->ddl_log_state_rm= &ddl_log_state_rm;
 
@@ -4931,18 +4929,12 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   /* We can abort create table for any table type */
   thd->abort_on_warning= thd->is_strict_mode();
 
-  if (atomic_replace)
+  if (atomic_replace &&
+      create_info->make_tmp_table_list(thd, &new_table, &create_table,
+                                       &create_table_mode))
   {
-    if (make_tmp_name(thd, "create", create_table, &new_table))
-    {
-      result= 1;
-      goto err;
-    }
-    create_table_mode|= CREATE_TMP_TABLE;
-    DBUG_ASSERT(!(create_info->options & HA_CREATE_TMP_ALTER));
-    // FIXME: restore options?
-    create_info->options|= HA_CREATE_TMP_ALTER;
-    create_table= &new_table;
+    result= 1;
+    goto err;
   }
 
   if (mysql_create_table_no_lock(thd,
@@ -5387,8 +5379,6 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
 
   bzero(&ddl_log_state_create, sizeof(ddl_log_state_create));
   bzero(&ddl_log_state_rm, sizeof(ddl_log_state_rm));
-  if (atomic_replace)
-    local_create_info.tmp_name= &new_table;
   local_create_info.ddl_log_state_create= &ddl_log_state_create;
   local_create_info.ddl_log_state_rm= &ddl_log_state_rm;
 
@@ -5487,16 +5477,10 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
 
   if (atomic_replace)
   {
-    if (make_tmp_name(thd, "create", table, &new_table))
-    {
+    if (local_create_info.make_tmp_table_list(thd, &new_table, &table,
+                                              &create_table_mode))
       goto err;
-    }
-    create_table_mode|= CREATE_TMP_TABLE;
-    DBUG_ASSERT(!(create_info->options & HA_CREATE_TMP_ALTER));
-    // FIXME: restore options?
-    local_create_info.options|= HA_CREATE_TMP_ALTER;
     new_table.mdl_request.duration= MDL_EXPLICIT;
-    table= &new_table;
   }
 
   res= ((create_res=
