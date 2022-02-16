@@ -2323,6 +2323,9 @@ struct Table_scope_and_contents_source_st:
 
 typedef struct st_ddl_log_state DDL_LOG_STATE;
 
+bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
+                   TABLE_LIST *res);
+
 struct Atomic_info
 {
   TABLE_LIST *tmp_name;
@@ -2346,6 +2349,42 @@ struct Atomic_info
       bzero(&drop_entry, sizeof(drop_entry));
     }
 };
+
+
+/*
+  mysql_create_table_no_lock can be called in one of the following
+  mutually exclusive situations:
+
+  - Just a normal ordinary CREATE TABLE statement that explicitly
+    defines the table structure.
+
+  - CREATE TABLE ... SELECT. It is special, because only in this case,
+    the list of fields is allowed to have duplicates, as long as one of the
+    duplicates comes from the select list, and the other doesn't. For
+    example in
+
+       CREATE TABLE t1 (a int(5) NOT NUL) SELECT b+10 as a FROM t2;
+
+    the list in alter_info->create_list will have two fields `a`.
+
+  - ALTER TABLE, that creates a temporary table #sql-xxx, which will be later
+    renamed to replace the original table.
+
+  - ALTER TABLE as above, but which only modifies the frm file, it only
+    creates an frm file for the #sql-xxx, the table in the engine is not
+    created.
+
+  - Assisted discovery, CREATE TABLE statement without the table structure.
+
+  These situations are distinguished by the following "create table mode"
+  values, where a CREATE ... SELECT is denoted by any non-negative number
+  (which should be the number of fields in the SELECT ... part), and other
+  cases use constants as defined below.
+*/
+#define C_ORDINARY_CREATE         0
+#define C_ALTER_TABLE             1
+#define C_ALTER_TABLE_FRM_ONLY    2
+#define C_ASSISTED_DISCOVERY      3
 
 
 /**
@@ -2410,6 +2449,20 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
                              const LEX_CSTRING &table_name,
                              const DDL_options_st options);
   bool finalize_ddl(THD *thd);
+  bool make_tmp_table_list(THD *thd, TABLE_LIST *new_table,
+                           TABLE_LIST **create_table,
+                           int *create_table_mode)
+  {
+    if (make_tmp_name(thd, "create", *create_table, new_table))
+      return true;
+    (*create_table_mode)|= C_ALTER_TABLE;
+    DBUG_ASSERT(!(options & HA_CREATE_TMP_ALTER));
+    // FIXME: restore options?
+    options|= HA_CREATE_TMP_ALTER;
+    tmp_name= new_table;
+    *create_table= new_table;
+    return false;
+  }
 };
 
 

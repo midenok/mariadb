@@ -97,41 +97,6 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
 bool add_keyword_to_query(THD *thd, String *result, const LEX_CSTRING *keyword,
                           const LEX_CSTRING *add);
 
-/*
-  mysql_create_table_no_lock can be called in one of the following
-  mutually exclusive situations:
-
-  - Just a normal ordinary CREATE TABLE statement that explicitly
-    defines the table structure.
-
-  - CREATE TABLE ... SELECT. It is special, because only in this case,
-    the list of fields is allowed to have duplicates, as long as one of the
-    duplicates comes from the select list, and the other doesn't. For
-    example in
-
-       CREATE TABLE t1 (a int(5) NOT NUL) SELECT b+10 as a FROM t2;
-
-    the list in alter_info->create_list will have two fields `a`.
-
-  - ALTER TABLE, that creates a temporary table #sql-xxx, which will be later
-    renamed to replace the original table.
-
-  - ALTER TABLE as above, but which only modifies the frm file, it only
-    creates an frm file for the #sql-xxx, the table in the engine is not
-    created.
-
-  - Assisted discovery, CREATE TABLE statement without the table structure.
-
-  These situations are distinguished by the following "create table mode"
-  values, where a CREATE ... SELECT is denoted by any non-negative number
-  (which should be the number of fields in the SELECT ... part), and other
-  cases use constants as defined below.
-*/
-#define C_ORDINARY_CREATE         0
-#define C_ALTER_TABLE             1
-#define C_ALTER_TABLE_FRM_ONLY    2
-#define C_ASSISTED_DISCOVERY      3
-
 int mysql_create_table_no_lock(THD *thd,
                                const LEX_CSTRING *orig_db,
                                const LEX_CSTRING *orig_table_name,
@@ -226,9 +191,6 @@ uint explain_filename(THD* thd, const char *from, char *to, uint to_length,
 extern MYSQL_PLUGIN_IMPORT const LEX_CSTRING primary_key_name;
 
 bool check_engine(THD *, const char *, const char *, HA_CREATE_INFO *);
-
-bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
-                   TABLE_LIST *res);
 
 bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
                                 const LEX_CSTRING &table_name,
