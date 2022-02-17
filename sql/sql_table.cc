@@ -1537,7 +1537,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     thd->replication_flags= 0;
     const bool was_view= table_type == TABLE_TYPE_VIEW;
 
-    if (!table_count++)
+    if (!table_count++ && !atomic_replace)
     {
       LEX_CSTRING comment= {comment_start, (size_t) comment_len};
       if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
@@ -1585,6 +1585,15 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       else
         tdc_remove_table(thd, db.str, table_name.str);
 
+      if (atomic_replace)
+      {
+        /*
+           FIXME: seems like we only need tdc_remove_table()/close_all_tables_for_name()
+           Do we need anything else in mysql_rm_table_no_locks() ?
+        */
+        goto report_error;
+      }
+
       /* Check that we have an exclusive lock on the table to be dropped. */
       DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
                                                 table_name.str, MDL_EXCLUSIVE));
@@ -1610,8 +1619,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       }
 
       debug_crash_here("ddl_log_drop_before_delete_table");
-      if (atomic_replace)
-        goto report_error;
       error= ha_delete_table(thd, hton, path, &db, &table_name,
                              enoent_warning);
       debug_crash_here("ddl_log_drop_after_delete_table");
@@ -1678,6 +1685,12 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     */
     if (non_existing_table_error(error))
     {
+      if (atomic_replace)
+      {
+        error= 0;
+        goto report_error;
+      }
+
       int ferror= 0;
       DBUG_ASSERT(!was_view);
 
@@ -1688,12 +1701,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       {
         error= -1;
         goto err;
-      }
-
-      if (atomic_replace)
-      {
-        error= 0;
-        goto report_error;
       }
 
       /* Remove extension for delete */
@@ -4322,15 +4329,63 @@ err:
 inline bool
 HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
                                       const LEX_CSTRING &table_name,
-                                      const DDL_options_st options)
+                                      const DDL_options_st options,
+                                      handlerton *old_hton)
 {
   DBUG_ASSERT(options.or_replace());
   DBUG_ASSERT(ok_atomic_replace());
+  /*
+    FIXME: proper chain names
+
+      ddl_log_state_rm -> chain_roll_forward
+      ddl_log_state_create -> chain_roll_back
+  */
+
+  if (old_hton)
+  {
+    /* Old table exists */
+//     LEX_CSTRING comment= {"", 0};
+    LEX_CSTRING cpath;
+    char path[FN_REFLEN + 1];
+    size_t path_length= build_table_filename(path, sizeof(path) - 1, backup_name->db.str,
+                                             backup_name->table_name.str, reg_ext, FN_IS_TMP);
+    char *path_end= path + path_length - reg_ext_length;
+    lex_string_set3(&cpath, path, (size_t) (path_end - path));
+
+//     if (ddl_log_drop_table_init(thd, chain_rm_backup, &backup_name->db, &comment))
+//       return true;
+//
+//     if (ddl_log_drop_table(thd, chain_rm_backup, old_hton, &cpath,
+//                            &backup_name->db, &backup_name->table_name))
+//       return true;
+
+    if (ddl_log_create_table(thd, chain_rm_backup, old_hton, &cpath,
+                           &backup_name->db, &backup_name->table_name, false))
+      return true;
+  }
+
+  // FIXME: add points to test, remove ddl_log_create_after_log_rename
   ddl_log_link_chains(ddl_log_state_rm, ddl_log_state_create);
+  debug_crash_here("ddl_log_create_after_link_chains");
   if (ddl_log_rename_table(thd, ddl_log_state_rm, db_type, &db, &table_name,
-                           &tmp_name->db, &tmp_name->table_name))
+                           &tmp_name->db, &tmp_name->table_name,
+                           DDL_LOG_FLAG_FROM_IS_TMP))
     return true;
-  debug_crash_here("ddl_log_create_after_log_rename");
+  if (old_hton)
+  {
+    ddl_log_link_chains(chain_rm_backup, ddl_log_state_rm);
+    debug_crash_here("ddl_log_create_after_backup_rename");
+    if (ddl_log_rename_table(thd, ddl_log_state_rm, old_hton,
+                            &backup_name->db, &backup_name->table_name,
+                            &db, &table_name, DDL_LOG_FLAG_TO_IS_TMP))
+      return true;
+    if (ddl_log_rename_table(thd, ddl_log_state_create, old_hton,
+                             &db, &table_name,
+                             &backup_name->db, &backup_name->table_name,
+                             DDL_LOG_FLAG_FROM_IS_TMP))
+      return true;
+  }
+  debug_crash_here("ddl_log_create_after_tmp_rename");
   return false;
 }
 
@@ -4373,38 +4428,13 @@ bool HA_CREATE_INFO::finalize_ddl(THD *thd)
 bool HA_CREATE_INFO::finalize_ddl2(THD *thd)
 {
   bool result;
-  debug_crash_here("ddl_log_create_before_remove_backup");
+  debug_crash_here("ddl_log_create_before_install_new");
   ddl_log_swap_master(ddl_log_state_create, ddl_log_state_rm);
-  debug_crash_here("ddl_log_create_before_remove_backup2");
+  debug_crash_here("ddl_log_create_before_install_new2");
   /* NOTE: holds "drop old table; rename tmp table"  */
   result= ddl_log_revert(thd, ddl_log_state_rm, true);
-  debug_crash_here("ddl_log_create_after_remove_backup");
-  ddl_log_complete(ddl_log_state_create);
-  debug_crash_here("ddl_log_create_log_complete");
+  debug_crash_here("ddl_log_create_after_install_new");
   return result;
-}
-
-static
-bool make_backup_name(THD *thd, TABLE_LIST *orig, TABLE_LIST *res)
-{
-  char res_name[NAME_LEN + 1];
-
-  size_t len= my_snprintf(res_name, sizeof(res_name) - 1,
-                          backup_file_prefix "%lx-%llx", current_pid,
-                          thd->thread_id, orig->table_name.str);
-
-  LEX_CSTRING n= { res_name, len };
-  res->init_one_table(&orig->db, &n, &n, TL_WRITE);
-
-  res->table_name.str= strmake_root(thd->mem_root,
-                                    LEX_STRING_WITH_LEN(res->table_name));
-  if (!res->table_name.str)
-  {
-    my_error(ER_OUT_OF_RESOURCES, MYF(0));
-    return true;
-  }
-  res->alias.str= res->table_name.str;
-  return false;
 }
 
 
@@ -4413,14 +4443,14 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
                                 const DDL_options_st options,
                                 HA_CREATE_INFO *create_info, int &error)
 {
-  handlerton *db_type;
+  handlerton *db_type= NULL;
   const bool atomic_replace= create_info->tmp_name != NULL;
 
   if (!ha_table_exists(thd, &db, &table_name,
                        &create_info->org_tabledef_version, NULL, &db_type))
   {
     if (atomic_replace &&
-        create_info->handle_atomic_replace(thd, db, table_name, options))
+        create_info->handle_atomic_replace(thd, db, table_name, options, NULL))
       return true;
     return false;
   }
@@ -4450,7 +4480,8 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
         drop, but not do rename. See next_active_log_entry handling in
         ddl_log_drop().
       */
-      if (create_info->handle_atomic_replace(thd, db, table_name, options))
+      DBUG_ASSERT(db_type);
+      if (create_info->handle_atomic_replace(thd, db, table_name, options, db_type))
         return true;
     }
     else
@@ -4468,14 +4499,16 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
 
     debug_crash_here("ddl_log_create_after_drop");
 
-    /*
-      We have to log this query, even if it failed later to ensure the
-      drop is done.
-    */
-    thd->variables.option_bits|= OPTION_KEEP_LOG;
-    thd->log_current_statement= 1;
     if (!atomic_replace)
+    {
+      /*
+        We have to log this query, even if it failed later to ensure the
+        drop is done.
+      */
+      thd->variables.option_bits|= OPTION_KEEP_LOG;
+      thd->log_current_statement= 1;
       create_info->table_was_deleted= 1;
+    }
     lex_string_set(&create_info->org_storage_engine_name,
                    ha_resolve_storage_engine_name(db_type));
     DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
@@ -4909,12 +4942,13 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
 {
   TABLE_LIST *pos_in_locked_tables= 0;
   MDL_ticket *mdl_ticket= 0;
-  DDL_LOG_STATE ddl_log_state_create, ddl_log_state_rm;
+  DDL_LOG_STATE ddl_log_state_create, ddl_log_state_rm, chain_rm_backup;
   int create_table_mode;
   uint save_thd_create_info_options;
   bool is_trans= FALSE;
   int result;
   TABLE_LIST new_table;
+  TABLE_LIST backup_table;
   TABLE_LIST *orig_table= create_table;
   const bool atomic_replace= create_info->is_atomic_replace();
   DBUG_ENTER("mysql_create_table");
@@ -4923,8 +4957,10 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
 
   bzero(&ddl_log_state_create, sizeof(ddl_log_state_create));
   bzero(&ddl_log_state_rm, sizeof(ddl_log_state_rm));
+  bzero(&chain_rm_backup, sizeof(chain_rm_backup));
   create_info->ddl_log_state_create= &ddl_log_state_create;
   create_info->ddl_log_state_rm= &ddl_log_state_rm;
+  create_info->chain_rm_backup= &chain_rm_backup;
 
   /* Copy temporarily the statement flags to thd for lock_table_names() */
   save_thd_create_info_options= thd->lex->create_info.options;
@@ -4971,7 +5007,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   thd->abort_on_warning= thd->is_strict_mode();
 
   if (atomic_replace &&
-      create_info->make_tmp_table_list(thd, &new_table, &create_table,
+      create_info->make_tmp_table_list(thd, &new_table, &backup_table, &create_table,
                                        &create_table_mode))
   {
     result= 1;
@@ -5017,6 +5053,8 @@ err:
 
   if (create_info->tmp_table())
     thd->transaction->stmt.mark_created_temp_table();
+  else if (!result)
+    result= create_info->finalize_ddl2(thd);
 
   /* Write log if no error or if we already deleted a table */
   if (likely(!result) || thd->log_current_statement)
@@ -5043,15 +5081,6 @@ err:
       DBUG_ASSERT(!atomic_replace);
       create_info->table->s->table_creation_was_logged= 1;
     }
-
-#if 0
-    make_backup_name();
-
-    if (ddl_log_rename_table(thd, ddl_log_state, hton,
-                             &ren_table->db, old_alias, new_db, new_alias))
-      DBUG_RETURN(1);
-#endif
-
 
     thd->binlog_xid= thd->query_id;
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
@@ -5082,13 +5111,19 @@ err:
       backup_log_ddl(&ddl_log);
     }
   }
+
   if (result)
   {
-    (void) ddl_log_revert(thd, &ddl_log_state_create);
     ddl_log_complete(&ddl_log_state_rm);
+    ddl_log_complete(&chain_rm_backup);
+    (void) ddl_log_revert(thd, &ddl_log_state_create);
   }
   else
-    result= create_info->finalize_ddl(thd);
+  {
+    DBUG_ASSERT(!ddl_log_state_rm.is_active());
+    ddl_log_complete(&ddl_log_state_create);
+    (void) ddl_log_revert(thd, &chain_rm_backup);
+  }
 
   /*
     Check if we are doing CREATE OR REPLACE TABLE under LOCK TABLES
@@ -5423,6 +5458,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
   uint not_used;
   int create_res;
   TABLE_LIST new_table;
+  TABLE_LIST backup_table;
   TABLE_LIST *orig_table= table;
   const bool atomic_replace= create_info->is_atomic_replace();
   int create_table_mode= CREATE_ORDINARY;
@@ -5528,7 +5564,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
 
   if (atomic_replace)
   {
-    if (local_create_info.make_tmp_table_list(thd, &new_table, &table,
+    if (local_create_info.make_tmp_table_list(thd, &new_table, &backup_table, &table,
                                               &create_table_mode))
       goto err;
     new_table.mdl_request.duration= MDL_EXPLICIT;
@@ -9585,7 +9621,7 @@ simple_rename_or_index_change(THD *thd, TABLE_LIST *table_list,
 
     (void) ddl_log_rename_table(thd, &ddl_log_state, old_db_type,
                                 &alter_ctx->db, &alter_ctx->table_name,
-                                &alter_ctx->new_db, &alter_ctx->new_alias);
+                                &alter_ctx->new_db, &alter_ctx->new_alias, 0);
     if (mysql_rename_table(old_db_type, &alter_ctx->db, &alter_ctx->table_name,
                            &alter_ctx->new_db, &alter_ctx->new_alias,
                            &table_version, 0))

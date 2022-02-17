@@ -4512,8 +4512,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
 
   if (atomic_replace)
   {
-    if (create_info->make_tmp_table_list(thd, &new_table, &create_table,
-                                         &create_table_mode))
+    if (create_info->make_tmp_table_list(thd, &new_table, &backup_table,
+                                         &create_table, &create_table_mode))
       DBUG_RETURN(NULL);
 
     select_insert::table_list= &new_table;

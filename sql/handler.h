@@ -2328,9 +2328,12 @@ bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
 
 struct Atomic_info
 {
+  /* NOTE: TABLE_LIST is not defined in handler.h */
   TABLE_LIST *tmp_name;
+  TABLE_LIST *backup_name;
   DDL_LOG_STATE *ddl_log_state_create;
   DDL_LOG_STATE *ddl_log_state_rm;
+  DDL_LOG_STATE *chain_rm_backup;
   backup_log_info drop_entry;
 
   Atomic_info() :
@@ -2417,20 +2420,25 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
   }
   bool handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
                              const LEX_CSTRING &table_name,
-                             const DDL_options_st options);
+                             const DDL_options_st options,
+                             handlerton *old_hton);
   bool finalize_ddl(THD *thd);
   bool finalize_ddl2(THD *thd);
   bool make_tmp_table_list(THD *thd, TABLE_LIST *new_table,
+                           TABLE_LIST *backup_table,
                            TABLE_LIST **create_table,
                            int *create_table_mode)
   {
     if (make_tmp_name(thd, "create", *create_table, new_table))
+      return true;
+    if (make_tmp_name(thd, "backup", *create_table, backup_table))
       return true;
     (*create_table_mode)|= CREATE_TMP_TABLE;
     DBUG_ASSERT(!(options & HA_CREATE_TMP_ALTER));
     // FIXME: restore options?
     options|= HA_CREATE_TMP_ALTER;
     tmp_name= new_table;
+    backup_name= backup_table;
     *create_table= new_table;
     return false;
   }
