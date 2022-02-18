@@ -4343,8 +4343,8 @@ HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
       ddl_log_state_rm -> chain_cleanup
       ddl_log_state_create -> chain_roll_back
   */
-  // FIXME: add points to test, remove ddl_log_create_after_log_rename
 
+  debug_crash_here("ddl_log_create_before_ddl_logging");
   ddl_log_link_chains(ddl_log_state_rm, ddl_log_state_create);
 
   LEX_CSTRING cpath;
@@ -4544,11 +4544,6 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
         return true;
       }
 
-      /*
-        NOTE: we must log rename before drop! Otherwise we may recover into
-        drop, but not do rename. See next_active_log_entry handling in
-        ddl_log_drop().
-      */
       if (create_info->handle_atomic_replace(thd, db, table_name, options, db_type))
         return true;
     }
@@ -5184,13 +5179,18 @@ err:
     debug_crash_here("ddl_log_create_fk_fail");
     ddl_log_complete(&ddl_log_state_rm);
     debug_crash_here("ddl_log_create_fk_fail2");
+    // FIXME: report error
     (void) ddl_log_revert(thd, &ddl_log_state_create);
     debug_crash_here("ddl_log_create_fk_fail3");
   }
   else
   {
+    debug_crash_here("ddl_log_create_log_complete");
     ddl_log_complete(&ddl_log_state_create);
-    DBUG_ASSERT(!ddl_log_revert(thd, &ddl_log_state_rm, true));
+    debug_crash_here("ddl_log_create_log_complete2");
+    // FIXME: report error
+    (void) ddl_log_revert(thd, &ddl_log_state_rm);
+    debug_crash_here("ddl_log_create_log_complete3");
   }
 
   /*
