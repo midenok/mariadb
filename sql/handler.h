@@ -2333,24 +2333,26 @@ struct Atomic_info
   TABLE_LIST *backup_name;
   DDL_LOG_STATE *ddl_log_state_create;
   DDL_LOG_STATE *ddl_log_state_rm;
-  DDL_LOG_STATE *chain_rm_backup;
+  handlerton *old_hton;
   backup_log_info drop_entry;
 
   Atomic_info() :
     tmp_name(NULL),
     ddl_log_state_create(NULL),
-    ddl_log_state_rm(NULL)
-    {
-      bzero(&drop_entry, sizeof(drop_entry));
-    }
+    ddl_log_state_rm(NULL),
+    old_hton(NULL)
+  {
+    bzero(&drop_entry, sizeof(drop_entry));
+  }
 
   Atomic_info(DDL_LOG_STATE *ddl_log_state_rm) :
     tmp_name(NULL),
     ddl_log_state_create(NULL),
-    ddl_log_state_rm(ddl_log_state_rm)
-    {
-      bzero(&drop_entry, sizeof(drop_entry));
-    }
+    ddl_log_state_rm(ddl_log_state_rm),
+    old_hton(NULL)
+  {
+    bzero(&drop_entry, sizeof(drop_entry));
+  }
 };
 
 
@@ -2423,7 +2425,8 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
                              const DDL_options_st options,
                              handlerton *old_hton);
   bool finalize_ddl(THD *thd);
-  bool finalize_ddl2(THD *thd);
+  bool finalize_atomic_replace(THD *thd, const LEX_CSTRING &db,
+                     const LEX_CSTRING &table_name);
   bool make_tmp_table_list(THD *thd, TABLE_LIST *new_table,
                            TABLE_LIST *backup_table,
                            TABLE_LIST **create_table,

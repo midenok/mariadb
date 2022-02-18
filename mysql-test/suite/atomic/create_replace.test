@@ -67,7 +67,7 @@ drop table t1;
 
 let $MYSQLD_DATADIR= `SELECT @@datadir`;
 
-let $crash_count=14;
+let $crash_count=16;
 let $crash_points='ddl_log_create_after_log_rename',
                   'ddl_log_create_before_create_frm',
                   'ddl_log_create_before_create_table',
@@ -80,11 +80,14 @@ let $crash_points='ddl_log_create_after_log_rename',
                   'ddl_log_create_before_install_new',
                   'ddl_log_create_before_install_new2',
                   'ddl_log_create_after_install_new',
-                  'ddl_log_create_after_remove_backup_fk',
+                  'ddl_log_create_fk_fail',
+                  'ddl_log_create_fk_fail2',
+                  'ddl_log_create_fk_fail3',
                   'ddl_log_create_log_complete';
 
-let $crash_count=1;
-let $crash_points='ddl_log_create_after_backup_rename';
+let $crash_count=2;
+let $crash_points='ddl_log_create_after_create_table',
+                  'ddl_log_create_after_drop';
 
 let $statement_count=1;
 let $statements='CREATE OR REPLACE TABLE t1 (new int) EXTRA_OPTION',
@@ -120,11 +123,12 @@ while ($r < $statement_count)
   while ($c < $crash_count)
   {
     inc $c;
-    let $crash=`select ELT($c, $crash_points)`;
+    let $crash= `select ELT($c, $crash_points)`;
+    let $fk_error= `select '$crash' like 'ddl_log_create_fk_fail%'`;
     
     --eval set @@default_storage_engine=$default_engine
     create or replace table t1 (old int);
-    if ($crash == 'ddl_log_create_after_remove_backup_fk')
+    if ($fk_error)
     {
       create or replace table t1 (old int primary key, y int) engine innodb;
       create table t2 (x int references t1(old)) engine innodb;
@@ -186,7 +190,7 @@ while ($r < $statement_count)
     --replace_column 6 '' 7 '' 8 '' 9 '' 10 '' 11 ''
     show triggers;
     # Drop the tables. The warnings will show what was dropped
-    if ($crash == 'ddl_log_create_after_remove_backup_fk')
+    if ($fk_error)
     {
       drop table t2;
     }
