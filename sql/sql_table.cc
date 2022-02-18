@@ -4344,20 +4344,12 @@ HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
   if (old_hton)
   {
     /* Old table exists */
-//     LEX_CSTRING comment= {"", 0};
     LEX_CSTRING cpath;
     char path[FN_REFLEN + 1];
     size_t path_length= build_table_filename(path, sizeof(path) - 1, backup_name->db.str,
                                              backup_name->table_name.str, reg_ext, FN_IS_TMP);
     char *path_end= path + path_length - reg_ext_length;
     lex_string_set3(&cpath, path, (size_t) (path_end - path));
-
-//     if (ddl_log_drop_table_init(thd, chain_rm_backup, &backup_name->db, &comment))
-//       return true;
-//
-//     if (ddl_log_drop_table(thd, chain_rm_backup, old_hton, &cpath,
-//                            &backup_name->db, &backup_name->table_name))
-//       return true;
 
     if (ddl_log_create_table(thd, chain_rm_backup, old_hton, &cpath,
                            &backup_name->db, &backup_name->table_name, false))
@@ -4373,6 +4365,12 @@ HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
     return true;
   if (old_hton)
   {
+    /*
+        Worst execution scenario:
+        1. chain_rm_backup: disabled
+        2. ddl_log_state_create: moves backup to current, removes tmp
+        3. ddl_log_state_rm: moves current to backup, moves tmp to current
+    */
     ddl_log_link_chains(chain_rm_backup, ddl_log_state_rm);
     debug_crash_here("ddl_log_create_after_backup_rename");
     if (ddl_log_rename_table(thd, ddl_log_state_rm, old_hton,
@@ -4429,8 +4427,8 @@ bool HA_CREATE_INFO::finalize_ddl2(THD *thd)
 {
   bool result;
   debug_crash_here("ddl_log_create_before_install_new");
-  ddl_log_swap_master(ddl_log_state_create, ddl_log_state_rm);
-  debug_crash_here("ddl_log_create_before_install_new2");
+//   ddl_log_swap_master(ddl_log_state_create, ddl_log_state_rm);
+//   debug_crash_here("ddl_log_create_before_install_new2");
   /* NOTE: holds "drop old table; rename tmp table"  */
   result= ddl_log_revert(thd, ddl_log_state_rm, true);
   debug_crash_here("ddl_log_create_after_install_new");
