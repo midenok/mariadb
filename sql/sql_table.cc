@@ -4350,9 +4350,8 @@ HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
   LEX_CSTRING cpath;
   char path[FN_REFLEN + 1];
   size_t path_length= build_table_filename(path, sizeof(path) - 1, backup_name->db.str,
-                                            backup_name->table_name.str, reg_ext, FN_IS_TMP);
-  char *path_end= path + path_length - reg_ext_length;
-  lex_string_set3(&cpath, path, (size_t) (path_end - path));
+                                            backup_name->table_name.str, "", FN_IS_TMP);
+  lex_string_set3(&cpath, path, path_length);
 
   if (ddl_log_create_table(thd, ddl_log_state_rm, old_hton, &cpath,
                           &backup_name->db, &backup_name->table_name, false))
@@ -4366,42 +4365,6 @@ HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
     return true;
   debug_crash_here("ddl_log_create_after_log_rename_backup");
   return false;
-}
-
-// FIXME: remove
-bool HA_CREATE_INFO::finalize_ddl(THD *thd)
-{
-  bool result;
-  if (ddl_log_state_create->execute_entry)
-  {
-    DBUG_ASSERT(ddl_log_state_create->is_active());
-    mysql_mutex_lock(&LOCK_gdl);
-    ddl_log_disable_execute_entry(&ddl_log_state_create->execute_entry);
-    mysql_mutex_unlock(&LOCK_gdl);
-  }
-  debug_crash_here("ddl_log_create_before_remove_backup");
-  /* NOTE: holds "drop old table; rename tmp table"  */
-  result= ddl_log_revert(thd, ddl_log_state_rm, true);
-  if (result && ddl_log_state_create->is_active())
-  {
-    debug_crash_here("ddl_log_create_after_remove_backup_fk");
-    /* In case roll forward fails we must roll back to drop tmp table */
-    mysql_mutex_lock(&LOCK_gdl);
-    ddl_log_write_execute_entry(ddl_log_state_create->list->entry_pos, 0,
-                                &ddl_log_state_create->execute_entry);
-    mysql_mutex_unlock(&LOCK_gdl);
-    (void) ddl_log_revert(thd, ddl_log_state_create);
-  }
-  else
-  {
-    debug_crash_here("ddl_log_create_after_remove_backup");
-    mysql_mutex_lock(&LOCK_gdl);
-    ddl_log_release_entries(ddl_log_state_create);
-    mysql_mutex_unlock(&LOCK_gdl);
-    ddl_log_state_create->list= 0;
-  }
-  debug_crash_here("ddl_log_create_log_complete");
-  return result;
 }
 
 // FIXME: merge with execute_rename_table() in ddl_log.cc
@@ -4455,6 +4418,7 @@ static int execute_rename_tabl2(handler *file,
     strmov(from_path+fr_length, reg_ext);
     strmov(to_path+to_length,   reg_ext);
   }
+  debug_crash_here("ddl_log_create_after_ha_rename_table");
   if (!access(from_path, F_OK))
     (void) mysql_file_rename(key_file_frm, from_path, to_path, MYF(MY_WME));
   DBUG_RETURN(err);
@@ -4496,6 +4460,29 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, const LEX_CSTRING &db,
   return false;
 }
 
+void HA_CREATE_INFO::finalize_ddl(THD *thd, bool roll_back)
+{
+  if (roll_back)
+  {
+    debug_crash_here("ddl_log_create_fk_fail");
+    ddl_log_complete(&ddl_log_state_rm);
+    debug_crash_here("ddl_log_create_fk_fail2");
+    // FIXME: report error
+    (void) ddl_log_revert(thd, &ddl_log_state_create);
+    debug_crash_here("ddl_log_create_fk_fail3");
+  }
+  else
+  {
+    debug_crash_here("ddl_log_create_log_complete");
+    ddl_log_complete(&ddl_log_state_create);
+    debug_crash_here("ddl_log_create_log_complete2");
+    // FIXME: report error
+    (void) ddl_log_revert(thd, &ddl_log_state_rm);
+    debug_crash_here("ddl_log_create_log_complete3");
+  }
+}
+
+
 
 bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
                                 const LEX_CSTRING &table_name,
@@ -4533,19 +4520,26 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
     {
       /*
          NOTE: here FK referencing is checked
-         FIXME: move to separate function
+         FIXME: move to separate
+         FIXME: skip self-references as they must not prohibit a table drop
       */
-      Open_table_context ot_ctx(thd, TL_READ);
-      if (open_table(thd, &table_list, &ot_ctx))
-        return true;
-      TABLE *table= table_list.table;
-      List <FOREIGN_KEY_INFO> fk_list;
-      table->file->get_parent_foreign_key_list(thd, &fk_list);
-      (void) close_thread_table(thd, &thd->open_tables);
-      if (!fk_list.is_empty())
+      if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
       {
-        my_error(ER_ROW_IS_REFERENCED_2, MYF(0), fk_list.head()->foreign_table->str);
-        return true;
+        Open_table_context ot_ctx(thd, TL_READ);
+        if (open_table(thd, &table_list, &ot_ctx))
+          return true;
+        TABLE *table= table_list.table;
+        List <FOREIGN_KEY_INFO> fk_list;
+        table->file->get_parent_foreign_key_list(thd, &fk_list);
+        (void) close_thread_table(thd, &thd->open_tables);
+        for (const FOREIGN_KEY_INFO &fk: fk_list)
+        {
+          if (!fk_list.is_empty())
+          {
+            my_error(ER_ROW_IS_REFERENCED_2, MYF(0), fk_list.head()->foreign_table->str);
+            return true;
+          }
+        }
       }
 
       if (create_info->handle_atomic_replace(thd, db, table_name, options, db_type))
@@ -5151,7 +5145,7 @@ err:
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
     if (!atomic_replace)
       ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
-    debug_crash_here("ddl_log_create_before_binlog");
+      debug_crash_here("ddl_log_create_before_binlog");
     if (unlikely(write_bin_log(thd, result ? FALSE : TRUE, thd->query(),
                                thd->query_length(), is_trans)))
       result= 1;
@@ -5177,24 +5171,7 @@ err:
     }
   }
 
-  if (result)
-  {
-    debug_crash_here("ddl_log_create_fk_fail");
-    ddl_log_complete(&ddl_log_state_rm);
-    debug_crash_here("ddl_log_create_fk_fail2");
-    // FIXME: report error
-    (void) ddl_log_revert(thd, &ddl_log_state_create);
-    debug_crash_here("ddl_log_create_fk_fail3");
-  }
-  else
-  {
-    debug_crash_here("ddl_log_create_log_complete");
-    ddl_log_complete(&ddl_log_state_create);
-    debug_crash_here("ddl_log_create_log_complete2");
-    // FIXME: report error
-    (void) ddl_log_revert(thd, &ddl_log_state_rm);
-    debug_crash_here("ddl_log_create_log_complete3");
-  }
+  create_info->finalize_ddl(thd, result);
 
   /*
     Check if we are doing CREATE OR REPLACE TABLE under LOCK TABLES

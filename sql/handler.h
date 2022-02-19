@@ -2454,9 +2454,9 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
                              const LEX_CSTRING &table_name,
                              const DDL_options_st options,
                              handlerton *old_hton);
-  bool finalize_ddl(THD *thd);
   bool finalize_atomic_replace(THD *thd, const LEX_CSTRING &db,
                      const LEX_CSTRING &table_name);
+  void finalize_ddl(THD *thd, bool roll_back);
   bool make_tmp_table_list(THD *thd, TABLE_LIST *new_table,
                            TABLE_LIST *backup_table,
                            TABLE_LIST **create_table,
