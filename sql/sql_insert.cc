@@ -5234,17 +5234,17 @@ bool select_create::send_eof()
     (as the query was logged before commit!)
   */
   debug_crash_here("ddl_log_create_after_binlog");
-  if (create_info->finalize_ddl(thd))
-  {
-    if (atomic_replace)
-    {
-      /* Now we have to log DROP_AFTER_CREATE */
-      atomic_replace= false;
-      create_table= &new_table;
-    }
-    abort_result_set();
-    DBUG_RETURN(true);
-  }
+//   if (create_info->finalize_ddl(thd))
+//   {
+//     if (atomic_replace)
+//     {
+//       /* Now we have to log DROP_AFTER_CREATE */
+//       atomic_replace= false;
+//       create_table= &new_table;
+//     }
+//     abort_result_set();
+//     DBUG_RETURN(true);
+//   }
 
   /*
     exit_done must only be set after last potential call to

@@ -4342,6 +4342,8 @@ HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
 
       ddl_log_state_rm -> chain_cleanup
       ddl_log_state_create -> chain_roll_back
+
+      FIXME: merge with finalize_atomic_replace()?
   */
 
   debug_crash_here("ddl_log_create_before_ddl_logging");
@@ -4465,19 +4467,19 @@ void HA_CREATE_INFO::finalize_ddl(THD *thd, bool roll_back)
   if (roll_back)
   {
     debug_crash_here("ddl_log_create_fk_fail");
-    ddl_log_complete(&ddl_log_state_rm);
+    ddl_log_complete(ddl_log_state_rm);
     debug_crash_here("ddl_log_create_fk_fail2");
     // FIXME: report error
-    (void) ddl_log_revert(thd, &ddl_log_state_create);
+    (void) ddl_log_revert(thd, ddl_log_state_create);
     debug_crash_here("ddl_log_create_fk_fail3");
   }
   else
   {
     debug_crash_here("ddl_log_create_log_complete");
-    ddl_log_complete(&ddl_log_state_create);
+    ddl_log_complete(ddl_log_state_create);
     debug_crash_here("ddl_log_create_log_complete2");
     // FIXME: report error
-    (void) ddl_log_revert(thd, &ddl_log_state_rm);
+    (void) ddl_log_revert(thd, ddl_log_state_rm);
     debug_crash_here("ddl_log_create_log_complete3");
   }
 }
@@ -4521,7 +4523,6 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
       /*
          NOTE: here FK referencing is checked
          FIXME: move to separate
-         FIXME: skip self-references as they must not prohibit a table drop
       */
       if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
       {
@@ -4529,16 +4530,14 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
         if (open_table(thd, &table_list, &ot_ctx))
           return true;
         TABLE *table= table_list.table;
-        List <FOREIGN_KEY_INFO> fk_list;
-        table->file->get_parent_foreign_key_list(thd, &fk_list);
+        FOREIGN_KEY_INFO *fk;
+        bool res= table->referenced_by_foreign_table(thd, fk);
         (void) close_thread_table(thd, &thd->open_tables);
-        for (const FOREIGN_KEY_INFO &fk: fk_list)
+        if (res)
         {
-          if (!fk_list.is_empty())
-          {
-            my_error(ER_ROW_IS_REFERENCED_2, MYF(0), fk_list.head()->foreign_table->str);
-            return true;
-          }
+          if (fk)
+            my_error(ER_ROW_IS_REFERENCED_2, MYF(0), fk->foreign_table->str);
+          return true;
         }
       }
 
@@ -5927,10 +5926,10 @@ err:
       ddl_log_complete(&ddl_log_state_create);
     ddl_log_complete(&ddl_log_state_rm);
   }
-  else
-  {
-    res= local_create_info.finalize_ddl(thd);
-  }
+//   else
+//   {
+//     res= local_create_info.finalize_ddl(thd);
+//   }
 
   /*
     Check if we are doing CREATE OR REPLACE TABLE under LOCK TABLES
