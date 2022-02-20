@@ -1150,26 +1150,11 @@ static int execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
     Convert triggers for from_db.from_name -> db.extra_name
 */
 
-static void rename_triggers(THD *thd, DDL_LOG_ENTRY *ddl_log_entry,
-                            bool swap_tables)
+static void rename_triggers(THD *thd, LEX_CSTRING from_db, LEX_CSTRING from_table,
+                            LEX_CSTRING to_db, LEX_CSTRING to_table)
 {
-  LEX_CSTRING to_table, from_table, to_db, from_db, from_converted_name;
+  LEX_CSTRING from_converted_name;
   char to_path[FN_REFLEN+1], from_path[FN_REFLEN+1], conv_path[FN_REFLEN+1];
-
-  if (!swap_tables)
-  {
-    from_db=    ddl_log_entry->db;
-    from_table= ddl_log_entry->name;
-    to_db=      ddl_log_entry->from_db;
-    to_table=   ddl_log_entry->from_name;
-  }
-  else
-  {
-    from_db=    ddl_log_entry->from_db;
-    from_table= ddl_log_entry->from_name;
-    to_db=      ddl_log_entry->db;
-    to_table=   ddl_log_entry->extra_name;
-  }
 
   build_filename_and_delete_tmp_file(from_path, sizeof(from_path),
                                      &from_db, &from_table,
@@ -1458,7 +1443,8 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     */
     switch (ddl_log_entry->phase) {
     case DDL_RENAME_PHASE_TRIGGER:
-      rename_triggers(thd, ddl_log_entry, 0);
+      rename_triggers(thd, ddl_log_entry->db, ddl_log_entry->name,
+                      ddl_log_entry->from_db, ddl_log_entry->from_name);
       if (increment_phase(entry_pos))
         break;
     /* fall through */
@@ -2175,7 +2161,8 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       if (is_renamed)
       {
         // rename_triggers will rename from: from_db.from_name -> db.extra_name
-        rename_triggers(thd, ddl_log_entry, 1);
+        rename_triggers(thd, ddl_log_entry->from_db, ddl_log_entry->from_name,
+                        ddl_log_entry->db, ddl_log_entry->name);
         (void) update_phase(entry_pos, DDL_ALTER_TABLE_PHASE_UPDATE_STATS);
       }
     }
