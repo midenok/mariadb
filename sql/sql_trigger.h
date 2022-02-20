@@ -89,6 +89,7 @@ public:
   TABLE table;
   bool upgrading50to51;
   bool got_error;
+  int rename_flags;
 
   TRIGGER_RENAME_PARAM()
   {
