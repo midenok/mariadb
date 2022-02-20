@@ -2354,7 +2354,8 @@ bool Table_triggers_list::change_table_name(THD *thd,
     This method interfaces the mysql server code protected by
     an exclusive metadata lock.
   */
-  DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, db->str,
+  DBUG_ASSERT((param->rename_flags & FN_FROM_IS_TMP) ||
+              thd->mdl_context.is_lock_owner(MDL_key::TABLE, db->str,
                                              old_table->str,
                                              MDL_EXCLUSIVE));
 

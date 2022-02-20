@@ -363,7 +363,8 @@ rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
 
     thd->replication_flags= 0;
 
-    if (ddl_log_rename_table(thd, ddl_log_state, hton,
+    if (ddl_log_state &&
+        ddl_log_rename_table(thd, ddl_log_state, hton,
                              &ren_table->db, old_alias, new_db, new_alias, 0))
       DBUG_RETURN(1);
 
@@ -376,7 +377,8 @@ rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
          It's safe to start recovery at rename trigger phase
       */
       debug_crash_here("ddl_log_rename_before_phase_trigger");
-      ddl_log_update_phase(ddl_log_state, DDL_RENAME_PHASE_TRIGGER);
+      if (ddl_log_state)
+        ddl_log_update_phase(ddl_log_state, DDL_RENAME_PHASE_TRIGGER);
 
       debug_crash_here("ddl_log_rename_before_rename_trigger");
 
@@ -407,7 +409,8 @@ rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
                                   &ren_table->db, old_alias, &param->old_version,
                                   NO_FK_CHECKS);
         debug_crash_here("ddl_log_rename_after_revert_rename_table");
-        ddl_log_disable_entry(ddl_log_state);
+        if (ddl_log_state)
+          ddl_log_disable_entry(ddl_log_state);
         debug_crash_here("ddl_log_rename_after_disable_entry");
       }
     }
@@ -428,6 +431,7 @@ rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
       DBUG_RETURN(1);
     }
 
+    DBUG_ASSERT(ddl_log_state);
     ddl_log_rename_view(thd, ddl_log_state, &ren_table->db,
                         &ren_table->table_name, new_db, new_alias);
     debug_crash_here("ddl_log_rename_before_rename_view");

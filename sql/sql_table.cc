@@ -4440,9 +4440,10 @@ static handler *create_handler2(THD *thd, handlerton *hton)
   return file;
 }
 
-bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, const LEX_CSTRING &db,
-                                             const LEX_CSTRING &table_name)
+bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
 {
+  const LEX_CSTRING &db= orig_table->db;
+  const LEX_CSTRING &table_name= orig_table->table_name;
   debug_crash_here("ddl_log_create_before_install_new");
   if (old_hton)
   {
@@ -4453,10 +4454,12 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, const LEX_CSTRING &db,
       return true;
     debug_crash_here("ddl_log_create_after_save_backup");
   }
-  // FIXME: get handler from open table?
-  handler *file= create_handler2(thd, db_type);
-  if (execute_rename_tabl2(file, &tmp_name->db, &tmp_name->table_name,
-                           &db, &table_name, FN_FROM_IS_TMP))
+
+  rename_param param;
+  param.rename_flags= FN_FROM_IS_TMP;
+  bool force_if_exists= false;
+  if (rename_check(thd, &param, tmp_name, &db, &table_name, &table_name, false) ||
+      rename_do(thd, &param, NULL, tmp_name, &db, false, &force_if_exists))
     return true;
   debug_crash_here("ddl_log_create_after_install_new");
   return false;
@@ -5112,8 +5115,7 @@ err:
   if (create_info->tmp_table())
     thd->transaction->stmt.mark_created_temp_table();
   else if (!result && atomic_replace)
-    result= create_info->finalize_atomic_replace(thd, orig_table->db,
-                                                 orig_table->table_name);
+    result= create_info->finalize_atomic_replace(thd, orig_table);
 
   /* Write log if no error or if we already deleted a table */
   if (likely(!result) || thd->log_current_statement)
