@@ -2450,10 +2450,6 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
            !(db_type->flags & HTON_EXPENSIVE_RENAME) &&
            !DBUG_IF("ddl_log_expensive_rename");
   }
-  bool handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
-                             const LEX_CSTRING &table_name,
-                             const DDL_options_st options,
-                             handlerton *old_hton);
   bool finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table);
   void finalize_ddl(THD *thd, bool roll_back);
   bool make_tmp_table_list(THD *thd, TABLE_LIST *new_table,

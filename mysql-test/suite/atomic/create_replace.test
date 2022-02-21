@@ -67,8 +67,8 @@ drop table t1;
 
 let $MYSQLD_DATADIR= `SELECT @@datadir`;
 
-let $crash_count=20;
-let $crash_points='ddl_log_create_before_ddl_logging',
+let $crash_count=19;
+let $crash_points='ddl_log_create_before_install_new',
                   'ddl_log_create_after_log_drop_backup',
                   'ddl_log_create_after_log_rename_backup',
                   'ddl_log_create_before_create_frm',
@@ -76,7 +76,6 @@ let $crash_points='ddl_log_create_before_ddl_logging',
                   'ddl_log_create_after_create_table',
                   'ddl_log_create_after_drop',
                   'ddl_log_create_after_send_data',
-                  'ddl_log_create_before_install_new',
                   'ddl_log_create_after_save_backup',
                   'ddl_log_create_after_install_new',
                   'ddl_log_create_before_binlog',
@@ -89,9 +88,8 @@ let $crash_points='ddl_log_create_before_ddl_logging',
                   'ddl_log_create_log_complete2',
                   'ddl_log_create_log_complete3';
 
-#let $crash_count=1;
-#let $crash_points='ddl_log_create_after_save_backup',
-#'ddl_log_create_after_install_new';
+let $crash_count=1;
+let $crash_points='ddl_log_create_after_save_backup';
 
 let $statement_count=1;
 let $statements='CREATE OR REPLACE TABLE t1 (new int) EXTRA_OPTION',

@@ -4326,64 +4326,52 @@ err:
   DBUG_RETURN(NULL);
 }
 
-inline bool
-HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
-                                      const LEX_CSTRING &table_name,
-                                      const DDL_options_st options,
-                                      handlerton *old_hton)
-{
-  DBUG_ASSERT(options.or_replace());
-  DBUG_ASSERT(ok_atomic_replace());
-  DBUG_ASSERT(old_hton);
-
-  Atomic_info::old_hton= old_hton;
-
-  /* FIXME: proper chain names
-
-      ddl_log_state_rm -> chain_cleanup
-      ddl_log_state_create -> chain_roll_back
-
-      FIXME: merge with finalize_atomic_replace()?
-  */
-
-  debug_crash_here("ddl_log_create_before_ddl_logging");
-  ddl_log_link_chains(ddl_log_state_rm, ddl_log_state_create);
-
-  LEX_CSTRING cpath;
-  char path[FN_REFLEN + 1];
-  size_t path_length= build_table_filename(path, sizeof(path) - 1,
-                                           backup_name->db.str,
-                                           backup_name->table_name.str,
-                                           "", FN_IS_TMP);
-  lex_string_set3(&cpath, path, path_length);
-
-  if (ddl_log_drop_table_init(thd, ddl_log_state_rm, &backup_name->db,
-                              &empty_clex_str) ||
-      ddl_log_drop_table(thd, ddl_log_state_rm, old_hton, &cpath,
-                         &backup_name->db, &backup_name->table_name,
-                         DDL_LOG_FLAG_FROM_IS_TMP))
-    return true;
-
-  debug_crash_here("ddl_log_create_after_log_drop_backup");
-  if (ddl_log_rename_table(thd, ddl_log_state_create, old_hton,
-                            &db, &table_name,
-                            &backup_name->db, &backup_name->table_name,
-                            DDL_RENAME_PHASE_TRIGGER,
-                            DDL_LOG_FLAG_FROM_IS_TMP))
-    return true;
-  debug_crash_here("ddl_log_create_after_log_rename_backup");
-  return false;
-}
-
 bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
 {
   rename_param param;
   bool dummy;
   const LEX_CSTRING &db= orig_table->db;
   const LEX_CSTRING &table_name= orig_table->table_name;
+
+
   debug_crash_here("ddl_log_create_before_install_new");
   if (old_hton)
   {
+    /* FIXME: proper chain names
+
+        ddl_log_state_rm -> chain_cleanup
+        ddl_log_state_create -> chain_roll_back
+
+        FIXME: merge with finalize_atomic_replace()?
+    */
+
+    ddl_log_link_chains(ddl_log_state_rm, ddl_log_state_create);
+
+    LEX_CSTRING cpath;
+    char path[FN_REFLEN + 1];
+    size_t path_length= build_table_filename(path, sizeof(path) - 1,
+                                            backup_name->db.str,
+                                            backup_name->table_name.str,
+                                            "", FN_IS_TMP);
+    lex_string_set3(&cpath, path, path_length);
+
+    if (ddl_log_drop_table_init(thd, ddl_log_state_rm, &backup_name->db,
+                                &empty_clex_str) ||
+        ddl_log_drop_table(thd, ddl_log_state_rm, old_hton, &cpath,
+                          &backup_name->db, &backup_name->table_name,
+                          DDL_LOG_FLAG_FROM_IS_TMP))
+      return true;
+
+    debug_crash_here("ddl_log_create_after_log_drop_backup");
+    if (ddl_log_rename_table(thd, ddl_log_state_create, old_hton,
+                              &db, &table_name,
+                              &backup_name->db, &backup_name->table_name,
+                              DDL_RENAME_PHASE_TRIGGER,
+                              DDL_LOG_FLAG_FROM_IS_TMP))
+      return true;
+    debug_crash_here("ddl_log_create_after_log_rename_backup");
+
+    /* Old table exists, rename it to backup_name */
     param.rename_flags= FN_TO_IS_TMP;
     param.from_table_hton= old_hton;
     param.old_version= org_tabledef_version;
@@ -4426,7 +4414,7 @@ void HA_CREATE_INFO::finalize_ddl(THD *thd, bool roll_back)
 }
 
 
-
+// FIXME: remove
 bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
                                 const LEX_CSTRING &table_name,
                                 const DDL_options_st options,
@@ -4437,9 +4425,9 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
 
   if (!ha_table_exists(thd, &db, &table_name,
                        &create_info->org_tabledef_version, NULL, &db_type))
-  {
     return false;
-  }
+
+  create_info->old_hton= db_type;
 
   if (ha_check_if_updates_are_ignored(thd, db_type, "CREATE"))
   {
@@ -4481,9 +4469,6 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
           return true;
         }
       }
-
-      if (create_info->handle_atomic_replace(thd, db, table_name, options, db_type))
-        return true;
     }
     else
     {
