@@ -2015,7 +2015,7 @@ bool Table_triggers_list::drop_all_triggers(THD *thd, const LEX_CSTRING *db,
   init_sql_alloc(key_memory_Table_trigger_dispatcher,
                  &table.mem_root, 8192, 0, MYF(MY_WME));
 
-  if (Table_triggers_list::check_n_load(thd, db, name, &table, 1, flags))
+  if (Table_triggers_list::check_n_load(thd, db, name, &table, true, flags))
   {
     result= 1;
     /* We couldn't parse trigger file, best to just remove it */
@@ -2267,7 +2267,8 @@ Table_triggers_list::prepare_for_rename(THD *thd,
               my_strcasecmp(table_alias_charset, old_alias->str,
                             new_table->str));
 
-  if (Table_triggers_list::check_n_load(thd, db, old_table, table, TRUE))
+  if (Table_triggers_list::check_n_load(thd, db, old_table, table, TRUE,
+                                        param->rename_flags))
   {
     result= 1;
     goto end;

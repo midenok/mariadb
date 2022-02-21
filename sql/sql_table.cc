@@ -1611,7 +1611,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
                                &table_name);
       else
         res= ddl_log_drop_table(thd, ddl_log_state, hton, &cpath, &db,
-                                &table_name);
+                                &table_name, 0);
       if (res)
       {
         error= -1;
@@ -1697,7 +1697,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       /* We've already logged drop and we don't need that entry anymore. */
       ddl_log_disable_entry(ddl_log_state);
       if (ddl_log_drop_table(thd, ddl_log_state, 0, &cpath, &db,
-                             &table_name))
+                             &table_name, 0))
       {
         error= -1;
         goto err;
@@ -1744,7 +1744,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     if (likely(!error) || non_existing_table_error(error))
     {
       if (Table_triggers_list::drop_all_triggers(thd, &db, &table_name,
-                                               MYF(MY_WME | MY_IGNORE_ENOENT)))
+                                                 MYF(MY_WME | MY_IGNORE_ENOENT), 0))
         error= error ? error : -1;
     }
     debug_crash_here("ddl_log_drop_after_drop_trigger");
@@ -4351,115 +4351,53 @@ HA_CREATE_INFO::handle_atomic_replace(THD *thd, const LEX_CSTRING &db,
 
   LEX_CSTRING cpath;
   char path[FN_REFLEN + 1];
-  size_t path_length= build_table_filename(path, sizeof(path) - 1, backup_name->db.str,
-                                            backup_name->table_name.str, "", FN_IS_TMP);
+  size_t path_length= build_table_filename(path, sizeof(path) - 1,
+                                           backup_name->db.str,
+                                           backup_name->table_name.str,
+                                           "", FN_IS_TMP);
   lex_string_set3(&cpath, path, path_length);
 
-  if (ddl_log_create_table(thd, ddl_log_state_rm, old_hton, &cpath,
-                          &backup_name->db, &backup_name->table_name, false))
+  if (ddl_log_drop_table_init(thd, ddl_log_state_rm, &backup_name->db,
+                              &empty_clex_str) ||
+      ddl_log_drop_table(thd, ddl_log_state_rm, old_hton, &cpath,
+                         &backup_name->db, &backup_name->table_name,
+                         DDL_LOG_FLAG_FROM_IS_TMP))
     return true;
 
   debug_crash_here("ddl_log_create_after_log_drop_backup");
   if (ddl_log_rename_table(thd, ddl_log_state_create, old_hton,
                             &db, &table_name,
                             &backup_name->db, &backup_name->table_name,
+                            DDL_RENAME_PHASE_TRIGGER,
                             DDL_LOG_FLAG_FROM_IS_TMP))
     return true;
   debug_crash_here("ddl_log_create_after_log_rename_backup");
   return false;
 }
 
-// FIXME: merge with execute_rename_table() in ddl_log.cc
-static int execute_rename_tabl2(handler *file,
-                                const LEX_CSTRING *from_db,
-                                const LEX_CSTRING *from_table,
-                                const LEX_CSTRING *to_db,
-                                const LEX_CSTRING *to_table,
-                                uint flags)
-{
-  uint to_length=0, fr_length=0;
-  int err;
-  DBUG_ENTER("execute_rename_table");
-
-  char from_path[FN_REFLEN + 1];
-  char to_path[FN_REFLEN + 1];
-
-  if (file->needs_lower_case_filenames())
-  {
-    build_lower_case_table_filename(from_path, FN_REFLEN,
-                                    from_db, from_table,
-                                    flags & FN_FROM_IS_TMP);
-    build_lower_case_table_filename(to_path, FN_REFLEN,
-                                    to_db, to_table, flags & FN_TO_IS_TMP);
-  }
-  else
-  {
-    fr_length=
-        build_table_filename(from_path, FN_REFLEN, from_db->str,
-                             from_table->str, "", flags & FN_FROM_IS_TMP);
-    to_length= build_table_filename(to_path, FN_REFLEN,
-                                    to_db->str, to_table->str, "",
-                                    flags & FN_TO_IS_TMP);
-  }
-  err= file->ha_rename_table(from_path, to_path);
-  if (file->needs_lower_case_filenames())
-  {
-    /*
-      We have to rebuild the file names as the .frm file should be used
-      without lower case conversion
-    */
-    fr_length= build_table_filename(from_path, FN_REFLEN,
-                                    from_db->str, from_table->str, reg_ext,
-                                    flags & FN_FROM_IS_TMP);
-    to_length= build_table_filename(to_path, FN_REFLEN,
-                                    to_db->str, to_table->str, reg_ext,
-                                    flags & FN_TO_IS_TMP);
-  }
-  else
-  {
-    strmov(from_path+fr_length, reg_ext);
-    strmov(to_path+to_length,   reg_ext);
-  }
-  debug_crash_here("ddl_log_create_after_ha_rename_table");
-  if (!access(from_path, F_OK))
-    (void) mysql_file_rename(key_file_frm, from_path, to_path, MYF(MY_WME));
-  DBUG_RETURN(err);
-}
-
-// FIXME: merge with create_handler() in ddl_log.cc
-static handler *create_handler2(THD *thd, handlerton *hton)
-{
-  handler *file;
-  if (!ha_storage_engine_is_enabled(hton))
-  {
-    my_error(ER_STORAGE_ENGINE_DISABLED, MYF(ME_ERROR_LOG), hton_name(hton)->str);
-    return 0;
-  }
-  if ((file= hton->create(hton, (TABLE_SHARE*) 0, thd->mem_root)))
-    file->init();
-  return file;
-}
-
 bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
 {
+  rename_param param;
+  bool dummy;
   const LEX_CSTRING &db= orig_table->db;
   const LEX_CSTRING &table_name= orig_table->table_name;
   debug_crash_here("ddl_log_create_before_install_new");
   if (old_hton)
   {
-    handler *old_file= create_handler2(thd, old_hton);
-    if (execute_rename_tabl2(old_file, &db, &table_name,
-                            &backup_name->db, &backup_name->table_name,
-                            FN_TO_IS_TMP))
+    param.rename_flags= FN_TO_IS_TMP;
+    param.from_table_hton= old_hton;
+    param.old_version= org_tabledef_version;
+    param.old_alias= lower_case_table_names == 2 ?
+                        orig_table->alias : orig_table->table_name;
+    param.new_alias= backup_name->table_name;
+    if (rename_do(thd, &param, NULL, orig_table, &backup_name->db, false, &dummy))
       return true;
     debug_crash_here("ddl_log_create_after_save_backup");
   }
 
-  rename_param param;
   param.rename_flags= FN_FROM_IS_TMP;
-  bool force_if_exists= false;
   if (rename_check(thd, &param, tmp_name, &db, &table_name, &table_name, false) ||
-      rename_do(thd, &param, NULL, tmp_name, &db, false, &force_if_exists))
+      rename_do(thd, &param, NULL, tmp_name, &db, false, &dummy))
     return true;
   debug_crash_here("ddl_log_create_after_install_new");
   return false;
@@ -9670,7 +9608,8 @@ simple_rename_or_index_change(THD *thd, TABLE_LIST *table_list,
 
     (void) ddl_log_rename_table(thd, &ddl_log_state, old_db_type,
                                 &alter_ctx->db, &alter_ctx->table_name,
-                                &alter_ctx->new_db, &alter_ctx->new_alias, 0);
+                                &alter_ctx->new_db, &alter_ctx->new_alias,
+                                DDL_RENAME_PHASE_TABLE, 0);
     if (mysql_rename_table(old_db_type, &alter_ctx->db, &alter_ctx->table_name,
                            &alter_ctx->new_db, &alter_ctx->new_alias,
                            &table_version, 0))

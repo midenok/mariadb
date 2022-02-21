@@ -1304,7 +1304,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   ddl_log_error_handler no_such_table_handler;
   uint entry_pos= ddl_log_entry->entry_pos;
   int error= 0;
-  uint flags;
+  uint fn_flags= 0;
   bool frm_action= FALSE;
   DBUG_ENTER("ddl_log_execute_action");
 
@@ -1339,6 +1339,11 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       goto end;
     hton= file->ht;
   }
+
+  if (ddl_log_entry->flags & DDL_LOG_FLAG_FROM_IS_TMP)
+    fn_flags|= FN_FROM_IS_TMP;
+  if (ddl_log_entry->flags & DDL_LOG_FLAG_TO_IS_TMP)
+    fn_flags|= FN_TO_IS_TMP;
 
   switch (ddl_log_entry->action_type) {
   case DDL_LOG_REPLACE_ACTION:
@@ -1463,25 +1468,28 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         break;
     /* fall through */
     case DDL_RENAME_PHASE_STAT:
-      /*
-        Stat tables must be updated last so that we can handle a rename of
-        a stat table. For now we just rememeber that we have to update it
-      */
-      update_flags(ddl_log_entry->entry_pos, DDL_LOG_FLAG_UPDATE_STAT);
-      ddl_log_entry->flags|= DDL_LOG_FLAG_UPDATE_STAT;
+      if (fn_flags & FN_TO_IS_TMP)
+      {
+        if (increment_phase(entry_pos))
+          break;
+      }
+      else
+      {
+        /*
+          Stat tables must be updated last so that we can handle a rename of
+          a stat table. For now we just rememeber that we have to update it
+        */
+        update_flags(ddl_log_entry->entry_pos, DDL_LOG_FLAG_UPDATE_STAT);
+        ddl_log_entry->flags|= DDL_LOG_FLAG_UPDATE_STAT;
+      }
     /* fall through */
     case DDL_RENAME_PHASE_TABLE:
       /* Restore frm and table to original names */
       // FIXME: check archive-test_sql_discovery.discover
-      flags= 0;
-      if (ddl_log_entry->flags & DDL_LOG_FLAG_FROM_IS_TMP)
-        flags|= FN_FROM_IS_TMP;
-      if (ddl_log_entry->flags & DDL_LOG_FLAG_TO_IS_TMP)
-        flags|= FN_TO_IS_TMP;
       error= execute_rename_table(ddl_log_entry, file,
                                   &ddl_log_entry->db, &ddl_log_entry->name,
                                   &ddl_log_entry->from_db, &ddl_log_entry->from_name,
-                                  flags, from_path, to_path);
+                                  fn_flags, from_path, to_path);
 
       if (ddl_log_entry->flags & DDL_LOG_FLAG_UPDATE_STAT)
       {
@@ -1588,25 +1596,34 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       /* Fall through */
     case DDL_DROP_PHASE_TRIGGER:
       Table_triggers_list::drop_all_triggers(thd, &db, &table,
-                                             MYF(MY_WME | MY_IGNORE_ENOENT));
+                                             MYF(MY_WME | MY_IGNORE_ENOENT),
+                                             fn_flags);
       if (increment_phase(entry_pos))
         break;
       /* Fall through */
     case DDL_DROP_PHASE_BINLOG:
-      if (strcmp(recovery_state.current_db, db.str))
-      {
-        append_identifier(thd, &recovery_state.drop_table, &db);
-        recovery_state.drop_table.append('.');
-      }
-      append_identifier(thd, &recovery_state.drop_table, &table);
-      recovery_state.drop_table.append(',');
-      /* We don't increment phase as we want to retry this in case of crash */
-
-      if (ddl_log_drop_to_binary_log(thd, ddl_log_entry,
-                                     &recovery_state.drop_table))
+      if (fn_flags & FN_IS_TMP)
       {
         if (increment_phase(entry_pos))
           break;
+      }
+      else
+      {
+        if (strcmp(recovery_state.current_db, db.str))
+        {
+          append_identifier(thd, &recovery_state.drop_table, &db);
+          recovery_state.drop_table.append('.');
+        }
+        append_identifier(thd, &recovery_state.drop_table, &table);
+        recovery_state.drop_table.append(',');
+        /* We don't increment phase as we want to retry this in case of crash */
+
+        if (ddl_log_drop_to_binary_log(thd, ddl_log_entry,
+                                      &recovery_state.drop_table))
+        {
+          if (increment_phase(entry_pos))
+            break;
+        }
       }
       break;
     case DDL_DROP_PHASE_RESET:
@@ -3084,6 +3101,7 @@ bool ddl_log_rename_table(THD *thd, DDL_LOG_STATE *ddl_state,
                           const LEX_CSTRING *org_alias,
                           const LEX_CSTRING *new_db,
                           const LEX_CSTRING *new_alias,
+                          enum_ddl_log_rename_table_phase phase,
                           uint16 flags)
 {
   // TODO: thd is unused!
@@ -3100,7 +3118,7 @@ bool ddl_log_rename_table(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.name=         *const_cast<LEX_CSTRING*>(new_alias);
   ddl_log_entry.from_db=      *const_cast<LEX_CSTRING*>(org_db);
   ddl_log_entry.from_name=    *const_cast<LEX_CSTRING*>(org_alias);
-  ddl_log_entry.phase=        DDL_RENAME_PHASE_TABLE;
+  ddl_log_entry.phase=        (uchar) phase;
   ddl_log_entry.flags=        flags;
 
   DBUG_RETURN(ddl_log_write(ddl_state, &ddl_log_entry));
@@ -3180,6 +3198,8 @@ bool ddl_log_drop_view_init(THD *thd, DDL_LOG_STATE *ddl_state,
    be stored in call order instead of reverse order, which is the normal
    case for all other events.
    See also comment before ddl_log_drop_init().
+
+   TODO: thd is unused
 */
 
 static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
@@ -3188,7 +3208,8 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
                          handlerton *hton,
                          const LEX_CSTRING *path,
                          const LEX_CSTRING *db,
-                         const LEX_CSTRING *table)
+                         const LEX_CSTRING *table,
+                         uint16 flags)
 {
   DDL_LOG_ENTRY ddl_log_entry;
   DDL_LOG_MEMORY_ENTRY *log_entry, *first_entry= NULL;
@@ -3205,6 +3226,7 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.name=         *const_cast<LEX_CSTRING*>(table);
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.phase=        (uchar) phase;
+  ddl_log_entry.flags=        flags;
 
   /*
     Get first entry in the chain and if it is not DDL_LOG_DROP_INIT_ACTION
@@ -3251,12 +3273,13 @@ bool ddl_log_drop_table(THD *thd, DDL_LOG_STATE *ddl_state,
                         handlerton *hton,
                         const LEX_CSTRING *path,
                         const LEX_CSTRING *db,
-                        const LEX_CSTRING *table)
+                        const LEX_CSTRING *table,
+                        uint16 flags)
 {
   DBUG_ENTER("ddl_log_drop_table");
   DBUG_RETURN(ddl_log_drop(thd, ddl_state,
                            DDL_LOG_DROP_TABLE_ACTION, DDL_DROP_PHASE_TABLE,
-                           hton, path, db, table));
+                           hton, path, db, table, flags));
 }
 
 
@@ -3268,7 +3291,7 @@ bool ddl_log_drop_view(THD *thd, DDL_LOG_STATE *ddl_state,
   DBUG_ENTER("ddl_log_drop_view");
   DBUG_RETURN(ddl_log_drop(thd, ddl_state,
                            DDL_LOG_DROP_VIEW_ACTION, 0,
-                           (handlerton*) 0, path, db, table));
+                           (handlerton*) 0, path, db, table, 0));
 }
 
 

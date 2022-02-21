@@ -296,6 +296,7 @@ bool ddl_log_rename_table(THD *thd, DDL_LOG_STATE *ddl_state,
                           const LEX_CSTRING *org_alias,
                           const LEX_CSTRING *new_db,
                           const LEX_CSTRING *new_alias,
+                          enum_ddl_log_rename_table_phase phase,
                           uint16 flags);
 bool ddl_log_rename_view(THD *thd, DDL_LOG_STATE *ddl_state,
                          const LEX_CSTRING *org_db,
@@ -311,7 +312,8 @@ bool ddl_log_drop_table(THD *thd, DDL_LOG_STATE *ddl_state,
                         handlerton *hton,
                         const LEX_CSTRING *path,
                         const LEX_CSTRING *db,
-                        const LEX_CSTRING *table);
+                        const LEX_CSTRING *table,
+                        uint16 flags);
 bool ddl_log_drop_view(THD *thd, DDL_LOG_STATE *ddl_state,
                         const LEX_CSTRING *path,
                         const LEX_CSTRING *db,

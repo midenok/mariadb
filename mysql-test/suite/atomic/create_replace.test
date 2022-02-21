@@ -90,7 +90,8 @@ let $crash_points='ddl_log_create_before_ddl_logging',
                   'ddl_log_create_log_complete3';
 
 #let $crash_count=1;
-#let $crash_points='ddl_log_create_after_ha_rename_table';
+#let $crash_points='ddl_log_create_after_save_backup',
+#'ddl_log_create_after_install_new';
 
 let $statement_count=1;
 let $statements='CREATE OR REPLACE TABLE t1 (new int) EXTRA_OPTION',

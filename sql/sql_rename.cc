@@ -365,7 +365,8 @@ rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
 
     if (ddl_log_state &&
         ddl_log_rename_table(thd, ddl_log_state, hton,
-                             &ren_table->db, old_alias, new_db, new_alias, 0))
+                             &ren_table->db, old_alias, new_db, new_alias,
+                             DDL_RENAME_PHASE_TABLE, 0))
       DBUG_RETURN(1);
 
     debug_crash_here("ddl_log_rename_before_rename_table");
