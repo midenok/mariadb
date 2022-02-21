@@ -4381,6 +4381,15 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
     if (rename_do(thd, &param, NULL, orig_table, &backup_name->db, false, &dummy))
       return true;
     debug_crash_here("ddl_log_create_after_save_backup");
+
+    /*
+      Restart statement transactions for the case of CREATE ... SELECT.
+
+      FIXME: is it needed here?
+    */
+    if (thd->lex->first_select_lex()->item_list.elements &&
+        restart_trans_for_tables(thd, thd->lex->query_tables))
+      return true;
   }
 
   param.rename_flags= FN_FROM_IS_TMP;
@@ -4441,17 +4450,20 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
     (void) delete_statistics_for_table(thd, &db, &table_name);
 
     TABLE_LIST table_list;
+    TABLE *table= create_info->table;
     table_list.init_one_table(&db, &table_name, 0, TL_WRITE_ALLOW_WRITE);
-    table_list.table= create_info->table;
+    table_list.table= table;
 
     if (check_if_log_table(&table_list, TRUE, "CREATE OR REPLACE"))
       return true;
+
+    lex_string_set(&create_info->org_storage_engine_name,
+                   ha_resolve_storage_engine_name(db_type));
 
     if (atomic_replace)
     {
       /*
          NOTE: here FK referencing is checked
-         FIXME: move to separate
       */
       if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
       {
@@ -4469,6 +4481,21 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
           return true;
         }
       }
+
+      if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
+          thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)
+      {
+        if (wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED))
+          return true;
+        close_all_tables_for_name(thd, table->s,
+                                  HA_EXTRA_PREPARE_FOR_DROP, NULL);
+        create_info->table= NULL;
+      }
+      else
+        tdc_remove_table(thd, db.str, table_name.str);
+
+
+      DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
     }
     else
     {
@@ -4477,16 +4504,17 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
         call to open_and_lock_tables() when we are using LOCK TABLES.
       */
       (void) trans_rollback_stmt(thd);
-    }
-    /* Remove normal table without logging. Keep tables locked */
-    if (mysql_rm_table_no_locks(thd, &table_list, &thd->db, create_info, 0, 0,
-                                0, 0, 1, 1))
-      return true;
 
-    debug_crash_here("ddl_log_create_after_drop");
+      /* Remove normal table without logging. Keep tables locked */
+      if (mysql_rm_table_no_locks(thd, &table_list, &thd->db, create_info, 0, 0,
+                                  0, 0, 1, 1))
+        return true;
 
-    if (!atomic_replace)
-    {
+      /* Locked table was closed */
+      create_info->table= table_list.table;
+
+      debug_crash_here("ddl_log_create_after_drop");
+
       /*
         We have to log this query, even if it failed later to ensure the
         drop is done.
@@ -4494,16 +4522,16 @@ bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
       thd->variables.option_bits|= OPTION_KEEP_LOG;
       thd->log_current_statement= 1;
       create_info->table_was_deleted= 1;
+
+      DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
+
+      /*
+        Restart statement transactions for the case of CREATE ... SELECT.
+      */
+      if (thd->lex->first_select_lex()->item_list.elements &&
+          restart_trans_for_tables(thd, thd->lex->query_tables))
+        return true;
     }
-    lex_string_set(&create_info->org_storage_engine_name,
-                   ha_resolve_storage_engine_name(db_type));
-    DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
-    /*
-      Restart statement transactions for the case of CREATE ... SELECT.
-    */
-    if (!atomic_replace && thd->lex->first_select_lex()->item_list.elements &&
-        restart_trans_for_tables(thd, thd->lex->query_tables))
-      return true;
   }
   else if (options.if_not_exists())
   {
@@ -4580,7 +4608,10 @@ int create_table_impl(THD *thd,
   handler	*file= 0;
   int		error= 1;
   bool          frm_only= (create_table_mode & C_ALTER_TABLE_FRM_ONLY);
-  bool          internal_tmp_table= (create_table_mode & C_ALTER_TABLE) || frm_only;
+  const bool    atomic_replace= create_info->tmp_name != NULL;
+  bool          internal_tmp_table= (!atomic_replace &&
+                                     (create_table_mode & C_ALTER_TABLE)) ||
+                                    frm_only;
   /* Easy check for ddl logging if we are creating a temporary table */
   DDL_LOG_STATE *ddl_log_state_create= create_info->tmp_table() ? 0 : create_info->ddl_log_state_create;
   DBUG_ENTER("create_table_impl");
@@ -4673,8 +4704,8 @@ int create_table_impl(THD *thd,
     }
 
     if (!internal_tmp_table &&
-        create_table_handle_exists(thd, db, table_name, options, create_info,
-                                   error))
+        create_table_handle_exists(thd, orig_db, orig_table_name, options,
+                                   create_info, error))
       goto err;
   }
 
@@ -5013,13 +5044,6 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
 
   if (atomic_replace)
   {
-    create_info->table= orig_table->table;
-    if (create_table_handle_exists(thd, orig_table->db, orig_table->table_name,
-                                   *create_info, create_info, result))
-    {
-      result= 1;
-      goto err;
-    }
     create_table= orig_table;
     create_info->table= 0;
   }
