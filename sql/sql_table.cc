@@ -4669,10 +4669,7 @@ int create_table_impl(THD *thd,
           goto err;
       }
       else if (options.if_not_exists())
-      {
-        error= -1;
-        goto err;
-      }
+        goto warn;
       else
       {
         my_error(ER_TABLE_EXISTS_ERROR, MYF(0), alias->str);
@@ -4703,11 +4700,136 @@ int create_table_impl(THD *thd,
       goto err;
     }
 
+    handlerton *db_type= NULL;
+
     if (!internal_tmp_table &&
-        create_table_handle_exists(thd, orig_db, orig_table_name, options,
-                                   create_info, error))
-      goto err;
-  }
+        ha_table_exists(thd, &orig_db, &orig_table_name,
+                        &create_info->org_tabledef_version, NULL, &db_type))
+    {
+      create_info->old_hton= db_type;
+
+      if (ha_check_if_updates_are_ignored(thd, db_type, "CREATE"))
+      {
+        /* Don't create table. CREATE will still be logged in binary log */
+        error= 0;
+        goto err;
+      }
+
+      if (options.or_replace())
+      {
+        (void) delete_statistics_for_table(thd, &orig_db, &orig_table_name);
+
+        TABLE_LIST table_list;
+        TABLE *table= create_info->table;
+        table_list.init_one_table(&orig_db, &orig_table_name, 0, TL_WRITE_ALLOW_WRITE);
+        table_list.table= table;
+
+        if (check_if_log_table(&table_list, TRUE, "CREATE OR REPLACE"))
+          goto err;
+
+        lex_string_set(&create_info->org_storage_engine_name,
+                      ha_resolve_storage_engine_name(db_type));
+
+        if (atomic_replace)
+        {
+          /* NOTE: here FK referencing is checked */
+          if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
+          {
+            Open_table_context ot_ctx(thd, TL_READ);
+            if (!table)
+            {
+              if (open_table(thd, &table_list, &ot_ctx))
+                goto err;
+              table= table_list.table;
+            }
+            FOREIGN_KEY_INFO *fk;
+            bool res= table->referenced_by_foreign_table(thd, fk);
+            if (table_list.table)
+            {
+              (void) close_thread_table(thd, &thd->open_tables);
+              table= NULL;
+            }
+            if (res)
+            {
+              if (fk)
+                my_error(ER_ROW_IS_REFERENCED_2, MYF(0), fk->foreign_table->str);
+              goto err;
+            }
+          }
+
+          if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
+              thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)
+          {
+            if (wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED))
+              goto err;
+            close_all_tables_for_name(thd, table->s,
+                                      HA_EXTRA_PREPARE_FOR_DROP, NULL);
+            create_info->table= NULL;
+          }
+          else
+            tdc_remove_table(thd, orig_db.str, orig_table_name.str);
+
+
+          DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
+        }
+        else
+        {
+          /*
+            Rollback the empty transaction started in mysql_create_table()
+            call to open_and_lock_tables() when we are using LOCK TABLES.
+          */
+          (void) trans_rollback_stmt(thd);
+
+          /* Remove normal table without logging. Keep tables locked */
+          if (mysql_rm_table_no_locks(thd, &table_list, &thd->db, create_info, 0, 0,
+                                      0, 0, 1, 1))
+            goto err;
+
+          /* Locked table was closed */
+          create_info->table= table_list.table;
+
+          debug_crash_here("ddl_log_create_after_drop");
+
+          /*
+            We have to log this query, even if it failed later to ensure the
+            drop is done.
+          */
+          thd->variables.option_bits|= OPTION_KEEP_LOG;
+          thd->log_current_statement= 1;
+          create_info->table_was_deleted= 1;
+
+          DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
+
+          /*
+            Restart statement transactions for the case of CREATE ... SELECT.
+          */
+          if (thd->lex->first_select_lex()->item_list.elements &&
+              restart_trans_for_tables(thd, thd->lex->query_tables))
+            goto err;
+        }
+      }
+      else if (options.if_not_exists())
+      {
+        /*
+          We never come here as part of normal create table as table existance
+          is  checked in open_and_lock_tables(). We may come here as part of
+          ALTER TABLE when converting a table for a distributed engine to a
+          a local one.
+        */
+
+        /* Log CREATE IF NOT EXISTS on slave for distributed engines */
+        if (thd->slave_thread && (db_type && db_type->flags &
+                                  HTON_IGNORE_UPDATES))
+          thd->log_current_statement= 1;
+        goto warn;
+      }
+      else
+      {
+        my_error(ER_TABLE_EXISTS_ERROR, MYF(0), orig_table_name.str);
+        goto err;
+      }
+    } /* ha_table_exists() */
+  } /* else (!create_info->tmp_table()) */
 
   THD_STAGE_INFO(thd, stage_creating_table);
 
@@ -4833,12 +4955,6 @@ int create_table_impl(THD *thd,
 
   error= 0;
 err:
-  if (error == -1)
-  {
-    push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
-                        ER_TABLE_EXISTS_ERROR,
-                        ER_THD(thd, ER_TABLE_EXISTS_ERROR), alias->str);
-  }
   if (unlikely(error) && ddl_log_state_create)
   {
     /* Table was never created, so we can ignore the ddl log entry */
@@ -4849,6 +4965,14 @@ err:
   delete file;
   DBUG_PRINT("exit", ("return: %d", error));
   DBUG_RETURN(error);
+
+warn:
+  error= -1;
+  push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
+                      ER_TABLE_EXISTS_ERROR,
+                      ER_THD(thd, ER_TABLE_EXISTS_ERROR),
+                      alias->str);
+  goto err;
 }
 
 /**
