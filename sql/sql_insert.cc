@@ -4250,6 +4250,12 @@ bool select_insert::prepare_eof()
   DBUG_RETURN(false);
 }
 
+bool select_insert::binlog_at_eof()
+{
+  // FIXME: split prepare_eof()?
+  return false;
+}
+
 bool select_insert::send_ok_packet() {
   char  message[160];                           /* status message */
   ulonglong row_count;                          /* rows affected */
@@ -5085,6 +5091,11 @@ bool select_create::send_eof()
     }
 
     create_info->table= orig_table->table;
+    if (create_info->finalize_atomic_replace(thd, orig_table))
+    {
+      abort_result_set();
+      DBUG_RETURN(true);
+    }
   }
 
   debug_crash_here("ddl_log_create_before_binlog");
@@ -5227,17 +5238,7 @@ bool select_create::send_eof()
     (as the query was logged before commit!)
   */
   debug_crash_here("ddl_log_create_after_binlog");
-//   if (create_info->finalize_ddl(thd))
-//   {
-//     if (atomic_replace)
-//     {
-//       /* Now we have to log DROP_AFTER_CREATE */
-//       atomic_replace= false;
-//       create_table= &new_table;
-//     }
-//     abort_result_set();
-//     DBUG_RETURN(true);
-//   }
+  create_info->finalize_ddl(thd, false);
 
   /*
     exit_done must only be set after last potential call to
@@ -5395,14 +5396,8 @@ void select_create::abort_result_set()
       }
     }
   }
-  if (!binary_logged)
-  {
-    if (ddl_log_state_rm.is_active())
-      (void) ddl_log_revert(thd, &ddl_log_state_create);
-    else
-      ddl_log_complete(&ddl_log_state_create);
-    ddl_log_complete(&ddl_log_state_rm);
-  }
+  if (!binary_logged) // FIXME: comment why this condition?
+    create_info->finalize_ddl(thd, true);
   thd->binlog_xid= 0;
 
   if (create_info->table_was_deleted)

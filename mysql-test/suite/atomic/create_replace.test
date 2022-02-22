@@ -97,7 +97,7 @@ let $statements='CREATE OR REPLACE TABLE t1 (new int) EXTRA_OPTION',
                 'CREATE OR REPLACE TABLE t1 EXTRA_OPTION SELECT * from const_table';
 
 let $statement_count=1;
-let $statements='CREATE OR REPLACE TABLE t1 LIKE const_table';
+let $statements='CREATE OR REPLACE TABLE t1 EXTRA_OPTION SELECT * from const_table';
 
 --disable_query_log
 let create_const=`select REPLACE('create table const_table (new int, b int) EXTRA_OPTION', ' EXTRA_OPTION', $extra_option)`;
