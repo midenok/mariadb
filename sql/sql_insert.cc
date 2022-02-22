@@ -5077,7 +5077,6 @@ bool select_create::send_eof()
   {
     DBUG_ASSERT(table->s->tmp_table);
 
-    int result;
     if (table->file->ha_index_or_rnd_end() ||
         table->file->ha_external_lock(thd, F_UNLCK))
     {
@@ -5086,12 +5085,6 @@ bool select_create::send_eof()
     }
 
     create_info->table= orig_table->table;
-    if (create_table_handle_exists(thd, orig_table->db, orig_table->table_name,
-                                   *create_info, create_info, result))
-    {
-      abort_result_set();
-      DBUG_RETURN(true);
-    }
   }
 
   debug_crash_here("ddl_log_create_before_binlog");

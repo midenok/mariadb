@@ -4341,8 +4341,6 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
 
         ddl_log_state_rm -> chain_cleanup
         ddl_log_state_create -> chain_roll_back
-
-        FIXME: merge with finalize_atomic_replace()?
     */
 
     ddl_log_link_chains(ddl_log_state_rm, ddl_log_state_create);
@@ -4420,140 +4418,6 @@ void HA_CREATE_INFO::finalize_ddl(THD *thd, bool roll_back)
     (void) ddl_log_revert(thd, ddl_log_state_rm);
     debug_crash_here("ddl_log_create_log_complete3");
   }
-}
-
-
-// FIXME: remove
-bool create_table_handle_exists(THD *thd, const LEX_CSTRING &db,
-                                const LEX_CSTRING &table_name,
-                                const DDL_options_st options,
-                                HA_CREATE_INFO *create_info, int &error)
-{
-  handlerton *db_type= NULL;
-  const bool atomic_replace= create_info->tmp_name != NULL;
-
-  if (!ha_table_exists(thd, &db, &table_name,
-                       &create_info->org_tabledef_version, NULL, &db_type))
-    return false;
-
-  create_info->old_hton= db_type;
-
-  if (ha_check_if_updates_are_ignored(thd, db_type, "CREATE"))
-  {
-    /* Don't create table. CREATE will still be logged in binary log */
-    error= 0;
-    return true;
-  }
-
-  if (options.or_replace())
-  {
-    (void) delete_statistics_for_table(thd, &db, &table_name);
-
-    TABLE_LIST table_list;
-    TABLE *table= create_info->table;
-    table_list.init_one_table(&db, &table_name, 0, TL_WRITE_ALLOW_WRITE);
-    table_list.table= table;
-
-    if (check_if_log_table(&table_list, TRUE, "CREATE OR REPLACE"))
-      return true;
-
-    lex_string_set(&create_info->org_storage_engine_name,
-                   ha_resolve_storage_engine_name(db_type));
-
-    if (atomic_replace)
-    {
-      /*
-         NOTE: here FK referencing is checked
-      */
-      if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
-      {
-        Open_table_context ot_ctx(thd, TL_READ);
-        if (open_table(thd, &table_list, &ot_ctx))
-          return true;
-        TABLE *table= table_list.table;
-        FOREIGN_KEY_INFO *fk;
-        bool res= table->referenced_by_foreign_table(thd, fk);
-        (void) close_thread_table(thd, &thd->open_tables);
-        if (res)
-        {
-          if (fk)
-            my_error(ER_ROW_IS_REFERENCED_2, MYF(0), fk->foreign_table->str);
-          return true;
-        }
-      }
-
-      if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
-          thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)
-      {
-        if (wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED))
-          return true;
-        close_all_tables_for_name(thd, table->s,
-                                  HA_EXTRA_PREPARE_FOR_DROP, NULL);
-        create_info->table= NULL;
-      }
-      else
-        tdc_remove_table(thd, db.str, table_name.str);
-
-
-      DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
-    }
-    else
-    {
-      /*
-        Rollback the empty transaction started in mysql_create_table()
-        call to open_and_lock_tables() when we are using LOCK TABLES.
-      */
-      (void) trans_rollback_stmt(thd);
-
-      /* Remove normal table without logging. Keep tables locked */
-      if (mysql_rm_table_no_locks(thd, &table_list, &thd->db, create_info, 0, 0,
-                                  0, 0, 1, 1))
-        return true;
-
-      /* Locked table was closed */
-      create_info->table= table_list.table;
-
-      debug_crash_here("ddl_log_create_after_drop");
-
-      /*
-        We have to log this query, even if it failed later to ensure the
-        drop is done.
-      */
-      thd->variables.option_bits|= OPTION_KEEP_LOG;
-      thd->log_current_statement= 1;
-      create_info->table_was_deleted= 1;
-
-      DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
-
-      /*
-        Restart statement transactions for the case of CREATE ... SELECT.
-      */
-      if (thd->lex->first_select_lex()->item_list.elements &&
-          restart_trans_for_tables(thd, thd->lex->query_tables))
-        return true;
-    }
-  }
-  else if (options.if_not_exists())
-  {
-    /*
-      We never come here as part of normal create table as table existance
-      is  checked in open_and_lock_tables(). We may come here as part of
-      ALTER TABLE when converting a table for a distributed engine to a
-      a local one.
-    */
-
-    /* Log CREATE IF NOT EXISTS on slave for distributed engines */
-    if (thd->slave_thread && (db_type && db_type->flags & HTON_IGNORE_UPDATES))
-      thd->log_current_statement= 1;
-    error= -1;
-    return true;
-  }
-  else
-  {
-    my_error(ER_TABLE_EXISTS_ERROR, MYF(0), table_name.str);
-    return true;
-  }
-  return false;
 }
 
 
@@ -5703,19 +5567,6 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
   if (res)
     goto err;
 
-  if (atomic_replace)
-  {
-    local_create_info.table= orig_table->table;
-    if (create_table_handle_exists(thd, orig_table->db, orig_table->table_name,
-                                   local_create_info, &local_create_info, res))
-      goto err;
-    /*
-      NOTE: orig_table->table is reopened and now is the same share as
-      new_table.
-    */
-    local_create_info.table= 0;
-  }
-
   DEBUG_SYNC(thd, "create_table_like_before_binlog");
 
   /*
@@ -5939,6 +5790,9 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
                  create_info->if_not_exists()));
   }
 
+  if (!res && atomic_replace)
+    res= local_create_info.finalize_atomic_replace(thd, orig_table);
+
 err:
   table= orig_table;
 
@@ -5990,19 +5844,7 @@ err:
     backup_log_ddl(&ddl_log);
   }
 
-  if (res)
-  {
-    if (ddl_log_state_rm.is_active() &&
-        ddl_log_revert(thd, &ddl_log_state_create))
-      res= 1;
-    else
-      ddl_log_complete(&ddl_log_state_create);
-    ddl_log_complete(&ddl_log_state_rm);
-  }
-//   else
-//   {
-//     res= local_create_info.finalize_ddl(thd);
-//   }
+  local_create_info.finalize_ddl(thd, res);
 
   /*
     Check if we are doing CREATE OR REPLACE TABLE under LOCK TABLES
