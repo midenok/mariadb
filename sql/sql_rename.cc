@@ -392,10 +392,13 @@ rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
                                                        new_alias)))
       {
         debug_crash_here("ddl_log_rename_before_stat_tables");
-        (void) rename_table_in_stat_tables(thd, &ren_table->db,
-                                           &ren_table->table_name,
-                                           new_db, new_alias);
-        debug_crash_here("ddl_log_rename_after_stat_tables");
+        if (!(param->rename_flags & FN_IS_TMP))
+        {
+          (void) rename_table_in_stat_tables(thd, &ren_table->db,
+                                            &ren_table->table_name,
+                                            new_db, new_alias);
+          debug_crash_here("ddl_log_rename_after_stat_tables");
+        }
       }
       else
       {

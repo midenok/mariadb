@@ -4333,7 +4333,6 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
   const LEX_CSTRING &db= orig_table->db;
   const LEX_CSTRING &table_name= orig_table->table_name;
 
-
   debug_crash_here("ddl_log_create_before_install_new");
   if (old_hton)
   {
@@ -4379,15 +4378,6 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
     if (rename_do(thd, &param, NULL, orig_table, &backup_name->db, false, &dummy))
       return true;
     debug_crash_here("ddl_log_create_after_save_backup");
-
-    /*
-      Restart statement transactions for the case of CREATE ... SELECT.
-
-      FIXME: is it needed here?
-    */
-    if (thd->lex->first_select_lex()->item_list.elements &&
-        restart_trans_for_tables(thd, thd->lex->query_tables))
-      return true;
   }
 
   param.rename_flags= FN_FROM_IS_TMP;

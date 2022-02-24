@@ -5103,12 +5103,6 @@ bool select_create::send_eof()
     }
 
     create_info->table= orig_table->table;
-    // FIXME: move lower
-    if (create_info->finalize_atomic_replace(thd, orig_table))
-    {
-      abort_result_set();
-      DBUG_RETURN(true);
-    }
   }
 
   debug_crash_here("ddl_log_create_before_binlog");
@@ -5148,23 +5142,6 @@ bool select_create::send_eof()
       DBUG_ASSERT(saved_tmp_table_share);
       thd->restore_tmp_table_share(saved_tmp_table_share);
     }
-  }
-  else if (atomic_replace)
-  {
-    create_table= orig_table;
-    create_info->table= NULL;
-    table->file->ha_release_auto_increment(); // FIXME: is it needed? check auto_increment
-    table->file->ha_reset();
-    /* FIXME: ER_NOT_KEYFILE until drop_temporary_table() for aria_notrans */
-    thd->drop_temporary_table(table, NULL, false);
-    table= NULL;
-  }
-
-  // FIXME: maybe lower?
-  if (binlog_at_eof(create_info))
-  {
-    abort_result_set();
-    DBUG_RETURN(true);
   }
 
   /*
@@ -5216,6 +5193,30 @@ bool select_create::send_eof()
       trans_commit_implicit(thd);
     thd->binlog_xid= 0;
 
+
+    if (atomic_replace &&
+        create_info->finalize_atomic_replace(thd, orig_table))
+    {
+      abort_result_set();
+      DBUG_RETURN(true);
+    }
+
+    if (atomic_replace)
+    {
+      create_table= orig_table;
+      create_info->table= NULL;
+      table->file->ha_release_auto_increment(); // FIXME: is it needed? check auto_increment
+      table->file->ha_reset();
+      thd->drop_temporary_table(table, NULL, false);
+      table= NULL;
+    }
+
+    if (binlog_at_eof(create_info))
+    {
+      abort_result_set();
+      DBUG_RETURN(true);
+    }
+
 #ifdef WITH_WSREP
     if (WSREP(thd))
     {
@@ -5254,6 +5255,12 @@ bool select_create::send_eof()
     }
     backup_log_ddl(&ddl_log);
   }
+  else if (binlog_at_eof(create_info))
+  {
+    abort_result_set();
+    DBUG_RETURN(true);
+  }
+
   /*
     If are using statement based replication the table will be deleted here
     in case of a crash as we can't use xid to check if the query was logged
