@@ -89,9 +89,11 @@ let $crash_points='ddl_log_create_before_install_new',
                   'ddl_log_create_log_complete3';
 
 #let $crash_count=1;
-#let $crash_points='ddl_log_create_after_save_backup';
+#let $crash_points='ddl_log_create_log_complete3';
+#                  'ddl_log_create_before_binlog3',
+#                  'ddl_log_create_before_binlog4';
 
-let $statement_count=1;
+let $statement_count=3;
 let $statements='CREATE OR REPLACE TABLE t1 (new int) EXTRA_OPTION',
                 'CREATE OR REPLACE TABLE t1 LIKE const_table',
                 'CREATE OR REPLACE TABLE t1 EXTRA_OPTION SELECT * from const_table';

@@ -6035,7 +6035,7 @@ class select_insert :public select_result_interceptor {
   virtual void store_values(List<Item> &values);
   virtual bool can_rollback_data() { return 0; }
   bool prepare_eof();
-  bool binlog_at_eof();
+  bool binlog_at_eof(Table_specification_st *create_info);
   bool send_ok_packet();
   bool send_eof();
   virtual void abort_result_set();

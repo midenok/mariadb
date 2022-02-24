@@ -4167,7 +4167,6 @@ bool select_insert::prepare_eof()
   int error;
   bool const trans_table= table->file->has_transactions_and_rollback();
   bool changed;
-  killed_state killed_status= thd->killed;
 
   DBUG_ENTER("select_insert::prepare_eof");
   DBUG_PRINT("enter", ("trans_table: %d, table_type: '%s'",
@@ -4208,18 +4207,39 @@ bool select_insert::prepare_eof()
   DBUG_ASSERT(trans_table || !changed || 
               thd->transaction->stmt.modified_non_trans_table);
 
+  if (unlikely(error))
+  {
+    if (thd->transaction->stmt.modified_non_trans_table &&
+        !atomic_replace &&
+        binlog_at_eof(NULL))
+    {}
+    else
+      table->file->print_error(error,MYF(0));
+    DBUG_RETURN(true);
+  }
+
+  DBUG_RETURN(false);
+}
+
+bool select_insert::binlog_at_eof(Table_specification_st *create_info)
+{
+  DBUG_ASSERT(table || atomic_replace);
+  const bool trans_table= table ? table->file->has_transactions_and_rollback() :
+                                  false;
+  killed_state killed_status= thd->killed;
+  DBUG_ENTER("select_insert::binlog_at_eof");
+
   /*
     Write to binlog before commiting transaction.  No statement will
     be written by the binlog_query() below in RBR mode.  All the
     events are in the transaction cache and will be written when
     ha_autocommit_or_rollback() is issued below.
   */
-  if ((WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) &&
-      (likely(!error) || thd->transaction->stmt.modified_non_trans_table))
+  if ((WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()))
   {
     int errcode= 0;
     int res;
-    if (likely(!error))
+    if (thd->is_error())
       thd->clear_error();
     else
       errcode= query_error_code(thd, killed_status == NOT_KILLED);
@@ -4228,32 +4248,23 @@ bool select_insert::prepare_eof()
                            trans_table, FALSE, FALSE, errcode);
     if (res > 0)
     {
-      table->file->ha_release_auto_increment();
+      if (table)
+        table->file->ha_release_auto_increment();
       DBUG_RETURN(true);
     }
-    /*
-      FIXME: bad check !table->s->tmp_table in case of atomic_replace.
-      The better check is create_info->tmp_table(). The even better is to
-      update binary_logged in do_postlock() for RBR.
-    */
-    binary_logged= res == 0 || !table->s->tmp_table;
+    /* TODO: Update binary_logged in do_postlock() for RBR? */
+    const bool tmp_table= create_info ? create_info->tmp_table() :
+                                        table->s->tmp_table;
+    binary_logged= res == 0 || tmp_table;
   }
-  table->s->table_creation_was_logged|= binary_logged;
-  table->file->ha_release_auto_increment();
-
-  if (unlikely(error))
+  if (table)
   {
-    table->file->print_error(error,MYF(0));
-    DBUG_RETURN(true);
+    /* NOTE: used in binlog_drop_table(), not needed for atomic_replace */
+    table->s->table_creation_was_logged|= binary_logged;
+    table->file->ha_release_auto_increment();
   }
 
   DBUG_RETURN(false);
-}
-
-bool select_insert::binlog_at_eof()
-{
-  // FIXME: split prepare_eof()?
-  return false;
 }
 
 bool select_insert::send_ok_packet() {
@@ -4297,7 +4308,8 @@ bool select_insert::send_eof()
 {
   bool res;
   DBUG_ENTER("select_insert::send_eof");
-  res= (prepare_eof() || (!suppress_my_ok && send_ok_packet()));
+  res= (prepare_eof() || binlog_at_eof(NULL) ||
+        (!suppress_my_ok && send_ok_packet()));
   DBUG_RETURN(res);
 }
 
@@ -5091,6 +5103,7 @@ bool select_create::send_eof()
     }
 
     create_info->table= orig_table->table;
+    // FIXME: move lower
     if (create_info->finalize_atomic_replace(thd, orig_table))
     {
       abort_result_set();
@@ -5140,9 +5153,18 @@ bool select_create::send_eof()
   {
     create_table= orig_table;
     create_info->table= NULL;
+    table->file->ha_release_auto_increment(); // FIXME: is it needed? check auto_increment
     table->file->ha_reset();
+    /* FIXME: ER_NOT_KEYFILE until drop_temporary_table() for aria_notrans */
     thd->drop_temporary_table(table, NULL, false);
     table= NULL;
+  }
+
+  // FIXME: maybe lower?
+  if (binlog_at_eof(create_info))
+  {
+    abort_result_set();
+    DBUG_RETURN(true);
   }
 
   /*
