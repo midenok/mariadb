@@ -5193,22 +5193,20 @@ bool select_create::send_eof()
       trans_commit_implicit(thd);
     thd->binlog_xid= 0;
 
-
-    if (atomic_replace &&
-        create_info->finalize_atomic_replace(thd, orig_table))
-    {
-      abort_result_set();
-      DBUG_RETURN(true);
-    }
-
     if (atomic_replace)
     {
       create_table= orig_table;
-      create_info->table= NULL;
+      create_info->table= orig_table->table;
       table->file->ha_release_auto_increment(); // FIXME: is it needed? check auto_increment
       table->file->ha_reset();
       thd->drop_temporary_table(table, NULL, false);
       table= NULL;
+
+      if (create_info->finalize_atomic_replace(thd, orig_table))
+      {
+        abort_result_set();
+        DBUG_RETURN(true);
+      }
     }
 
     if (binlog_at_eof(create_info))

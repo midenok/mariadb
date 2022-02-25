@@ -4368,6 +4368,20 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
       return true;
     debug_crash_here("ddl_log_create_after_log_rename_backup");
 
+    if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
+        thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)
+    {
+      DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
+                                                 table_name.str,
+                                                 MDL_EXCLUSIVE));
+
+      close_all_tables_for_name(thd, table->s,
+                                HA_EXTRA_PREPARE_FOR_DROP, NULL);
+      table= NULL;
+      orig_table->table= NULL;
+    }
+
+
     /* Old table exists, rename it to backup_name */
     param.rename_flags= FN_TO_IS_TMP;
     param.from_table_hton= old_hton;
@@ -4590,7 +4604,7 @@ int create_table_impl(THD *thd,
           if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
           {
             Open_table_context ot_ctx(thd, TL_READ);
-            if (!table)
+            if (!create_info->table)
             {
               if (open_table(thd, &table_list, &ot_ctx))
                 goto err;
@@ -4598,7 +4612,7 @@ int create_table_impl(THD *thd,
             }
             FOREIGN_KEY_INFO *fk;
             bool res= table->referenced_by_foreign_table(thd, fk);
-            if (table_list.table)
+            if (!create_info->table)
             {
               (void) close_thread_table(thd, &thd->open_tables);
               table= NULL;
@@ -4616,12 +4630,14 @@ int create_table_impl(THD *thd,
           {
             if (wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED))
               goto err;
-            close_all_tables_for_name(thd, table->s,
-                                      HA_EXTRA_PREPARE_FOR_DROP, NULL);
-            create_info->table= NULL;
           }
           else
-            tdc_remove_table(thd, orig_db.str, orig_table_name.str);
+          {
+            DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE,
+                                                       orig_db.str,
+                                                       orig_table_name.str,
+                                                       MDL_EXCLUSIVE));
+          }
 
 
           DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
@@ -5023,7 +5039,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   if (atomic_replace)
   {
     create_table= orig_table;
-    create_info->table= 0;
+    create_info->table= orig_table->table;
   }
 
 err:
@@ -5780,11 +5796,16 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
                  create_info->if_not_exists()));
   }
 
-  if (!res && atomic_replace)
-    res= local_create_info.finalize_atomic_replace(thd, orig_table);
-
 err:
-  table= orig_table;
+  if (atomic_replace)
+  {
+    table= orig_table;
+    local_create_info.table= orig_table->table;
+
+    if (!res)
+      res= local_create_info.finalize_atomic_replace(thd, orig_table);
+  }
+
 
   if (do_logging)
   {
