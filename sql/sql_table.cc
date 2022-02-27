@@ -4600,6 +4600,11 @@ int create_table_impl(THD *thd,
 
         if (atomic_replace)
         {
+          if (db_type == view_pseudo_hton)
+          {
+            my_error(ER_IT_IS_A_VIEW, MYF(0), orig_table_name.str);
+            goto err;
+          }
           /* NOTE: here FK referencing is checked */
           if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
           {

@@ -970,11 +970,12 @@ static bool build_filename_and_delete_tmp_file(char *path, size_t path_length,
                                                const LEX_CSTRING *db,
                                                const LEX_CSTRING *name,
                                                const char *ext,
-                                               PSI_file_key psi_key)
+                                               PSI_file_key psi_key,
+                                               uint flags)
 {
   bool deleted;
   uint length= build_table_filename(path, path_length-1,
-                                    db->str, name->str, ext, 0);
+                                    db->str, name->str, ext, flags);
   path[length]= '~';
   path[length+1]= 0;
   deleted= mysql_file_delete(psi_key, path, MYF(0)) != 0;
@@ -1151,7 +1152,7 @@ static int execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
 */
 
 static void rename_triggers(THD *thd, DDL_LOG_ENTRY *ddl_log_entry,
-                            bool swap_tables)
+                            bool swap_tables, uint flags)
 {
   LEX_CSTRING to_table, from_table, to_db, from_db, from_converted_name;
   char to_path[FN_REFLEN+1], from_path[FN_REFLEN+1], conv_path[FN_REFLEN+1];
@@ -1173,10 +1174,10 @@ static void rename_triggers(THD *thd, DDL_LOG_ENTRY *ddl_log_entry,
 
   build_filename_and_delete_tmp_file(from_path, sizeof(from_path),
                                      &from_db, &from_table,
-                                     TRG_EXT, key_file_trg);
+                                     TRG_EXT, key_file_trg, flags & FN_FROM_IS_TMP);
   build_filename_and_delete_tmp_file(to_path, sizeof(to_path),
                                      &to_db, &to_table,
-                                     TRG_EXT, key_file_trg);
+                                     TRG_EXT, key_file_trg, flags & FN_TO_IS_TMP);
   if (lower_case_table_names)
   {
     uint errors;
@@ -1463,7 +1464,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     */
     switch (ddl_log_entry->phase) {
     case DDL_RENAME_PHASE_TRIGGER:
-      rename_triggers(thd, ddl_log_entry, 0);
+      rename_triggers(thd, ddl_log_entry, 0, fn_flags);
       if (increment_phase(entry_pos))
         break;
     /* fall through */
@@ -1517,11 +1518,11 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
                                        &ddl_log_entry->db,
                                        &ddl_log_entry->name,
                                        reg_ext,
-                                       key_file_fileparser);
+                                       key_file_fileparser, 0);
     build_filename_and_delete_tmp_file(from_path, sizeof(from_path) - 1,
                                        &ddl_log_entry->from_db,
                                        &ddl_log_entry->from_name,
-                                       reg_ext, key_file_fileparser);
+                                       reg_ext, key_file_fileparser, 0);
 
     /* Rename view back if the original rename did succeed */
     if (!access(to_path, F_OK))
@@ -1679,7 +1680,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
                                             &ddl_log_entry->db,
                                             &ddl_log_entry->name,
                                             TRG_EXT,
-                                            key_file_fileparser))
+                                            key_file_fileparser, 0))
     {
       /* Temporary file existed and was deleted, nothing left to do */
       (void) update_phase(entry_pos, DDL_LOG_FINAL_PHASE);
@@ -1879,11 +1880,11 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     (void) build_filename_and_delete_tmp_file(to_path, sizeof(to_path) - 1,
                                               &db, &table,
                                               TRG_EXT,
-                                              key_file_fileparser);
+                                              key_file_fileparser, 0);
     (void) build_filename_and_delete_tmp_file(to_path, sizeof(to_path) - 1,
                                               &db, &trigger,
                                               TRN_EXT,
-                                              key_file_fileparser);
+                                              key_file_fileparser, 0);
     switch (ddl_log_entry->phase) {
     case DDL_CREATE_TRIGGER_PHASE_DELETE_COPY:
     {
@@ -2192,7 +2193,7 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       if (is_renamed)
       {
         // rename_triggers will rename from: from_db.from_name -> db.extra_name
-        rename_triggers(thd, ddl_log_entry, 1);
+        rename_triggers(thd, ddl_log_entry, 1, 0);
         (void) update_phase(entry_pos, DDL_ALTER_TABLE_PHASE_UPDATE_STATS);
       }
     }
