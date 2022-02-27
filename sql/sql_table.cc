@@ -4569,10 +4569,12 @@ int create_table_impl(THD *thd,
     }
 
     handlerton *db_type= NULL;
+    LEX_CSTRING partition_engine_name= {NULL, 0};
 
     if (!internal_tmp_table &&
         ha_table_exists(thd, &orig_db, &orig_table_name,
-                        &create_info->org_tabledef_version, NULL, &db_type))
+                        &create_info->org_tabledef_version,
+                        &partition_engine_name, &db_type))
     {
       create_info->old_hton= db_type;
 
@@ -4649,6 +4651,16 @@ int create_table_impl(THD *thd,
                                                        MDL_EXCLUSIVE));
           }
 
+          backup_log_info *d= &create_info->drop_entry;
+          d->query= { C_STRING_WITH_LEN("DROP") };
+          if ((d->org_partitioned= (partition_engine_name.str != 0)))
+            d->org_storage_engine_name= partition_engine_name;
+          else
+            lex_string_set(&d->org_storage_engine_name,
+                           ha_resolve_storage_engine_name(db_type));
+          d->org_database=     orig_db;
+          d->org_table=        orig_table_name;
+          d->org_table_id=     create_info->org_tabledef_version;
 
           DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
         }
