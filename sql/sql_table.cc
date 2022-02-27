@@ -1144,9 +1144,11 @@ bool mysql_rm_table(THD *thd,TABLE_LIST *tables, bool if_exists,
 
   /* mark for close and remove all cached entries */
   thd->push_internal_handler(&err_handler);
-  error= mysql_rm_table_no_locks(thd, tables, &thd->db, NULL, if_exists,
-                                 drop_temporary, false, drop_sequence,
-                                 dont_log_query, false);
+  error= mysql_rm_table_no_locks(thd, tables, &thd->db, (DDL_LOG_STATE*) 0,
+                                 if_exists,
+                                 drop_temporary,
+                                 false, drop_sequence, dont_log_query,
+                                 false);
   thd->pop_internal_handler();
 
   if (unlikely(error))
@@ -1274,7 +1276,7 @@ bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
 
 int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
                             const LEX_CSTRING *current_db,
-                            Atomic_info *atomic_info,
+                            DDL_LOG_STATE *ddl_log_state,
                             bool if_exists,
                             bool drop_temporary, bool drop_view,
                             bool drop_sequence,
@@ -1301,15 +1303,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
   String normal_tables;
   String built_trans_tmp_query, built_non_trans_tmp_query;
   DBUG_ENTER("mysql_rm_table_no_locks");
-
-  DDL_LOG_STATE *ddl_log_state= NULL;
-  bool atomic_replace= false;
-
-  if (atomic_info)
-  {
-    ddl_log_state= atomic_info->ddl_log_state_rm;
-    atomic_replace= (atomic_info->tmp_name != NULL);
-  }
 
   if (!ddl_log_state)
   {
@@ -1537,7 +1530,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     thd->replication_flags= 0;
     const bool was_view= table_type == TABLE_TYPE_VIEW;
 
-    if (!table_count++ && !atomic_replace)
+    if (!table_count++)
     {
       LEX_CSTRING comment= {comment_start, (size_t) comment_len};
       if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
@@ -1584,15 +1577,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       }
       else
         tdc_remove_table(thd, db.str, table_name.str);
-
-      if (atomic_replace)
-      {
-        /*
-           FIXME: seems like we only need tdc_remove_table()/close_all_tables_for_name()
-           Do we need anything else in mysql_rm_table_no_locks() ?
-        */
-        goto report_error;
-      }
 
       /* Check that we have an exclusive lock on the table to be dropped. */
       DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, db.str,
@@ -1685,12 +1669,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     */
     if (non_existing_table_error(error))
     {
-      if (atomic_replace)
-      {
-        error= 0;
-        goto report_error;
-      }
-
       int ferror= 0;
       DBUG_ASSERT(!was_view);
 
@@ -1792,42 +1770,29 @@ report_error:
     if (if_exists && non_existing_table_error(error))
       error= 0;
 
-    if (!error)
+    if (!error && table_dropped)
     {
-      if (table_dropped)
-      {
-        PSI_CALL_drop_table_share(temporary_table_was_dropped, db.str,
-                                  (uint) db.length, table_name.str,
-                                  (uint) table_name.length);
-        mysql_audit_drop_table(thd, table);
-      }
-      if (!is_temporary && (atomic_replace || table_dropped))
+      PSI_CALL_drop_table_share(temporary_table_was_dropped,
+                                db.str, (uint)db.length,
+                                table_name.str, (uint)table_name.length);
+      mysql_audit_drop_table(thd, table);
+      if (!is_temporary)
       {
         backup_log_info ddl_log;
-        backup_log_info *d;
-        DBUG_ASSERT(!atomic_replace || atomic_info);
-        DBUG_ASSERT(!(atomic_replace && table_dropped));
-        if (atomic_replace)
-          d= &atomic_info->drop_entry;
+        bzero(&ddl_log, sizeof(ddl_log));
+        ddl_log.query= { C_STRING_WITH_LEN("DROP") };
+        if ((ddl_log.org_partitioned= (partition_engine_name.str != 0)))
+          ddl_log.org_storage_engine_name= partition_engine_name;
         else
-        {
-          d= &ddl_log;
-          bzero(d, sizeof(*d));
-        }
-        d->query= { C_STRING_WITH_LEN("DROP") };
-        if ((d->org_partitioned= (partition_engine_name.str != 0)))
-          d->org_storage_engine_name= partition_engine_name;
-        else
-          lex_string_set(&d->org_storage_engine_name,
+          lex_string_set(&ddl_log.org_storage_engine_name,
                          ha_resolve_storage_engine_name(hton));
-        d->org_database=     table->db;
-        d->org_table=        table->table_name;
-        d->org_table_id=     version;
-        if (table_dropped)
-          backup_log_ddl(d);
+        ddl_log.org_database=     table->db;
+        ddl_log.org_table=        table->table_name;
+        ddl_log.org_table_id=     version;
+        backup_log_ddl(&ddl_log);
       }
     }
-    if (!was_view && !atomic_replace)
+    if (!was_view)
       ddl_log_update_phase(ddl_log_state, DDL_DROP_PHASE_BINLOG);
 
     if (!dont_log_query &&
@@ -4673,8 +4638,9 @@ int create_table_impl(THD *thd,
           (void) trans_rollback_stmt(thd);
 
           /* Remove normal table without logging. Keep tables locked */
-          if (mysql_rm_table_no_locks(thd, &table_list, &thd->db, create_info, 0, 0,
-                                      0, 0, 1, 1))
+          if (mysql_rm_table_no_locks(thd, &table_list, &thd->db,
+                                      create_info->ddl_log_state_rm,
+                                      0, 0, 0, 0, 1, 1))
             goto err;
 
           /* Locked table was closed */

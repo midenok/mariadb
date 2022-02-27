@@ -182,7 +182,7 @@ bool mysql_rm_table(THD *thd,TABLE_LIST *tables, bool if_exists,
                     bool dont_log_query);
 int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
                             const LEX_CSTRING *db,
-                            Atomic_info *atomic_info,
+                            DDL_LOG_STATE *ddl_log_state,
                             bool if_exists,
                             bool drop_temporary, bool drop_view,
                             bool drop_sequence,
