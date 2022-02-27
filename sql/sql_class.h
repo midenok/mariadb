@@ -6094,6 +6094,7 @@ public:
   const THD *get_thd(void) { return thd; }
   const HA_CREATE_INFO *get_create_info() { return create_info; };
   int prepare2(JOIN *join) { return 0; }
+  bool finalize_locked_tables(THD *thd);
 
 private:
   TABLE *create_table_from_items(THD *thd,

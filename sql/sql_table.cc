@@ -4602,13 +4602,18 @@ int create_table_impl(THD *thd,
         {
           if (db_type == view_pseudo_hton)
           {
-            my_error(ER_IT_IS_A_VIEW, MYF(0), orig_table_name.str);
+            StringBuffer<FN_REFLEN> tbl_name(system_charset_info);
+            tbl_name.length(0);
+            tbl_name.append(&orig_db);
+            tbl_name.append('.');
+            tbl_name.append(&orig_table_name);
+            my_error(ER_IT_IS_A_VIEW, MYF(0), tbl_name.c_ptr_safe());
             goto err;
           }
           /* NOTE: here FK referencing is checked */
           if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
           {
-            Open_table_context ot_ctx(thd, TL_READ);
+            Open_table_context ot_ctx(thd, TL_READ|MYSQL_OPEN_GET_NEW_TABLE);
             if (!create_info->table)
             {
               if (open_table(thd, &table_list, &ot_ctx))
