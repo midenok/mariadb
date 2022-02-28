@@ -34,3 +34,22 @@ drop temporary table if exists tmp;
 --enable_warnings
 drop table t1;
 --source include/rpl_end.inc
+
+
+--echo #
+--echo # MDEV-25292 Atomic CREATE OR REPLACE TABLE
+--echo #
+set @saved_debug_dbug= @@session.debug_dbug;
+create table t1 (a int);
+insert t1 values (1), (1);
+create table t2 (c int);
+lock tables t2 write, t1 write;
+set session debug_dbug= '+d,atomic_replace_external_lock_fail';
+--error ER_LOCK_TABLE_FULL
+create or replace table t2 (y int) as select * from t1;
+let $MYSQLD_DATADIR= `SELECT @@datadir`;
+--list_files $MYSQLD_DATADIR/test *sql*
+show create table t1;
+unlock tables;
+drop tables t2, t1;
+set session debug_dbug= @saved_debug_dbug;

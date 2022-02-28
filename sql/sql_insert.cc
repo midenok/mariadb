@@ -4593,10 +4593,16 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
           for a temporary table).
         */
         bool on_save= thd->transaction->on;
+        TABLE *table= create_table->table;
+        int error;
         thd->transaction->on= false;
-        if (create_table->table->file->ha_external_lock(thd, F_WRLCK))
+        if ((DBUG_IF("atomic_replace_external_lock_fail") &&
+              (error= HA_ERR_LOCK_TABLE_FULL)) ||
+              (error= table->file->ha_external_lock(thd, F_WRLCK)))
         {
-          // FIXME: test
+          table->file->print_error(error, MYF(0));
+          table->file->ha_reset();
+          thd->drop_temporary_table(table, NULL, false);
           create_table->table= 0;
           thd->transaction->on= on_save;
           goto err;
@@ -4655,11 +4661,12 @@ err:
   if (unlikely(!(table= create_table->table)))
   {
     if (likely(!thd->is_error()))             // CREATE ... IF NOT EXISTS
+    {
       my_ok(thd);                             //   succeed, but did nothing
-    if (ddl_log_state_rm.is_active())
-      (void) ddl_log_revert(thd, &ddl_log_state_create);
-    else
       ddl_log_complete(&ddl_log_state_create);
+    }
+    else
+      (void) ddl_log_revert(thd, &ddl_log_state_create);
     ddl_log_complete(&ddl_log_state_rm);
     DBUG_RETURN(NULL);
   }
