@@ -3835,7 +3835,7 @@ select_insert::select_insert(THD *thd_arg, TABLE_LIST *table_list_par,
   table_list(table_list_par), table(table_par), fields(fields_par),
   autoinc_value_of_last_inserted_row(0),
   insert_into_view(table_list_par && table_list_par->view != 0),
-  binary_logged(false), atomic_replace(false)
+  binary_logged(false), atomic_replace(false), create_info(NULL)
 {
   bzero((char*) &info,sizeof(info));
   info.handle_duplicates= duplic;
@@ -4210,8 +4210,7 @@ bool select_insert::prepare_eof()
   if (unlikely(error))
   {
     if (thd->transaction->stmt.modified_non_trans_table &&
-        !atomic_replace &&
-        binlog_at_eof(NULL))
+        !atomic_replace && binlog_at_eof())
     {}
     else
       table->file->print_error(error,MYF(0));
@@ -4221,7 +4220,7 @@ bool select_insert::prepare_eof()
   DBUG_RETURN(false);
 }
 
-bool select_insert::binlog_at_eof(Table_specification_st *create_info)
+bool select_insert::binlog_at_eof()
 {
   DBUG_ASSERT(table || atomic_replace);
   const bool trans_table= table ? table->file->has_transactions_and_rollback() :
@@ -4308,7 +4307,7 @@ bool select_insert::send_eof()
 {
   bool res;
   DBUG_ENTER("select_insert::send_eof");
-  res= (prepare_eof() || binlog_at_eof(NULL) ||
+  res= (prepare_eof() || binlog_at_eof() ||
         (!suppress_my_ok && send_ok_packet()));
   DBUG_RETURN(res);
 }
@@ -4373,12 +4372,10 @@ void select_insert::abort_result_set()
                                  thd->query_length(),
                                  transactional_table, FALSE, FALSE, errcode);
 
-          /*
-            FIXME: bad check !table->s->tmp_table in case of atomic_replace.
-            The better check is create_info->tmp_table(). The even better is to
-            update binary_logged in do_postlock() for RBR.
-          */
-          binary_logged= res == 0 || !table->s->tmp_table;
+          /* TODO: Update binary_logged in do_postlock() for RBR? */
+          const bool tmp_table= create_info ? create_info->tmp_table() :
+                                              table->s->tmp_table;
+          binary_logged= res == 0 || !tmp_table;
         }
 	if (changed)
 	  query_cache_invalidate3(thd, table, 1);
@@ -5209,7 +5206,7 @@ bool select_create::send_eof()
       }
     }
 
-    if (binlog_at_eof(create_info))
+    if (binlog_at_eof())
     {
       abort_result_set();
       DBUG_RETURN(true);
@@ -5253,7 +5250,7 @@ bool select_create::send_eof()
     }
     backup_log_ddl(&ddl_log);
   }
-  else if (binlog_at_eof(create_info))
+  else if (binlog_at_eof())
   {
     abort_result_set();
     DBUG_RETURN(true);

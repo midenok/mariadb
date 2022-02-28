@@ -6023,6 +6023,7 @@ class select_insert :public select_result_interceptor {
   bool insert_into_view;
   bool binary_logged;
   bool atomic_replace;
+  Table_specification_st *create_info;
 
   select_insert(THD *thd_arg, TABLE_LIST *table_list_par, TABLE *table_par,
                 List<Item> *fields_par, List<Item> *update_fields,
@@ -6035,7 +6036,7 @@ class select_insert :public select_result_interceptor {
   virtual void store_values(List<Item> &values);
   virtual bool can_rollback_data() { return 0; }
   bool prepare_eof();
-  bool binlog_at_eof(Table_specification_st *create_info);
+  bool binlog_at_eof();
   bool send_ok_packet();
   bool send_eof();
   virtual void abort_result_set();
@@ -6049,7 +6050,6 @@ class select_create: public select_insert {
   TABLE_LIST *orig_table;
   TABLE_LIST new_table;
   TABLE_LIST backup_table;
-  Table_specification_st *create_info;
   TABLE_LIST *select_tables;
   Alter_info *alter_info;
   Field **field;
@@ -6071,7 +6071,6 @@ public:
                   ignore, NULL),
     create_table(table_arg),
     orig_table(table_arg),
-    create_info(create_info_par),
     select_tables(select_tables_arg),
     alter_info(alter_info_arg),
     m_plock(NULL), exit_done(0),
@@ -6079,6 +6078,7 @@ public:
     {
       bzero(&ddl_log_state_create, sizeof(ddl_log_state_create));
       bzero(&ddl_log_state_rm, sizeof(ddl_log_state_rm));
+      create_info= create_info_par;
       atomic_replace= create_info->is_atomic_replace();
       create_info->ddl_log_state_create= &ddl_log_state_create;
       create_info->ddl_log_state_rm= &ddl_log_state_rm;
