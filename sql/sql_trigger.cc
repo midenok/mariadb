@@ -1220,7 +1220,8 @@ bool rm_trigname_file(char *path, const LEX_CSTRING *db,
 */
 
 bool Table_triggers_list::save_trigger_file(THD *thd, const LEX_CSTRING *db,
-                                            const LEX_CSTRING *table_name)
+                                            const LEX_CSTRING *table_name,
+                                            uint flags)
 {
   char file_buff[FN_REFLEN];
   LEX_CSTRING file;
@@ -1230,7 +1231,7 @@ bool Table_triggers_list::save_trigger_file(THD *thd, const LEX_CSTRING *db,
     DBUG_RETURN(true);
 
   file.length= build_table_filename(file_buff, FN_REFLEN - 1, db->str, table_name->str,
-                                    TRG_EXT, 0);
+                                    TRG_EXT, flags);
   file.str= file_buff;
   DBUG_RETURN(sql_create_definition_file(NULL, &file, &triggers_file_type,
                                          (uchar*) this,
@@ -1345,7 +1346,7 @@ bool Table_triggers_list::drop_trigger(THD *thd, TABLE_LIST *tables,
   }
   else
   {
-    if (save_trigger_file(thd, &tables->db, &tables->table_name))
+    if (save_trigger_file(thd, &tables->db, &tables->table_name, 0))
       goto err;
   }
 
@@ -2095,7 +2096,8 @@ change_table_name_in_triggers(THD *thd,
                               const LEX_CSTRING *old_db_name,
                               const LEX_CSTRING *new_db_name,
                               const LEX_CSTRING *old_table_name,
-                              const LEX_CSTRING *new_table_name)
+                              const LEX_CSTRING *new_table_name,
+                              uint flags)
 {
   struct change_table_name_param param;
   sql_mode_t save_sql_mode= thd->variables.sql_mode;
@@ -2111,13 +2113,14 @@ change_table_name_in_triggers(THD *thd,
   if (unlikely(thd->is_fatal_error))
     return TRUE; /* OOM */
 
-  if (save_trigger_file(thd, new_db_name, new_table_name))
+  if (save_trigger_file(thd, new_db_name, new_table_name, (flags & FN_TO_IS_TMP)))
     return TRUE;
 
-  if (rm_trigger_file(path_buff, old_db_name, old_table_name, MYF(MY_WME)))
+  if (rm_trigger_file(path_buff, old_db_name, old_table_name, MYF(MY_WME),
+                      (flags & FN_FROM_IS_TMP)))
   {
     (void) rm_trigger_file(path_buff, new_db_name, new_table_name,
-                           MYF(MY_WME));
+                           MYF(MY_WME), (flags & FN_TO_IS_TMP));
     return TRUE;
   }
   return FALSE;
@@ -2362,9 +2365,9 @@ bool Table_triggers_list::change_table_name(THD *thd,
 
   if (table->triggers)
   {
-    if (unlikely(table->triggers->change_table_name_in_triggers(thd, db, new_db,
-                                                               old_alias,
-                                                               new_table)))
+    if (unlikely(table->triggers->change_table_name_in_triggers(
+                                    thd, db, new_db, old_alias, new_table,
+                                    param->rename_flags)))
     {
       result= 1;
       goto end;
@@ -2384,7 +2387,8 @@ bool Table_triggers_list::change_table_name(THD *thd,
                                old_alias, err_trigger);
       (void) table->triggers->change_table_name_in_triggers(
                                thd, db, new_db,
-                               new_table, old_alias);
+                               new_table, old_alias,
+                               (param->rename_flags ^ FN_IS_TMP));
       result= 1;
       goto end;
     }
