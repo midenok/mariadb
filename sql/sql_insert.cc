@@ -4255,7 +4255,7 @@ bool select_insert::binlog_at_eof(Table_specification_st *create_info)
     /* TODO: Update binary_logged in do_postlock() for RBR? */
     const bool tmp_table= create_info ? create_info->tmp_table() :
                                         table->s->tmp_table;
-    binary_logged= res == 0 || tmp_table;
+    binary_logged= res == 0 || !tmp_table;
   }
   if (table)
   {
