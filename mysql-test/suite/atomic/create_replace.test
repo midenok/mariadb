@@ -30,12 +30,11 @@ if ($MTR_COMBINATION_ARIA_NOTRANS)
 }
 if ($MTR_COMBINATION_EXPENSIVE_RENAME)
 {
-  let $default_engine=Aria;
-  let $extra_option=' engine=aria,transactional=0';
+  # Disable atomic CREATE OR REPLACE (emulates HTON_EXPENSIVE_RENAME flag)
+  let $default_engine=MyISAM;
   let $show_error=0, ER_NO_SUCH_TABLE;
   let $drop_error=0, ER_BAD_TABLE_ERROR;
   set @@debug_dbug="+d,ddl_log_expensive_rename";
-  call mtr.add_suppression("WARNING: 1 UNDO records skipped in UNDO phase;");
 }
 
 if ($MTR_COMBINATION_STMT)
@@ -53,15 +52,6 @@ if ($MTR_COMBINATION_MIX)
 
 --eval set @@default_storage_engine=$default_engine
 --enable_query_log
-
-# Put entry_pos into higher position, so drop chain executes before create chain
-create table t1 (c int);
---error ER_DUP_KEYNAME
-create or replace table t1 (a int, b int, key k (a), key k (b));
---error ER_DUP_KEYNAME
-create or replace table t1 (a int, b int, key k (a), key k (b));
---error $drop_error
-drop table t1;
 
 --echo # Crash recovery
 
@@ -104,7 +94,7 @@ let $statements='CREATE OR REPLACE TABLE t1 (new int) EXTRA_OPTION',
 --disable_query_log
 let create_const=`select REPLACE('create table const_table (new int, b int) EXTRA_OPTION', ' EXTRA_OPTION', $extra_option)`;
 eval $create_const;
---replace_result $default_engine DEFAULT_ENGINE ' PAGE_CHECKSUM=1' '' ' TRANSACTIONAL=0' ''
+--replace_result $default_engine ENGINE ' PAGE_CHECKSUM=1' '' ' TRANSACTIONAL=0' ''
 show create table const_table;
 --enable_query_log
 insert into const_table values (1, 1), (2, 2);
@@ -165,6 +155,7 @@ while ($r < $statement_count)
       --echo # No crash!
     }
     # Check which tables still exists
+    --replace_result .MAD .DATA1 .MYD .DATA1 .MAI .DATA2 .MYI .DATA2
     --list_files $MYSQLD_DATADIR/test t*
     --list_files $MYSQLD_DATADIR/test *sql*
 
@@ -181,7 +172,7 @@ while ($r < $statement_count)
       # Again we suppress 'marked as crashed', it works differently in --ps
       --disable_warnings
     }
-    --replace_result $default_engine DEFAULT_ENGINE ' PAGE_CHECKSUM=1' '' ' TRANSACTIONAL=0' ''
+    --replace_result $default_engine ENGINE InnoDB ENGINE ' PAGE_CHECKSUM=1' '' ' TRANSACTIONAL=0' ''
     --error $show_error
     show create table t1;
     --enable_warnings

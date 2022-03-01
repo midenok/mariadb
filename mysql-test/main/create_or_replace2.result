@@ -51,3 +51,9 @@ t1	CREATE TABLE `t1` (
 unlock tables;
 drop tables t2, t1;
 set session debug_dbug= @saved_debug_dbug;
+create table t1 (c int);
+create or replace table t1 (a int, b int, key k (a), key k (b));
+ERROR 42000: Duplicate key name 'k'
+create or replace table t1 (a int, b int, key k (a), key k (b));
+ERROR 42000: Duplicate key name 'k'
+drop table t1;

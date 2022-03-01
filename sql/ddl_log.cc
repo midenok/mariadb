@@ -2464,7 +2464,7 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry,
     read_entry= ddl_log_entry.next_entry;
   } while (read_entry);
 
-  recovery_state.free(); // FIXME: is this correct?
+  recovery_state.free();
   free_root(&mem_root, MYF(0));
   DBUG_RETURN(result);
 }
@@ -2892,6 +2892,7 @@ void ddl_log_release()
   }
   my_free(global_ddl_log.file_entry_buf);
   global_ddl_log.file_entry_buf= 0;
+  recovery_state.free();
   close_ddl_log();
 
   create_ddl_log_file_name(file_name, 0);

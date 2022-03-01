@@ -2444,7 +2444,7 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
     else
       return table_options;
   }
-  bool ok_atomic_replace() const
+  bool check_atomic_replace() const
   {
     return !tmp_table() && !sequence &&
            !(db_type->flags & HTON_EXPENSIVE_RENAME) &&
@@ -2504,7 +2504,7 @@ struct Table_specification_st: public HA_CREATE_INFO,
   }
   bool is_atomic_replace() const
   {
-    return or_replace() && ok_atomic_replace();
+    return or_replace() && check_atomic_replace();
   }
 };
 
@@ -2800,6 +2800,8 @@ typedef struct st_key_create_information
   The hooks are usually used for functions that does several things,
   e.g., create_table_from_items(), which both create a table and lock
   it.
+
+  TODO: Remove creepy TABLEOP_HOOKS interface?
  */
 class TABLEOP_HOOKS
 {

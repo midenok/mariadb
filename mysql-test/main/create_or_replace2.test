@@ -53,3 +53,12 @@ show create table t1;
 unlock tables;
 drop tables t2, t1;
 set session debug_dbug= @saved_debug_dbug;
+
+# Test entry_pos in higher position, so drop chain executes before create chain
+# (see commit message: On linking two chains together)
+create table t1 (c int);
+--error ER_DUP_KEYNAME
+create or replace table t1 (a int, b int, key k (a), key k (b));
+--error ER_DUP_KEYNAME
+create or replace table t1 (a int, b int, key k (a), key k (b));
+drop table t1;

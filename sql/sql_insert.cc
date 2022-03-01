@@ -4184,7 +4184,7 @@ bool select_insert::prepare_eof()
     error= thd->get_stmt_da()->sql_errno();
 
   if (info.ignore || info.handle_duplicates != DUP_ERROR)
-    if (!atomic_replace && table->file->ha_table_flags() & HA_DUPLICATE_POS)
+    if (!atomic_replace && (table->file->ha_table_flags() & HA_DUPLICATE_POS))
       table->file->ha_rnd_end();
   table->file->extra(HA_EXTRA_END_ALTER_COPY);
   table->file->extra(HA_EXTRA_NO_IGNORE_DUP_KEY);
@@ -4589,9 +4589,11 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
 
       create_table->table=
           thd->create_and_open_tmp_table(&frm, tmp_path, orig_table->db.str,
-                                         orig_table->table_name.str, true);
-      /* NOTE: if create_and_open_tmp_table() fails the table is dropped by
-       * ddl_log_state_create */
+                                         orig_table->table_name.str, false);
+      /*
+          NOTE: if create_and_open_tmp_table() fails the table is dropped by
+          ddl_log_state_create
+      */
       if (create_table->table)
       {
         /*
@@ -4672,14 +4674,11 @@ err:
 
   if (unlikely(!(table= create_table->table)))
   {
-    if (likely(!thd->is_error()))             // CREATE ... IF NOT EXISTS
-    {
-      my_ok(thd);                             //   succeed, but did nothing
-      ddl_log_complete(&ddl_log_state_create);
-    }
-    else
-      (void) ddl_log_revert(thd, &ddl_log_state_create);
-    ddl_log_complete(&ddl_log_state_rm);
+    const bool error= thd->is_error();
+    /* CREATE ... IF NOT EXISTS succeed, but did nothing */
+    if (likely(!error))
+      my_ok(thd);
+    create_info->finalize_ddl(thd, error);
     DBUG_RETURN(NULL);
   }
 
@@ -4789,8 +4788,6 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
     {
       /*
          NOTE: for row format CREATE TABLE must be logged before row data.
-
-         TODO: Remove creepy TABLEOP_HOOKS interface?
       */
       int error;
       THD *thd= const_cast<THD*>(ptr->get_thd());
