@@ -1097,7 +1097,7 @@ static int execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
                                 char *from_path, char *to_path)
 {
   uint to_length=0, fr_length=0;
-  int err;
+  int error;
   DBUG_ENTER("execute_rename_table");
 
   if (file->needs_lower_case_filenames())
@@ -1110,14 +1110,14 @@ static int execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
   }
   else
   {
-    fr_length=
-        build_table_filename(from_path, FN_REFLEN, from_db->str,
-                             from_table->str, "", flags & FN_FROM_IS_TMP);
+    fr_length= build_table_filename(from_path, FN_REFLEN,
+                                    from_db->str, from_table->str, "",
+                                    flags & FN_FROM_IS_TMP);
     to_length= build_table_filename(to_path, FN_REFLEN,
                                     to_db->str, to_table->str, "",
                                     flags & FN_TO_IS_TMP);
   }
-  err= file->ha_rename_table(from_path, to_path);
+  error= file->ha_rename_table(from_path, to_path);
   if (file->needs_lower_case_filenames())
   {
     /*
@@ -1138,7 +1138,7 @@ static int execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
   }
   if (!access(from_path, F_OK))
     (void) mysql_file_rename(key_file_frm, from_path, to_path, MYF(MY_WME));
-  DBUG_RETURN(err);
+  DBUG_RETURN(error);
 }
 
 
@@ -1488,7 +1488,8 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       /* Restore frm and table to original names */
       error= execute_rename_table(ddl_log_entry, file,
                                   &ddl_log_entry->db, &ddl_log_entry->name,
-                                  &ddl_log_entry->from_db, &ddl_log_entry->from_name,
+                                  &ddl_log_entry->from_db,
+                                  &ddl_log_entry->from_name,
                                   fn_flags, from_path, to_path);
 
       if (ddl_log_entry->flags & DDL_LOG_FLAG_UPDATE_STAT)
@@ -1596,8 +1597,8 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       /* Fall through */
     case DDL_DROP_PHASE_TRIGGER:
       Table_triggers_list::drop_all_triggers(thd, &db, &table,
-                                             MYF(MY_WME | MY_IGNORE_ENOENT),
-                                             fn_flags);
+                                             fn_flags,
+                                             MYF(MY_WME | MY_IGNORE_ENOENT));
       if (increment_phase(entry_pos))
         break;
       /* Fall through */

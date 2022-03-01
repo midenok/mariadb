@@ -2005,7 +2005,7 @@ bool add_table_for_trigger(THD *thd,
 
 bool Table_triggers_list::drop_all_triggers(THD *thd, const LEX_CSTRING *db,
                                             const LEX_CSTRING *name,
-                                            myf MyFlags, uint flags)
+                                            uint flags, myf MyFlags)
 {
   TABLE table;
   char path[FN_REFLEN];

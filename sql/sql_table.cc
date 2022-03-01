@@ -1721,8 +1721,8 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
     if (likely(!error) || non_existing_table_error(error))
     {
-      if (Table_triggers_list::drop_all_triggers(thd, &db, &table_name,
-                                                 MYF(MY_WME | MY_IGNORE_ENOENT), 0))
+      if (Table_triggers_list::drop_all_triggers(thd, &db, &table_name, 0,
+                                                 MYF(MY_WME | MY_IGNORE_ENOENT)))
         error= error ? error : -1;
     }
     debug_crash_here("ddl_log_drop_after_drop_trigger");
