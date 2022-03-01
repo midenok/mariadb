@@ -3213,7 +3213,7 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
                          uint16 flags)
 {
   DDL_LOG_ENTRY ddl_log_entry;
-  DDL_LOG_MEMORY_ENTRY *log_entry, *first_entry= NULL;
+  DDL_LOG_MEMORY_ENTRY *log_entry;
   DBUG_ENTER("ddl_log_drop");
 
   DBUG_ASSERT(ddl_state->list);
@@ -3228,25 +3228,6 @@ static bool ddl_log_drop(THD *thd, DDL_LOG_STATE *ddl_state,
   ddl_log_entry.tmp_name=     *const_cast<LEX_CSTRING*>(path);
   ddl_log_entry.phase=        (uchar) phase;
   ddl_log_entry.flags=        flags;
-
-  /*
-    Get first entry in the chain and if it is not DDL_LOG_DROP_INIT_ACTION
-    place it after this action. Required for logging rename before drop,
-    but replaying rename after drop.
-  */
-  for (log_entry= ddl_state->list->next_active_log_entry; log_entry;
-       first_entry= log_entry, log_entry= log_entry->next_active_log_entry);
-
-  if (first_entry)
-  {
-    DDL_LOG_ENTRY first;
-    mysql_mutex_lock(&LOCK_gdl);
-    (void) read_ddl_log_entry(first_entry->entry_pos, &first);
-    mysql_mutex_unlock(&LOCK_gdl);
-    if (first.action_type != DDL_LOG_DROP_INIT_ACTION)
-      ddl_log_entry.next_entry=
-          ddl_state->list->next_active_log_entry->entry_pos;
-  }
 
   mysql_mutex_lock(&LOCK_gdl);
   if (ddl_log_write_entry(&ddl_log_entry, &log_entry))

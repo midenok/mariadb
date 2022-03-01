@@ -5202,6 +5202,10 @@ bool select_create::send_eof()
       create_info->table= orig_table->table;
       table->file->ha_release_auto_increment(); // FIXME: is it needed? check auto_increment
       table->file->ha_reset();
+      /*
+        Remove the temporary table structures from memory but keep the table
+        files.
+      */
       thd->drop_temporary_table(table, NULL, false);
       table= NULL;
 

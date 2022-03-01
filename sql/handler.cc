@@ -6922,8 +6922,6 @@ bool ha_show_status(THD *thd, handlerton *db_type, enum ha_stat_type stat)
   RETURN VALUE
     0  No binary logging in row format
     1  Row needs to be logged
-
-  TODO: remove needless proxy
 */
 
 bool handler::check_table_binlog_row_based()

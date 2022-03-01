@@ -14,8 +14,8 @@ insert into const_table values (1, 1), (2, 2);
 flush tables;
 # QUERY: CREATE OR REPLACE TABLE t1 (new int)
 # CRASH POINT: ddl_log_create_before_install_new
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -25,8 +25,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_log_drop_backup
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -36,8 +36,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_log_rename_backup
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -47,8 +47,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_before_create_frm
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -58,8 +58,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_before_create_table
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -69,8 +69,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_create_table
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -81,8 +81,8 @@ Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_clie
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_drop
 # No crash!
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
@@ -92,8 +92,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_after_send_data
 # No crash!
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
@@ -102,8 +102,8 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_after_save_backup
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -113,8 +113,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_install_new
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -124,8 +124,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_before_binlog
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -136,8 +136,8 @@ Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_clie
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_prepare_eof
 # No crash!
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
@@ -146,8 +146,8 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_after_binlog
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
@@ -198,8 +198,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_log_complete
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
@@ -208,8 +208,8 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_log_complete2
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
@@ -218,8 +218,8 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_log_complete3
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 (new int)
 Table	Create Table
@@ -229,8 +229,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # QUERY: CREATE OR REPLACE TABLE t1 LIKE const_table
 # CRASH POINT: ddl_log_create_before_install_new
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -240,8 +240,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_log_drop_backup
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -251,8 +251,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_log_rename_backup
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -262,8 +262,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_before_create_frm
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -273,8 +273,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_before_create_table
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -284,8 +284,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_create_table
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -296,8 +296,8 @@ Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_clie
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_drop
 # No crash!
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 LIKE const_table
 Table	Create Table
@@ -308,8 +308,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_after_send_data
 # No crash!
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 LIKE const_table
 Table	Create Table
@@ -319,8 +319,8 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_after_save_backup
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -330,8 +330,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_install_new
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -341,8 +341,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_before_binlog
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -353,8 +353,8 @@ Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_clie
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_prepare_eof
 # No crash!
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 LIKE const_table
 Table	Create Table
@@ -364,8 +364,8 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_after_binlog
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 LIKE const_table
 Table	Create Table
@@ -417,8 +417,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_log_complete
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 LIKE const_table
 Table	Create Table
@@ -428,8 +428,8 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_log_complete2
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 LIKE const_table
 Table	Create Table
@@ -439,8 +439,8 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=DEFAULT_ENGINE DEFAULT CHARSET=latin1
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_log_complete3
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 LIKE const_table
 Table	Create Table
@@ -451,8 +451,8 @@ t1	CREATE TABLE `t1` (
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # QUERY: CREATE OR REPLACE TABLE t1 SELECT * from const_table
 # CRASH POINT: ddl_log_create_before_install_new
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -463,8 +463,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_log_drop_backup
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -475,8 +475,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_log_rename_backup
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -487,8 +487,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_before_create_frm
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -499,8 +499,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_before_create_table
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -511,8 +511,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_create_table
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -524,8 +524,8 @@ Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_clie
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_drop
 # No crash!
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 Table	Create Table
@@ -538,8 +538,8 @@ new	b
 2	2
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_after_send_data
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -550,8 +550,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_save_backup
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -562,8 +562,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_install_new
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -574,8 +574,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_before_binlog
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -586,8 +586,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_prepare_eof
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.TRG
 t1.frm
 Table	Create Table
@@ -598,8 +598,8 @@ old
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_after_binlog
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 Table	Create Table
@@ -657,8 +657,8 @@ old	y
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 a	INSERT	t1	set @s= 1	BEFORE						
 # CRASH POINT: ddl_log_create_log_complete
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 Table	Create Table
@@ -671,8 +671,8 @@ new	b
 2	2
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_log_complete2
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 Table	Create Table
@@ -685,8 +685,8 @@ new	b
 2	2
 Trigger	Event	Table	Statement	Timing	Created	sql_mode	Definer	character_set_client	collation_connection	Database Collation
 # CRASH POINT: ddl_log_create_log_complete3
-t1.MAD
-t1.MAI
+t1.MYD
+t1.MYI
 t1.frm
 master-bin.000001	#	Query	#	#	use `test`; CREATE OR REPLACE TABLE t1 SELECT * from const_table
 Table	Create Table

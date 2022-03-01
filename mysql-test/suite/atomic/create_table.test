@@ -51,11 +51,12 @@ while ($e < $engine_count)
   inc $e;
   let $engine=`select ELT($e, $engines)`;
   let $default_engine=$engine;
+  # Note: $extra_option is not used. This dead code here is for conformity with
+  # other tests.
   let $extra_option=;
 
   if ($engine == "aria")
   {
-    # TODO: unused $extra_option
     let $extra_option=transactional=1;
   }
   if ($engine == "aria_notrans")

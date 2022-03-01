@@ -4683,6 +4683,7 @@ int create_table_impl(THD *thd,
       }
       else
       {
+        DBUG_ASSERT(!atomic_replace);
         my_error(ER_TABLE_EXISTS_ERROR, MYF(0), orig_table_name.str);
         goto err;
       }
