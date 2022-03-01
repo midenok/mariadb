@@ -2389,7 +2389,7 @@ struct Atomic_info
 #define C_ORDINARY_CREATE         0
 #define C_ALTER_TABLE             1
 #define C_ALTER_TABLE_FRM_ONLY    2
-#define C_ASSISTED_DISCOVERY      3
+#define C_ASSISTED_DISCOVERY      4
 
 
 /**
