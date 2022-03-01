@@ -89,7 +89,7 @@ let $crash_points='ddl_log_create_before_install_new',
                   'ddl_log_create_log_complete3';
 
 #let $crash_count=1;
-#let $crash_points='ddl_log_create_log_complete3';
+#let $crash_points='ddl_log_create_after_install_new';
 #                  'ddl_log_create_before_binlog3',
 #                  'ddl_log_create_before_binlog4';
 

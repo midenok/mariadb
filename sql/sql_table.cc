@@ -4297,25 +4297,20 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
   bool dummy;
   const LEX_CSTRING &db= orig_table->db;
   const LEX_CSTRING &table_name= orig_table->table_name;
+  LEX_CSTRING cpath;
+  char path[FN_REFLEN + 1];
+  cpath.str= path;
 
   debug_crash_here("ddl_log_create_before_install_new");
   if (old_hton)
   {
-    /* FIXME: proper chain names
-
-        ddl_log_state_rm -> chain_cleanup
-        ddl_log_state_create -> chain_roll_back
-    */
-
+    /* Old table exists, rename it to backup_name */
     ddl_log_link_chains(ddl_log_state_rm, ddl_log_state_create);
 
-    LEX_CSTRING cpath;
-    char path[FN_REFLEN + 1];
-    size_t path_length= build_table_filename(path, sizeof(path) - 1,
-                                            backup_name->db.str,
-                                            backup_name->table_name.str,
-                                            "", FN_IS_TMP);
-    lex_string_set3(&cpath, path, path_length);
+    cpath.length= build_table_filename(path, sizeof(path) - 1,
+                                       backup_name->db.str,
+                                       backup_name->table_name.str,
+                                       "", FN_IS_TMP);
 
     if (ddl_log_drop_table_init(thd, ddl_log_state_rm, &backup_name->db,
                                 &empty_clex_str) ||
@@ -4331,6 +4326,7 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
                               DDL_RENAME_PHASE_TRIGGER,
                               DDL_LOG_FLAG_FROM_IS_TMP))
       return true;
+
     debug_crash_here("ddl_log_create_after_log_rename_backup");
 
     if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
@@ -4346,8 +4342,6 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
       orig_table->table= NULL;
     }
 
-
-    /* Old table exists, rename it to backup_name */
     param.rename_flags= FN_TO_IS_TMP;
     param.from_table_hton= old_hton;
     param.old_version= org_tabledef_version;
@@ -4359,8 +4353,12 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
     debug_crash_here("ddl_log_create_after_save_backup");
   }
 
+  cpath.length= build_table_filename(path, sizeof(path) - 1, db.str,
+                                     table_name.str, "", 0);
   param.rename_flags= FN_FROM_IS_TMP;
   if (rename_check(thd, &param, tmp_name, &db, &table_name, &table_name, false) ||
+      ddl_log_create_table(thd, ddl_log_state_create, param.from_table_hton,
+                           &cpath, &db, &table_name, false) ||
       rename_do(thd, &param, NULL, tmp_name, &db, false, &dummy))
     return true;
   debug_crash_here("ddl_log_create_after_install_new");
