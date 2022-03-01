@@ -4236,6 +4236,18 @@ bool select_insert::binlog_at_eof()
   */
   if ((WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()))
   {
+
+    debug_crash_here("ddl_log_create_before_binlog");
+
+    if (create_info && !create_info->tmp_table())
+    {
+      thd->binlog_xid= thd->query_id;
+      /* Remember xid's for the case of row based logging */
+      ddl_log_update_xid(create_info->ddl_log_state_create, thd->binlog_xid);
+      if (create_info->ddl_log_state_rm->is_active() && !atomic_replace)
+        ddl_log_update_xid(create_info->ddl_log_state_rm, thd->binlog_xid);
+    }
+
     int errcode= 0;
     int res;
     if (thd->is_error())
@@ -4796,17 +4808,6 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
       if (thd->is_current_stmt_binlog_format_row() &&
           !ptr->create_info->tmp_table())
       {
-        thd->binlog_xid= thd->query_id;
-        /*
-           Remember xid's for the case of row based logging. Note that binary
-           log is not flushed until the end of statement, so it is OK to write
-           it now and if crash happens until we closed ddl_log_state_rm we
-           won't see CREATE OR REPLACE event in the binary log.
-         */
-        ddl_log_update_xid(&ptr->ddl_log_state_create, thd->binlog_xid);
-        if (ptr->ddl_log_state_rm.is_active() &&
-            !ptr->create_info->is_atomic_replace())
-          ddl_log_update_xid(&ptr->ddl_log_state_rm, thd->binlog_xid);
         error= binlog_show_create_table(thd, *tables, ptr->create_info);
         return error;
       }
@@ -5099,25 +5100,28 @@ bool select_create::send_eof()
   {
     DBUG_ASSERT(table->s->tmp_table);
 
+    /*
+       Note: InnoDB does autocommit on external unlock.
+       We cannot do commit twice and we must commit after binlog
+       (flush row events is done at commit), so we cannot do it here.
+       Test: rpl.create_or_replace_row
+    */
+    const bool autocommit= !(thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT);
+    if (autocommit)
+      thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
+
     if (table->file->ha_index_or_rnd_end() ||
         table->file->ha_external_lock(thd, F_UNLCK))
     {
+      if (autocommit)
+        thd->variables.option_bits&= ~OPTION_NOT_AUTOCOMMIT;
       abort_result_set();
       DBUG_RETURN(true);
     }
 
+    if (autocommit)
+      thd->variables.option_bits&= ~OPTION_NOT_AUTOCOMMIT;
     create_info->table= orig_table->table;
-  }
-
-  debug_crash_here("ddl_log_create_before_binlog");
-
-  if (!thd->binlog_xid && !create_info->tmp_table())
-  {
-    thd->binlog_xid= thd->query_id;
-    /* Remember xid's for the case of row based logging */
-    ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
-    if (ddl_log_state_rm.is_active() && !atomic_replace)
-      ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
   }
 
   if (prepare_eof())
@@ -5192,11 +5196,6 @@ bool select_create::send_eof()
       thd->get_stmt_da()->set_overwrite_status(true);
     }
 #endif /* WITH_WSREP */
-    trans_commit_stmt(thd);
-    if (!(thd->variables.option_bits & OPTION_GTID_BEGIN))
-      trans_commit_implicit(thd);
-    thd->binlog_xid= 0;
-
     if (atomic_replace)
     {
       create_table= orig_table;
@@ -5218,6 +5217,20 @@ bool select_create::send_eof()
       abort_result_set();
       DBUG_RETURN(true);
     }
+
+    debug_crash_here("ddl_log_create_after_binlog");
+    trans_commit_stmt(thd);
+    if (!(thd->variables.option_bits & OPTION_GTID_BEGIN))
+      trans_commit_implicit(thd);
+    thd->binlog_xid= 0;
+
+    /*
+      If are using statement based replication the table will be deleted here
+      in case of a crash as we can't use xid to check if the query was logged
+      (as the query was logged before commit!)
+    */
+    create_info->finalize_ddl(thd, false);
+
 
 #ifdef WITH_WSREP
     if (WSREP(thd))
@@ -5262,14 +5275,6 @@ bool select_create::send_eof()
     abort_result_set();
     DBUG_RETURN(true);
   }
-
-  /*
-    If are using statement based replication the table will be deleted here
-    in case of a crash as we can't use xid to check if the query was logged
-    (as the query was logged before commit!)
-  */
-  debug_crash_here("ddl_log_create_after_binlog");
-  create_info->finalize_ddl(thd, false);
 
   /*
     exit_done must only be set after last potential call to
