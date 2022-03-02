@@ -4834,9 +4834,9 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
 
   if (!(table= create_table_from_items(thd, &values, &extra_lock, hook_ptr)))
   {
+    /* FIXME: Use create_info->table_was_deleted (binlog.binlog_stm_binlog fails) */
     if (create_info->or_replace() && !atomic_replace)
     {
-      /* TODO: why create_info->table_was_deleted not used? */
       /* Original table was deleted. We have to log it */
       log_drop_table(thd, &create_table->db, &create_table->table_name,
                      &create_info->org_storage_engine_name,
@@ -4963,8 +4963,12 @@ static int binlog_show_create_table(THD *thd, TABLE *table,
   DBUG_ASSERT(result == 0); /* show_create_table() always return 0 */
 
   /*
-    TODO (optimization): why it does show_create_table() even if
-    !mysql_bin_log.is_open()?
+    NOTE: why it does show_create_table() even if !mysql_bin_log.is_open()?
+
+    Because Galera needs it even if there is no binlog.
+    (I assume Galera will hijack the binlog information and use it itself
+    if there is no binlog). That is the the only thing that makes sence
+    looking at the if statement... Monty
   */
   if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
   {
