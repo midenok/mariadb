@@ -5951,6 +5951,9 @@ bool THD::binlog_write_annotated_row(Log_event_writer *writer)
    Also write annotate events and start transactions.
    This is using the "tables_with_row_logging" list prepared by
    THD::binlog_prepare_for_row_logging
+
+   Atomic CREATE OR REPLACE .. SELECT logs row events via temporary table,
+   so it is missed in locks. We write table map for that specially via cur_table.
 */
 
 bool THD::binlog_write_table_maps(TABLE *cur_table)
