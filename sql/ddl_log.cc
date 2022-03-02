@@ -1799,6 +1799,31 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     }
     strxnmov(to_path, sizeof(to_path)-1, path.str, reg_ext, NullS);
     mysql_file_delete(key_file_frm, to_path, MYF(MY_WME|MY_IGNORE_ENOENT));
+    if (ddl_log_entry->phase == DDL_CREATE_TABLE_PHASE_LOG)
+    {
+      /*
+        The server logged CREATE TABLE ... SELECT into binary log
+        before crashing. As the commit failed and we have delete the
+        table above, we have now to log the DROP of the created table.
+      */
+
+      String *query= &recovery_state.drop_table;
+      query->length(0);
+      query->append(STRING_WITH_LEN("DROP TABLE IF EXISTS "));
+      append_identifier(thd, query, &db);
+      query->append('.');
+      append_identifier(thd, query, &table);
+      query->append(&end_comment);
+
+      if (mysql_bin_log.is_open())
+      {
+        mysql_mutex_unlock(&LOCK_gdl);
+        (void) thd->binlog_query(THD::STMT_QUERY_TYPE,
+                                 query->ptr(), query->length(),
+                                 TRUE, FALSE, FALSE, 0);
+        mysql_mutex_lock(&LOCK_gdl);
+      }
+    }
     (void) update_phase(entry_pos, DDL_LOG_FINAL_PHASE);
     error= 0;
     break;

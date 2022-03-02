@@ -1714,9 +1714,18 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
     if (!was_view)
     {
-      debug_crash_here("ddl_log_drop_before_drop_trigger");
-      ddl_log_update_phase(ddl_log_state, DDL_DROP_PHASE_TRIGGER);
-      debug_crash_here("ddl_log_drop_before_drop_trigger2");
+      if (table_dropped)
+      {
+        debug_crash_here("ddl_log_drop_before_drop_trigger");
+        ddl_log_update_phase(ddl_log_state, DDL_DROP_PHASE_TRIGGER);
+        debug_crash_here("ddl_log_drop_before_drop_trigger2");
+      }
+      else
+      {
+        /* NOTE: table may not be dropped due to FK error */
+        DBUG_ASSERT(error);
+        ddl_log_update_phase(ddl_log_state, DDL_DROP_PHASE_END);
+      }
     }
 
     if (likely(!error) || non_existing_table_error(error))
@@ -1792,7 +1801,7 @@ report_error:
         backup_log_ddl(&ddl_log);
       }
     }
-    if (!was_view)
+    if (!was_view && table_dropped)
       ddl_log_update_phase(ddl_log_state, DDL_DROP_PHASE_BINLOG);
 
     if (!dont_log_query &&
