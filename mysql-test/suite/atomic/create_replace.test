@@ -36,6 +36,12 @@ if ($MTR_COMBINATION_EXPENSIVE_RENAME)
   let $drop_error=0, ER_BAD_TABLE_ERROR;
   set @@debug_dbug="+d,ddl_log_expensive_rename";
 }
+if ($MTR_COMBINATION_LOCK_TABLES)
+{
+  let $default_engine=Aria;
+  call mtr.add_suppression("Checking table");
+  call mtr.add_suppression("marked as crashed");
+}
 
 if ($MTR_COMBINATION_STMT)
 {
@@ -129,9 +135,9 @@ while ($r < $statement_count)
     }
     create trigger a before insert on t1 for each row set @s= 1;
     flush tables;
-    if (!$c)
+    if ($MTR_COMBINATION_LOCK_TABLES)
     {
-      lock tables t1 write;
+      lock tables t1 write, const_table read;
     }
 
     --source $binlog_format
@@ -153,6 +159,10 @@ while ($r < $statement_count)
     if ($error == 0)
     {
       --echo # No crash!
+      if ($MTR_COMBINATION_LOCK_TABLES)
+      {
+        unlock tables;
+      }
     }
     # Check which tables still exists
     --replace_result .MAD .DATA1 .MYD .DATA1 .MAI .DATA2 .MYI .DATA2
