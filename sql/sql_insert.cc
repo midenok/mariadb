@@ -4211,11 +4211,36 @@ bool select_insert::prepare_eof()
     error= thd->get_stmt_da()->sql_errno();
 
   if (info.ignore || info.handle_duplicates != DUP_ERROR)
-    if (!atomic_replace && (table->file->ha_table_flags() & HA_DUPLICATE_POS))
+    if (table->file->ha_table_flags() & HA_DUPLICATE_POS)
       table->file->ha_rnd_end();
   table->file->extra(HA_EXTRA_END_ALTER_COPY);
   table->file->extra(HA_EXTRA_NO_IGNORE_DUP_KEY);
   table->file->extra(HA_EXTRA_WRITE_CANNOT_REPLACE);
+
+  if (atomic_replace)
+  {
+    DBUG_ASSERT(table->s->tmp_table);
+
+    /*
+       Note: InnoDB does autocommit on external unlock.
+       We cannot do commit twice and we must commit after binlog
+       (flush row events is done at commit), so we cannot do it here.
+       Test: rpl.create_or_replace_row
+    */
+    const bool autocommit= !(thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT);
+    if (autocommit)
+      thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
+
+    if (table->file->ha_external_lock(thd, F_UNLCK))
+    {
+      if (autocommit)
+        thd->variables.option_bits&= ~OPTION_NOT_AUTOCOMMIT;
+      DBUG_RETURN(true);
+    }
+
+    if (autocommit)
+      thd->variables.option_bits&= ~OPTION_NOT_AUTOCOMMIT;
+  }
 
   if (likely((changed= (info.copied || info.deleted || info.updated))))
   {
@@ -5123,34 +5148,6 @@ bool select_create::send_eof()
 
   if (thd->slave_thread)
     thd->variables.binlog_annotate_row_events= 0;
-
-  if (atomic_replace)
-  {
-    DBUG_ASSERT(table->s->tmp_table);
-
-    /*
-       Note: InnoDB does autocommit on external unlock.
-       We cannot do commit twice and we must commit after binlog
-       (flush row events is done at commit), so we cannot do it here.
-       Test: rpl.create_or_replace_row
-    */
-    const bool autocommit= !(thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT);
-    if (autocommit)
-      thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
-
-    if (table->file->ha_index_or_rnd_end() ||
-        table->file->ha_external_lock(thd, F_UNLCK))
-    {
-      if (autocommit)
-        thd->variables.option_bits&= ~OPTION_NOT_AUTOCOMMIT;
-      abort_result_set();
-      DBUG_RETURN(true);
-    }
-
-    if (autocommit)
-      thd->variables.option_bits&= ~OPTION_NOT_AUTOCOMMIT;
-    create_info->table= orig_table->table;
-  }
 
   if (prepare_eof())
   {
