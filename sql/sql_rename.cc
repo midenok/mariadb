@@ -258,12 +258,12 @@ struct rename_param
 */
 
 static int
-check_rename(THD *thd, rename_param *param,
-             TABLE_LIST *ren_table,
-             const LEX_CSTRING *new_db,
-             const LEX_CSTRING *new_table_name,
-             const LEX_CSTRING *new_table_alias,
-             bool if_exists)
+rename_check_preconditions(THD *thd, rename_param *param,
+                           TABLE_LIST *ren_table,
+                           const LEX_CSTRING *new_db,
+                           const LEX_CSTRING *new_table_name,
+                           const LEX_CSTRING *new_table_alias,
+                           bool if_exists)
 {
   DBUG_ENTER("check_rename");
   DBUG_PRINT("enter", ("if_exists: %d", (int) if_exists));
@@ -334,9 +334,10 @@ check_rename(THD *thd, rename_param *param,
 */
 
 static bool
-do_rename(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
-          TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
-          bool skip_error, bool *force_if_exists)
+rename_table_and_triggers(THD *thd, rename_param *param,
+                          DDL_LOG_STATE *ddl_log_state,
+                          TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
+                          bool skip_error, bool *force_if_exists)
 {
   int rc= 1;
   handlerton *hton;
@@ -522,17 +523,18 @@ rename_tables(THD *thd, TABLE_LIST *table_list, DDL_LOG_STATE *ddl_log_state,
     {
       int error;
       rename_param param;
-      error= check_rename(thd, &param, ren_table, &new_table->db,
-                          &new_table->table_name,
-                          &new_table->alias, (skip_error || if_exists));
+      error= rename_check_preconditions(thd, &param, ren_table,
+                                        &new_table->db, &new_table->table_name,
+                                        &new_table->alias,
+                                        (skip_error || if_exists));
       if (error < 0)
         continue;                               // Ignore rename (if exists)
       if (error > 0)
         goto revert_rename;
 
-      if (do_rename(thd, &param, ddl_log_state,
-                    ren_table, &new_table->db,
-                    skip_error, force_if_exists))
+      if (rename_table_and_triggers(thd, &param, ddl_log_state,
+                                    ren_table, &new_table->db,
+                                    skip_error, force_if_exists))
         goto revert_rename;
     }
   }
