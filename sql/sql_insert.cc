@@ -3847,6 +3847,33 @@ select_insert::select_insert(THD *thd_arg, TABLE_LIST *table_list_par,
 }
 
 
+select_create::select_create(THD *thd, TABLE_LIST *table_arg,
+                             Table_specification_st *create_info_par,
+                             Alter_info *alter_info_arg,
+                             List<Item> &select_fields,
+                             enum_duplicates duplic, bool ignore,
+                             TABLE_LIST *select_tables_arg):
+  select_insert(thd, table_arg, NULL, &select_fields, 0, 0, duplic,
+                ignore, NULL),
+  create_table(table_arg),
+  orig_table(table_arg),
+  select_tables(select_tables_arg),
+  alter_info(alter_info_arg),
+  m_plock(NULL), exit_done(0),
+  saved_tmp_table_share(0)
+{
+  bzero(&ddl_log_state_create, sizeof(ddl_log_state_create));
+  bzero(&ddl_log_state_rm, sizeof(ddl_log_state_rm));
+  create_info= create_info_par;
+  if (!thd->is_current_stmt_binlog_format_row() ||
+      !ha_check_storage_engine_flag(create_info->db_type,
+                                    HTON_NO_BINLOG_ROW_OPT))
+    atomic_replace= create_info->is_atomic_replace();
+  create_info->ddl_log_state_create= &ddl_log_state_create;
+  create_info->ddl_log_state_rm= &ddl_log_state_rm;
+}
+
+
 int
 select_insert::prepare(List<Item> &values, SELECT_LEX_UNIT *u)
 {

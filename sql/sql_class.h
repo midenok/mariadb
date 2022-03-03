@@ -6066,23 +6066,7 @@ public:
                 Table_specification_st *create_info_par,
                 Alter_info *alter_info_arg,
                 List<Item> &select_fields,enum_duplicates duplic, bool ignore,
-                TABLE_LIST *select_tables_arg):
-    select_insert(thd_arg, table_arg, NULL, &select_fields, 0, 0, duplic,
-                  ignore, NULL),
-    create_table(table_arg),
-    orig_table(table_arg),
-    select_tables(select_tables_arg),
-    alter_info(alter_info_arg),
-    m_plock(NULL), exit_done(0),
-    saved_tmp_table_share(0)
-    {
-      bzero(&ddl_log_state_create, sizeof(ddl_log_state_create));
-      bzero(&ddl_log_state_rm, sizeof(ddl_log_state_rm));
-      create_info= create_info_par;
-      atomic_replace= create_info->is_atomic_replace();
-      create_info->ddl_log_state_create= &ddl_log_state_create;
-      create_info->ddl_log_state_rm= &ddl_log_state_rm;
-    }
+                TABLE_LIST *select_tables_arg);
   int prepare(List<Item> &list, SELECT_LEX_UNIT *u);
 
   void store_values(List<Item> &values);
