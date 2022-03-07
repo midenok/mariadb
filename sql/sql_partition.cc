@@ -7511,9 +7511,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
            (thd->binlog_xid= 0))) ||
         ERROR_INJECT("convert_partition_9"))
     {
+      handle_alter_part_error(lpt, true, true, false);
       ddl_log_complete(&chain_drop_backup);
       (void) ddl_log_revert(thd, lpt->part_info);
-      handle_alter_part_error(lpt, true, true, false);
       goto err;
     }
     ddl_log_complete(lpt->part_info);
@@ -7560,9 +7560,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
            (thd->binlog_xid= 0))) ||
         ERROR_INJECT("convert_partition_9"))
     {
+      handle_alter_part_error(lpt, true, true, false);
       ddl_log_complete(&chain_drop_backup);
       (void) ddl_log_revert(thd, lpt->part_info);
-      handle_alter_part_error(lpt, true, true, false);
       goto err;
     }
     ddl_log_complete(lpt->part_info);
