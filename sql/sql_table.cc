@@ -808,7 +808,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     create_info->db_type= work_part_info->default_engine_type;
     /* NOTE: partitioned temporary tables are not supported. */
     DBUG_ASSERT(!create_info->tmp_table());
-    if (ddl_log_create_table(thd, part_info, create_info->db_type, &new_path,
+    if (ddl_log_create_table(part_info, create_info->db_type, &new_path,
                              &alter_ctx->new_db, &alter_ctx->new_name, true) ||
         ERROR_INJECT("create_before_create_frm"))
       DBUG_RETURN(TRUE);
@@ -1533,7 +1533,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
     if (!table_count++)
     {
       LEX_CSTRING comment= {comment_start, (size_t) comment_len};
-      if (ddl_log_drop_table_init(thd, ddl_log_state, current_db, &comment))
+      if (ddl_log_drop_table_init(ddl_log_state, current_db, &comment))
       {
         error= 1;
         goto err;
@@ -1591,10 +1591,10 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       bool enoent_warning= !dont_log_query && !(hton && hton->discover_table);
 
       if (was_view)
-        res= ddl_log_drop_view(thd, ddl_log_state, &cpath, &db,
+        res= ddl_log_drop_view(ddl_log_state, &cpath, &db,
                                &table_name);
       else
-        res= ddl_log_drop_table(thd, ddl_log_state, hton, &cpath, &db,
+        res= ddl_log_drop_table(ddl_log_state, hton, &cpath, &db,
                                 &table_name, 0);
       if (res)
       {
@@ -1674,7 +1674,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
       /* We've already logged drop and we don't need that entry anymore. */
       ddl_log_disable_entry(ddl_log_state);
-      if (ddl_log_drop_table(thd, ddl_log_state, 0, &cpath, &db,
+      if (ddl_log_drop_table(ddl_log_state, 0, &cpath, &db,
                              &table_name, 0))
       {
         error= -1;
@@ -4321,15 +4321,15 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
                                        backup_name->table_name.str,
                                        "", FN_IS_TMP);
 
-    if (ddl_log_drop_table_init(thd, ddl_log_state_rm, &backup_name->db,
+    if (ddl_log_drop_table_init(ddl_log_state_rm, &backup_name->db,
                                 &empty_clex_str) ||
-        ddl_log_drop_table(thd, ddl_log_state_rm, old_hton, &cpath,
+        ddl_log_drop_table(ddl_log_state_rm, old_hton, &cpath,
                           &backup_name->db, &backup_name->table_name,
                           DDL_LOG_FLAG_FROM_IS_TMP))
       return true;
 
     debug_crash_here("ddl_log_create_after_log_drop_backup");
-    if (ddl_log_rename_table(thd, ddl_log_state_create, old_hton,
+    if (ddl_log_rename_table(ddl_log_state_create, old_hton,
                               &db, &table_name,
                               &backup_name->db, &backup_name->table_name,
                               DDL_RENAME_PHASE_TRIGGER,
@@ -4366,7 +4366,7 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
                                      table_name.str, "", 0);
   param.rename_flags= FN_FROM_IS_TMP;
   if (rename_check(thd, &param, tmp_name, &db, &table_name, &table_name, false) ||
-      ddl_log_create_table(thd, ddl_log_state_create, param.from_table_hton,
+      ddl_log_create_table(ddl_log_state_create, param.from_table_hton,
                            &cpath, &db, &table_name, false) ||
       rename_do(thd, &param, NULL, tmp_name, &db, false, &dummy))
     return true;
@@ -4733,7 +4733,7 @@ int create_table_impl(THD *thd,
       .frm files are deleted
     */
     if (ddl_log_state_create)
-      ddl_log_create_table(thd, ddl_log_state_create, (handlerton*) 0, &path,
+      ddl_log_create_table(ddl_log_state_create, (handlerton*) 0, &path,
                            &db, &table_name, 1);
 
     ha_err= hton->discover_table_structure(hton, thd, &share, create_info);
@@ -4758,7 +4758,7 @@ int create_table_impl(THD *thd,
   else
   {
     if (ddl_log_state_create)
-      ddl_log_create_table(thd, ddl_log_state_create, create_info->db_type,
+      ddl_log_create_table(ddl_log_state_create, create_info->db_type,
                            &path, &db, &table_name, frm_only);
     debug_crash_here("ddl_log_create_before_create_frm");
 
@@ -9586,7 +9586,7 @@ simple_rename_or_index_change(THD *thd, TABLE_LIST *table_list,
     close_all_tables_for_name(thd, table->s, HA_EXTRA_PREPARE_FOR_RENAME,
                               NULL);
 
-    (void) ddl_log_rename_table(thd, &ddl_log_state, old_db_type,
+    (void) ddl_log_rename_table(&ddl_log_state, old_db_type,
                                 &alter_ctx->db, &alter_ctx->table_name,
                                 &alter_ctx->new_db, &alter_ctx->new_alias,
                                 DDL_RENAME_PHASE_TABLE, 0);
@@ -10492,7 +10492,7 @@ do_continue:;
     if (alter_ctx.is_table_renamed())
       tmp_table= alter_ctx.new_alias;
 
-    if (ddl_log_alter_table(thd, &ddl_log_state,
+    if (ddl_log_alter_table(&ddl_log_state,
                             old_db_type,
                             &alter_ctx.db, &alter_ctx.table_name,
                             new_db_type,
