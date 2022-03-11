@@ -6011,6 +6011,11 @@ bool THD::binlog_write_table_maps(TABLE *cur_table)
   }
   if (cur_table->s->tmp_table && cur_table->file->row_logging)
   {
+    /*
+      This is a temporary table created with CREATE OR REPLACE ... SELECT.
+      As these types of tables are not locked, we have to write the bitmap
+      separately.
+    */
     if (binlog_write_table_map(cur_table, with_annotate))
       DBUG_RETURN(1);
   }
