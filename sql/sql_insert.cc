@@ -5349,18 +5349,19 @@ bool select_create::finalize_locked_tables(THD *thd)
   /*
     Add back the deleted table and re-created table as a locked table
     This should always work as we have a meta lock on the table.
-    */
+  */
   thd->locked_tables_list.add_back_last_deleted_lock(pos_in_locked_tables);
   if (thd->locked_tables_list.reopen_tables(thd, false))
   {
     thd->locked_tables_list.unlink_all_closed_tables(thd, NULL, 0);
     return true;
   }
-  else
-  {
-    TABLE *table= pos_in_locked_tables->table;
-    table->mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
-  }
+  /*
+    The lock was made exclusive in create_table_impl(). We have now
+    to bring it back to it's orginal state
+  */
+  TABLE *table= pos_in_locked_tables->table;
+  table->mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
 
   return false;
 }
