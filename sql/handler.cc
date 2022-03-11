@@ -4949,7 +4949,7 @@ void handler::mark_trx_read_write_internal()
       table_share can be NULL, for example, in ha_delete_table() or
       ha_rename_table().
     */
-    if (table_share == NULL || table_share->tmp_table == NO_TMP_TABLE)
+    if (table_share == NULL || table_share->tmp_table <= NO_TMP_TABLE)
       ha_info->set_trx_read_write();
   }
 }
@@ -7525,7 +7525,7 @@ int handler::ha_write_row(const uchar *buf)
       error= binlog_log_row(table, 0, buf, log_func);
     }
 #ifdef WITH_WSREP
-    if (WSREP_NNULL(ha_thd()) && table_share->tmp_table == NO_TMP_TABLE &&
+    if (WSREP_NNULL(ha_thd()) && table_share->tmp_table <= NO_TMP_TABLE &&
         ht->flags & HTON_WSREP_REPLICATION &&
         !error && (error= wsrep_after_row(ha_thd())))
     {
@@ -7592,7 +7592,7 @@ int handler::ha_update_row(const uchar *old_data, const uchar *new_data)
                       " can not mark as PA unsafe");
       }
 
-      if (!error && table_share->tmp_table == NO_TMP_TABLE &&
+      if (!error && table_share->tmp_table <= NO_TMP_TABLE &&
           ht->flags & HTON_WSREP_REPLICATION)
         error= wsrep_after_row(thd);
     }
@@ -7670,7 +7670,7 @@ int handler::ha_delete_row(const uchar *buf)
                       " can not mark as PA unsafe");
       }
 
-      if (!error && table_share->tmp_table == NO_TMP_TABLE &&
+      if (!error && table_share->tmp_table <= NO_TMP_TABLE &&
           ht->flags & HTON_WSREP_REPLICATION)
         error= wsrep_after_row(thd);
     }

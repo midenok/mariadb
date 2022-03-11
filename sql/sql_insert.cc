@@ -4648,6 +4648,7 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
       */
       if (create_table->table)
       {
+        create_table->table->s->tmp_table= TMP_TABLE_ATOMIC_REPLACE;
         /*
           NOTE: Aria tables require table locking to work in transactional
           mode. Since we don't lock our temporary table we get problems with
