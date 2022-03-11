@@ -5413,8 +5413,6 @@ void select_create::abort_result_set()
       DBUG_ASSERT(saved_tmp_table_share);
       thd->restore_tmp_table_share(saved_tmp_table_share);
     }
-    else if (atomic_replace)
-      create_table= &new_table;
 
     if (table->file->inited &&
         (info.ignore || info.handle_duplicates != DUP_ERROR) &&
