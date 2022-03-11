@@ -4903,9 +4903,18 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
     DBUG_ASSERT(m_plock == NULL);
 
     if (table->s->tmp_table)
+    {
+      /* Table is a temporary table, don't write table map to binary log */
       m_plock= &m_lock;
+    }
     else
+    {
+      /*
+        Table is a normal table. Inform binlog_write_table_maps() that
+        it should write the table map for the current table.
+      */
       m_plock= &thd->extra_lock;
+    }
 
     *m_plock= extra_lock;
   }
