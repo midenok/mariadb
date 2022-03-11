@@ -3869,6 +3869,8 @@ select_create::select_create(THD *thd, TABLE_LIST *table_arg,
       !ha_check_storage_engine_flag(create_info->db_type,
                                     HTON_NO_BINLOG_ROW_OPT))
     atomic_replace= create_info->is_atomic_replace();
+  else
+    DBUG_ASSERT(!atomic_replace);
   create_info->ddl_log_state_create= &ddl_log_state_create;
   create_info->ddl_log_state_rm= &ddl_log_state_rm;
 }
@@ -4227,7 +4229,8 @@ bool select_insert::prepare_eof()
        (flush row events is done at commit), so we cannot do it here.
        Test: rpl.create_or_replace_row
     */
-    const bool autocommit= !(thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT);
+    const bool autocommit= !(thd->variables.option_bits &
+                             OPTION_NOT_AUTOCOMMIT);
     if (autocommit)
       thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
 
