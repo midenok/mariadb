@@ -4357,7 +4357,8 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
     param.old_alias= lower_case_table_names == 2 ?
                         orig_table->alias : orig_table->table_name;
     param.new_alias= backup_name->table_name;
-    if (rename_do(thd, &param, NULL, orig_table, &backup_name->db, false, &dummy))
+    if (rename_table_and_triggers(thd, &param, NULL, orig_table,
+                                  &backup_name->db, false, &dummy))
       return true;
     debug_crash_here("ddl_log_create_after_save_backup");
   }
@@ -4365,10 +4366,12 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
   cpath.length= build_table_filename(path, sizeof(path) - 1, db.str,
                                      table_name.str, "", 0);
   param.rename_flags= FN_FROM_IS_TMP;
-  if (rename_check(thd, &param, tmp_name, &db, &table_name, &table_name, false) ||
+  if (rename_check_preconditions(thd, &param, tmp_name, &db, &table_name,
+                                 &table_name, false) ||
       ddl_log_create_table(ddl_log_state_create, param.from_table_hton,
                            &cpath, &db, &table_name, false) ||
-      rename_do(thd, &param, NULL, tmp_name, &db, false, &dummy))
+      rename_table_and_triggers(thd, &param, NULL, tmp_name, &db, false,
+                                &dummy))
     return true;
   debug_crash_here("ddl_log_create_after_install_new");
   return false;

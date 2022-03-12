@@ -228,8 +228,6 @@ do_rename_temporary(THD *thd, TABLE_LIST *ren_table, TABLE_LIST *new_table)
 
 
 /**
-  rename_check()
-
   Check pre-conditions for rename
   - From table should exists
   - To table should not exists.
@@ -246,12 +244,12 @@ do_rename_temporary(THD *thd, TABLE_LIST *ren_table, TABLE_LIST *new_table)
 */
 
 int
-rename_check(THD *thd, rename_param *param,
-             TABLE_LIST *ren_table,
-             const LEX_CSTRING *new_db,
-             const LEX_CSTRING *new_table_name,
-             const LEX_CSTRING *new_table_alias,
-             bool if_exists)
+rename_check_preconditions(THD *thd, rename_param *param,
+                           TABLE_LIST *ren_table,
+                           const LEX_CSTRING *new_db,
+                           const LEX_CSTRING *new_table_name,
+                           const LEX_CSTRING *new_table_alias,
+                           bool if_exists)
 {
   DBUG_ENTER("check_rename");
   DBUG_PRINT("enter", ("if_exists: %d", (int) if_exists));
@@ -306,7 +304,6 @@ rename_check(THD *thd, rename_param *param,
   Rename a single table or a view
 
   SYNPOSIS
-    rename_do()
       thd               Thread handle
       ren_table         A table/view to be renamed
       new_db            The database to which the table to be moved to
@@ -324,9 +321,10 @@ rename_check(THD *thd, rename_param *param,
 */
 
 bool
-rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
-          TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
-          bool skip_error, bool *force_if_exists)
+rename_table_and_triggers(THD *thd, rename_param *param,
+                          DDL_LOG_STATE *ddl_log_state, TABLE_LIST *ren_table,
+                          const LEX_CSTRING *new_db, bool skip_error,
+                          bool *force_if_exists)
 {
   int rc= 1;
   handlerton *hton;
@@ -521,7 +519,7 @@ rename_tables(THD *thd, TABLE_LIST *table_list, DDL_LOG_STATE *ddl_log_state,
     {
       int error;
       rename_param param;
-      error= rename_check(thd, &param, ren_table, &new_table->db,
+      error= rename_check_preconditions(thd, &param, ren_table, &new_table->db,
                           &new_table->table_name,
                           &new_table->alias, (skip_error || if_exists));
       if (error < 0)
@@ -529,7 +527,7 @@ rename_tables(THD *thd, TABLE_LIST *table_list, DDL_LOG_STATE *ddl_log_state,
       if (error > 0)
         goto revert_rename;
 
-      if (rename_do(thd, &param, ddl_log_state,
+      if (rename_table_and_triggers(thd, &param, ddl_log_state,
                           ren_table, &new_table->db,
                           skip_error, force_if_exists))
         goto revert_rename;

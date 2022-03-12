@@ -156,11 +156,11 @@ struct rename_param
     rename_flags(0) {}
 };
 bool
-rename_do(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
+rename_table_and_triggers(THD *thd, rename_param *param, DDL_LOG_STATE *ddl_log_state,
           TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
           bool skip_error, bool *force_if_exists);
 int
-rename_check(THD *thd, rename_param *param,
+rename_check_preconditions(THD *thd, rename_param *param,
              TABLE_LIST *ren_table,
              const LEX_CSTRING *new_db,
              const LEX_CSTRING *new_table_name,
