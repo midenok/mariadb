@@ -6023,6 +6023,7 @@ class select_insert :public select_result_interceptor {
   bool insert_into_view;
   bool binary_logged;                   // true if query was binlogged
   bool atomic_replace;                  // true for atomic create or replace
+  bool tmp_table;
   Table_specification_st *create_info;
 
   select_insert(THD *thd_arg, TABLE_LIST *table_list_par, TABLE *table_par,

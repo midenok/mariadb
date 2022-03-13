@@ -3844,6 +3844,7 @@ select_insert::select_insert(THD *thd_arg, TABLE_LIST *table_list_par,
   info.update_values= update_values;
   info.view= (table_list_par->view ? table_list_par : 0);
   info.table_list= table_list_par;
+  tmp_table= table ? table->s->tmp_table : false;
 }
 
 
@@ -3873,6 +3874,7 @@ select_create::select_create(THD *thd, TABLE_LIST *table_arg,
     DBUG_ASSERT(!atomic_replace);
   create_info->ddl_log_state_create= &ddl_log_state_create;
   create_info->ddl_log_state_rm= &ddl_log_state_rm;
+  tmp_table= create_info->tmp_table();
 }
 
 
@@ -4265,10 +4267,8 @@ bool select_insert::prepare_eof()
 
   if (unlikely(error))
   {
-    if (thd->transaction->stmt.modified_non_trans_table &&
-        !atomic_replace && binlog_query())
-    {}
-    else
+    if (!(thd->transaction->stmt.modified_non_trans_table &&
+          !atomic_replace && binlog_query()))
       table->file->print_error(error,MYF(0));
     DBUG_RETURN(true);
   }
@@ -4282,7 +4282,7 @@ bool select_insert::binlog_query()
   const bool trans_table= table ? table->file->has_transactions_and_rollback() :
                                   false;
   killed_state killed_status= thd->killed;
-  DBUG_ENTER("select_insert::binlog_at_eof");
+  DBUG_ENTER("select_insert::binlog_query");
 
   /*
     Write to binlog before commiting transaction.  No statement will
@@ -4319,9 +4319,6 @@ bool select_insert::binlog_query()
         table->file->ha_release_auto_increment();
       DBUG_RETURN(true);
     }
-    /* TODO: Update binary_logged in do_postlock() for RBR? */
-    const bool tmp_table= create_info ? create_info->tmp_table() :
-                                        (bool) table->s->tmp_table;
     binary_logged= res == 0 || !tmp_table;
   }
   if (table)
