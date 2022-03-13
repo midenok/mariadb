@@ -4238,6 +4238,7 @@ bool select_insert::prepare_eof()
     {
       if (autocommit)
         thd->variables.option_bits&= ~OPTION_NOT_AUTOCOMMIT;
+      /* purecov: inspected */
       DBUG_RETURN(true);
     }
 
