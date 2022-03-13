@@ -1203,8 +1203,10 @@ static uint32 get_comment(THD *thd, uint32 comment_pos,
   return 0;
 }
 
-bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
-                   TABLE_LIST *res)
+
+static
+bool make_tmp_name(THD *thd, const char *prefix, const Table_name *orig,
+                   Table_name *res)
 {
   char res_name[NAME_LEN + 1];
   char file_name[FN_REFLEN];
@@ -1224,14 +1226,52 @@ bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
   }
 
   table_name.length= len;
+  res->db= orig->db;
+  res->table_name= table_name;
 
   if (lower_case_table_names)
   {
     my_casedn_str(system_charset_info, res_name);
     table_name.str= strmake_root(thd->mem_root, res_name, len);
+    if (!table_name.str)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
   }
 
-  res->init_one_table(&orig->db, &table_name, NULL, orig->lock_type);
+  res->alias= table_name;
+  return false;
+}
+
+
+/**
+  Helper for making utility table names for atomic CREATE OR REPLACE.
+
+  Creates two temporary names: "create" (used for new table)
+  and "backup" (used for saving old table).
+
+  @param create_table[in/out]   Original table name, on output holds new name
+  @param create_table_mode[out] Create flags or-ed with C_ALTER_TABLE
+*/
+
+bool HA_CREATE_INFO::make_tmp_table_list(THD *thd, TABLE_LIST **create_table,
+                                         int *create_table_mode)
+{
+  TABLE_LIST *new_table;
+  if (make_tmp_name(thd, "create", *create_table, &tmp_name) ||
+      make_tmp_name(thd, "backup", *create_table, &backup_name) ||
+      !(new_table= (TABLE_LIST *)thd->alloc(sizeof(TABLE_LIST))))
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+  (*create_table_mode)|= C_ALTER_TABLE;
+  DBUG_ASSERT(!(options & HA_CREATE_TMP_ALTER));
+  options|= HA_CREATE_TMP_ALTER;
+  new_table->init_one_table(&tmp_name.db, &tmp_name.table_name,
+                            &tmp_name.alias, (*create_table)->lock_type);
+  *create_table= new_table;
   return false;
 }
 
@@ -2983,11 +3023,11 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
       }
       else
         fk_key->ref_columns.append(&fk_key->columns);
-      if (create_info->tmp_name &&
+      if (create_info->tmp_name.is_set() &&
           !lex_string_cmp(table_alias_charset, &table_name,
                           &fk_key->ref_table))
       {
-        fk_key->ref_table= create_info->tmp_name->table_name;
+        fk_key->ref_table= create_info->tmp_name.table_name;
       }
       continue;
     }
@@ -4317,21 +4357,21 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
     ddl_log_link_chains(ddl_log_state_rm, ddl_log_state_create);
 
     cpath.length= build_table_filename(path, sizeof(path) - 1,
-                                       backup_name->db.str,
-                                       backup_name->table_name.str,
+                                       backup_name.db.str,
+                                       backup_name.table_name.str,
                                        "", FN_IS_TMP);
 
-    if (ddl_log_drop_table_init(ddl_log_state_rm, &backup_name->db,
+    if (ddl_log_drop_table_init(ddl_log_state_rm, &backup_name.db,
                                 &empty_clex_str) ||
         ddl_log_drop_table(ddl_log_state_rm, old_hton, &cpath,
-                          &backup_name->db, &backup_name->table_name,
+                          &backup_name.db, &backup_name.table_name,
                           DDL_LOG_FLAG_FROM_IS_TMP))
       return true;
 
     debug_crash_here("ddl_log_create_after_log_drop_backup");
     if (ddl_log_rename_table(ddl_log_state_create, old_hton,
                               &db, &table_name,
-                              &backup_name->db, &backup_name->table_name,
+                              &backup_name.db, &backup_name.table_name,
                               DDL_RENAME_PHASE_TRIGGER,
                               DDL_LOG_FLAG_FROM_IS_TMP))
       return true;
@@ -4356,9 +4396,9 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
     param.old_version= org_tabledef_version;
     param.old_alias= lower_case_table_names == 2 ?
                         orig_table->alias : orig_table->table_name;
-    param.new_alias= backup_name->table_name;
+    param.new_alias= backup_name.table_name;
     if (rename_table_and_triggers(thd, &param, NULL, orig_table,
-                                  &backup_name->db, false, &dummy))
+                                  &backup_name.db, false, &dummy))
       return true;
     debug_crash_here("ddl_log_create_after_save_backup");
   }
@@ -4366,11 +4406,11 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
   cpath.length= build_table_filename(path, sizeof(path) - 1, db.str,
                                      table_name.str, "", 0);
   param.rename_flags= FN_FROM_IS_TMP;
-  if (rename_check_preconditions(thd, &param, tmp_name, &db, &table_name,
+  if (rename_check_preconditions(thd, &param, &tmp_name, &db, &table_name,
                                  &table_name, false) ||
       ddl_log_create_table(ddl_log_state_create, param.from_table_hton,
                            &cpath, &db, &table_name, false) ||
-      rename_table_and_triggers(thd, &param, NULL, tmp_name, &db, false,
+      rename_table_and_triggers(thd, &param, NULL, &tmp_name, &db, false,
                                 &dummy))
     return true;
   debug_crash_here("ddl_log_create_after_install_new");
@@ -4449,7 +4489,7 @@ int create_table_impl(THD *thd,
   handler	*file= 0;
   int		error= 1;
   bool          frm_only= (create_table_mode & C_ALTER_TABLE_FRM_ONLY);
-  const bool    atomic_replace= create_info->tmp_name != NULL;
+  const bool    atomic_replace= create_info->tmp_name.is_set();
   bool          internal_tmp_table= (!atomic_replace &&
                                      (create_table_mode & C_ALTER_TABLE)) ||
                                     frm_only;
@@ -4955,8 +4995,6 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   uint save_thd_create_info_options;
   bool is_trans= FALSE;
   int result;
-  TABLE_LIST new_table;
-  TABLE_LIST backup_table;
   TABLE_LIST *orig_table= create_table;
   const bool atomic_replace= create_info->is_atomic_replace();
   DBUG_ENTER("mysql_create_table");
@@ -5013,8 +5051,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   thd->abort_on_warning= thd->is_strict_mode();
 
   if (atomic_replace &&
-      create_info->make_tmp_table_list(thd, &new_table, &backup_table, &create_table,
-                                       &create_table_mode))
+      create_info->make_tmp_table_list(thd, &create_table, &create_table_mode))
   {
     result= 1;
     goto err;
@@ -5444,8 +5481,6 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
   bool src_table_exists= FALSE;
   uint not_used;
   int create_res;
-  TABLE_LIST new_table;
-  TABLE_LIST backup_table;
   TABLE_LIST *orig_table= table;
   const bool atomic_replace= create_info->is_atomic_replace();
   int create_table_mode= C_ORDINARY_CREATE;
@@ -5551,10 +5586,9 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
 
   if (atomic_replace)
   {
-    if (local_create_info.make_tmp_table_list(thd, &new_table, &backup_table, &table,
-                                              &create_table_mode))
+    if (local_create_info.make_tmp_table_list(thd, &table, &create_table_mode))
       goto err;
-    new_table.mdl_request.duration= MDL_EXPLICIT;
+    table->mdl_request.duration= MDL_EXPLICIT;
   }
 
   res= ((create_res=

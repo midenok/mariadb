@@ -2323,14 +2323,10 @@ struct Table_scope_and_contents_source_st:
 
 typedef struct st_ddl_log_state DDL_LOG_STATE;
 
-bool make_tmp_name(THD *thd, const char *prefix, const TABLE_LIST *orig,
-                   TABLE_LIST *res);
-
 struct Atomic_info
 {
-  /* NOTE: TABLE_LIST is not defined in handler.h */
-  TABLE_LIST *tmp_name;
-  TABLE_LIST *backup_name;
+  Table_name tmp_name;
+  Table_name backup_name;
   DDL_LOG_STATE *ddl_log_state_create;
   DDL_LOG_STATE *ddl_log_state_rm;
   handlerton *old_hton;
@@ -2445,36 +2441,8 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
   }
   bool finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table);
   void finalize_ddl(THD *thd, bool roll_back);
-
-  /**
-    Helper for making utility table names for atomic CREATE OR REPLACE.
-
-    Creates two temporary names: "create" (used for new table)
-    and "backup" (used for saving old table).
-
-    @param new_table[out]         Holds "create" name on return
-    @param backup_table[out]      Holds "backup" name on return
-    @param create_table[in/out]   Original table name, on output holds new name
-    @param create_table_mode[out] Create flags or-ed with C_ALTER_TABLE
-  */
-
-  bool make_tmp_table_list(THD *thd, TABLE_LIST *new_table,
-                           TABLE_LIST *backup_table,
-                           TABLE_LIST **create_table,
-                           int *create_table_mode)
-  {
-    if (make_tmp_name(thd, "create", *create_table, new_table))
-      return true;
-    if (make_tmp_name(thd, "backup", *create_table, backup_table))
-      return true;
-    (*create_table_mode)|= C_ALTER_TABLE;
-    DBUG_ASSERT(!(options & HA_CREATE_TMP_ALTER));
-    options|= HA_CREATE_TMP_ALTER;
-    tmp_name= new_table;
-    backup_name= backup_table;
-    *create_table= new_table;
-    return false;
-  }
+  bool make_tmp_table_list(THD *thd, TABLE_LIST **create_table,
+                           int *create_table_mode);
 };
 
 

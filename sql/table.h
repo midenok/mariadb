@@ -35,6 +35,7 @@
 #include "sql_i_s.h"
 #include "sql_type.h"               /* vers_kind_t */
 #include "privilege.h"              /* privilege_t */
+#include "structs.h"
 
 /* Structs that defines the TABLE */
 
@@ -699,14 +700,6 @@ public:
   bool start_stats_load() { return stats_state.start_load(); }
   void end_stats_load() { stats_state.end_load(); }
   void abort_stats_load() { stats_state.abort_load(); }
-};
-
-
-struct Table_name
-{
-  LEX_CSTRING   db;
-  LEX_CSTRING   table_name;
-  LEX_CSTRING   alias;
 };
 
 

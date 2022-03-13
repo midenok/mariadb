@@ -4594,11 +4594,11 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
 
   if (atomic_replace)
   {
-    if (create_info->make_tmp_table_list(thd, &new_table, &backup_table,
-                                         &create_table, &create_table_mode))
+    if (create_info->make_tmp_table_list(thd, &create_table,
+                                         &create_table_mode))
       DBUG_RETURN(NULL);
 
-    select_insert::table_list= &new_table;
+    select_insert::table_list= create_table;
   }
 
   /*
@@ -4638,8 +4638,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
     if (atomic_replace)
     {
       char tmp_path[FN_REFLEN + 1];
-      build_table_filename(tmp_path, sizeof(tmp_path) - 1, new_table.db.str,
-                           new_table.table_name.str, "", FN_IS_TMP);
+      build_table_filename(tmp_path, sizeof(tmp_path) - 1, create_table->db.str,
+                           create_table->table_name.str, "", FN_IS_TMP);
 
       create_table->table=
           thd->create_and_open_tmp_table(&frm, tmp_path, orig_table->db.str,
