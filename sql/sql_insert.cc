@@ -3856,7 +3856,6 @@ select_create::select_create(THD *thd, TABLE_LIST *table_arg,
                              TABLE_LIST *select_tables_arg):
   select_insert(thd, table_arg, NULL, &select_fields, 0, 0, duplic,
                 ignore, NULL),
-  create_table(table_arg),
   orig_table(table_arg),
   select_tables(select_tables_arg),
   alter_info(alter_info_arg),
@@ -4539,7 +4538,7 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
   if (!opt_explicit_defaults_for_timestamp)
     promote_first_timestamp_column(&alter_info->create_list);
 
-  if (create_info->fix_create_fields(thd, alter_info, *create_table))
+  if (create_info->fix_create_fields(thd, alter_info, *table_list))
     DBUG_RETURN(NULL);
 
   while ((item=it++))
@@ -4580,29 +4579,27 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
   }
 
   if (create_info->check_fields(thd, alter_info,
-                                create_table->table_name,
-                                create_table->db))
+                                table_list->table_name,
+                                table_list->db))
     DBUG_RETURN(NULL);
 
   DEBUG_SYNC(thd,"create_table_select_before_create");
 
   /* Check if LOCK TABLES + CREATE OR REPLACE of existing normal table*/
-  if (thd->locked_tables_mode && create_table->table &&
+  if (thd->locked_tables_mode && table_list->table &&
       !create_info->tmp_table())
   {
     /* Remember information about the locked table */
     create_info->pos_in_locked_tables=
-      create_table->table->pos_in_locked_tables;
-    create_info->mdl_ticket= create_table->table->mdl_ticket;
+      table_list->table->pos_in_locked_tables;
+    create_info->mdl_ticket= table_list->table->mdl_ticket;
   }
 
   if (atomic_replace)
   {
-    if (create_info->make_tmp_table_list(thd, &create_table,
+    if (create_info->make_tmp_table_list(thd, &table_list,
                                          &create_table_mode))
       DBUG_RETURN(NULL);
-
-    select_insert::table_list= create_table;
   }
 
   /*
@@ -4625,10 +4622,10 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
   if (!mysql_create_table_no_lock(thd,
                                   &orig_table->db,
                                   &orig_table->table_name,
-                                  &create_table->db,
-                                  &create_table->table_name,
+                                  &table_list->db,
+                                  &table_list->table_name,
                                   create_info, alter_info, NULL,
-                                  create_table_mode, create_table,
+                                  create_table_mode, table_list,
                                   atomic_replace ? &frm : NULL))
   {
     DEBUG_SYNC(thd,"create_table_select_before_open");
@@ -4637,24 +4634,24 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
       If we had a temporary table or a table used with LOCK TABLES,
       it was closed by mysql_create()
     */
-    create_table->table= 0;
+    table_list->table= 0;
 
     if (atomic_replace)
     {
       char tmp_path[FN_REFLEN + 1];
-      build_table_filename(tmp_path, sizeof(tmp_path) - 1, create_table->db.str,
-                           create_table->table_name.str, "", FN_IS_TMP);
+      build_table_filename(tmp_path, sizeof(tmp_path) - 1, table_list->db.str,
+                           table_list->table_name.str, "", FN_IS_TMP);
 
-      create_table->table=
+      table_list->table=
           thd->create_and_open_tmp_table(&frm, tmp_path, orig_table->db.str,
                                          orig_table->table_name.str, false);
       /*
         NOTE: if create_and_open_tmp_table() fails the table is dropped by
         ddl_log_state_create
       */
-      if (create_table->table)
+      if (table_list->table)
       {
-        create_table->table->s->tmp_table= TMP_TABLE_ATOMIC_REPLACE;
+        table_list->table->s->tmp_table= TMP_TABLE_ATOMIC_REPLACE;
         /*
           NOTE: Aria tables require table locking to work in transactional
           mode. Since we don't lock our temporary table we get problems with
@@ -4665,7 +4662,7 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
           This hack disables logging for Aria table (that is not needed anyway
           for a temporary table).
         */
-        TABLE *table= create_table->table;
+        TABLE *table= table_list->table;
         int error;
 
         /* Disable logging of inserted rows */
@@ -4683,11 +4680,11 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
           thd->transaction->on= true;
           table->file->ha_reset();
           thd->drop_temporary_table(table, NULL, false);
-          create_table->table= 0;
+          table_list->table= 0;
           goto err;
         }
 
-        create_table->table->s->can_do_row_logging= 1;
+        table_list->table->s->can_do_row_logging= 1;
       }
     }
     else if (!create_info->tmp_table())
@@ -4696,20 +4693,20 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
       TABLE_LIST::enum_open_strategy save_open_strategy;
 
       /* Force the newly created table to be opened */
-      save_open_strategy= create_table->open_strategy;
-      create_table->open_strategy= TABLE_LIST::OPEN_NORMAL;
+      save_open_strategy= table_list->open_strategy;
+      table_list->open_strategy= TABLE_LIST::OPEN_NORMAL;
       /*
         Here we open the destination table, on which we already have
         an exclusive metadata lock.
       */
-      if (open_table(thd, create_table, &ot_ctx))
+      if (open_table(thd, table_list, &ot_ctx))
       {
-        quick_rm_table(thd, create_info->db_type, &create_table->db,
-                       table_case_name(create_info, &create_table->table_name),
+        quick_rm_table(thd, create_info->db_type, &table_list->db,
+                       table_case_name(create_info, &table_list->table_name),
                        0);
       }
       /* Restore */
-      create_table->open_strategy= save_open_strategy;
+      table_list->open_strategy= save_open_strategy;
     }
     else
     {
@@ -4717,8 +4714,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
         The pointer to the newly created temporary table has been stored in
         table->create_info.
       */
-      create_table->table= create_info->table;
-      if (!create_table->table)
+      table_list->table= create_info->table;
+      if (!table_list->table)
       {
         /*
           This shouldn't happen as creation of temporary table should make
@@ -4730,13 +4727,13 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
     }
   }
   else
-    create_table->table= 0;                     // Create failed
+    table_list->table= 0;                     // Create failed
 
 err:
-  DBUG_ASSERT(!create_table->table || frm.str || !atomic_replace);
+  DBUG_ASSERT(!table_list->table || frm.str || !atomic_replace);
   my_free(const_cast<uchar *>(frm.str));
 
-  if (unlikely(!(table= create_table->table)))
+  if (unlikely(!(table= table_list->table)))
   {
     const bool error= thd->is_error();
     /* CREATE ... IF NOT EXISTS succeed, but did nothing */
@@ -4780,7 +4777,7 @@ err:
       mysql_unlock_tables(thd, *lock);
       *lock= 0;
     }
-    drop_open_table(thd, table, &create_table->db, &create_table->table_name);
+    drop_open_table(thd, table, &table_list->db, &table_list->table_name);
     if (atomic_replace)
       create_info->finalize_ddl(thd, 1);
     else
@@ -4838,10 +4835,10 @@ int select_create::postlock(THD *thd, TABLE **tables)
     NOTE: for row format CREATE TABLE must be logged before row data.
   */
   int error;
-  TABLE_LIST *save_next_global= create_table->next_global;
-  create_table->next_global= select_tables;
-  error= thd->decide_logging_format(create_table);
-  create_table->next_global= save_next_global;
+  TABLE_LIST *save_next_global= table_list->next_global;
+  table_list->next_global= select_tables;
+  error= thd->decide_logging_format(table_list);
+  table_list->next_global= save_next_global;
 
   if (unlikely(error))
     return error;
@@ -4883,7 +4880,7 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
     if (create_info->or_replace() && !atomic_replace)
     {
       /* Original table was deleted. We have to log it */
-      log_drop_table(thd, &create_table->db, &create_table->table_name,
+      log_drop_table(thd, &table_list->db, &table_list->table_name,
                      &create_info->org_storage_engine_name,
                      create_info->db_type == partition_hton,
                      &create_info->org_tabledef_version,
@@ -4894,7 +4891,7 @@ select_create::prepare(List<Item> &_values, SELECT_LEX_UNIT *u)
     DBUG_RETURN(-1);
   }
 
-  DBUG_ASSERT(table == create_table->table);
+  DBUG_ASSERT(table == table_list->table);
 
   if (create_info->tmp_table())
   {
@@ -5203,8 +5200,8 @@ bool select_create::send_eof()
       */
       wsrep_key_arr_t key_arr= {0, 0};
       wsrep_prepare_keys_for_isolation(thd,
-                                       create_table->db.str,
-                                       create_table->table_name.str,
+                                       table_list->db.str,
+                                       table_list->table_name.str,
                                        table_list,
                                        &key_arr);
       int rcode= wsrep_thd_append_key(thd, key_arr.keys, key_arr.keys_len,
@@ -5225,7 +5222,7 @@ bool select_create::send_eof()
 #endif /* WITH_WSREP */
     if (atomic_replace)
     {
-      create_table= orig_table;
+      table_list= orig_table;
       create_info->table= orig_table->table;
       thd->transaction->on= true;
       table->file->ha_reset();
@@ -5291,8 +5288,8 @@ bool select_create::send_eof()
     else
       lex_string_set(&ddl_log.org_storage_engine_name,
                      ha_resolve_storage_engine_name(create_info->db_type));
-    ddl_log.org_database=   create_table->db;
-    ddl_log.org_table=      create_table->table_name;
+    ddl_log.org_database=   table_list->db;
+    ddl_log.org_table=      table_list->table_name;
     ddl_log.org_table_id=   create_info->tabledef_version;
     if (create_info->drop_entry.query.length)
     {
@@ -5420,8 +5417,8 @@ void select_create::abort_result_set()
       (void) thd->drop_temporary_table(table, NULL, true);
     }
     else
-      drop_open_table(thd, table, &create_table->db,
-                      &create_table->table_name);
+      drop_open_table(thd, table, &table_list->db,
+                      &table_list->table_name);
     table=0;                                    // Safety
     if (thd->log_current_statement)
     {
