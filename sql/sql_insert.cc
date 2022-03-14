@@ -4665,23 +4665,28 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
           This hack disables logging for Aria table (that is not needed anyway
           for a temporary table).
         */
-        bool on_save= thd->transaction->on;
         TABLE *table= create_table->table;
         int error;
-        thd->transaction->on= false;
+
+        /* Disable logging of inserted rows */
+        mysql_trans_prepare_alter_copy_data(thd);
+
         if ((DBUG_IF("atomic_replace_external_lock_fail") &&
               (error= HA_ERR_LOCK_TABLE_FULL)) ||
               (error= table->file->ha_external_lock(thd, F_WRLCK)))
         {
           table->file->print_error(error, MYF(0));
+          /*
+            Enable transaction logging. We cannot call ha_enable_transaction()
+            as this would write the transaction to the binary log
+          */
+          thd->transaction->on= true;
           table->file->ha_reset();
           thd->drop_temporary_table(table, NULL, false);
           create_table->table= 0;
-          thd->transaction->on= on_save;
           goto err;
         }
 
-        thd->transaction->on= on_save;
         create_table->table->s->can_do_row_logging= 1;
       }
     }
@@ -4784,6 +4789,7 @@ err:
       ddl_log_complete(&ddl_log_state_create);
       debug_crash_here("ddl_log_create_log_complete2");
     }
+    thd->transaction->on= true;
     DBUG_RETURN(NULL);
     /* purecov: end */
   }
@@ -5221,6 +5227,7 @@ bool select_create::send_eof()
     {
       create_table= orig_table;
       create_info->table= orig_table->table;
+      thd->transaction->on= true;
       table->file->ha_reset();
       /*
         Remove the temporary table structures from memory but keep the table
@@ -5377,6 +5384,7 @@ void select_create::abort_result_set()
   thd->variables.option_bits&= ~OPTION_BIN_LOG;
   select_insert::abort_result_set();
   thd->transaction->stmt.modified_non_trans_table= FALSE;
+  thd->transaction->on= true;
   thd->variables.option_bits= save_option_bits;
 
   /* possible error of writing binary log is ignored deliberately */
