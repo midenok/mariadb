@@ -4439,20 +4439,24 @@ void HA_CREATE_INFO::finalize_ddl(THD *thd, bool roll_back)
 }
 
 
-bool HA_CREATE_INFO::finalize_locked_tables(THD *thd)
+bool HA_CREATE_INFO::finalize_locked_tables(THD *thd, bool reopen)
 {
   DBUG_ASSERT(pos_in_locked_tables);
   DBUG_ASSERT(thd->locked_tables_mode);
   DBUG_ASSERT(thd->variables.option_bits & OPTION_TABLE_LOCK);
-  /*
-    Add back the deleted table and re-created table as a locked table
-    This should always work as we have a meta lock on the table.
-  */
-  thd->locked_tables_list.add_back_last_deleted_lock(pos_in_locked_tables);
-  if (thd->locked_tables_list.reopen_tables(thd, false))
+
+  if (reopen)
   {
-    thd->locked_tables_list.unlink_all_closed_tables(thd, NULL, 0);
-    return true;
+    /*
+      Add back the deleted table and re-created table as a locked table
+      This should always work as we have a meta lock on the table.
+    */
+    thd->locked_tables_list.add_back_last_deleted_lock(pos_in_locked_tables);
+    if (thd->locked_tables_list.reopen_tables(thd, false))
+    {
+      thd->locked_tables_list.unlink_all_closed_tables(thd, NULL, 0);
+      return true;
+    }
   }
   /*
     The lock was made exclusive in create_table_impl(). We have now
@@ -5022,6 +5026,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   uint save_thd_create_info_options;
   bool is_trans= FALSE;
   int result;
+  bool reopen_locked= false;
   TABLE_LIST *orig_table= create_table;
   const bool atomic_replace= create_info->is_atomic_replace();
   DBUG_ENTER("mysql_create_table");
@@ -5104,6 +5109,8 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
     create_info->table= orig_table->table;
   }
 
+  reopen_locked= true;
+
 err:
   thd->abort_on_warning= 0;
 
@@ -5181,9 +5188,10 @@ err:
     Check if we are doing CREATE OR REPLACE TABLE under LOCK TABLES
     on a non temporary table
   */
-  if (thd->locked_tables_mode && pos_in_locked_tables &&
+  if ((reopen_locked || atomic_replace) &&
+      thd->locked_tables_mode && pos_in_locked_tables &&
       create_info->or_replace())
-    result|= create_info->finalize_locked_tables(thd);
+    result|= create_info->finalize_locked_tables(thd, reopen_locked);
 
   DBUG_RETURN(result);
 }
@@ -5493,6 +5501,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
   int create_res;
   TABLE_LIST *orig_table= table;
   const bool atomic_replace= create_info->is_atomic_replace();
+  bool reopen_locked= false;
   int create_table_mode= C_ORDINARY_CREATE;
   DBUG_ENTER("mysql_create_like_table");
 
@@ -5840,6 +5849,8 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
                  create_info->if_not_exists()));
   }
 
+  reopen_locked= true;
+
 err:
   if (atomic_replace)
   {
@@ -5905,9 +5916,10 @@ err:
     Check if we are doing CREATE OR REPLACE TABLE under LOCK TABLES
     on a non temporary table
   */
-  if (thd->locked_tables_mode && pos_in_locked_tables &&
+  if ((reopen_locked || atomic_replace) &&
+      thd->locked_tables_mode && pos_in_locked_tables &&
       create_info->or_replace())
-    res|= local_create_info.finalize_locked_tables(thd);
+    res|= local_create_info.finalize_locked_tables(thd, reopen_locked);
 
   DBUG_RETURN(res != 0);
 }
