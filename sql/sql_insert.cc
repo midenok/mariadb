@@ -5330,38 +5330,11 @@ bool select_create::send_eof()
     mysql_unlock_tables(thd, lock);
   }
   else if (atomic_replace && create_info->pos_in_locked_tables &&
-           finalize_locked_tables(thd))
+           create_info->finalize_locked_tables(thd))
     DBUG_RETURN(true);
 
   send_ok_packet();
   DBUG_RETURN(false);
-}
-
-
-bool select_create::finalize_locked_tables(THD *thd)
-{
-  DBUG_ASSERT(create_info->pos_in_locked_tables);
-  DBUG_ASSERT(thd->locked_tables_mode);
-  DBUG_ASSERT(thd->variables.option_bits & OPTION_TABLE_LOCK);
-  TABLE_LIST *pos_in_locked_tables= create_info->pos_in_locked_tables;
-  /*
-    Add back the deleted table and re-created table as a locked table
-    This should always work as we have a meta lock on the table.
-  */
-  thd->locked_tables_list.add_back_last_deleted_lock(pos_in_locked_tables);
-  if (thd->locked_tables_list.reopen_tables(thd, false))
-  {
-    thd->locked_tables_list.unlink_all_closed_tables(thd, NULL, 0);
-    return true;
-  }
-  /*
-    The lock was made exclusive in create_table_impl(). We have now
-    to bring it back to it's orginal state
-  */
-  TABLE *table= pos_in_locked_tables->table;
-  table->mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
-
-  return false;
 }
 
 
@@ -5468,6 +5441,6 @@ void select_create::abort_result_set()
     thd->locked_tables_list.unlock_locked_table(thd, create_info->mdl_ticket);
   }
   else if (atomic_replace && create_info->pos_in_locked_tables)
-    (void) finalize_locked_tables(thd);
+    (void) create_info->finalize_locked_tables(thd);
   DBUG_VOID_RETURN;
 }

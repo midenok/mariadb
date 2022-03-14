@@ -4417,6 +4417,7 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
   return false;
 }
 
+
 void HA_CREATE_INFO::finalize_ddl(THD *thd, bool roll_back)
 {
   if (roll_back)
@@ -4435,6 +4436,32 @@ void HA_CREATE_INFO::finalize_ddl(THD *thd, bool roll_back)
     (void) ddl_log_revert(thd, ddl_log_state_rm);
     debug_crash_here("ddl_log_create_log_complete3");
   }
+}
+
+
+bool HA_CREATE_INFO::finalize_locked_tables(THD *thd)
+{
+  DBUG_ASSERT(pos_in_locked_tables);
+  DBUG_ASSERT(thd->locked_tables_mode);
+  DBUG_ASSERT(thd->variables.option_bits & OPTION_TABLE_LOCK);
+  /*
+    Add back the deleted table and re-created table as a locked table
+    This should always work as we have a meta lock on the table.
+  */
+  thd->locked_tables_list.add_back_last_deleted_lock(pos_in_locked_tables);
+  if (thd->locked_tables_list.reopen_tables(thd, false))
+  {
+    thd->locked_tables_list.unlink_all_closed_tables(thd, NULL, 0);
+    return true;
+  }
+  /*
+    The lock was made exclusive in create_table_impl(). We have now
+    to bring it back to it's orginal state
+  */
+  TABLE *table= pos_in_locked_tables->table;
+  table->mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
+
+  return false;
 }
 
 
@@ -5033,6 +5060,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   if ((create_info->table= create_table->table))
   {
     pos_in_locked_tables= create_info->table->pos_in_locked_tables;
+    create_info->pos_in_locked_tables= pos_in_locked_tables;
     mdl_ticket= create_table->table->mdl_ticket;
   }
   
@@ -5155,25 +5183,7 @@ err:
   */
   if (thd->locked_tables_mode && pos_in_locked_tables &&
       create_info->or_replace())
-  {
-    DBUG_ASSERT(thd->variables.option_bits & OPTION_TABLE_LOCK);
-    /*
-      Add back the deleted table and re-created table as a locked table
-      This should always work as we have a meta lock on the table.
-     */
-    thd->locked_tables_list.add_back_last_deleted_lock(pos_in_locked_tables);
-    if (thd->locked_tables_list.reopen_tables(thd, false))
-    {
-      thd->locked_tables_list.unlink_all_closed_tables(thd, NULL, 0);
-      result= 1;
-      goto err;
-    }
-    else
-    {
-      TABLE *table= pos_in_locked_tables->table;
-      table->mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
-    }
-  }
+    result|= create_info->finalize_locked_tables(thd);
 
   DBUG_RETURN(result);
 }
@@ -5582,7 +5592,10 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
 
   /* The following is needed only in case of lock tables */
   if ((local_create_info.table= thd->lex->query_tables->table))
+  {
     pos_in_locked_tables= local_create_info.table->pos_in_locked_tables;
+    local_create_info.pos_in_locked_tables= pos_in_locked_tables;
+  }
 
   if (atomic_replace)
   {
@@ -5894,27 +5907,7 @@ err:
   */
   if (thd->locked_tables_mode && pos_in_locked_tables &&
       create_info->or_replace())
-  {
-    /*
-      Add back the deleted table and re-created table as a locked table
-      This should always work as we have a meta lock on the table.
-     */
-    thd->locked_tables_list.add_back_last_deleted_lock(pos_in_locked_tables);
-    if (thd->locked_tables_list.reopen_tables(thd, false))
-    {
-      thd->locked_tables_list.unlink_all_closed_tables(thd, NULL, 0);
-      res= 1; // We got an error
-    }
-    else
-    {
-      /*
-        Get pointer to the newly opened table. We need this to ensure we
-        don't reopen the table when doing statment logging below.
-      */
-      table->table= pos_in_locked_tables->table;
-      table->table->mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
-    }
-  }
+    res|= local_create_info.finalize_locked_tables(thd);
 
   DBUG_RETURN(res != 0);
 }
