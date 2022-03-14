@@ -4649,8 +4649,8 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
           thd->create_and_open_tmp_table(&frm, tmp_path, orig_table->db.str,
                                          orig_table->table_name.str, false);
       /*
-          NOTE: if create_and_open_tmp_table() fails the table is dropped by
-          ddl_log_state_create
+        NOTE: if create_and_open_tmp_table() fails the table is dropped by
+        ddl_log_state_create
       */
       if (create_table->table)
       {

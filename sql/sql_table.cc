@@ -4469,8 +4469,8 @@ bool HA_CREATE_INFO::finalize_locked_tables(THD *thd)
   Create a table
 
   @param thd                 Thread object
-  @param orig_db             Database for error messages
-  @param orig_table_name     Table name for error messages
+  @param orig_db             Database for error messages or atomic replace
+  @param orig_table_name     Table name for error messages or atomic replace
                              (it's different from table_name for ALTER TABLE)
   @param db                  Database
   @param table_name          Table name
@@ -4912,6 +4912,23 @@ warn:
 /**
   Simple wrapper around create_table_impl() to be used
   in various version of CREATE TABLE statement.
+
+  @param thd                 Thread object
+  @param orig_db             Database for error messages or atomic replace
+  @param orig_table_name     Table name for error messages or atomic replace
+                             (it's different from table_name for ALTER TABLE)
+  @param db                  Database
+  @param table_name          Table name
+  @param create_info         Create information (like MAX_ROWS)
+  @param alter_info          Description of fields and keys for new table
+  @param[out] is_trans       Identifies the type of engine where the table
+                             was created: either trans or non-trans.
+  @param create_table_mode   C_ORDINARY_CREATE, C_ALTER_TABLE,
+                             C_ASSISTED_DISCOVERY or C_ALTER_TABLE_FRM_ONLY.
+                             or any positive number (for C_CREATE_SELECT).
+                             If set to C_ALTER_TABLE_FRM_ONY then no frm or
+                             table is created, only the frm image in memory.
+  @param[out] frm            The frm image.
 
   @result
     1 unspecifed error
