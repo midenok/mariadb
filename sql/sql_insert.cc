@@ -4268,8 +4268,13 @@ bool select_insert::prepare_eof()
   if (unlikely(error))
   {
     if (!(thd->transaction->stmt.modified_non_trans_table &&
-          !atomic_replace && binlog_query()))
-      table->file->print_error(error,MYF(0));
+          !atomic_replace))
+    {
+      if (binlog_query())
+        table->file->print_error(error,MYF(0));
+    }
+    else
+      table->file->ha_release_auto_increment();
     DBUG_RETURN(true);
   }
 
@@ -4278,6 +4283,7 @@ bool select_insert::prepare_eof()
 
 bool select_insert::binlog_query()
 {
+  /* For atomic_replace table was already closed in send_eof(). */
   DBUG_ASSERT(table || atomic_replace);
   const bool trans_table= table ? table->file->has_transactions_and_rollback() :
                                   false;
