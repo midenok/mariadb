@@ -1228,18 +1228,6 @@ bool make_tmp_name(THD *thd, const char *prefix, const Table_name *orig,
   table_name.length= len;
   res->db= orig->db;
   res->table_name= table_name;
-
-  if (lower_case_table_names)
-  {
-    my_casedn_str(system_charset_info, res_name);
-    table_name.str= strmake_root(thd->mem_root, res_name, len);
-    if (!table_name.str)
-    {
-      my_error(ER_OUT_OF_RESOURCES, MYF(0));
-      return true;
-    }
-  }
-
   res->alias= table_name;
   return false;
 }
@@ -1712,7 +1700,14 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       int ferror= 0;
       DBUG_ASSERT(!was_view);
 
-      /* We've already logged drop and we don't need that entry anymore. */
+      /*
+        We where not able to drop the table for the engine. We will now try
+        to drop the table for any engines (to handle the case where we don't have
+        an .frm file or when the the information in the .frm does not match the
+        engine type).
+        We start by discarding the previous drop attempt, as we have tried
+        this drop already and it failed.
+      */
       ddl_log_disable_entry(ddl_log_state);
       if (ddl_log_drop_table(ddl_log_state, 0, &cpath, &db,
                              &table_name, 0))
