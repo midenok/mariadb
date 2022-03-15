@@ -1749,11 +1749,15 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
 
     if (!was_view)
     {
-      if (table_dropped)
+      if (likely(!error) || non_existing_table_error(error))
       {
         debug_crash_here("ddl_log_drop_before_drop_trigger");
         ddl_log_update_phase(ddl_log_state, DDL_DROP_PHASE_TRIGGER);
         debug_crash_here("ddl_log_drop_before_drop_trigger2");
+        if (Table_triggers_list::drop_all_triggers(thd, &db, &table_name, 0,
+                                                   MYF(MY_WME |
+                                                       MY_IGNORE_ENOENT)))
+          error= error ? error : -1;
       }
       else
       {
@@ -1763,12 +1767,6 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
       }
     }
 
-    if (likely(!error) || non_existing_table_error(error))
-    {
-      if (Table_triggers_list::drop_all_triggers(thd, &db, &table_name, 0,
-                                                 MYF(MY_WME | MY_IGNORE_ENOENT)))
-        error= error ? error : -1;
-    }
     debug_crash_here("ddl_log_drop_after_drop_trigger");
 
 report_error:
@@ -1838,8 +1836,8 @@ report_error:
     }
     /*
       Foreign key check may fail and we didn't drop the table.
-      We must not binlog DROP query in that case, so we don't update
-      the phase to DDL_DROP_PHASE_BINLOG.
+      We are already at DDL_DROP_PHASE_END in this case and we
+      must not binlog DROP query.
     */
     if (!was_view && table_dropped)
       ddl_log_update_phase(ddl_log_state, DDL_DROP_PHASE_BINLOG);
@@ -3023,6 +3021,10 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
       }
       else
         fk_key->ref_columns.append(&fk_key->columns);
+      /*
+        If this is a self refering table from CREATE ... SELECT,
+        update the foreign key table name to the used (temporary) table name.
+      */
       if (create_info->tmp_name.is_set() &&
           !lex_string_cmp(table_alias_charset, &table_name,
                           &fk_key->ref_table))
@@ -4340,12 +4342,30 @@ err:
   DBUG_RETURN(NULL);
 }
 
+
+/**
+  Finalize atomic CREATE OR REPLACE.
+
+  Renames old table to backup table (in case it exists), rename tmp table to
+  new table. These operations are covered with DDL logging in two chains:
+
+    ddl_log_state_create: rolls back the tables to the original state before
+    the command was started.
+
+    ddl_log_state_rm: keep the new table and drop the backup table.
+
+  finalize_ddl() executes one of the above chains depending on error or success
+  state.
+
+  @return true in case of error
+*/
+
 bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
 {
   rename_param param;
   bool dummy;
-  const LEX_CSTRING &db= orig_table->db;
-  const LEX_CSTRING &table_name= orig_table->table_name;
+  const LEX_CSTRING db= orig_table->db;
+  const LEX_CSTRING table_name= orig_table->table_name;
   LEX_CSTRING cpath;
   char path[FN_REFLEN + 1];
   cpath.str= path;
@@ -4394,8 +4414,8 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
     param.rename_flags= FN_TO_IS_TMP;
     param.from_table_hton= old_hton;
     param.old_version= org_tabledef_version;
-    param.old_alias= lower_case_table_names == 2 ?
-                        orig_table->alias : orig_table->table_name;
+    param.old_alias= lower_case_table_names == 2 ? orig_table->alias :
+                                                   table_name;
     param.new_alias= backup_name.table_name;
     if (rename_table_and_triggers(thd, &param, NULL, orig_table,
                                   &backup_name.db, false, &dummy))
