@@ -5190,14 +5190,15 @@ err:
         If create_info->table was not set, it's a normal table and
         table_creation_was_logged will be set when the share is created.
 
-        NOTE: this is only needed for non-atomic CREATE OR REPLACE
+        NOTE: this is only needed for non-atomic CREATE OR REPLACE and
+              CREATE TEMPORARY TABLE.
       */
       DBUG_ASSERT(!atomic_replace);
       create_info->table->s->table_creation_was_logged= 1;
     }
     thd->binlog_xid= thd->query_id;
     ddl_log_update_xid(&ddl_log_state_create, thd->binlog_xid);
-    if (!atomic_replace)
+    if (ddl_log_state_rm.is_active() && !atomic_replace)
       ddl_log_update_xid(&ddl_log_state_rm, thd->binlog_xid);
     debug_crash_here("ddl_log_create_before_binlog");
     if (unlikely(write_bin_log(thd, result ? FALSE : TRUE, thd->query(),
@@ -5744,17 +5745,20 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
           save_open_strategy= table->open_strategy;
           table->open_strategy= TABLE_LIST::OPEN_NORMAL;
 
-          if (atomic_replace &&
-              thd->mdl_context.acquire_lock(&table->mdl_request,
-                                            thd->variables.lock_wait_timeout))
+          if (atomic_replace)
           {
             /*
                NOTE: We acquire lock for temporary table just to make
                close_thread_table() happy. We open it like a normal table
                because it's too complex to open it like tmp_table here.
             */
-            res= 1;
-            goto err;
+
+            if (thd->mdl_context.acquire_lock(&table->mdl_request,
+                                            thd->variables.lock_wait_timeout))
+            {
+              res= 1;
+              goto err;
+            }
           }
 
           /*
@@ -5865,7 +5869,8 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
           Remember that tmp table creation was logged so that we know if
           we should log a delete of it.
 
-          NOTE: this is only needed for non-atomic CREATE OR REPLACE
+          NOTE: this is only needed for non-atomic CREATE OR REPLACE and
+                CREATE TEMPORARY TABLE.
         */
         DBUG_ASSERT(!atomic_replace);
         local_create_info.table->s->table_creation_was_logged= 1;

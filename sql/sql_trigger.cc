@@ -2113,7 +2113,8 @@ change_table_name_in_triggers(THD *thd,
   if (unlikely(thd->is_fatal_error))
     return TRUE; /* OOM */
 
-  if (save_trigger_file(thd, new_db_name, new_table_name, (flags & FN_TO_IS_TMP)))
+  if (save_trigger_file(thd, new_db_name, new_table_name,
+                        (flags & FN_TO_IS_TMP)))
     return TRUE;
 
   if (rm_trigger_file(path_buff, old_db_name, old_table_name, MYF(MY_WME),
@@ -2365,9 +2366,10 @@ bool Table_triggers_list::change_table_name(THD *thd,
 
   if (table->triggers)
   {
-    if (unlikely(table->triggers->change_table_name_in_triggers(
-                                    thd, db, new_db, old_alias, new_table,
-                                    param->rename_flags)))
+    if (unlikely(table->triggers->
+                 change_table_name_in_triggers(thd, db, new_db, old_alias,
+                                               new_table,
+                                               param->rename_flags)))
     {
       result= 1;
       goto end;
@@ -2385,10 +2387,9 @@ bool Table_triggers_list::change_table_name(THD *thd,
       (void) table->triggers->change_table_name_in_trignames(
                                upgrading50to51 ? new_db : NULL, db,
                                old_alias, err_trigger);
-      (void) table->triggers->change_table_name_in_triggers(
-                               thd, db, new_db,
-                               new_table, old_alias,
-                               (param->rename_flags ^ FN_IS_TMP));
+      (void) table->triggers->
+        change_table_name_in_triggers(thd, db, new_db, new_table, old_alias,
+                                      (param->rename_flags ^ FN_IS_TMP));
       result= 1;
       goto end;
     }
