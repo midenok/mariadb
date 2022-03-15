@@ -1836,6 +1836,11 @@ report_error:
         backup_log_ddl(&ddl_log);
       }
     }
+    /*
+      Foreign key check may fail and we didn't drop the table.
+      We must not binlog DROP query in that case, so we don't update
+      the phase to DDL_DROP_PHASE_BINLOG.
+    */
     if (!was_view && table_dropped)
       ddl_log_update_phase(ddl_log_state, DDL_DROP_PHASE_BINLOG);
 
