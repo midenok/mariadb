@@ -5330,16 +5330,16 @@ bool select_create::send_eof()
       table->mdl_ticket= create_info->mdl_ticket;
 
       /* The following should never fail, except if out of memory */
-      if (thd->locked_tables_list.restore_lock(thd,
-                                               create_info->
-                                               pos_in_locked_tables,
-                                               table, lock))
+      if (!thd->locked_tables_list.restore_lock(thd,
+                                                create_info->
+                                                pos_in_locked_tables,
+                                                table, lock))
       {
-        my_error(ER_OUT_OF_RESOURCES, MYF(0));
-        DBUG_RETURN(true);
+        send_ok_packet();
+        DBUG_RETURN(false);                     // ok
       }
-      send_ok_packet();
-      DBUG_RETURN(false);
+      /* Fail. Continue without locking the table */
+      thd->clear_error();
     }
     mysql_unlock_tables(thd, lock);
   }
