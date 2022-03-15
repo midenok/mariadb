@@ -4426,9 +4426,11 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
   cpath.length= build_table_filename(path, sizeof(path) - 1, db.str,
                                      table_name.str, "", 0);
   param.rename_flags= FN_FROM_IS_TMP;
-  if (rename_check_preconditions(thd, &param, &tmp_name, &db, &table_name,
-                                 &table_name, false) ||
-      ddl_log_create_table(ddl_log_state_create, param.from_table_hton,
+  param.from_table_hton= db_type;
+  param.old_version= tabledef_version;
+  param.old_alias= tmp_name.table_name;
+  param.new_alias= table_name;
+  if (ddl_log_create_table(ddl_log_state_create, param.from_table_hton,
                            &cpath, &db, &table_name, false) ||
       rename_table_and_triggers(thd, &param, NULL, &tmp_name, &db, false,
                                 &dummy))
@@ -4438,10 +4440,20 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
 }
 
 
+/**
+  Execute ddl_log_state_rm or ddl_log_state_create depending on error or success
+  state.
+*/
+
 void HA_CREATE_INFO::finalize_ddl(THD *thd, bool roll_back)
 {
   if (roll_back)
   {
+    /*
+      Statement failed
+        - Forget drop of backup table
+        - Rollback create (drop temporary table, rename backup to original)
+    */
     debug_crash_here("ddl_log_create_fk_fail");
     ddl_log_complete(ddl_log_state_rm);
     debug_crash_here("ddl_log_create_fk_fail2");
@@ -4450,6 +4462,11 @@ void HA_CREATE_INFO::finalize_ddl(THD *thd, bool roll_back)
   }
   else
   {
+    /*
+      Statement succeded
+        - Forget revert of create table
+        - Drop backup table
+    */
     debug_crash_here("ddl_log_create_log_complete");
     ddl_log_complete(ddl_log_state_create);
     debug_crash_here("ddl_log_create_log_complete2");
@@ -4536,12 +4553,13 @@ int create_table_impl(THD *thd,
   handler	*file= 0;
   int		error= 1;
   bool          frm_only= (create_table_mode & C_ALTER_TABLE_FRM_ONLY);
-  const bool    atomic_replace= create_info->tmp_name.is_set();
+  bool          atomic_replace= create_info->tmp_name.is_set();
   bool          internal_tmp_table= (!atomic_replace &&
                                      (create_table_mode & C_ALTER_TABLE)) ||
                                     frm_only;
   /* Easy check for ddl logging if we are creating a temporary table */
-  DDL_LOG_STATE *ddl_log_state_create= create_info->tmp_table() ? 0 : create_info->ddl_log_state_create;
+  DDL_LOG_STATE *ddl_log_state_create=
+    create_info->tmp_table() ? 0 : create_info->ddl_log_state_create;
   DBUG_ENTER("create_table_impl");
   DBUG_PRINT("enter", ("db: '%s'  table: '%s'  tmp: %d  path: %s",
                        db.str, table_name.str, internal_tmp_table, path.str));
@@ -4660,18 +4678,11 @@ int create_table_impl(THD *thd,
         lex_string_set(&create_info->org_storage_engine_name,
                       ha_resolve_storage_engine_name(db_type));
 
+        if (db_type == view_pseudo_hton)
+          atomic_replace= false;
+
         if (atomic_replace)
         {
-          if (db_type == view_pseudo_hton)
-          {
-            StringBuffer<FN_REFLEN> tbl_name(system_charset_info);
-            tbl_name.length(0);
-            tbl_name.append(&orig_db);
-            tbl_name.append('.');
-            tbl_name.append(&orig_table_name);
-            my_error(ER_IT_IS_A_VIEW, MYF(0), tbl_name.c_ptr_safe());
-            goto err;
-          }
           /* NOTE: here FK referencing is checked */
           if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
           {
@@ -4683,7 +4694,7 @@ int create_table_impl(THD *thd,
               table= table_list.table;
             }
             FOREIGN_KEY_INFO *fk;
-            bool res= table->referenced_by_foreign_table(thd, fk);
+            bool res= table->referenced_by_foreign_table(thd, &fk);
             if (!create_info->table)
             {
               (void) close_thread_table(thd, &thd->open_tables);
@@ -4975,8 +4986,10 @@ int mysql_create_table_no_lock(THD *thd, const LEX_CSTRING *orig_db,
   char path[FN_REFLEN + 1];
   LEX_CSTRING cpath;
   LEX_CUSTRING frm_local;
+
   if (!frm)
   {
+    /* Used in atomic replace */
     frm_local= {0, 0};
     frm= &frm_local;
   }

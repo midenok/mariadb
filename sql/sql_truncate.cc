@@ -117,11 +117,11 @@ static const char *fk_info_str(THD *thd, FOREIGN_KEY_INFO *fk_info)
 */
 
 bool
-TABLE::referenced_by_foreign_table(THD *thd, FOREIGN_KEY_INFO *&fk_info) const
+TABLE::referenced_by_foreign_table(THD *thd, FOREIGN_KEY_INFO **fk_info) const
 {
   List<FOREIGN_KEY_INFO> fk_list;
   List_iterator_fast<FOREIGN_KEY_INFO> it;
-  fk_info= NULL;
+  *fk_info= NULL;
 
   /*
     Bail out early if the table is not referenced by a foreign key.
@@ -145,21 +145,21 @@ TABLE::referenced_by_foreign_table(THD *thd, FOREIGN_KEY_INFO *&fk_info) const
   it.init(fk_list);
 
   /* Loop over the set of foreign keys for which this table is a parent. */
-  while ((fk_info= it++))
+  while ((*fk_info= it++))
   {
-    if (lex_string_cmp(system_charset_info, fk_info->referenced_db,
+    if (lex_string_cmp(system_charset_info, (*fk_info)->referenced_db,
                        &s->db) ||
-        lex_string_cmp(system_charset_info, fk_info->referenced_table,
+        lex_string_cmp(system_charset_info, (*fk_info)->referenced_table,
                        &s->table_name) ||
-        lex_string_cmp(system_charset_info, fk_info->foreign_db,
+        lex_string_cmp(system_charset_info, (*fk_info)->foreign_db,
                        &s->db) ||
-        lex_string_cmp(system_charset_info, fk_info->foreign_table,
+        lex_string_cmp(system_charset_info, (*fk_info)->foreign_table,
                        &s->table_name))
       break;
   }
 
   /* Table is parent in a non-self-referencing foreign key. */
-  if (fk_info)
+  if (*fk_info)
     return TRUE; /* tested by main.trigger-trans */
 
   return FALSE;
@@ -231,7 +231,7 @@ Sql_cmd_truncate_table::handler_truncate(THD *thd, TABLE_LIST *table_ref,
 
   /* Whether to truncate regardless of foreign keys. */
   if (! (thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
-    if (table_ref->table->referenced_by_foreign_table(thd, fk_info))
+    if (table_ref->table->referenced_by_foreign_table(thd, &fk_info))
     {
       /* Table is parent in a non-self-referencing foreign key. */
       if (fk_info)
