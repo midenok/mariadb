@@ -5152,13 +5152,13 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
     goto err;
   }
 
+err:
   if (atomic_replace)
   {
     create_table= orig_table;
     create_info->table= orig_table->table;
   }
 
-err:
   thd->abort_on_warning= 0;
 
   /* In RBR or readonly server we don't need to log CREATE TEMPORARY TABLE */
