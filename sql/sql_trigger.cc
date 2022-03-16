@@ -1174,8 +1174,8 @@ bool Trigger::add_to_file_list(void* param_arg)
 */
 
 static bool rm_trigger_file(char *path, const LEX_CSTRING *db,
-                            const LEX_CSTRING *table_name, myf MyFlags,
-                            uint flags= 0)
+                            const LEX_CSTRING *table_name, uint flags,
+                            myf MyFlags)
 {
   build_table_filename(path, FN_REFLEN - 1, db->str, table_name->str, TRG_EXT,
                        flags);
@@ -1341,7 +1341,7 @@ bool Table_triggers_list::drop_trigger(THD *thd, TABLE_LIST *tables,
       drop or create ddl_log recovery will ensure that all related
       trigger files are deleted or the original ones are restored.
     */
-    if (rm_trigger_file(path, &tables->db, &tables->table_name, MYF(MY_WME)))
+    if (rm_trigger_file(path, &tables->db, &tables->table_name, 0, MYF(MY_WME)))
       goto err;
   }
   else
@@ -2020,7 +2020,7 @@ bool Table_triggers_list::drop_all_triggers(THD *thd, const LEX_CSTRING *db,
   {
     result= 1;
     /* We couldn't parse trigger file, best to just remove it */
-    rm_trigger_file(path, db, name, MyFlags, flags);
+    rm_trigger_file(path, db, name, flags, MyFlags);
     goto end;
   }
   if (table.triggers)
@@ -2054,7 +2054,7 @@ bool Table_triggers_list::drop_all_triggers(THD *thd, const LEX_CSTRING *db,
         }
       }
     }
-    if (rm_trigger_file(path, db, name, MyFlags, flags))
+    if (rm_trigger_file(path, db, name, flags, MyFlags))
       result= 1;
     delete table.triggers;
   }
@@ -2117,11 +2117,11 @@ change_table_name_in_triggers(THD *thd,
                         (flags & FN_TO_IS_TMP)))
     return TRUE;
 
-  if (rm_trigger_file(path_buff, old_db_name, old_table_name, MYF(MY_WME),
-                      (flags & FN_FROM_IS_TMP)))
+  if (rm_trigger_file(path_buff, old_db_name, old_table_name,
+                      (flags & FN_FROM_IS_TMP), MYF(MY_WME)))
   {
     (void) rm_trigger_file(path_buff, new_db_name, new_table_name,
-                           MYF(MY_WME), (flags & FN_TO_IS_TMP));
+                           (flags & FN_TO_IS_TMP), MYF(MY_WME));
     return TRUE;
   }
   return FALSE;

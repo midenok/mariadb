@@ -5854,8 +5854,12 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
               When opening the table, we ignored the locked tables
               (MYSQL_OPEN_GET_NEW_TABLE). Now we can close the table
               without risking to close some locked table.
+
+              For atomic_replace we must remove TABLE and TABLE_SHARE
+              from cache since they are the objects for temporary table.
             */
-            table->table->s->tdc->flushed= true;
+            if (atomic_replace)
+              table->table->s->tdc->flushed= true;
             close_thread_table(thd, &thd->open_tables);
             if (atomic_replace)
               thd->mdl_context.release_lock(table->mdl_request.ticket);
@@ -5900,9 +5904,12 @@ err:
     local_create_info.table= orig_table->table;
 
     if (!res)
+    {
       res= local_create_info.finalize_atomic_replace(thd, orig_table);
+      if (res)
+        do_logging= false;
+    }
   }
-
 
   if (do_logging)
   {
