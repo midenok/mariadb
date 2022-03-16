@@ -5706,10 +5706,20 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
   if (thd->is_current_stmt_binlog_format_row() || force_generated_create)
   {
     /*
-       Since temporary tables are not replicated under row-based
-       replication, CREATE TABLE ... LIKE ... needs special
-       treatement.  We have some cases to consider, according to the
-       following decision table:
+      The logging for CREATE .. LIKE is a bit different from normal
+      create as we want in statement-based logging use the original statement.
+
+      Generated statement means the CREATE TABLE statement without LIKE. Same
+      thing we do with CREATE .. SELECT in row based logging. It is needed to
+      get replication working if the original table didn't exists.
+
+      However as an engine can change a table definition, it is probly better to
+      use CREATE TABLE instead of LIKE to ensure the table definition will be
+      same on both side. (This is just a guess).
+
+      Since temporary tables are not replicated under row-based replication,
+      CREATE TABLE .. LIKE needs special treatment.  We have some cases to
+      consider, according to the following decision table:
 
            ==== ========= ========= ==============================
            Case    Target    Source Write to binary log
@@ -5722,14 +5732,6 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
            5       any       shared Generated statement if the table
                                     was created if engine changed
            ==== ========= ========= ==============================
-
-        TODO: why this is in a separate branch? All logging should be done in
-       single branch (if (do_logging)), possibly moved out to a separate
-       function. Along with backup logging, XID update, etc. This branch is not
-       properly tested now, AFAICS this is tested only by
-       rpl.create_or_replace2.
-
-        Why "generated statement" is needed? No explanation in this comment...
     */
     if (!(create_info->tmp_table()) || force_generated_create)
     {
