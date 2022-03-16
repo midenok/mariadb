@@ -4722,16 +4722,20 @@ int create_table_impl(THD *thd,
                                                        MDL_EXCLUSIVE));
           }
 
-          backup_log_info *d= &create_info->drop_entry;
-          d->query= { C_STRING_WITH_LEN("DROP") };
-          if ((d->org_partitioned= (partition_engine_name.str != 0)))
-            d->org_storage_engine_name= partition_engine_name;
+          /*
+            Prepare DROP entry for backup log. It will be logged before logging
+            the CREATE entry when the command succeeds.
+          */
+          backup_log_info *drop_entry= &create_info->drop_entry;
+          drop_entry->query= { C_STRING_WITH_LEN("DROP") };
+          if ((drop_entry->org_partitioned= (partition_engine_name.str != 0)))
+            drop_entry->org_storage_engine_name= partition_engine_name;
           else
-            lex_string_set(&d->org_storage_engine_name,
+            lex_string_set(&drop_entry->org_storage_engine_name,
                            ha_resolve_storage_engine_name(db_type));
-          d->org_database=     orig_db;
-          d->org_table=        orig_table_name;
-          d->org_table_id=     create_info->org_tabledef_version;
+          drop_entry->org_database=     orig_db;
+          drop_entry->org_table=        orig_table_name;
+          drop_entry->org_table_id=     create_info->org_tabledef_version;
 
           DBUG_EXECUTE_IF("send_kill_after_delete", thd->set_killed(KILL_QUERY););
         }
@@ -5648,12 +5652,9 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
     local_create_info.pos_in_locked_tables= pos_in_locked_tables;
   }
 
-  if (atomic_replace)
-  {
-    if (local_create_info.make_tmp_table_list(thd, &table, &create_table_mode))
-      goto err;
-    table->mdl_request.duration= MDL_EXPLICIT;
-  }
+  if (atomic_replace &&
+      local_create_info.make_tmp_table_list(thd, &table, &create_table_mode))
+    goto err;
 
   res= ((create_res=
          mysql_create_table_no_lock(thd,
@@ -5667,6 +5668,20 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
   do_logging= thd->log_current_statement;
   if (res)
     goto err;
+
+  /*
+    Ensure that we have an exclusive lock on target table if we are creating
+    non-temporary table. We don't have or need the lock if the create failed
+    because of existing table when using "if exists".
+  */
+  DBUG_ASSERT((thd->locked_tables_mode && pos_in_locked_tables &&
+              create_info->or_replace()) || atomic_replace ||
+              (create_info->tmp_table()) || create_res < 0 ||
+              thd->mdl_context.is_lock_owner(MDL_key::TABLE, table->db.str,
+                                              table->table_name.str,
+                                              MDL_EXCLUSIVE) ||
+              (thd->locked_tables_mode && pos_in_locked_tables &&
+                create_info->if_not_exists()));
 
   DEBUG_SYNC(thd, "create_table_like_before_binlog");
 
@@ -5748,11 +5763,11 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
           if (atomic_replace)
           {
             /*
-               NOTE: We acquire lock for temporary table just to make
+               NOTE: We acquire explicit lock for temporary table just to make
                close_thread_table() happy. We open it like a normal table
                because it's too complex to open it like tmp_table here.
             */
-
+            table->mdl_request.duration= MDL_EXPLICIT;
             if (thd->mdl_context.acquire_lock(&table->mdl_request,
                                             thd->variables.lock_wait_timeout))
             {
@@ -5877,22 +5892,6 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
       }
     }
     do_logging= TRUE;
-  }
-
-  if (!(thd->locked_tables_mode && pos_in_locked_tables &&
-        create_info->or_replace()))
-  {
-    /*
-      Ensure that we have an exclusive lock on target table if we are creating
-      non-temporary table. We don't have or need the lock if the create failed
-      because of existing table when using "if exists".
-    */
-    DBUG_ASSERT((create_info->tmp_table()) || create_res < 0 ||
-                thd->mdl_context.is_lock_owner(MDL_key::TABLE, orig_table->db.str,
-                                               orig_table->table_name.str,
-                                               MDL_EXCLUSIVE) ||
-                (thd->locked_tables_mode && pos_in_locked_tables &&
-                 create_info->if_not_exists()));
   }
 
 err:

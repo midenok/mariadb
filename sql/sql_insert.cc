@@ -5294,6 +5294,10 @@ bool select_create::send_eof()
     ddl_log.org_database=   table_list->db;
     ddl_log.org_table=      table_list->table_name;
     ddl_log.org_table_id=   create_info->tabledef_version;
+    /*
+      Since atomic replace doesn't do mysql_rm_table_no_locks() we have
+      to log DROP entry now. It was already prepared in create_table_impl().
+    */
     if (create_info->drop_entry.query.length)
     {
       DBUG_ASSERT(atomic_replace);
