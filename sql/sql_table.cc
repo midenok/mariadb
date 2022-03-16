@@ -5814,16 +5814,18 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
           /*
             As the reference table is temporary and may not exist on slave, we
             must force the ENGINE to be present into CREATE TABLE.
-
-            Note: to keep WITH_DB_NAME logic we force name only in case of
-            atomic_replace.
           */
           create_info->used_fields|= HA_CREATE_USED_ENGINE;
 
+          const LEX_CSTRING *const db=
+            table->schema_table ? &INFORMATION_SCHEMA_NAME : &orig_table->db;
+          const char *force_db= NULL;
+          if (!thd->db.str || cmp(db, &thd->db))
+            force_db= db->str;
+
           int result __attribute__((unused))=
-            show_create_table_ex(thd, table, NULL,
-                                 (atomic_replace ? orig_table->table_name.str :
-                                                   NULL),
+            show_create_table_ex(thd, table,
+                                 force_db, orig_table->table_name.str,
                                  &query, create_info, WITH_DB_NAME);
 
           DBUG_ASSERT(result == 0); // show_create_table() always return 0
