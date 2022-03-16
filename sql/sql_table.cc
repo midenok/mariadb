@@ -5817,19 +5817,9 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
           */
           create_info->used_fields|= HA_CREATE_USED_ENGINE;
 
-          if (atomic_replace)
-          {
-            DBUG_ASSERT(!table->schema_table);
-            table->table->s->table_name.str=
-                strmake_root(&table->table->s->mem_root,
-                             LEX_STRING_WITH_LEN(orig_table->table_name));
-            table->table->s->table_name.length= orig_table->table_name.length;
-            table->table->alias.copy(LEX_STRING_WITH_LEN(orig_table->alias),
-                                     system_charset_info);
-          }
-
           int result __attribute__((unused))=
-            show_create_table(thd, table, &query, create_info, WITH_DB_NAME);
+            show_create_table_ex(thd, table, NULL, orig_table->table_name.str,
+                                 &query, create_info, WITH_DB_NAME);
 
           DBUG_ASSERT(result == 0); // show_create_table() always return 0
           do_logging= FALSE;
