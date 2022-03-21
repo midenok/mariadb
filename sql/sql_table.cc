@@ -1209,16 +1209,20 @@ bool make_tmp_name(THD *thd, const char *prefix, const Table_name *orig,
                    Table_name *res)
 {
   char res_name[NAME_LEN + 1];
-  char file_name[FN_REFLEN];
+  char file_name[NAME_LEN + 1];
   LEX_CSTRING table_name;
 
-  (void) tablename_to_filename(orig->table_name.str, file_name,
-                               sizeof(file_name));
   size_t len= my_snprintf(res_name, sizeof(res_name) - 1,
-                          tmp_file_prefix "-%s-%lx-%llx-%s", prefix,
-                          current_pid, thd->thread_id, file_name);
+                          tmp_file_prefix "-%s-%lx-%llx-", prefix,
+                          current_pid, thd->thread_id);
 
-  res_name[NAME_LEN]= 0;
+  uint len2= tablename_to_filename(orig->table_name.str, file_name,
+                                   sizeof(res_name) - len - 1);
+
+  DBUG_ASSERT(len + len2 < sizeof(res_name) - 1);
+  memcpy(res_name + len, file_name, len2 + 1);
+  len+= len2;
+
   table_name.str= strmake_root(thd->mem_root, res_name, len);
   if (!table_name.str)
   {
@@ -4559,7 +4563,7 @@ int create_table_impl(THD *thd,
   handler	*file= 0;
   int		error= 1;
   bool          frm_only= (create_table_mode & C_ALTER_TABLE_FRM_ONLY);
-  bool          atomic_replace= create_info->tmp_name.is_set();
+  bool          atomic_replace= create_info->is_atomic_replace();
   bool          internal_tmp_table= (!atomic_replace &&
                                      (create_table_mode & C_ALTER_TABLE)) ||
                                     frm_only;

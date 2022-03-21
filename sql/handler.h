@@ -2350,7 +2350,7 @@ struct Atomic_info
 
   bool is_atomic_replace() const
   {
-    return tmp_name.table_name.str != NULL;
+    return tmp_name.is_set();
   }
 };
 

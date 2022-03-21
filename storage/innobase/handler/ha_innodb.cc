@@ -12209,7 +12209,7 @@ create_table_info_t::create_foreign_keys()
 		dict_table_t* table_to_alter;
 		mem_heap_t*   heap = mem_heap_create(10000);
 		ulint	      highest_id_so_far;
-		DBUG_ASSERT(!m_create_info->tmp_name.is_set());
+		DBUG_ASSERT(!m_create_info->is_atomic_replace());
 		char*	      n = dict_get_referenced_table(
 			name, LEX_STRING_WITH_LEN(m_form->s->db),
 			LEX_STRING_WITH_LEN(m_form->s->table_name),
@@ -12407,7 +12407,7 @@ create_table_info_t::create_foreign_keys()
 		ref_table is temporary too. We must skip charset conversion
 		in that case. */
 		tmp_ref_table = !strcmp(basename, fk->ref_table.str)
-			? (m_create_info->tmp_name.is_set()) : false;
+			? m_create_info->is_atomic_replace() : false;
 
 		foreign->referenced_table_name = dict_get_referenced_table(
 			name, LEX_STRING_WITH_LEN(fk->ref_db),
