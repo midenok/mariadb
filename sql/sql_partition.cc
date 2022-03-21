@@ -7000,7 +7000,7 @@ static void handle_alter_part_error(ALTER_PARTITION_PARAM_TYPE *lpt,
                                     bool action_completed,
                                     bool drop_partition,
                                     bool frm_install,
-                                    bool reopen= true)
+                                    bool reopen)
 {
   THD *thd= lpt->thd;
   partition_info *part_info= lpt->part_info->get_clone(thd);
@@ -7479,7 +7479,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
                         thd->query(), thd->query_length()), FALSE)) ||
         ERROR_INJECT("drop_partition_9"))
     {
-      handle_alter_part_error(lpt, action_completed, TRUE, frm_install);
+      handle_alter_part_error(lpt, action_completed, TRUE, frm_install, true);
       goto err;
     }
     if (alter_partition_lock_handling(lpt))
@@ -7642,7 +7642,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
                         thd->query(), thd->query_length()), FALSE)) ||
         ERROR_INJECT("add_partition_10"))
     {
-      handle_alter_part_error(lpt, action_completed, FALSE, frm_install);
+      handle_alter_part_error(lpt, action_completed, FALSE, frm_install, true);
       goto err;
     }
     if (alter_partition_lock_handling(lpt))
@@ -7735,7 +7735,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
                         thd->query(), thd->query_length()), FALSE)) ||
         ERROR_INJECT("change_partition_12"))
     {
-      handle_alter_part_error(lpt, action_completed, FALSE, frm_install);
+      handle_alter_part_error(lpt, action_completed, FALSE, frm_install, true);
       goto err;
     }
     if (alter_partition_lock_handling(lpt))
