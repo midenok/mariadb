@@ -4310,9 +4310,13 @@ bool select_insert::binlog_query()
     res= thd->binlog_query(THD::ROW_QUERY_TYPE,
                            thd->query(), thd->query_length(),
                            trans_table, FALSE, FALSE, errcode);
-    thd->binlog_xid= 0;
+    /*
+      NOTE: binlog_xid must be cleared after commit because pending row events
+            are written at commit phase.
+    */
     if (res > 0)
     {
+      thd->binlog_xid= 0;
       if (table)
         table->file->ha_release_auto_increment();
       DBUG_RETURN(true);
