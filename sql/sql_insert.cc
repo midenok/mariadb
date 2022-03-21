@@ -3844,7 +3844,7 @@ select_insert::select_insert(THD *thd_arg, TABLE_LIST *table_list_par,
   info.update_values= update_values;
   info.view= (table_list_par->view ? table_list_par : 0);
   info.table_list= table_list_par;
-  tmp_table= table ? table->s->tmp_table : false;
+  tmp_table= table ? table->s->tmp_table != NO_TMP_TABLE : false;
 }
 
 
@@ -4230,21 +4230,13 @@ bool select_insert::prepare_eof()
        (flush row events is done at commit), so we cannot do it here.
        Test: rpl.create_or_replace_row
     */
-    const bool autocommit= !(thd->variables.option_bits &
-                             OPTION_NOT_AUTOCOMMIT);
-    if (autocommit)
-      thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
+    ulonglong save_options_bits= thd->variables.option_bits;
+    thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
+    int lock_error= table->file->ha_external_lock(thd, F_UNLCK);
+    thd->variables.option_bits= save_options_bits;
 
-    if (table->file->ha_external_lock(thd, F_UNLCK))
-    {
-      if (autocommit)
-        thd->variables.option_bits&= ~OPTION_NOT_AUTOCOMMIT;
-      /* purecov: inspected */
-      DBUG_RETURN(true);
-    }
-
-    if (autocommit)
-      thd->variables.option_bits&= ~OPTION_NOT_AUTOCOMMIT;
+    if (lock_error)
+      DBUG_RETURN(true); /* purecov: inspected */
   }
 
   if (likely((changed= (info.copied || info.deleted || info.updated))))
@@ -4318,6 +4310,7 @@ bool select_insert::binlog_query()
     res= thd->binlog_query(THD::ROW_QUERY_TYPE,
                            thd->query(), thd->query_length(),
                            trans_table, FALSE, FALSE, errcode);
+    thd->binlog_xid= 0;
     if (res > 0)
     {
       if (table)
