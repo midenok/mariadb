@@ -3031,6 +3031,8 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
         update the foreign key table name to the used (temporary) table name.
       */
       if (create_info->tmp_name.is_set() &&
+          (!fk_key->ref_db.str ||
+           !lex_string_cmp(table_alias_charset, &db, &fk_key->ref_db)) &&
           !lex_string_cmp(table_alias_charset, &table_name,
                           &fk_key->ref_table))
       {
