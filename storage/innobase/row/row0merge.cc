@@ -2199,7 +2199,8 @@ end_of_index:
 		}
 
 		/* Get the next Doc ID */
-		if (add_doc_id && !history_row) {
+		if (add_doc_id) {
+			ut_ad(!history_row);
 			doc_id++;
 		} else {
 			doc_id = 0;
