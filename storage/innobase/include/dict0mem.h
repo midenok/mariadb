@@ -1211,9 +1211,6 @@ struct dict_index_t{
     return 0;
   }
 
-  /* @return TRX_ID for inserted secondary index row */
-  trx_id_t sec_rec_get_trx_id(const rec_t *rec);
-
 #ifdef BTR_CUR_HASH_ADAPT
   /** @return a clone of this */
   dict_index_t* clone() const;
