@@ -28,6 +28,10 @@ let $basic_stage= insert_1;
 let $restart_bindir=;
 --source include/restart_mysqld.inc
 
+--error ER_INDEX_CORRUPT
+SELECT * FROM articles WHERE MATCH (title,body)
+AGAINST ('Database' IN NATURAL LANGUAGE MODE);
+
 call mtr.add_suppression("test/articles contains 3 indexes inside InnoDB");
 alter table articles force;
 flush tables;
