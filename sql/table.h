@@ -888,6 +888,8 @@ struct TABLE_SHARE
   /** Instrumentation for this table share. */
   PSI_table_share *m_psi;
 
+  bool rolled_back;
+
   inline void reset() { bzero((void*)this, sizeof(*this)); }
 
   /*
@@ -1082,6 +1084,10 @@ struct TABLE_SHARE
 
   /* frees the memory allocated in read_frm_image */
   void free_frm_image(const uchar *frm);
+  void rollback()
+  {
+    rolled_back= true;
+  }
 };
 
 

@@ -21961,3 +21961,25 @@ buf_pool_size_align(
     return (ulint)((size / m + 1) * m);
   }
 }
+
+
+void dict_table_t::rollback(trx_t *trx)
+{
+  TABLE_SHARE *s;
+  TABLE_LIST table_list;
+  char db_buf[NAME_LEN + 1];
+  char tbl_buf[NAME_LEN + 1];
+  LEX_CSTRING db= { db_buf, 0 };
+  LEX_CSTRING table_name= { tbl_buf, 0};
+
+  ut_ad(trx->mysql_thd);
+
+  if (!table_name_parse(name, db_buf, tbl_buf, db.length, table_name.length)) {
+    ut_ad(!"invalid table name");
+  }
+
+  table_list.init_one_table(&db, &table_name, 0, TL_READ);
+  s= tdc_acquire_share(trx->mysql_thd, &table_list, GTS_TABLE);
+  if (s)
+    s->rollback();
+}

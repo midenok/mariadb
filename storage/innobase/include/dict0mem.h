@@ -2126,6 +2126,8 @@ public:
   {
     return versioned() ? 2 : 1;
   }
+
+  void rollback(trx_t *trx);
 };
 
 inline void dict_index_t::set_modified(mtr_t& mtr) const

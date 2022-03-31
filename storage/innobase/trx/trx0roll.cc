@@ -157,6 +157,8 @@ trx_rollback_to_savepoint_low(
 			if (j->second.rollback(limit)) {
 				trx->mod_tables.erase(j);
 			}
+			dict_table_t *table = j->first;
+			table->rollback(trx);
 		}
 		trx->lock.que_state = TRX_QUE_RUNNING;
 		MONITOR_INC(MONITOR_TRX_ROLLBACK_SAVEPOINT);

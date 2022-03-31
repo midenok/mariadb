@@ -996,6 +996,7 @@ void tdc_release_share(TABLE_SHARE *share)
     tdc_delete_share_from_hash(share->tdc);
     DBUG_VOID_RETURN;
   }
+  share->rolled_back= false; // FIXME: is it needed?
   /* Link share last in used_table_share list */
   DBUG_PRINT("info", ("moving share to unused list"));
   DBUG_ASSERT(share->tdc->next == 0);
