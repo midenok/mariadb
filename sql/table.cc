@@ -3080,7 +3080,8 @@ bool TABLE::vcol_fix_expr(THD *thd)
       vcol_refix_list.is_empty())
     return false;
 
-  if (!thd->stmt_arena->is_conventional())
+  if (!thd->stmt_arena->is_conventional() &&
+      vcol_refix_list.head()->expr->fixed)
   {
     /* NOTE: Under trigger we already have fixed expressions */
     return false;
