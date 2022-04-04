@@ -3018,7 +3018,6 @@ class Vcol_expr_context
   LEX *old_lex;
   LEX lex;
   table_map old_map;
-  bool old_want_privilege;
   Security_context *save_security_ctx;
   sql_mode_t save_sql_mode;
 
@@ -3029,7 +3028,6 @@ public:
     table(_table),
     old_lex(thd->lex),
     old_map(table->map),
-    old_want_privilege(table->grant.want_privilege),
     save_security_ctx(thd->security_ctx),
     save_sql_mode(thd->variables.sql_mode) {}
   bool init();
@@ -3051,7 +3049,6 @@ bool Vcol_expr_context::init()
     return true;
   }
 
-//   table->grant.want_privilege= false;
   lex.sql_command= old_lex->sql_command;
   thd->variables.sql_mode= 0;
 
@@ -3069,7 +3066,6 @@ Vcol_expr_context::~Vcol_expr_context()
 {
   if (!inited)
     return;
-  table->grant.want_privilege= old_want_privilege;
   end_lex_with_single_table(thd, table, old_lex);
   table->map= old_map;
   thd->security_ctx= save_security_ctx;
