@@ -1611,7 +1611,6 @@ public:
                                       TABLE *tmp_table,
                                       TMP_TABLE_PARAM *tmp_table_param,
                                       bool with_cleanup);
-  bool vcol_build_refix_list(THD *thd);
   bool vcol_fix_expr(THD *thd);
   bool vcol_cleanup_expr(THD *thd);
   bool vcol_fix_exprs(THD *thd);

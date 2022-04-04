@@ -2988,17 +2988,13 @@ bool Virtual_column_info::fix_expr(THD *thd)
     @note this is done for all vcols for INSERT/UPDATE/DELETE,
     and only as needed for SELECTs.
 */
-bool Virtual_column_info::fix_session_expr(THD *thd, TABLE *table)
+bool Virtual_column_info::fix_session_expr(THD *thd)
 {
   if (!need_refix())
     return false;
 
   DBUG_ASSERT(!expr->fixed);
-  if (expr->walk(&Item::change_context_processor, 0, thd->lex->current_context()))
-    return true;
   if (fix_expr(thd))
-    return true;
-  if (expr->walk(&Item::change_context_processor, 0, NULL))
     return true;
   return false;
 }
@@ -3055,7 +3051,7 @@ bool Vcol_expr_context::init()
     return true;
   }
 
-  table->grant.want_privilege= false;
+//   table->grant.want_privilege= false;
   lex.sql_command= old_lex->sql_command;
   thd->variables.sql_mode= 0;
 
@@ -3085,24 +3081,6 @@ Vcol_expr_context::~Vcol_expr_context()
 }
 
 
-bool TABLE::vcol_build_refix_list(THD *thd)
-{
-  for (Field **vf= vfield; vf && *vf; vf++)
-    if (vcol_refix_list.push_back((*vf)->vcol_info, &mem_root))
-      return true;
-
-  for (Field **df= default_field; df && *df; df++)
-    if ((*df)->default_value &&
-        vcol_refix_list.push_back((*df)->default_value, &mem_root))
-      return true;
-
-  for (Virtual_column_info **cc= check_constraints; cc && *cc; cc++)
-    if (vcol_refix_list.push_back(*cc, &mem_root))
-      return true;
-  return false;
-}
-
-
 bool TABLE::vcol_fix_expr(THD *thd)
 {
   DBUG_ASSERT(pos_in_table_list || s->tmp_table);
@@ -3122,7 +3100,7 @@ bool TABLE::vcol_fix_expr(THD *thd)
 
   List_iterator_fast<Virtual_column_info> it(vcol_refix_list);
   while (Virtual_column_info *vcol= it++)
-    if (vcol->fix_session_expr(thd, this))
+    if (vcol->fix_session_expr(thd))
       goto error;
 
   return false;
@@ -3228,7 +3206,10 @@ bool Virtual_column_info::fix_and_check_expr(THD *thd, TABLE *table)
   flags= res.errors;
 
   if (need_refix())
+  {
     cleanup_session_expr();
+    table->vcol_refix_list.push_back(this, &table->mem_root);
+  }
 
   DBUG_RETURN(0);
 }
@@ -3311,8 +3292,6 @@ unpack_vcol_info_from_frm(THD *thd, TABLE *table,
   {
     *vcol_ptr= vcol_info= vcol_storage.vcol_info;   // Expression ok
     DBUG_ASSERT(vcol_info->expr);
-    if (vcol_info->need_refix())
-      table->vcol_refix_list.push_back(vcol_info, &table->mem_root);
     goto end;
   }
   *error_reported= TRUE;

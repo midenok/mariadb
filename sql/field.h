@@ -621,7 +621,7 @@ public:
     return flags & (VCOL_TIME_FUNC|VCOL_SESSION_FUNC);
   }
   bool fix_expr(THD *thd);
-  bool fix_session_expr(THD *thd, TABLE *table);
+  bool fix_session_expr(THD *thd);
   bool cleanup_session_expr();
   bool fix_and_check_expr(THD *thd, TABLE *table);
   inline bool is_equal(const Virtual_column_info* vcol) const;
