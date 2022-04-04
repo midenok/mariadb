@@ -3055,14 +3055,10 @@ bool Vcol_expr_context::init()
   lex.sql_command= old_lex->sql_command;
   thd->variables.sql_mode= 0;
 
-  /*
-     NOTE: we refix also tmp tables used in ALTER TABLE,
-     they have (pos_in_table_list == NULL).
-  */
   TABLE_LIST const *tl= table->pos_in_table_list;
-  DBUG_ASSERT(tl || table->s->tmp_table);
+  DBUG_ASSERT(table->pos_in_table_list);
 
-  if (tl && tl->security_ctx)
+  if (table->pos_in_table_list->security_ctx)
     thd->security_ctx= tl->security_ctx;
 
   inited= true;
@@ -3205,7 +3201,7 @@ bool Virtual_column_info::fix_and_check_expr(THD *thd, TABLE *table)
   }
   flags= res.errors;
 
-  if (need_refix())
+  if (!table->s->tmp_table && need_refix())
   {
     cleanup_session_expr();
     table->vcol_refix_list.push_back(this, &table->mem_root);
