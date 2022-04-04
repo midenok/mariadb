@@ -618,7 +618,7 @@ public:
   }
   bool need_refix() const
   {
-    return flags & (VCOL_TIME_FUNC|VCOL_SESSION_FUNC);
+    return flags & VCOL_SESSION_FUNC;
   }
   bool fix_expr(THD *thd);
   bool fix_session_expr(THD *thd);
