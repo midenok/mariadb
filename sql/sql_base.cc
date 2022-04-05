@@ -1614,6 +1614,7 @@ bool open_table(THD *thd, TABLE_LIST *table_list, Open_table_context *ot_ctx)
   MDL_ticket *mdl_ticket;
   TABLE_SHARE *share;
   uint gts_flags;
+  bool from_share= false;
 #ifdef WITH_PARTITION_STORAGE_ENGINE
   int part_names_error=0;
 #endif
@@ -2025,6 +2026,7 @@ retry_share:
 
     /* Add table to the share's used tables list. */
     tc_add_table(thd, table);
+    from_share= true;
   }
 
   table->mdl_ticket= mdl_ticket;
@@ -2044,7 +2046,7 @@ retry_share:
   table_list->updatable= 1; // It is not derived table nor non-updatable VIEW
   table_list->table= table;
 
-  if (table->vcol_fix_expr(thd))
+  if (!from_share && table->vcol_fix_expr(thd))
     goto err_lock;
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE

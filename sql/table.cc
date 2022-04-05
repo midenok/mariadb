@@ -3075,9 +3075,7 @@ Vcol_expr_context::~Vcol_expr_context()
 
 bool TABLE::vcol_fix_expr(THD *thd)
 {
-  DBUG_ASSERT(pos_in_table_list || s->tmp_table);
-  if ((pos_in_table_list && pos_in_table_list->placeholder()) ||
-      vcol_refix_list.is_empty())
+  if (pos_in_table_list->placeholder() || vcol_refix_list.is_empty())
     return false;
 
   if (!thd->stmt_arena->is_conventional() &&
@@ -3199,10 +3197,7 @@ bool Virtual_column_info::fix_and_check_expr(THD *thd, TABLE *table)
   flags= res.errors;
 
   if (!table->s->tmp_table && need_refix())
-  {
-    cleanup_session_expr();
     table->vcol_refix_list.push_back(this, &table->mem_root);
-  }
 
   DBUG_RETURN(0);
 }
