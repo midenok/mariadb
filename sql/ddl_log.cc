@@ -1295,7 +1295,8 @@ static void rename_in_stat_tables(THD *thd, DDL_LOG_ENTRY *ddl_log_entry,
 */
 
 static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
-                                  DDL_LOG_ENTRY *ddl_log_entry)
+                                  DDL_LOG_ENTRY *ddl_log_entry,
+                                  bool report_error)
 {
   LEX_CSTRING handler_name;
   handler *file= NULL;
@@ -1328,7 +1329,8 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     DBUG_RETURN(FALSE);
 
   handler_name=    ddl_log_entry->handler_name;
-  thd->push_internal_handler(&no_such_table_handler);
+  if (!report_error)
+    thd->push_internal_handler(&no_such_table_handler);
 
   if (!strcmp(ddl_log_entry->handler_name.str, reg_ext))
     frm_action= TRUE;
@@ -2342,11 +2344,28 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   }
 
 end:
+  if (report_error)
+  {
+    if (error && file)
+    {
+      TABLE_SHARE share;
+      bzero(&share, sizeof(share));
+      share.db=               ddl_log_entry->db;
+      share.table_name=       ddl_log_entry->name;
+      share.normalized_path=  ddl_log_entry->tmp_name;
+      /* TODO: make TABLE_SHARE-independent handler::print_error()? */
+      file->change_table_ptr(NULL, &share);
+      file->print_error(error, MYF(0));
+    }
+  }
+  else
+  {
+    /* We are only interested in errors that where not ignored */
+    if ((error= (no_such_table_handler.unhandled_errors > 0)))
+      my_errno= no_such_table_handler.first_error;
+    thd->pop_internal_handler();
+  }
   delete file;
-  /* We are only interested in errors that where not ignored */
-  if ((error= (no_such_table_handler.unhandled_errors > 0)))
-    my_errno= no_such_table_handler.first_error;
-  thd->pop_internal_handler();
   DBUG_RETURN(error);
 }
 
@@ -2441,11 +2460,13 @@ void ddl_log_release_memory_entry(DDL_LOG_MEMORY_ENTRY *log_entry)
     @retval FALSE              Success
 */
 
-static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry)
+static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry,
+                                          bool report_error)
 {
   DDL_LOG_ENTRY ddl_log_entry;
   uint read_entry= first_entry;
   MEM_ROOT mem_root;
+  bool result= false;
   DBUG_ENTER("ddl_log_execute_entry_no_lock");
 
   mysql_mutex_assert_owner(&LOCK_gdl);
@@ -2461,24 +2482,28 @@ static bool ddl_log_execute_entry_no_lock(THD *thd, uint first_entry)
     DBUG_ASSERT(ddl_log_entry.entry_type == DDL_LOG_ENTRY_CODE ||
                 ddl_log_entry.entry_type == DDL_LOG_IGNORE_ENTRY_CODE);
 
-    if (ddl_log_execute_action(thd, &mem_root, &ddl_log_entry))
+    if (ddl_log_execute_action(thd, &mem_root, &ddl_log_entry, report_error))
     {
       uint action_type= ddl_log_entry.action_type;
       if (action_type >= DDL_LOG_LAST_ACTION)
         action_type= 0;
 
-      /* Write to error log and continue with next log entry */
-      sql_print_error("DDL_LOG: Got error %d when trying to execute action "
-                      "for entry %u of type '%s'",
-                      (int) my_errno, read_entry,
-                      ddl_log_action_name[action_type]);
+      if (!report_error)
+      {
+        /* Write to error log and continue with next log entry */
+        sql_print_error("DDL_LOG: Got error %d when trying to execute action "
+                        "for entry %u of type '%s'",
+                        (int) my_errno, read_entry,
+                        ddl_log_action_name[action_type]);
+      }
+      result= true;
       break;
     }
     read_entry= ddl_log_entry.next_entry;
   } while (read_entry);
 
   free_root(&mem_root, MYF(0));
-  DBUG_RETURN(FALSE);
+  DBUG_RETURN(result);
 }
 
 
@@ -2684,7 +2709,7 @@ bool ddl_log_execute_entry(THD *thd, uint first_entry)
   DBUG_ENTER("ddl_log_execute_entry");
 
   mysql_mutex_lock(&LOCK_gdl);
-  error= ddl_log_execute_entry_no_lock(thd, first_entry);
+  error= ddl_log_execute_entry_no_lock(thd, first_entry, false);
   mysql_mutex_unlock(&LOCK_gdl);
   DBUG_RETURN(error);
 }
