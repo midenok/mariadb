@@ -7631,6 +7631,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
        FIXME: what happens when cleanup_chain then part_info chain are executed?
     */
 
+    ddl_log_link_chains(part_info, &cleanup_chain);
+
     if (write_log_drop_frm(lpt, &cleanup_chain, false) ||
         ERROR_INJECT("drop_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
@@ -7650,20 +7652,18 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
            (thd->binlog_xid= 0))))
     {
       ddl_log_complete(lpt->part_info);
-      // FIXME: DDL_LOG_ERR_WARN
-      (void) ddl_log_revert(thd, &cleanup_chain);
+      (void) ddl_log_revert(thd, &cleanup_chain, DDL_LOG_ERR_WARN);
       (void) alter_partition_lock_handling(lpt);
       goto err;
     }
 
     if (ERROR_INJECT("drop_partition_7"))
       res= true;
-    // FIXME: remove
+    res|= ddl_log_revert(thd, lpt->part_info, DDL_LOG_ERR_ROLLBACK);
     if (ERROR_INJECT("drop_partition_8"))
       res= true;
-    res|= ddl_log_revert(thd, lpt->part_info, DDL_LOG_ERR_ROLLBACK);
     if (res)
-      res|= ddl_log_revert(thd, &cleanup_chain, DDL_LOG_ERR_REPORT);
+      (void) ddl_log_revert(thd, &cleanup_chain, DDL_LOG_ERR_WARN);
     else
       ddl_log_complete(&cleanup_chain);
 
