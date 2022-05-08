@@ -14,7 +14,11 @@ partition by range(x) (
   
 write_file $MYSQLD_DATADIR/test/t1#P#p3#TMP#.ibd;
 EOF
-    
+
+
+--list_files $MYSQLD_DATADIR/test t*
+--list_files $MYSQLD_DATADIR/test *sql*
+
 --error ER_GET_ERRNO
 alter table t1 drop partition p3, p4, p5;
 
