@@ -7617,11 +7617,11 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   }
   else if (alter_info->partition_flags & ALTER_PARTITION_DROP)
   {
-    DDL_LOG_STATE cleanup_chain;
+    DDL_LOG_STATE rollback_chain;
     bool res= false;
-    bzero(&cleanup_chain, sizeof(cleanup_chain));
+    bzero(&rollback_chain, sizeof(rollback_chain));
     // FIXME: remove cleanup_chain argument
-    lpt->rollback_chain= &cleanup_chain;
+    lpt->rollback_chain= &rollback_chain;
 
     /*
        part_info chain contains roll forward actions,
@@ -7631,45 +7631,50 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
        FIXME: what happens when cleanup_chain then part_info chain are executed?
     */
 
-    ddl_log_link_chains(part_info, &cleanup_chain);
-
-    if (write_log_drop_frm(lpt, &cleanup_chain, false) ||
+    if (write_log_drop_frm(lpt, &rollback_chain, false) ||
         ERROR_INJECT("drop_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
         ERROR_INJECT("drop_partition_2") ||
         wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
         ERROR_INJECT("drop_partition_3") ||
-        write_log_drop_partition(lpt, &cleanup_chain) ||
+        write_log_drop_partition(lpt, &rollback_chain) ||
         ERROR_INJECT("drop_partition_4") ||
         alter_close_table(lpt) ||
         ERROR_INJECT("drop_partition_5") ||
         log_partition_alter_to_ddl_log(lpt) ||
-        ERROR_INJECT("drop_partition_6") ||
-        ((!thd->lex->no_write_to_binlog) &&
-          ((thd->binlog_xid= thd->query_id),
-           ddl_log_update_xid(&cleanup_chain, thd->binlog_xid),
-           write_bin_log(thd, false, thd->query(), thd->query_length()),
-           (thd->binlog_xid= 0))))
+        ERROR_INJECT("drop_partition_6"))
     {
       ddl_log_complete(lpt->part_info);
-      (void) ddl_log_revert(thd, &cleanup_chain, DDL_LOG_ERR_WARN);
+      (void) ddl_log_revert(thd, &rollback_chain, DDL_LOG_ERR_WARN);
       (void) alter_partition_lock_handling(lpt);
       goto err;
     }
 
-    if (ERROR_INJECT("drop_partition_7"))
-      res= true;
-    res|= ddl_log_revert(thd, lpt->part_info, DDL_LOG_ERR_ROLLBACK);
-    if (ERROR_INJECT("drop_partition_8"))
-      res= true;
+    // FIXME: link them at first write_execute_entry()
+    ddl_log_link_chains(part_info, &rollback_chain);
+
+    res= ERROR_INJECT("drop_partition_7") ||
+          ddl_log_revert(thd, lpt->part_info, DDL_LOG_ERR_ROLLBACK);
+
+    if (!res && !thd->lex->no_write_to_binlog)
+    {
+      thd->binlog_xid= thd->query_id;
+      ddl_log_update_xid(&rollback_chain, thd->binlog_xid),
+      // FIXME: generate binlog output in test
+      res= ERROR_INJECT("drop_partition_8") ||
+           write_bin_log(thd, false, thd->query(), thd->query_length());
+      thd->binlog_xid= 0;
+    }
+
+    ERROR_INJECT("drop_partition_9");
     if (res)
-      (void) ddl_log_revert(thd, &cleanup_chain, DDL_LOG_ERR_WARN);
+      (void) ddl_log_revert(thd, &rollback_chain, DDL_LOG_ERR_WARN);
     else
-      ddl_log_complete(&cleanup_chain);
+      ddl_log_complete(&rollback_chain);
 
     if (alter_partition_lock_handling(lpt) ||
         res ||
-        ERROR_INJECT("drop_partition_9"))
+        ERROR_INJECT("drop_partition_10"))
       goto err;
   }
   else if (alter_info->partition_flags & ALTER_PARTITION_CONVERT_OUT)
