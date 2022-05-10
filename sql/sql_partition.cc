@@ -6623,10 +6623,9 @@ public:
       DBUG_ASSERT(!part_info->num_subparts);
       handler **files= ((ha_partition *)(table->file))->get_child_handlers();
       handler *file= files[part_elem->id];
-      char to_path[FN_REFLEN+1], from_path[FN_REFLEN+1];
-      ha_err= rename_table(file, &table->s->db, &ddl_log_entry.from_name,
-                           &table->s->db, &ddl_log_entry.name,
-                           0, from_path, to_path);
+      ha_err= file->ha_rename_table(ddl_log_entry.from_name.str,
+                                    ddl_log_entry.name.str);
+      DBUG_ASSERT(ha_err == 0); //FIXME: remove
     }
 
     return ha_err ? true : false;
