@@ -6221,6 +6221,7 @@ static bool alter_partition_convert_out(ALTER_PARTITION_PARAM_TYPE *lpt)
     NONE
 */
 
+// FIXME: remove
 static void release_part_info_log_entries(DDL_LOG_MEMORY_ENTRY *log_entry)
 {
   DBUG_ENTER("release_part_info_log_entries");
@@ -6570,6 +6571,7 @@ public:
 
   bool process_partition(partition_element *part_elem)
   {
+    int ha_err= 0;
     if (Alter_partition_action::process_partition(part_elem))
       return true;
 
@@ -6617,9 +6619,17 @@ public:
 
     if (phase == RENAME_TO_BACKUPS)
     {
+      DBUG_ASSERT(table->file->ht->db_type == DB_TYPE_PARTITION_DB);
+      DBUG_ASSERT(!part_info->num_subparts);
+      handler **files= ((ha_partition *)(table->file))->get_child_handlers();
+      handler *file= files[part_elem->id];
+      char to_path[FN_REFLEN+1], from_path[FN_REFLEN+1];
+      ha_err= rename_table(file, &table->s->db, &ddl_log_entry.from_name,
+                           &table->s->db, &ddl_log_entry.name,
+                           0, from_path, to_path);
     }
 
-    return false;
+    return ha_err ? true : false;
   }
 };
 
@@ -6891,12 +6901,11 @@ static bool prepare_drop_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
   mysql_mutex_lock(&LOCK_gdl);
 
   Action_drop act(lpt, path, NULL);
-  act.phase= Action_drop::DROP_BACKUPS;
-  if (act.iterate())
-    return true;
-  act.phase= Action_drop::RENAME_TO_BACKUPS;
-  if (act.iterate())
-    return true;
+  // FIXME:
+//   if (act.iterate(Action_drop::DROP_BACKUPS))
+//     goto error;
+  if (act.iterate(Action_drop::RENAME_TO_BACKUPS))
+    goto error;
 
   if (ddl_log_delete_frm(part_info, (const char*) bak_path))
     goto error;
@@ -6914,7 +6923,7 @@ static bool prepare_drop_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
   return false;
 
 error:
-  release_part_info_log_entries(part_info->list);
+//   release_part_info_log_entries(part_info->list);
   mysql_mutex_unlock(&LOCK_gdl);
   my_error(ER_DDL_LOG_ERROR, MYF(0));
   return true;
@@ -7656,6 +7665,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("drop_partition_3") ||
         alter_close_table(lpt) ||
         ERROR_INJECT("drop_partition_4") ||
+        // FIXME: test drop partition with subpartitions, drop subpartition
         prepare_drop_partitions(lpt, &rollback_chain) ||
         ERROR_INJECT("drop_partition_5") ||
         log_partition_alter_to_ddl_log(lpt) ||

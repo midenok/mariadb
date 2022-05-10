@@ -875,6 +875,7 @@ create_error:
     drop (each partition has a state attached to it)
 */
 
+// FIXME: remove? Including ha_drop_partitions() and mysql_drop_partitions()?
 int ha_partition::drop_partitions(const char *path)
 {
   List_iterator<partition_element> part_it(m_part_info->partitions);
