@@ -1104,18 +1104,16 @@ static handler *create_handler(THD *thd, MEM_ROOT *mem_root,
 
 
 /*
-  Rename a table and its .frm file for a ddl_log_entry
+  Rename a table and its .frm file
 
   We first rename the table and then the .frm file as some engines,
   like connect, needs the .frm file to exists to be able to do an rename.
 */
 
-static int execute_rename_table(DDL_LOG_ENTRY *ddl_log_entry, handler *file,
-                                const LEX_CSTRING *from_db,
-                                const LEX_CSTRING *from_table,
-                                const LEX_CSTRING *to_db,
-                                const LEX_CSTRING *to_table, uint flags,
-                                char *from_path, char *to_path)
+int rename_table(handler *file, const LEX_CSTRING *from_db,
+                 const LEX_CSTRING *from_table,
+                 const LEX_CSTRING *to_db, const LEX_CSTRING *to_table,
+                 uint flags, char *from_path, char *to_path)
 {
   uint to_length=0, fr_length=0;
   int error;
@@ -1555,11 +1553,10 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
     /* fall through */
     case DDL_RENAME_PHASE_TABLE:
       /* Restore frm and table to original names */
-      error= execute_rename_table(ddl_log_entry, file,
-                                  &ddl_log_entry->db, &ddl_log_entry->name,
-                                  &ddl_log_entry->from_db,
-                                  &ddl_log_entry->from_name,
-                                  fn_flags, from_path, to_path);
+      error= rename_table(file, &ddl_log_entry->db, &ddl_log_entry->name,
+                          &ddl_log_entry->from_db,
+                          &ddl_log_entry->from_name,
+                          fn_flags, from_path, to_path);
 
       if (ddl_log_entry->flags & DDL_LOG_FLAG_UPDATE_STAT)
       {
@@ -2112,13 +2109,10 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       quick_rm_table(thd, hton, &db, &table, FN_IS_TMP);
       if (!is_renamed)
       {
-        execute_rename_table(ddl_log_entry, file,
-                             &ddl_log_entry->from_db,
-                             &ddl_log_entry->extra_name, // #sql-backup
-                             &ddl_log_entry->from_db,
-                             &ddl_log_entry->from_name,
-                             FN_FROM_IS_TMP,
-                             from_path, to_path);
+        rename_table(file, &ddl_log_entry->from_db,
+                     &ddl_log_entry->extra_name, // #sql-backup
+                     &ddl_log_entry->from_db, &ddl_log_entry->from_name,
+                     FN_FROM_IS_TMP, from_path, to_path);
       }
       (void) update_phase(entry_pos, DDL_LOG_FINAL_PHASE);
       break;
@@ -2205,11 +2199,9 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         /* After the renames above, the original table is now in from_name */
         ddl_log_entry->name= ddl_log_entry->from_name;
         /* Rename db.name -> db.extra_name */
-        execute_rename_table(ddl_log_entry, file,
-                             &ddl_log_entry->db, &ddl_log_entry->name,
-                             &ddl_log_entry->db, &ddl_log_entry->extra_name,
-                             0,
-                             from_path, to_path);
+        rename_table(file, &ddl_log_entry->db, &ddl_log_entry->name,
+                     &ddl_log_entry->db, &ddl_log_entry->extra_name,
+                     0, from_path, to_path);
       }
       (void) update_phase(entry_pos, DDL_ALTER_TABLE_PHASE_UPDATE_TRIGGERS);
       goto update_triggers;
@@ -2256,13 +2248,9 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
       {
         uint length;
         /* Rename new "temporary" table to the original wanted name */
-        execute_rename_table(ddl_log_entry, file,
-                             &ddl_log_entry->db,
-                             &ddl_log_entry->name,
-                             &ddl_log_entry->from_db,
-                             &ddl_log_entry->from_name,
-                             FN_FROM_IS_TMP,
-                             from_path, to_path);
+        rename_table(file, &ddl_log_entry->db, &ddl_log_entry->name,
+                     &ddl_log_entry->from_db, &ddl_log_entry->from_name,
+                     FN_FROM_IS_TMP, from_path, to_path);
 
         /*
           Remove backup (only happens if alter table used without rename).
@@ -2294,11 +2282,9 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
                           MYF(MY_WME|MY_IGNORE_ENOENT));
       }
       else
-        execute_rename_table(ddl_log_entry, file,
-                             &ddl_log_entry->db, &ddl_log_entry->name,
-                             &ddl_log_entry->db, &ddl_log_entry->extra_name,
-                             FN_FROM_IS_TMP,
-                             from_path, to_path);
+        rename_table(file, &ddl_log_entry->db, &ddl_log_entry->name,
+                     &ddl_log_entry->db, &ddl_log_entry->extra_name,
+                     FN_FROM_IS_TMP, from_path, to_path);
       (void) update_phase(entry_pos, DDL_ALTER_TABLE_PHASE_UPDATE_TRIGGERS);
     }
     /* fall through */
@@ -3838,7 +3824,7 @@ bool ddl_log_delete_frm(DDL_LOG_STATE *ddl_state, const char *to_path)
 
 /*
    Link the ddl_log_state to another (master) chain. If the master
-   chain is active during DDL recovery, this event will not be executed.
+   chain is active during DDL recovery, 'state' chain will not be executed.
 
    This is used for DROP TABLE of the original table when
    CREATE OR REPLACE ... is used.

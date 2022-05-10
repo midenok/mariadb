@@ -368,5 +368,9 @@ bool ddl_log_store_query(THD *thd, DDL_LOG_STATE *ddl_log_state,
                          const char *query, size_t length);
 bool ddl_log_delete_frm(DDL_LOG_STATE *ddl_state, const char *to_path);
 void ddl_log_link_chains(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state);
+int rename_table(handler *file, const LEX_CSTRING *from_db,
+                 const LEX_CSTRING *from_table,
+                 const LEX_CSTRING *to_db, const LEX_CSTRING *to_table,
+                 uint flags, char *from_path, char *to_path);
 extern mysql_mutex_t LOCK_gdl;
 #endif /* DDL_LOG_INCLUDED */
