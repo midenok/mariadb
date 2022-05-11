@@ -3,6 +3,7 @@
 let $keep_include_silent= 1;
 let $grep_script= ALTER;
 let $binlog_file=master-bin.000001;
+RESET MASTER;
 
 --eval $create_statement
 --eval $insert_statement
@@ -19,7 +20,7 @@ SELECT * FROM t1;
 --exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --disable_reconnect
 # CR_SERVER_LOST
---error 2013
+--error 0, 2013
 --eval $crash_statement
 
 --echo # $dbug_flag: AFTER crash

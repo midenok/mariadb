@@ -507,8 +507,6 @@ ERROR HY000: Unknown error
 show warnings;
 Level	Code	Message
 Error	1105	Unknown error
-Warning	1932	Table '../test/t1#P#p20#TMP#' doesn't exist in engine
-Warning	1932	Table '../test/t1#P#p10#TMP#' doesn't exist in engine
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -583,8 +581,6 @@ ERROR HY000: Unknown error
 show warnings;
 Level	Code	Message
 Error	1105	Unknown error
-Warning	1932	Table '../test/t1#P#p20#TMP#' doesn't exist in engine
-Warning	1932	Table '../test/t1#P#p10#TMP#' doesn't exist in engine
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -661,8 +657,6 @@ ERROR HY000: Unknown error
 show warnings;
 Level	Code	Message
 Error	1105	Unknown error
-Warning	1932	Table '../test/t1#P#p20#TMP#' doesn't exist in engine
-Warning	1932	Table '../test/t1#P#p10#TMP#' doesn't exist in engine
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -737,8 +731,6 @@ ERROR HY000: Unknown error
 show warnings;
 Level	Code	Message
 Error	1105	Unknown error
-Warning	1932	Table '../test/t1#P#p20#TMP#' doesn't exist in engine
-Warning	1932	Table '../test/t1#P#p10#TMP#' doesn't exist in engine
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -815,8 +807,6 @@ ERROR HY000: Unknown error
 show warnings;
 Level	Code	Message
 Error	1105	Unknown error
-Warning	1932	Table '../test/t1#P#p20#TMP#' doesn't exist in engine
-Warning	1932	Table '../test/t1#P#p10#TMP#' doesn't exist in engine
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -891,8 +881,6 @@ ERROR HY000: Unknown error
 show warnings;
 Level	Code	Message
 Error	1105	Unknown error
-Warning	1932	Table '../test/t1#P#p20#TMP#' doesn't exist in engine
-Warning	1932	Table '../test/t1#P#p10#TMP#' doesn't exist in engine
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -969,8 +957,6 @@ ERROR HY000: Unknown error
 show warnings;
 Level	Code	Message
 Error	1105	Unknown error
-Warning	1932	Table '../test/t1#P#p20#TMP#' doesn't exist in engine
-Warning	1932	Table '../test/t1#P#p10#TMP#' doesn't exist in engine
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -1045,8 +1031,6 @@ ERROR HY000: Unknown error
 show warnings;
 Level	Code	Message
 Error	1105	Unknown error
-Warning	1932	Table '../test/t1#P#p20#TMP#' doesn't exist in engine
-Warning	1932	Table '../test/t1#P#p10#TMP#' doesn't exist in engine
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -1125,6 +1109,8 @@ Level	Code	Message
 Error	1105	Unknown error
 db.opt
 t1#P#p0.ibd
+t1#P#p10.ibd
+t1#P#p20.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -1136,10 +1122,16 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
  PARTITION BY LIST (`a`)
 (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
  PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
 SELECT * FROM t1;
 a	b
 1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
 2	Original from partition p0
 3	Original from partition p0
 4	Original from partition p0
@@ -1191,6 +1183,8 @@ Level	Code	Message
 Error	1105	Unknown error
 db.opt
 t1#P#p0.ibd
+t1#P#p10.ibd
+t1#P#p20.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -1202,10 +1196,16 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
  PARTITION BY LIST (`a`)
 (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
  PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
 SELECT * FROM t1;
 a	b
 1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
 2	Original from partition p0
 3	Original from partition p0
 4	Original from partition p0
@@ -1252,15 +1252,11 @@ a	b
 3	Original from partition p0
 4	Original from partition p0
 ALTER TABLE t1 DROP PARTITION p10, p20;
-ERROR HY000: Unknown error
 # d,ddl_log,fail_drop_partition_9: AFTER failure
 show warnings;
 Level	Code	Message
-Error	1105	Unknown error
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -1293,9 +1289,7 @@ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from part
 # d,ddl_log,fail_drop_partition_9: BEFORE failure (under LOCK TABLE)
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
 t1#P#p10.ibd
-t1#P#p20#TMP#.ibd
 t1#P#p20.ibd
 t1#P#p30.ibd
 t1.frm
@@ -1323,12 +1317,77 @@ a	b
 4	Original from partition p0
 LOCK TABLE t1 WRITE;
 ALTER TABLE t1 DROP PARTITION p10, p20;
-ERROR 42S01: Table './test/t1#P#p20#TMP#' already exists
 # d,ddl_log,fail_drop_partition_9: AFTER failure (under LOCK TABLE)
 show warnings;
 Level	Code	Message
-Error	1050	Table './test/t1#P#p20#TMP#' already exists
-Error	1030	Got error 168 "Unknown (generic) error from engine" from storage engine InnoDB
+db.opt
+t1#P#p0.ibd
+t1#P#p30.ibd
+t1.frm
+t1.par
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+ PARTITION BY LIST (`a`)
+(PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+2	Original from partition p0
+3	Original from partition p0
+4	Original from partition p0
+master-bin.000001	#	Query	#	#	use `test`; ALTER TABLE t1 DROP PARTITION p10, p20
+UNLOCK TABLES;
+DROP TABLE t1;
+SET SESSION debug_dbug=@save_dbug;
+SET SESSION debug_dbug="+d,fail_alter_partition_binlog_1";
+RESET MASTER;
+CREATE TABLE t1 (a INT, b VARCHAR(64))
+ENGINE = 'InnoDB'
+PARTITION BY LIST (a)
+(PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+PARTITION p30 VALUES IN (31,32,33,34,35,36,37,38,39));
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+# d,ddl_log,fail_alter_partition_binlog_1: BEFORE failure
+db.opt
+t1#P#p0.ibd
+t1#P#p10.ibd
+t1#P#p20.ibd
+t1#P#p30.ibd
+t1.frm
+t1.par
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+ PARTITION BY LIST (`a`)
+(PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+ PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+3	Original from partition p0
+4	Original from partition p0
+ALTER TABLE t1 DROP PARTITION p10, p20;
+ERROR HY000: Unknown error
+# d,ddl_log,fail_alter_partition_binlog_1: AFTER failure
+show warnings;
+Level	Code	Message
 Error	1105	Unknown error
 db.opt
 t1#P#p0.ibd
@@ -1345,10 +1404,240 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
  PARTITION BY LIST (`a`)
 (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
  PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
 SELECT * FROM t1;
 a	b
 1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+3	Original from partition p0
+4	Original from partition p0
+DROP TABLE t1;
+RESET MASTER;
+CREATE TABLE t1 (a INT, b VARCHAR(64))
+ENGINE = 'InnoDB'
+PARTITION BY LIST (a)
+(PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+PARTITION p30 VALUES IN (31,32,33,34,35,36,37,38,39));
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+# d,ddl_log,fail_alter_partition_binlog_1: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.ibd
+t1#P#p10.ibd
+t1#P#p20.ibd
+t1#P#p30.ibd
+t1.frm
+t1.par
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+ PARTITION BY LIST (`a`)
+(PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+ PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLE t1 WRITE;
+ALTER TABLE t1 DROP PARTITION p10, p20;
+ERROR HY000: Unknown error
+# d,ddl_log,fail_alter_partition_binlog_1: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1105	Unknown error
+db.opt
+t1#P#p0.ibd
+t1#P#p10.ibd
+t1#P#p20.ibd
+t1#P#p30.ibd
+t1.frm
+t1.par
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+ PARTITION BY LIST (`a`)
+(PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+ PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+3	Original from partition p0
+4	Original from partition p0
+UNLOCK TABLES;
+DROP TABLE t1;
+SET SESSION debug_dbug=@save_dbug;
+SET SESSION debug_dbug="+d,fail_alter_partition_binlog_2";
+RESET MASTER;
+CREATE TABLE t1 (a INT, b VARCHAR(64))
+ENGINE = 'InnoDB'
+PARTITION BY LIST (a)
+(PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+PARTITION p30 VALUES IN (31,32,33,34,35,36,37,38,39));
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+# d,ddl_log,fail_alter_partition_binlog_2: BEFORE failure
+db.opt
+t1#P#p0.ibd
+t1#P#p10.ibd
+t1#P#p20.ibd
+t1#P#p30.ibd
+t1.frm
+t1.par
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+ PARTITION BY LIST (`a`)
+(PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+ PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+3	Original from partition p0
+4	Original from partition p0
+ALTER TABLE t1 DROP PARTITION p10, p20;
+ERROR HY000: Unknown error
+# d,ddl_log,fail_alter_partition_binlog_2: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1105	Unknown error
+db.opt
+t1#P#p0.ibd
+t1#P#p10.ibd
+t1#P#p20.ibd
+t1#P#p30.ibd
+t1.frm
+t1.par
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+ PARTITION BY LIST (`a`)
+(PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+ PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+3	Original from partition p0
+4	Original from partition p0
+DROP TABLE t1;
+RESET MASTER;
+CREATE TABLE t1 (a INT, b VARCHAR(64))
+ENGINE = 'InnoDB'
+PARTITION BY LIST (a)
+(PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+PARTITION p30 VALUES IN (31,32,33,34,35,36,37,38,39));
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+# d,ddl_log,fail_alter_partition_binlog_2: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.ibd
+t1#P#p10.ibd
+t1#P#p20.ibd
+t1#P#p30.ibd
+t1.frm
+t1.par
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+ PARTITION BY LIST (`a`)
+(PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+ PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLE t1 WRITE;
+ALTER TABLE t1 DROP PARTITION p10, p20;
+ERROR HY000: Unknown error
+# d,ddl_log,fail_alter_partition_binlog_2: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1105	Unknown error
+db.opt
+t1#P#p0.ibd
+t1#P#p10.ibd
+t1#P#p20.ibd
+t1#P#p30.ibd
+t1.frm
+t1.par
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+ PARTITION BY LIST (`a`)
+(PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+ PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+ PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+ PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
 2	Original from partition p0
 3	Original from partition p0
 4	Original from partition p0

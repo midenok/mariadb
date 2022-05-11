@@ -1,9 +1,8 @@
 # To be used with partition mgm commands like
 # ALTER TABLE t1 DROP PARTITION.
 --echo # Test DROP PARTITION
+--source suite/parts/inc/partition_crash.inc
 SET @save_dbug=@@debug_dbug;
-if (0)
-{
 SET SESSION debug_dbug="+d,crash_drop_partition_1";
 --source suite/parts/inc/partition_crash.inc
 SET SESSION debug_dbug=@save_dbug;
@@ -28,10 +27,15 @@ SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,crash_drop_partition_8";
 --source suite/parts/inc/partition_crash.inc
 SET SESSION debug_dbug=@save_dbug;
+SET SESSION debug_dbug="+d,crash_alter_partition_binlog_1";
+--source suite/parts/inc/partition_crash.inc
+SET SESSION debug_dbug=@save_dbug;
+SET SESSION debug_dbug="+d,crash_alter_partition_binlog_1";
+--source suite/parts/inc/partition_crash.inc
+SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,crash_drop_partition_9";
 --source suite/parts/inc/partition_crash.inc
 SET SESSION debug_dbug=@save_dbug;
-}
 SET SESSION debug_dbug="+d,crash_drop_partition_10";
 --source suite/parts/inc/partition_crash.inc
 SET SESSION debug_dbug=@save_dbug;

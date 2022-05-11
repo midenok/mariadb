@@ -41,8 +41,10 @@ inline bool _error_inject(const char *crash_kw, const char *fail_kw)
   return false;
 }
 #define ERROR_INJECT(code) (_error_inject("crash_" code, "fail_" code))
+#define CRASH_INJECT(code) (_error_inject("crash_" code, "crash_" code))
 #else
 #define ERROR_INJECT(code) false
+#define CRASH_INJECT(code) false
 #endif
 
 class Alter_info;
