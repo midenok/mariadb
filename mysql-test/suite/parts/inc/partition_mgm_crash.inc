@@ -23,6 +23,7 @@ let $insert_statement= INSERT INTO t1 VALUES (1, "Original from partition p0"), 
 
 let $crash_statement= ALTER TABLE t1 ADD PARTITION
 (PARTITION p20 VALUES IN (20,21,22,23,24,25,26,27,28,29));
+
 if ($do_crash0)
 {
 --source suite/parts/inc/partition_crash_add.inc

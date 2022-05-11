@@ -26,9 +26,6 @@ SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,fail_drop_partition_8";
 --source suite/parts/inc/partition_fail.inc
 SET SESSION debug_dbug=@save_dbug;
-SET SESSION debug_dbug="+d,fail_drop_partition_9";
---source suite/parts/inc/partition_fail.inc
-SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,fail_alter_partition_binlog_1";
 --source suite/parts/inc/partition_fail.inc
 SET SESSION debug_dbug=@save_dbug;

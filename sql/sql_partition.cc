@@ -7689,32 +7689,6 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     CRASH_INJECT("drop_partition_10");
     (void) ddl_log_revert(thd, &cleanup_chain, DDL_LOG_ERR_WARN);
 
-#if 0
-    if (!res && !thd->lex->no_write_to_binlog)
-    {
-      thd->binlog_xid= thd->query_id;
-      ddl_log_update_xid(&rollback_chain, thd->binlog_xid),
-      // FIXME: generate binlog output in test
-      res= ERROR_INJECT("drop_partition_8") ||
-           write_bin_log(thd, false, thd->query(), thd->query_length());
-      thd->binlog_xid= 0;
-    }
-
-    // FIXME: use finalize_ddl()?
-    if (res)
-    {
-      ddl_log_complete(&cleanup_chain);
-      ERROR_INJECT("drop_partition_9");
-      (void) ddl_log_revert(thd, &rollback_chain, DDL_LOG_ERR_WARN);
-    }
-    else
-    {
-      res= ERROR_INJECT("drop_partition_9");
-      ddl_log_complete(&rollback_chain);
-      (void) ddl_log_revert(thd, &cleanup_chain, DDL_LOG_ERR_WARN);
-    }
-#endif
-
     if (alter_partition_lock_handling(lpt))
       goto err;
   }
