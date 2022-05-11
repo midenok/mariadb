@@ -730,6 +730,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
   uint syntax_len;
   partition_info *part_info= lpt->part_info;
 #endif
+  DDL_LOG_STATE *rollback_chain= lpt->rollback_chain;
   DBUG_ENTER("mysql_write_frm");
 
   /*
@@ -808,7 +809,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     create_info->db_type= work_part_info->default_engine_type;
     /* NOTE: partitioned temporary tables are not supported. */
     DBUG_ASSERT(!create_info->tmp_table());
-    if (ddl_log_create_table(part_info, create_info->db_type, &new_path,
+    if (ddl_log_create_table(rollback_chain, create_info->db_type, &new_path,
                              &alter_ctx->new_db, &alter_ctx->new_name, true) ||
         ERROR_INJECT("create_before_create_frm"))
       DBUG_RETURN(TRUE);
@@ -844,7 +845,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 
     DBUG_RETURN(false);
   }
-  if (flags & WFRM_BACKUP_ORIGINAL)
+  if (flags == WFRM_BACKUP_ORIGINAL)
   {
     build_table_filename(path, sizeof(path) - 1, lpt->db.str,
                          lpt->table_name.str, "", 0);
@@ -853,20 +854,20 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     build_table_shadow_filename(bak_path, sizeof(bak_path) - 1, lpt, true);
     strxmov(bak_frm_name, bak_path, reg_ext, NullS);
 
-    DDL_LOG_MEMORY_ENTRY *main_entry= part_info->main_entry;
+    DDL_LOG_MEMORY_ENTRY *main_entry= rollback_chain->main_entry;
     mysql_mutex_lock(&LOCK_gdl);
     // FIXME: now this is rename
     if (write_log_replace_frm(lpt,
                               (const char*) bak_path,
                               (const char*) path) ||
-        ddl_log_write_execute_entry(part_info->list->entry_pos, 0,
-                                    &part_info->execute_entry))
+        ddl_log_write_execute_entry(rollback_chain->list->entry_pos, 0,
+                                    &rollback_chain->execute_entry))
     {
       mysql_mutex_unlock(&LOCK_gdl);
       DBUG_RETURN(TRUE);
     }
     mysql_mutex_unlock(&LOCK_gdl);
-    part_info->main_entry= main_entry;
+    rollback_chain->main_entry= main_entry;
     if (mysql_file_rename(key_file_frm, frm_name, bak_frm_name, MYF(MY_WME)))
       DBUG_RETURN(TRUE);
     if (lpt->table->file->ha_create_partitioning_metadata(bak_path, path,
@@ -878,9 +879,6 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 #endif /* !WITH_PARTITION_STORAGE_ENGINE */
   if (flags & WFRM_INSTALL_SHADOW)
   {
-#ifdef WITH_PARTITION_STORAGE_ENGINE
-    partition_info *part_info= lpt->part_info;
-#endif
     /*
       Build frm file name
     */
@@ -902,7 +900,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 #ifdef WITH_PARTITION_STORAGE_ENGINE
         || lpt->table->file->ha_create_partitioning_metadata(path, shadow_path,
                                                           CHF_DELETE_FLAG) ||
-        ddl_log_increment_phase(part_info->main_entry->entry_pos) ||
+        ddl_log_increment_phase(rollback_chain->main_entry->entry_pos) ||
         (ddl_log_sync(), FALSE)
 #endif
       ))

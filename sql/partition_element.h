@@ -111,6 +111,7 @@ public:
   ha_rows part_min_rows;
   longlong range_value;
   const char *partition_name;
+  // FIXME: remove
   struct st_ddl_log_memory_entry *log_entry;
   const char* part_comment;
   const char* data_file_name;

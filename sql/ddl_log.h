@@ -272,6 +272,8 @@ bool ddl_log_close_binlogged_events(HASH *xids);
 int ddl_log_execute_recovery();
 
 /* functions for updating the ddl log */
+bool ddl_log_write(DDL_LOG_STATE *ddl_state,
+                   DDL_LOG_ENTRY *ddl_log_entry);
 bool ddl_log_write_entry(DDL_LOG_ENTRY *ddl_log_entry,
                            DDL_LOG_MEMORY_ENTRY **active_entry);
 

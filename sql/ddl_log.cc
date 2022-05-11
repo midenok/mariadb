@@ -3238,8 +3238,8 @@ bool ddl_log_update_xid(DDL_LOG_STATE *state, ulonglong xid)
   Will update DDL_LOG_STATE->flags
 */
 
-static bool ddl_log_write(DDL_LOG_STATE *ddl_state,
-                          DDL_LOG_ENTRY *ddl_log_entry)
+bool ddl_log_write(DDL_LOG_STATE *ddl_state,
+                   DDL_LOG_ENTRY *ddl_log_entry)
 {
   int error;
   DDL_LOG_MEMORY_ENTRY *log_entry;
