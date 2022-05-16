@@ -11,6 +11,7 @@
 --echo # after timed out COALESCE PARTITION
 --echo # Extended crash recovery testing of fast_alter_partition_table.
 call mtr.add_suppression("Attempting backtrace. You can use the following information to find out");
+call mtr.add_suppression("Crashing at");
 flush tables;
 let $create_statement= CREATE TABLE t1 (a INT, b VARCHAR(64))
 ENGINE = $engine

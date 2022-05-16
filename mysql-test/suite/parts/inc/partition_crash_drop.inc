@@ -39,3 +39,9 @@ SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,crash_drop_partition_10";
 --source suite/parts/inc/partition_crash.inc
 SET SESSION debug_dbug=@save_dbug;
+SET SESSION debug_dbug="+d,fail_drop_partition_5,crash_drop_partition_11";
+--source suite/parts/inc/partition_crash.inc
+SET SESSION debug_dbug=@save_dbug;
+SET SESSION debug_dbug="+d,fail_drop_partition_5,crash_drop_partition_12";
+--source suite/parts/inc/partition_crash.inc
+SET SESSION debug_dbug=@save_dbug;

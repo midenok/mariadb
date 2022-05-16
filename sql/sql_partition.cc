@@ -7677,8 +7677,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         alter_partition_log_backup(lpt) ||
         alter_partition_binlog(lpt))
     {
-      // FIXME: insert crashes
+      CRASH_INJECT("drop_partition_11");
       ddl_log_complete(&cleanup_chain);
+      CRASH_INJECT("drop_partition_12");
       // FIXME: test when revert fails
       (void) ddl_log_revert(thd, &rollback_chain, DDL_LOG_ERR_WARN);
       (void) alter_partition_lock_handling(lpt);
