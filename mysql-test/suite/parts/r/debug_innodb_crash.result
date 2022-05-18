@@ -10,6 +10,7 @@ call mtr.add_suppression("InnoDB: Warning: MariaDB is trying to drop table ");
 # Extended crash recovery testing of fast_alter_partition_table.
 call mtr.add_suppression("Attempting backtrace. You can use the following information to find out");
 call mtr.add_suppression("Crashing at");
+call mtr.add_suppression("Failing at");
 flush tables;
 # Test DROP PARTITION
 RESET MASTER;

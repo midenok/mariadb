@@ -6428,18 +6428,30 @@ public:
   virtual void set_name_variant(partition_element *) {}
   virtual bool check_state(partition_element *part_elem)= 0;
 
-  virtual bool process_partition(partition_element *part_elem)
+  virtual bool process_partition(partition_element *part_elem,
+                                 partition_element *sub_elem)
   {
     lex_string_set(&ddl_log_entry.handler_name,
                     ha_resolve_storage_engine_name(part_elem->engine_type));
-    if (create_partition_name(part_name, sizeof(part_name), path,
-                              part_elem->partition_name, name_variant,
-                              true /* translate */))
-      return true;
+    if (!sub_elem)
+    {
+      if (create_partition_name(part_name, sizeof(part_name), path,
+                                part_elem->partition_name, name_variant,
+                                true /* translate */))
+        return true;
+    }
+    else
+    {
+      if (create_subpartition_name(part_name, sizeof(part_name), path,
+                                   part_elem->partition_name,
+                                   sub_elem->partition_name, name_variant))
+        return true;
+    }
 
     return false;
   }
 
+  // FIXME: remove
   virtual bool process_subpartition(partition_element *part_elem, partition_element *sub_elem)
   {
     // FIXME: where it is tested?
@@ -6484,13 +6496,14 @@ public:
     name_variant= NORMAL_PART_NAME;
   }
 
-  bool process_partition(partition_element *part_elem)
+  bool process_partition(partition_element *part_elem,
+                         partition_element *sub_elem)
   {
     DBUG_ASSERT(phase == NO_PHASE);
     DBUG_ASSERT(new_name);
     DBUG_ASSERT(part_elem->part_state == PART_TO_BE_ADDED);
 
-    if (Alter_partition_action::process_partition(part_elem))
+    if (Alter_partition_action::process_partition(part_elem, sub_elem))
       return true;
 
     ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
@@ -6521,13 +6534,14 @@ public:
            part_elem->part_state == PART_CHANGED;
   }
 
-  bool process_partition(partition_element *part_elem)
+  bool process_partition(partition_element *part_elem,
+                         partition_element *sub_elem)
   {
     DBUG_ASSERT(phase == NO_PHASE);
     DBUG_ASSERT(new_name);
     DBUG_ASSERT(part_elem->part_state == PART_TO_BE_DROPPED);
 
-    if (Alter_partition_action::process_partition(part_elem))
+    if (Alter_partition_action::process_partition(part_elem, sub_elem))
       return true;
 
     ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
@@ -6578,10 +6592,11 @@ public:
     return false;
   }
 
-  bool process_partition(partition_element *part_elem)
+  bool process_partition(partition_element *part_elem,
+                         partition_element *sub_elem)
   {
     int ha_err= 0;
-    if (Alter_partition_action::process_partition(part_elem))
+    if (Alter_partition_action::process_partition(part_elem, sub_elem))
       return true;
 
     if (phase != DROP_ADDED_PARTS)
@@ -6589,10 +6604,20 @@ public:
       DBUG_ASSERT(phase == DROP_BACKUPS || phase == RENAME_TO_BACKUPS);
       DBUG_ASSERT(part_elem->part_state == PART_TO_BE_DROPPED);
       DBUG_ASSERT(name_variant == NORMAL_PART_NAME);
-      if (create_partition_name(new_name, sizeof(new_name), path,
-                                part_elem->partition_name, TEMP_PART_NAME,
-                                true /* translate */))
-        return true;
+      if (!sub_elem)
+      {
+        if (create_partition_name(new_name, sizeof(new_name), path,
+                                  part_elem->partition_name, TEMP_PART_NAME,
+                                  true /* translate */))
+          return true;
+      }
+      else
+      {
+        if (create_subpartition_name(new_name, sizeof(new_name), path,
+                                     part_elem->partition_name,
+                                     sub_elem->partition_name, TEMP_PART_NAME))
+          return true;
+      }
     }
 
     DDL_LOG_STATE *output_chain;
@@ -6628,9 +6653,10 @@ public:
     if (phase == RENAME_TO_BACKUPS)
     {
       DBUG_ASSERT(table->file->ht->db_type == DB_TYPE_PARTITION_DB);
-      DBUG_ASSERT(!part_info->num_subparts);
       handler **files= ((ha_partition *)(table->file))->get_child_handlers();
-      handler *file= files[part_elem->id];
+      handler *file= sub_elem ?
+        files[part_elem->id * part_info->num_subparts + sub_elem->id] :
+        files[part_elem->id];
       ha_err= file->ha_rename_table(ddl_log_entry.name.str,
                                     ddl_log_entry.from_name.str);
       DBUG_ASSERT(ha_err == 0); //FIXME: remove
@@ -6661,7 +6687,8 @@ public:
 
   }
 
-  bool process_partition(partition_element *part_elem)
+  bool process_partition(partition_element *part_elem,
+                         partition_element *sub_elem)
   {
     DBUG_ASSERT(phase == NO_PHASE);
     char tmp_path[FN_REFLEN + 1];
@@ -6690,7 +6717,8 @@ public:
     return false;
   }
 
-  bool process_subpartition(partition_element *part_elem, partition_element *sub_elem)
+  bool process_subpartition(partition_element *part_elem,
+                            partition_element *sub_elem)
   {
     // FIXME: where it is tested?
     char tmp_path[FN_REFLEN + 1];
@@ -6744,13 +6772,13 @@ bool Alter_partition_action::iterate(Phase phase_arg)
         do
         {
           partition_element *sub_elem= sub_it++;
-          if (process_subpartition(part_elem, sub_elem))
+          if (process_partition(part_elem, sub_elem))
             DBUG_RETURN(TRUE);
         } while (++j < num_subparts);
       }
       else
       {
-        if (process_partition(part_elem))
+        if (process_partition(part_elem, NULL))
           DBUG_RETURN(TRUE);
       }
     }
@@ -9136,6 +9164,8 @@ static const char *longest_str(const char *s1, const char *s2,
   DESCRIPTION
     This method is used to calculate the partition name, service routine to
     the del_ren_cre_table method.
+
+  TODO: Merge create_partition_name() and create_subpartition_name()
 */
 
 int create_partition_name(char *out, size_t outlen, const char *in1,

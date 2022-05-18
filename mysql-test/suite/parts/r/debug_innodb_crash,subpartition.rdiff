@@ -1,0 +1,1191 @@
+--- debug_innodb_crash.result
++++ debug_innodb_crash.reject
+@@ -16,7 +16,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -24,10 +24,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -37,6 +41,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -54,14 +60,18 @@
+ ALTER TABLE t1 DROP PARTITION p10, p20;
+ # d,ddl_log: AFTER crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,ddl_log: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -71,6 +81,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+ SELECT * FROM t1;
+@@ -86,7 +98,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -94,10 +106,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,crash_drop_partition_1: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -107,6 +123,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -124,18 +142,26 @@
+ ALTER TABLE t1 DROP PARTITION p10, p20;
+ # d,ddl_log,crash_drop_partition_1: AFTER crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,ddl_log,crash_drop_partition_1: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -145,6 +171,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -165,7 +193,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -173,10 +201,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_drop_partition_2: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -186,6 +218,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -205,18 +239,26 @@
+ #sql-shadow-t1.frm
+ #sql-shadow-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_drop_partition_2: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -226,6 +268,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -246,7 +290,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -254,10 +298,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_drop_partition_3: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -267,6 +315,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -286,18 +336,26 @@
+ #sql-shadow-t1.frm
+ #sql-shadow-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_drop_partition_3: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -307,6 +365,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -327,7 +387,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -335,10 +395,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_drop_partition_4: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -348,6 +412,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -367,18 +433,26 @@
+ #sql-shadow-t1.frm
+ #sql-shadow-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_drop_partition_4: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -388,6 +462,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -408,7 +484,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -416,10 +492,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_drop_partition_5: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -429,6 +509,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -448,18 +530,26 @@
+ #sql-shadow-t1.frm
+ #sql-shadow-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_drop_partition_5: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -469,6 +559,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -489,7 +581,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -497,10 +589,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_drop_partition_6: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -510,6 +606,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -529,18 +627,26 @@
+ #sql-shadow-t1.frm
+ #sql-shadow-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_drop_partition_6: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -550,6 +656,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -570,7 +678,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -578,10 +686,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_drop_partition_7: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -591,6 +703,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -612,16 +726,24 @@
+ #sql-shadow-t1.frm
+ #sql-shadow-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ # d,crash_drop_partition_7: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -631,6 +753,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -651,7 +775,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -659,10 +783,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_drop_partition_8: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -672,6 +800,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -691,18 +821,26 @@
+ #sql-backup-4-t1.frm
+ #sql-backup-4-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_drop_partition_8: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -712,6 +850,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -732,7 +872,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -740,10 +880,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_alter_partition_binlog_1: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -753,6 +897,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -772,18 +918,26 @@
+ #sql-backup-4-t1.frm
+ #sql-backup-4-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_alter_partition_binlog_1: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -793,6 +947,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -813,7 +969,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -821,10 +977,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_alter_partition_binlog_1: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -834,6 +994,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -853,18 +1015,26 @@
+ #sql-backup-4-t1.frm
+ #sql-backup-4-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_alter_partition_binlog_1: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -874,6 +1044,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -894,7 +1066,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -902,10 +1074,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_drop_partition_9: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -915,6 +1091,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -934,16 +1112,22 @@
+ #sql-backup-4-t1.frm
+ #sql-backup-4-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_drop_partition_9: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -953,6 +1137,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+ SELECT * FROM t1;
+@@ -968,7 +1154,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -976,10 +1162,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,crash_drop_partition_10: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -989,6 +1179,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1008,16 +1200,22 @@
+ #sql-backup-4-t1.frm
+ #sql-backup-4-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,crash_drop_partition_10: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1027,6 +1225,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p30` VALUES IN (31,32,33,34,35,36,37,38,39) ENGINE = InnoDB)
+ SELECT * FROM t1;
+@@ -1042,7 +1242,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -1050,10 +1250,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,fail_drop_partition_5,crash_drop_partition_11: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1063,6 +1267,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1082,18 +1288,26 @@
+ #sql-shadow-t1.frm
+ #sql-shadow-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,fail_drop_partition_5,crash_drop_partition_11: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1103,6 +1317,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1123,7 +1339,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -1131,10 +1347,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,fail_drop_partition_5,crash_drop_partition_12: BEFORE crash
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1144,6 +1364,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1163,18 +1385,26 @@
+ #sql-shadow-t1.frm
+ #sql-shadow-t1.par
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10#TMP#.ibd
+-t1#P#p20#TMP#.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0#TMP#.ibd
++t1#P#p10#SP#p10sp1#TMP#.ibd
++t1#P#p20#SP#p20sp0#TMP#.ibd
++t1#P#p20#SP#p20sp1#TMP#.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ # d,fail_drop_partition_5,crash_drop_partition_12: AFTER recovery
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1184,6 +1414,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,

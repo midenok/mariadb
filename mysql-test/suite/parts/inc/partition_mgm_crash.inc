@@ -12,10 +12,17 @@
 --echo # Extended crash recovery testing of fast_alter_partition_table.
 call mtr.add_suppression("Attempting backtrace. You can use the following information to find out");
 call mtr.add_suppression("Crashing at");
+call mtr.add_suppression("Failing at");
 flush tables;
+let $subpartitioning= ;
+if ($MTR_COMBINATION_SUBPARTITION)
+{
+  let $subpartitioning=`select(' SUBPARTITION BY HASH(a) SUBPARTITIONS 2')`;
+}
+
 let $create_statement= CREATE TABLE t1 (a INT, b VARCHAR(64))
 ENGINE = $engine
-PARTITION BY LIST (a)
+PARTITION BY LIST (a)$subpartitioning
 (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
  PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
  PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
