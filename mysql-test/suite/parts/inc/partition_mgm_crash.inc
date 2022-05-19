@@ -37,17 +37,17 @@ if ($do_crash0)
 --source suite/parts/inc/partition_crash_add.inc
 }
 let $fail_statement= $crash_statement;
-if ($do_fail0)
+if ($do_fail)
 {
 --source suite/parts/inc/partition_fail_add.inc
 }
 let $crash_statement= ALTER TABLE t1 DROP PARTITION p10, p20;
-if ($do_crash)
+if ($do_crash0)
 {
 --source suite/parts/inc/partition_crash_drop.inc
 }
 let $fail_statement= $crash_statement;
-if ($do_fail)
+if ($do_fail0)
 {
 --source suite/parts/inc/partition_fail_drop.inc
 }
