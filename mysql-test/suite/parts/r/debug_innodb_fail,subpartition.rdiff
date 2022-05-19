@@ -1,0 +1,1302 @@
+--- debug_innodb_fail.result
++++ debug_innodb_fail.reject
+@@ -18,7 +18,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -26,10 +26,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_1: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -39,6 +43,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -60,10 +66,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -73,6 +83,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -91,7 +103,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -99,10 +111,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_1: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -112,6 +128,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -134,10 +152,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -147,6 +169,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -168,7 +192,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -176,10 +200,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_2: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -189,6 +217,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -210,10 +240,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -223,6 +257,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -241,7 +277,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -249,10 +285,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_2: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -262,6 +302,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -284,10 +326,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -297,6 +343,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -318,7 +366,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -326,10 +374,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_3: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -339,6 +391,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -360,10 +414,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -373,6 +431,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -391,7 +451,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -399,10 +459,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_3: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -412,6 +476,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -434,10 +500,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -447,6 +517,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -468,7 +540,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -476,10 +548,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_4: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -489,6 +565,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -510,10 +588,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -523,6 +605,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -541,7 +625,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -549,10 +633,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_4: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -562,6 +650,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -584,10 +674,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -597,6 +691,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -618,7 +714,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -626,10 +722,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_5: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -639,6 +739,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -660,10 +762,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -673,6 +779,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -691,7 +799,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -699,10 +807,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_5: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -712,6 +824,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -734,10 +848,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -747,6 +865,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -768,7 +888,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -776,10 +896,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_6: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -789,6 +913,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -810,10 +936,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -823,6 +953,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -841,7 +973,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -849,10 +981,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_6: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -862,6 +998,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -884,10 +1022,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -897,6 +1039,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -918,7 +1062,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -926,10 +1070,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_7: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -939,6 +1087,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -960,10 +1110,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -973,6 +1127,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -991,7 +1147,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -999,10 +1155,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_7: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1012,6 +1172,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1034,10 +1196,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1047,6 +1213,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1068,7 +1236,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -1076,10 +1244,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_8: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1089,6 +1261,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1110,10 +1284,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1123,6 +1301,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1141,7 +1321,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -1149,10 +1329,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_drop_partition_8: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1162,6 +1346,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1184,10 +1370,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1197,6 +1387,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1218,7 +1410,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -1226,10 +1418,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_alter_partition_binlog_1: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1239,6 +1435,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1260,10 +1458,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1273,6 +1475,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1292,7 +1496,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -1300,10 +1504,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_alter_partition_binlog_1: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1313,6 +1521,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1335,10 +1545,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1348,6 +1562,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1369,7 +1585,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -1377,10 +1593,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_alter_partition_binlog_2: BEFORE failure
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1390,6 +1610,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1411,10 +1633,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1424,6 +1650,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1443,7 +1671,7 @@
+ RESET MASTER;
+ CREATE TABLE t1 (a INT, b VARCHAR(64))
+ ENGINE = 'InnoDB'
+-PARTITION BY LIST (a)
++PARTITION BY LIST (a) SUBPARTITION BY HASH(a) SUBPARTITIONS 2
+ (PARTITION p0 VALUES IN (0,1,2,3,4,5,6,7,8,9),
+ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
+ PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
+@@ -1451,10 +1679,14 @@
+ INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
+ # d,ddl_log,fail_alter_partition_binlog_2: BEFORE failure (under LOCK TABLE)
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1464,6 +1696,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
+@@ -1486,10 +1720,14 @@
+ Level	Code	Message
+ Error	1105	Unknown error
+ db.opt
+-t1#P#p0.ibd
+-t1#P#p10.ibd
+-t1#P#p20.ibd
+-t1#P#p30.ibd
++t1#P#p0#SP#p0sp0.ibd
++t1#P#p0#SP#p0sp1.ibd
++t1#P#p10#SP#p10sp0.ibd
++t1#P#p10#SP#p10sp1.ibd
++t1#P#p20#SP#p20sp0.ibd
++t1#P#p20#SP#p20sp1.ibd
++t1#P#p30#SP#p30sp0.ibd
++t1#P#p30#SP#p30sp1.ibd
+ t1.frm
+ t1.par
+ SHOW CREATE TABLE t1;
+@@ -1499,6 +1737,8 @@
+   `b` varchar(64) DEFAULT NULL
+ ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  PARTITION BY LIST (`a`)
++SUBPARTITION BY HASH (`a`)
++SUBPARTITIONS 2
+ (PARTITION `p0` VALUES IN (0,1,2,3,4,5,6,7,8,9) ENGINE = InnoDB,
+  PARTITION `p10` VALUES IN (11,12,13,14,15,16,17,18,19) ENGINE = InnoDB,
+  PARTITION `p20` VALUES IN (21,22,23,24,25,26,27,28,29) ENGINE = InnoDB,
