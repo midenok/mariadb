@@ -6390,7 +6390,7 @@ static bool write_log_changed_partitions0(ALTER_PARTITION_PARAM_TYPE *lpt,
 }
 
 
-class Alter_partition_action : public ALTER_PARTITION_PARAM_TYPE
+class Alter_partition_action
 {
 protected:
   const char *path;
@@ -6402,7 +6402,11 @@ protected:
   char part_name[FN_REFLEN + 1];
   char new_name[FN_REFLEN + 1];
   List<partition_element> *parts;
-
+  ALTER_PARTITION_PARAM_TYPE *lpt;
+  TABLE *table;
+  partition_info *part_info;
+  DDL_LOG_STATE *rollback_chain;
+  DDL_LOG_STATE *cleanup_chain;
 
 public:
   enum Phase
@@ -6413,8 +6417,10 @@ public:
   } phase;
 
   Alter_partition_action(ALTER_PARTITION_PARAM_TYPE *lpt) :
-                         ALTER_PARTITION_PARAM_TYPE(*lpt),
-                         path(NULL), parts(&lpt->part_info->partitions)
+                         path(NULL), parts(&lpt->part_info->partitions),
+                         lpt(lpt), table(lpt->table), part_info(lpt->part_info),
+                         rollback_chain(&lpt->rollback_chain),
+                         cleanup_chain(&lpt->cleanup_chain)
   {
     bzero(&ddl_log_entry, sizeof(ddl_log_entry));
   }
@@ -6422,9 +6428,11 @@ public:
   Alter_partition_action(ALTER_PARTITION_PARAM_TYPE *lpt,
                          const char *path,
                          List<partition_element> *reorg_parts) :
-                         ALTER_PARTITION_PARAM_TYPE(*lpt),
-                            path(path),
-                            parts(reorg_parts ? reorg_parts : &lpt->part_info->partitions)
+                         path(path),
+                         parts(reorg_parts ? reorg_parts : &lpt->part_info->partitions),
+                         lpt(lpt), table(lpt->table), part_info(lpt->part_info),
+                         rollback_chain(&lpt->rollback_chain),
+                         cleanup_chain(&lpt->cleanup_chain)
   {
     bzero(&ddl_log_entry, sizeof(ddl_log_entry));
   }
@@ -6643,13 +6651,13 @@ public:
       ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
       ddl_log_entry.name= { part_name, strlen(part_name) };
       ddl_log_entry.from_name= { new_name, strlen(new_name) };
-      output_chain= &rollback_chain;
+      output_chain= rollback_chain;
       break;
     case DROP_BACKUPS:
       ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
       ddl_log_entry.name= { new_name, strlen(new_name) };
-      output_chain= &cleanup_chain;
-      ddl_log_link_chains(&cleanup_chain, &rollback_chain);
+      output_chain= cleanup_chain;
+      ddl_log_link_chains(cleanup_chain, rollback_chain);
       break;
     // FIXME: remove
 #if 0
@@ -6739,7 +6747,7 @@ public:
     if (Alter_partition_action::process_partition(part_elem, sub_elem))
       return true;
 
-    ha_err= hp->prepare_new_partition(table, create_info, part_name,
+    ha_err= hp->prepare_new_partition(table, lpt->create_info, part_name,
                                       sub_elem ? sub_elem : part_elem,
                                       disable_non_uniq_indexes);
     if (ha_err)
@@ -7700,6 +7708,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   lpt->table_name= alter_ctx->table_name;
   lpt->org_tabledef_version= table->s->tabledef_version;
 
+  DDL_LOG_STATE *rollback_chain= &lpt->rollback_chain;
+  DDL_LOG_STATE *cleanup_chain= &lpt->cleanup_chain;
+
   /* Add IF EXISTS to binlog if shared table */
   if (table->file->partition_ht()->flags & HTON_TABLE_MAY_NOT_EXIST_ON_SLAVE)
     thd->variables.option_bits|= OPTION_IF_EXISTS;
@@ -7755,9 +7766,6 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   else if (alter_info->partition_flags & ALTER_PARTITION_DROP)
   {
     Action_drop action_drop(lpt);
-    lpt= &action_drop;
-    DDL_LOG_STATE *rollback_chain= &lpt->rollback_chain;
-    DDL_LOG_STATE *cleanup_chain= &lpt->cleanup_chain;
 
     /*
        part_info chain contains roll forward actions,
@@ -7905,9 +7913,6 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   {
     DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN));
     bool res= false;
-
-    DDL_LOG_STATE *rollback_chain= &lpt->rollback_chain;
-    DDL_LOG_STATE *cleanup_chain= &lpt->cleanup_chain;
 
     if (write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT("add_partition_1") ||
