@@ -6392,6 +6392,8 @@ static bool write_log_changed_partitions0(ALTER_PARTITION_PARAM_TYPE *lpt,
 
 class Alter_partition_action
 {
+  char path_buf[FN_REFLEN + 1];
+
 protected:
   const char *path;
   uint name_variant;
@@ -6423,6 +6425,10 @@ public:
                          cleanup_chain(&lpt->cleanup_chain)
   {
     bzero(&ddl_log_entry, sizeof(ddl_log_entry));
+
+    build_table_filename(path_buf, sizeof(path_buf) - 1, lpt->db.str,
+                         lpt->table_name.str, "", 0);
+    path= path_buf;
   }
 
   Alter_partition_action(ALTER_PARTITION_PARAM_TYPE *lpt,
@@ -6575,22 +6581,8 @@ public:
 
 class Action_drop : public Alter_partition_action
 {
-  char path_buf[FN_REFLEN + 1];
-
 public:
-  // FIXME: is it needed?
-  Action_drop(ALTER_PARTITION_PARAM_TYPE *lpt, const char *path,
-             List<partition_element> *reorg_parts) :
-             Alter_partition_action(lpt, path, reorg_parts)
-  {}
-
-  Action_drop(ALTER_PARTITION_PARAM_TYPE *lpt) :
-              Alter_partition_action(lpt)
-  {
-    build_table_filename(path_buf, sizeof(path_buf) - 1, lpt->db.str,
-                         lpt->table_name.str, "", 0);
-    path= path_buf;
-  }
+  using Alter_partition_action::Alter_partition_action;
 
   bool check_state(partition_element *part_elem)
   {
