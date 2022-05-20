@@ -69,8 +69,13 @@ typedef struct st_lock_param_type
   DDL_LOG_MEMORY_ENTRY *drop_shadow_frm;
   // TODO: remove duplicate data: part_info can be accessed via table->part_info
   partition_info *part_info;
-  DDL_LOG_STATE *rollback_chain;
-  DDL_LOG_STATE *cleanup_chain;
+  DDL_LOG_STATE rollback_chain;
+  DDL_LOG_STATE cleanup_chain;
+
+  st_lock_param_type()
+  {
+    bzero(this, sizeof(*this));
+  }
 } ALTER_PARTITION_PARAM_TYPE;
 
 typedef struct {

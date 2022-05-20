@@ -730,7 +730,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
   uint syntax_len;
   partition_info *part_info= lpt->part_info;
 #endif
-  DDL_LOG_STATE *rollback_chain= lpt->rollback_chain;
+  DDL_LOG_STATE *rollback_chain= &lpt->rollback_chain;
   DBUG_ENTER("mysql_write_frm");
 
   /*
