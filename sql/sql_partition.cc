@@ -6407,11 +6407,17 @@ protected:
 public:
   enum Phase
   {
-    DROP_BACKUPS= 0,
-    RENAME_TO_BACKUPS,
-    DROP_ADDED_PARTS,
+    ROLLBACK_FROM_BACKUPS= 0,
+    DROP_BACKUPS,
     NO_PHASE= 255
   } phase;
+
+  Alter_partition_action(ALTER_PARTITION_PARAM_TYPE *lpt) :
+                         ALTER_PARTITION_PARAM_TYPE(*lpt),
+                         path(NULL), parts(&lpt->part_info->partitions)
+  {
+    bzero(&ddl_log_entry, sizeof(ddl_log_entry));
+  }
 
   Alter_partition_action(ALTER_PARTITION_PARAM_TYPE *lpt,
                          const char *path,
@@ -6561,8 +6567,24 @@ public:
 
 class Action_drop : public Alter_partition_action
 {
+  char path_buf[FN_REFLEN + 1];
+
 public:
   using Alter_partition_action::Alter_partition_action;
+
+  // FIXME: is it needed?
+  Action_drop(ALTER_PARTITION_PARAM_TYPE *lpt, const char *path,
+             List<partition_element> *reorg_parts) :
+             Alter_partition_action(lpt, path, reorg_parts)
+  {}
+
+  Action_drop(ALTER_PARTITION_PARAM_TYPE *lpt) :
+              Alter_partition_action(lpt)
+  {
+    build_table_filename(path_buf, sizeof(path_buf) - 1, lpt->db.str,
+                         lpt->table_name.str, "", 0);
+    path= path_buf;
+  }
 
   bool check_state(partition_element *part_elem)
   {
@@ -6575,65 +6597,70 @@ public:
     name_variant= NORMAL_PART_NAME;
   }
 
-  bool process_phases()
+  bool process()
   {
-    if (iterate(RENAME_TO_BACKUPS))
+    if (iterate(ROLLBACK_FROM_BACKUPS))
       return true;
     if (iterate(DROP_BACKUPS))
       return true;
     return false;
   }
 
+
+  /**
+    Rename partitions marked for drop to TMP partitions and write rollback_chain
+    so it reverts these operations. Write cleanup_chain so it drops TMP partitions,
+    but only when rollback_chain is inactive.
+  */
+
   bool process_partition(partition_element *part_elem,
                          partition_element *sub_elem)
   {
-    int ha_err= 0;
     if (Alter_partition_action::process_partition(part_elem, sub_elem))
       return true;
 
-    if (phase != DROP_ADDED_PARTS)
+    DBUG_ASSERT(phase == DROP_BACKUPS || phase == ROLLBACK_FROM_BACKUPS);
+    DBUG_ASSERT(part_elem->part_state == PART_TO_BE_DROPPED);
+    DBUG_ASSERT(name_variant == NORMAL_PART_NAME);
+    if (!sub_elem)
     {
-      DBUG_ASSERT(phase == DROP_BACKUPS || phase == RENAME_TO_BACKUPS);
-      DBUG_ASSERT(part_elem->part_state == PART_TO_BE_DROPPED);
-      DBUG_ASSERT(name_variant == NORMAL_PART_NAME);
-      if (!sub_elem)
-      {
-        if (create_partition_name(new_name, sizeof(new_name), path,
-                                  part_elem->partition_name, TEMP_PART_NAME,
-                                  true /* translate */))
-          return true;
-      }
-      else
-      {
-        if (create_subpartition_name(new_name, sizeof(new_name), path,
-                                     part_elem->partition_name,
-                                     sub_elem->partition_name, TEMP_PART_NAME))
-          return true;
-      }
+      if (create_partition_name(new_name, sizeof(new_name), path,
+                                part_elem->partition_name, TEMP_PART_NAME,
+                                true /* translate */))
+        return true;
+    }
+    else
+    {
+      if (create_subpartition_name(new_name, sizeof(new_name), path,
+                                    part_elem->partition_name,
+                                    sub_elem->partition_name, TEMP_PART_NAME))
+        return true;
     }
 
     DDL_LOG_STATE *output_chain;
 
     switch (phase)
     {
+    case ROLLBACK_FROM_BACKUPS:
+      ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
+      ddl_log_entry.name= { part_name, strlen(part_name) };
+      ddl_log_entry.from_name= { new_name, strlen(new_name) };
+      output_chain= rollback_chain;
+      break;
     case DROP_BACKUPS:
       ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
       ddl_log_entry.name= { new_name, strlen(new_name) };
       output_chain= cleanup_chain;
       ddl_log_link_chains(cleanup_chain, rollback_chain);
       break;
-    case RENAME_TO_BACKUPS:
-      ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
-      ddl_log_entry.name= { part_name, strlen(part_name) };
-      ddl_log_entry.from_name= { new_name, strlen(new_name) };
-      output_chain= rollback_chain;
-      break;
     // FIXME: remove
+#if 0
     case DROP_ADDED_PARTS:
       ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
       ddl_log_entry.name= { part_name, strlen(part_name) };
       output_chain= rollback_chain;
       break;
+#endif
     default:
       DBUG_ASSERT(0);
       return true;
@@ -6641,10 +6668,15 @@ public:
 
     ddl_log_entry.next_entry= output_chain->list ? output_chain->list->entry_pos : 0;
     if (ddl_log_write(output_chain, &ddl_log_entry))
-      return true;
-
-    if (phase == RENAME_TO_BACKUPS)
     {
+      my_error(ER_DDL_LOG_ERROR, MYF(0));
+      return true;
+    }
+
+    if (phase == ROLLBACK_FROM_BACKUPS)
+    {
+      int ha_err;
+      /* Rename partition to backup (protected by rollback_chain). */
       DBUG_ASSERT(table->file->ht->db_type == DB_TYPE_PARTITION_DB);
       handler **files= ((ha_partition *)(table->file))->get_child_handlers();
       handler *file= sub_elem ?
@@ -6653,9 +6685,15 @@ public:
       ha_err= file->ha_rename_table(ddl_log_entry.name.str,
                                     ddl_log_entry.from_name.str);
       DBUG_ASSERT(ha_err == 0); //FIXME: remove
+      if (ha_err)
+      {
+        // FIXME: test
+        file->print_error(ha_err, MYF(0));
+        return true;
+      }
     }
 
-    return ha_err ? true : false;
+    return false;
   }
 };
 
@@ -6687,11 +6725,11 @@ public:
     name_variant= NORMAL_PART_NAME;
   }
 
-  bool process_phases()
+  bool process()
   {
     if (ha_err)
       return true; /* ctor initialization failed */
-    if (iterate(DROP_ADDED_PARTS))
+    if (iterate(NO_PHASE))
       return true;
     return false;
   }
@@ -6858,7 +6896,7 @@ static bool write_log_dropped_partitions(ALTER_PARTITION_PARAM_TYPE *lpt,
   res= act.iterate(mode);
   if (res || mode != Action_drop::DROP_BACKUPS)
     return res;
-  return act.iterate(Action_drop::RENAME_TO_BACKUPS);
+  return act.iterate(Action_drop::ROLLBACK_FROM_BACKUPS);
 }
 
 
@@ -6972,29 +7010,6 @@ bool write_log_drop_backup_frm(ALTER_PARTITION_PARAM_TYPE *lpt)
 }
 
 
-/**
-  Rename partitions marked for drop to TMP partitions and write rollback_chain
-  so it reverts these operations. Write cleanup_chain so it drops TMP partitions,
-  but only when rollback_chain is inactive.
-*/
-
-static bool alter_partition_drop(ALTER_PARTITION_PARAM_TYPE *lpt)
-{
-  char path[FN_REFLEN + 1];
-  build_table_filename(path, sizeof(path) - 1, lpt->db.str, lpt->table_name.str, "", 0);
-
-  Action_drop act(lpt, path, NULL);
-  if (act.process_phases())
-  {
-    // FIXME: test
-    my_error(ER_DDL_LOG_ERROR, MYF(0));
-    return true;
-  }
-
-  return false;
-}
-
-
 // FIXME: converge with alter_partition_drop() (construct Action in fast_alter())
 static bool alter_partition_add(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
@@ -7002,7 +7017,7 @@ static bool alter_partition_add(ALTER_PARTITION_PARAM_TYPE *lpt)
   build_table_filename(path, sizeof(path) - 1, lpt->db.str, lpt->table_name.str, "", 0);
 
   Action_add act(lpt, path, NULL);
-  if (act.process_phases())
+  if (act.process())
   {
     // FIXME: test
     my_error(ER_DDL_LOG_ERROR, MYF(0));
@@ -7141,7 +7156,8 @@ static bool write_log_final_change_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
   if (write_log_changed_partitions(lpt, (const char*)path))
     goto error;
   if (write_log_dropped_partitions(lpt, (const char*)path,
-                                   Action_drop::DROP_ADDED_PARTS,
+                                  // FIXME:
+                                   Action_drop::/*DROP_ADDED_PARTS*/ NO_PHASE,
                                    lpt->alter_info->partition_flags & ALTER_PARTITION_REORGANIZE ?
                                    &lpt->part_info->temp_partitions : NULL))
     goto error;
@@ -7755,6 +7771,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     lpt->cleanup_chain= &cleanup_chain;
     lpt->rollback_chain= &rollback_chain;
 
+    Action_drop action_drop(lpt);
+
     /*
        part_info chain contains roll forward actions,
        cleanup_chain drops shadow frm.
@@ -7771,8 +7789,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("drop_partition_3") ||
         alter_close_table(lpt) ||
         ERROR_INJECT("drop_partition_4") ||
-        // FIXME: test drop partition with subpartitions, drop subpartition
-        alter_partition_drop(lpt) ||
+        action_drop.process() ||
         ERROR_INJECT("drop_partition_5") ||
         write_log_drop_backup_frm(lpt) ||
         ERROR_INJECT("drop_partition_6") ||
