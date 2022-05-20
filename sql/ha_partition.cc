@@ -388,6 +388,7 @@ void ha_partition::init_handler_variables()
   m_new_file= NULL;
   m_reorged_parts= 0;
   m_added_file= NULL;
+  m_added_count= 0;
   m_tot_parts= 0;
   m_part_spec.start_part= NO_CURRENT_PART_ID;
   m_scan_value= 2;
@@ -1655,12 +1656,15 @@ bool ha_partition::is_crashed() const
 
 int ha_partition::prepare_new_partition(TABLE *tbl,
                                         HA_CREATE_INFO *create_info,
-                                        handler *file, const char *part_name,
+                                        const char *part_name,
                                         partition_element *p_elem,
                                         uint disable_non_uniq_indexes)
 {
   int error;
   DBUG_ENTER("prepare_new_partition");
+
+  const uint part= p_elem->serial_id(m_part_info->num_subparts);
+  handler *file= m_new_file[part];
 
   /*
     This call to set_up_table_before_create() is done for an alter table.
@@ -1718,6 +1722,8 @@ int ha_partition::prepare_new_partition(TABLE *tbl,
   if (disable_non_uniq_indexes)
     file->ha_disable_indexes(HA_KEY_SWITCH_NONUNIQ_SAVE);
 
+  m_added_file[m_added_count++]= file;
+
   DBUG_RETURN(0);
 error_external_lock:
   (void) file->ha_close();
@@ -1733,7 +1739,6 @@ error_create:
 
   SYNOPSIS
     cleanup_new_partition()
-    part_count             Number of partitions to remove
 
   RETURN VALUE
     NONE
@@ -1755,7 +1760,7 @@ error_create:
     which can then be used to undo the call.
 */
 
-void ha_partition::cleanup_new_partition(uint part_count)
+void ha_partition::cleanup_new_partition()
 {
   DBUG_ENTER("ha_partition::cleanup_new_partition");
 
@@ -1763,7 +1768,7 @@ void ha_partition::cleanup_new_partition(uint part_count)
   {
     THD *thd= ha_thd();
     handler **file= m_added_file;
-    while ((part_count > 0) && (*file))
+    while (*file)
     {
       (*file)->ha_external_unlock(thd);
       (*file)->ha_close();
@@ -1771,10 +1776,10 @@ void ha_partition::cleanup_new_partition(uint part_count)
       /* Leave the (*file)->delete_table(part_name) to the ddl-log */
 
       file++;
-      part_count--;
     }
     m_added_file= NULL;
   }
+  m_new_file= NULL;
   DBUG_VOID_RETURN;
 }
 
@@ -1807,38 +1812,32 @@ void ha_partition::cleanup_new_partition(uint part_count)
     get zero length and a NULL reference here.
 */
 
-int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
-                                    const char *path,
-                                    ulonglong * const copied,
-                                    ulonglong * const deleted,
-                                    const uchar *pack_frm_data
-                                    __attribute__((unused)),
-                                    size_t pack_frm_len
-                                    __attribute__((unused)))
+int ha_partition::allocate_partitions()
 {
   List_iterator<partition_element> part_it(m_part_info->partitions);
-  List_iterator <partition_element> t_it(m_part_info->temp_partitions);
-  char part_name_buff[FN_REFLEN + 1];
-  uint num_parts= m_part_info->partitions.elements;
-  uint num_subparts= m_part_info->num_subparts;
+  const uint num_parts= m_part_info->partitions.elements;
+  const uint num_subparts= m_part_info->is_sub_partitioned() ?
+    m_part_info->num_subparts : 1;
   uint i= 0;
   uint num_remain_partitions, part_count, orig_count;
   handler **new_file_array;
-  int error= 1;
   bool first;
-  uint temp_partitions= m_part_info->temp_partitions.elements;
+  const uint temp_partitions= m_part_info->temp_partitions.elements;
   THD *thd= ha_thd();
-  DBUG_ENTER("ha_partition::change_partitions");
+  DBUG_ENTER("ha_partition::allocate_partitions");
 
+#if 0
+  // FIXME: put somewhere
+  char part_name_buff[FN_REFLEN + 1];
   /*
     Assert that it works without HA_FILE_BASED and lower_case_table_name = 2.
     We use m_file[0] as long as all partitions have the same storage engine.
   */
   DBUG_ASSERT(!strcmp(path, get_canonical_filename(m_file[0], path,
                                                    part_name_buff)));
+#endif
+
   m_reorged_parts= 0;
-  if (!m_part_info->is_sub_partitioned())
-    num_subparts= 1;
 
   /*
     Step 1:
@@ -1900,6 +1899,7 @@ int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
     DBUG_RETURN(HA_ERR_OUT_OF_MEM);
   }
   m_added_file= &new_file_array[num_remain_partitions + 1];
+  m_added_count= 0;
 
   /*
     Step 3:
@@ -2004,7 +2004,42 @@ int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
       }
     }
   } while (++i < num_parts);
-  first= FALSE;
+
+  m_new_file= new_file_array;
+  DBUG_RETURN(0);
+}
+
+
+int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
+                                    const char *path,
+                                    ulonglong * const copied,
+                                    ulonglong * const deleted,
+                                    const uchar *pack_frm_data
+                                    __attribute__((unused)),
+                                    size_t pack_frm_len
+                                    __attribute__((unused)))
+{
+  List_iterator<partition_element> part_it(m_part_info->partitions);
+  List_iterator <partition_element> t_it(m_part_info->temp_partitions);
+  char part_name_buff[FN_REFLEN + 1];
+  uint num_parts= m_part_info->partitions.elements;
+  uint num_subparts= m_part_info->num_subparts;
+  uint i= 0;
+  int error;
+  uint temp_partitions= m_part_info->temp_partitions.elements;
+  DBUG_ENTER("ha_partition::change_partitions");
+
+  /*
+    Assert that it works without HA_FILE_BASED and lower_case_table_name = 2.
+    We use m_file[0] as long as all partitions have the same storage engine.
+  */
+  DBUG_ASSERT(!strcmp(path, get_canonical_filename(m_file[0], path,
+                                                   part_name_buff)));
+
+  if ((error= allocate_partitions()))
+    DBUG_RETURN(error);
+  DBUG_ASSERT(m_new_file);
+
   /*
     Step 5:
       Create the new partitions and also open, lock and call external_lock
@@ -2019,12 +2054,11 @@ int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
 
   uint disable_non_uniq_indexes= indexes_are_disabled();
 
-  i= 0;
-  part_count= 0;
   part_it.rewind();
   do
   {
     partition_element *part_elem= part_it++;
+    DBUG_ASSERT(i == part_elem->id);
     if (part_elem->part_state == PART_TO_BE_ADDED ||
         part_elem->part_state == PART_CHANGED)
     {
@@ -2040,10 +2074,12 @@ int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
       if (m_part_info->is_sub_partitioned())
       {
         List_iterator<partition_element> sub_it(part_elem->subpartitions);
-        uint j= 0, part;
+        uint j= 0;
         do
         {
           partition_element *sub_elem= sub_it++;
+          DBUG_ASSERT(part_elem == sub_elem->parent_part);
+          DBUG_ASSERT(j == sub_elem->id);
           if (unlikely((error=
                         create_subpartition_name(part_name_buff,
                                                  sizeof(part_name_buff), path,
@@ -2051,23 +2087,19 @@ int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
                                                  sub_elem->partition_name,
                                                  name_variant))))
           {
-            cleanup_new_partition(part_count);
+            cleanup_new_partition();
             DBUG_RETURN(error);
           }
-          part= i * num_subparts + j;
           DBUG_PRINT("info", ("Add subpartition %s", part_name_buff));
           if (unlikely((error=
                         prepare_new_partition(table, create_info,
-                                              new_file_array[part],
                                               (const char *)part_name_buff,
                                               sub_elem,
                                               disable_non_uniq_indexes))))
           {
-            cleanup_new_partition(part_count);
+            cleanup_new_partition();
             DBUG_RETURN(error);
           }
-
-          m_added_file[part_count++]= new_file_array[part];
         } while (++j < num_subparts);
       }
       else
@@ -2078,23 +2110,20 @@ int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
                                             part_elem->partition_name,
                                             name_variant, TRUE))))
         {
-          cleanup_new_partition(part_count);
+          cleanup_new_partition();
           DBUG_RETURN(error);
         }
 
         DBUG_PRINT("info", ("Add partition %s", part_name_buff));
         if (unlikely((error=
                       prepare_new_partition(table, create_info,
-                                            new_file_array[i],
                                             (const char *)part_name_buff,
                                             part_elem,
                                             disable_non_uniq_indexes))))
         {
-          cleanup_new_partition(part_count);
+          cleanup_new_partition();
           DBUG_RETURN(error);
         }
-
-        m_added_file[part_count++]= new_file_array[i];
       }
     }
   } while (++i < num_parts);
@@ -2121,16 +2150,13 @@ int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
     DBUG_ASSERT(part_elem->part_state == PART_TO_BE_REORGED);
     part_elem->part_state= PART_TO_BE_DROPPED;
   }
-  DBUG_ASSERT(m_new_file == 0);
-  m_new_file= new_file_array;
   if (unlikely((error= copy_partitions(copied, deleted))))
   {
     /*
       Close and unlock the new temporary partitions.
       They will later be deleted through the ddl-log.
     */
-    cleanup_new_partition(part_count);
-    m_new_file= 0;
+    cleanup_new_partition();
   }
   DBUG_RETURN(error);
 }
