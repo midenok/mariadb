@@ -6422,7 +6422,7 @@ public:
     switch (phase)
     {
     case RENAME_TO_BACKUPS:
-      /* Rollback from backup */
+      /* Log rollback from backup */
       ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
       ddl_log_entry.name= { part_name, strlen(part_name) };
       ddl_log_entry.from_name= { new_name, strlen(new_name) };
@@ -6553,7 +6553,7 @@ public:
   bool check_state(partition_element *part_elem)
   {
     if (phase == ADD_PARTITIONS &&
-        part_elem->part_state == PART_IS_ADDED)
+        part_elem->part_state == PART_TO_BE_ADDED)
     {
       DBUG_ASSERT(part_info->temp_partitions.elements);
       return true;
@@ -7586,9 +7586,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("change_partition_2") ||
         wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
         ERROR_INJECT("change_partition_3") ||
-        alter_close_table(lpt) ||
-        ERROR_INJECT("change_partition_4") ||
         action_change.process() ||
+        ERROR_INJECT("change_partition_4") ||
+        alter_close_table(lpt) ||
         ERROR_INJECT("change_partition_5") ||
         write_log_drop_backup_frm(lpt) ||
         ERROR_INJECT("change_partition_6") ||
