@@ -559,8 +559,6 @@ public:
                         const uchar *pack_frm_data, size_t pack_frm_len)
     override;
   int allocate_partitions();
-  int drop_partitions(const char *path) override;
-  int rename_partitions(const char *path) override;
   bool get_no_parts(const char *, uint *num_parts) override
   {
     DBUG_ENTER("ha_partition::get_no_parts");

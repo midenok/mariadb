@@ -5481,23 +5481,6 @@ handler::ha_change_partitions(HA_CREATE_INFO *create_info,
 
 
 /**
-  Rename partitions: public interface.
-
-  @sa handler::rename_partitions()
-*/
-
-int
-handler::ha_rename_partitions(const char *path)
-{
-  DBUG_ASSERT(!table->db_stat);
-
-  mark_trx_read_write();
-
-  return rename_partitions(path);
-}
-
-
-/**
   Tell the storage engine that it is allowed to "disable transaction" in the
   handler. It is a hint that ACID is not required - it was used in NDB for
   ALTER TABLE, for example, when data are copied to temporary table.

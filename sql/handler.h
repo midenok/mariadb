@@ -3626,8 +3626,6 @@ public:
                            ulonglong * const deleted,
                            const uchar *pack_frm_data,
                            size_t pack_frm_len);
-  int ha_drop_partitions(const char *path);
-  int ha_rename_partitions(const char *path);
 
   void adjust_next_insert_id_after_explicit_value(ulonglong nr);
   int update_auto_increment();
@@ -5141,10 +5139,6 @@ public:
                                 ulonglong * const deleted,
                                 const uchar *pack_frm_data,
                                 size_t pack_frm_len)
-  { return HA_ERR_WRONG_COMMAND; }
-  virtual int drop_partitions(const char *path)
-  { return HA_ERR_WRONG_COMMAND; }
-  virtual int rename_partitions(const char *path)
   { return HA_ERR_WRONG_COMMAND; }
   virtual bool set_ha_share_ref(Handler_share **arg_ha_share)
   {
