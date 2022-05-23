@@ -5481,23 +5481,6 @@ handler::ha_change_partitions(HA_CREATE_INFO *create_info,
 
 
 /**
-  Drop partitions: public interface.
-
-  @sa handler::drop_partitions()
-*/
-
-int
-handler::ha_drop_partitions(const char *path)
-{
-  DBUG_ASSERT(!table->db_stat);
-
-  mark_trx_read_write();
-
-  return drop_partitions(path);
-}
-
-
-/**
   Rename partitions: public interface.
 
   @sa handler::rename_partitions()
