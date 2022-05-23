@@ -5748,6 +5748,10 @@ the generated partition syntax in a correct manner.
               found_last= TRUE;
           }
         } while (++part_count < tab_part_info->num_parts);
+        tab_it.rewind();
+        part_count= 0;
+        while (partition_element *el= tab_it++)
+          el->id= part_count++;
         if (drop_count != num_parts_reorged)
         {
           my_error(ER_PARTITION_DOES_NOT_EXIST, MYF(0));
