@@ -47,6 +47,7 @@ typedef struct st_key_range key_range;
 #define NORMAL_PART_NAME 0
 #define TEMP_PART_NAME 1
 #define RENAMED_PART_NAME 2
+#define SKIP_PART_NAME 255
 
 typedef struct st_lock_param_type
 {
