@@ -467,6 +467,10 @@ public:
   {
     return m_file;
   }
+  handler **get_new_handlers()
+  {
+    return m_new_file;
+  }
   ha_partition *get_clone_source()
   {
     return m_is_clone_of;

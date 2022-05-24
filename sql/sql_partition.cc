@@ -6223,6 +6223,7 @@ protected:
   partition_info *part_info;
   DDL_LOG_STATE *rollback_chain;
   DDL_LOG_STATE *cleanup_chain;
+  ha_partition *hp;
 
 public:
   enum Phase
@@ -6240,8 +6241,10 @@ public:
                          parts(&lpt->part_info->partitions),
                          lpt(lpt), table(lpt->table), part_info(lpt->part_info),
                          rollback_chain(&lpt->rollback_chain),
-                         cleanup_chain(&lpt->cleanup_chain)
+                         cleanup_chain(&lpt->cleanup_chain),
+                         hp((ha_partition *) table->file)
   {
+    DBUG_ASSERT(table->file->ht->db_type == DB_TYPE_PARTITION_DB);
     bzero(&ddl_log_entry, sizeof(ddl_log_entry));
 
     build_table_filename(path_buf, sizeof(path_buf) - 1, lpt->db.str,
@@ -6411,11 +6414,6 @@ public:
   bool process_partition(partition_element *part_elem,
                          partition_element *sub_elem)
   {
-
-    DBUG_ASSERT(phase == DROP_BACKUPS || phase == RENAME_TO_BACKUPS);
-    DBUG_ASSERT(part_elem->part_state == PART_TO_BE_DROPPED ||
-                part_elem->part_state == PART_TO_BE_REORGED);
-
     if (build_names(part_elem, sub_elem))
       return true;
 
@@ -6427,27 +6425,31 @@ public:
       /* Log rollback from backup */
       DBUG_ASSERT(from_name_type == NORMAL_PART_NAME);
       DBUG_ASSERT(to_name_type == RENAMED_PART_NAME);
+      DBUG_ASSERT(part_elem->part_state == PART_TO_BE_DROPPED ||
+                  part_elem->part_state == PART_TO_BE_REORGED);
       ddl_log_entry.action_type= DDL_LOG_RENAME_ACTION;
       ddl_log_entry.name= { from_name, strlen(from_name) };
       ddl_log_entry.from_name= { to_name, strlen(to_name) };
       output_chain= rollback_chain;
       break;
+    case RENAME_ADDED_PARTS:
+      DBUG_ASSERT(from_name_type == TEMP_PART_NAME);
+      DBUG_ASSERT(to_name_type == NORMAL_PART_NAME);
+      DBUG_ASSERT(part_elem->part_state == PART_IS_ADDED);
+      ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
+      ddl_log_entry.name= { from_name, strlen(from_name) };
+      output_chain= rollback_chain;
+      break;
     case DROP_BACKUPS:
       DBUG_ASSERT(from_name_type == RENAMED_PART_NAME);
       DBUG_ASSERT(to_name_type == SKIP_PART_NAME);
+      DBUG_ASSERT(part_elem->part_state == PART_TO_BE_DROPPED ||
+                  part_elem->part_state == PART_TO_BE_REORGED);
       ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
       ddl_log_entry.name= { from_name, strlen(from_name) };
       output_chain= cleanup_chain;
       ddl_log_link_chains(cleanup_chain, rollback_chain);
       break;
-    // FIXME: remove
-#if 0
-    case DROP_ADDED_PARTS:
-      ddl_log_entry.action_type= DDL_LOG_DELETE_ACTION;
-      ddl_log_entry.name= { part_name, strlen(part_name) };
-      output_chain= rollback_chain;
-      break;
-#endif
     default:
       DBUG_ASSERT(0);
       return true;
@@ -6460,18 +6462,19 @@ public:
       return true;
     }
 
-    if (phase == RENAME_TO_BACKUPS)
+    if (phase == RENAME_TO_BACKUPS || phase == RENAME_ADDED_PARTS)
     {
       int ha_err;
       /* Rename partition to backup (protected by rollback_chain). */
       DBUG_ASSERT(table->file->ht->db_type == DB_TYPE_PARTITION_DB);
-      handler **files= ((ha_partition *)(table->file))->get_child_handlers();
+      handler **files= (phase == RENAME_ADDED_PARTS ?
+                          hp->get_new_handlers() :
+                          hp->get_child_handlers());
       handler *file= sub_elem ?
         files[part_elem->id * part_info->num_subparts + sub_elem->id] :
         files[part_elem->id];
-      ha_err= file->ha_rename_table(ddl_log_entry.name.str,
-                                    ddl_log_entry.from_name.str);
-      DBUG_ASSERT(ha_err == 0); //FIXME: remove
+      ha_err= file->ha_rename_table(from_name, to_name);
+      DBUG_ASSERT(ha_err == 0); // FIXME: remove
       if (ha_err)
       {
         // FIXME: test
@@ -6488,7 +6491,6 @@ public:
 class Action_add : public Action_drop
 {
 protected:
-  ha_partition *hp;
   uint disable_non_uniq_indexes;
   int ha_err;
 
@@ -6496,8 +6498,6 @@ public:
   Action_add(ALTER_PARTITION_PARAM_TYPE *lpt) :
              Action_drop(lpt)
   {
-    DBUG_ASSERT(table->file->ht->db_type == DB_TYPE_PARTITION_DB);
-    hp= (ha_partition *)table->file;
     disable_non_uniq_indexes= hp->indexes_are_disabled();
     ha_err= hp->allocate_partitions();
   }
@@ -6548,6 +6548,7 @@ public:
   }
 };
 
+
 /**
   Change partition action (ADD HASH/COALESCE/REBUILD/REORGANIZE)
 */
@@ -6586,7 +6587,7 @@ public:
     return false;
   }
 
-  bool rename_to_backups()
+  bool rename_parts()
   {
     from_name_type= NORMAL_PART_NAME;
     to_name_type= RENAMED_PART_NAME;
@@ -6594,9 +6595,16 @@ public:
     processed_state= PART_TO_BE_REORGED;
     if (iterate(RENAME_TO_BACKUPS))
       return true;
-    // FIXME; progress
+    from_name_type= TEMP_PART_NAME;
+    to_name_type= NORMAL_PART_NAME;
+    processed_state= PART_IS_ADDED;
+    parts= &part_info->partitions;
     if (iterate(RENAME_ADDED_PARTS))
       return true;
+    from_name_type= RENAMED_PART_NAME;
+    to_name_type= SKIP_PART_NAME;
+    parts= &part_info->temp_partitions;
+    processed_state= PART_TO_BE_REORGED;
     if (iterate(DROP_BACKUPS))
       return true;
     return false;
@@ -6610,34 +6618,13 @@ public:
     case ADD_PARTITIONS:
       return Action_add::process_partition(part_elem, sub_elem);
     case RENAME_TO_BACKUPS:
+    case RENAME_ADDED_PARTS:
+    case DROP_BACKUPS:
       return Action_drop::process_partition(part_elem, sub_elem);
     default:
-      break;
+      DBUG_ASSERT(0);
+      return true;
     }
-#if 0
-    else
-    {
-      char tmp_name[FN_REFLEN + 1];
-
-      if (Alter_partition_action::process_partition(part_elem, sub_elem))
-        return true;
-
-      if (!sub_elem)
-      {
-        if (create_partition_name(tmp_name, sizeof(tmp_name), path,
-                                  part_elem->partition_name, TEMP_PART_NAME,
-                                  true /* translate */))
-          return true;
-      }
-      else
-      {
-        if (create_subpartition_name(tmp_name, sizeof(tmp_name), path,
-                                      part_elem->partition_name,
-                                      sub_elem->partition_name, TEMP_PART_NAME))
-          return true;
-      }
-    }
-#endif
     return false;
   }
 };
@@ -7596,7 +7583,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("change_partition_4") ||
         alter_close_table(lpt) ||
         ERROR_INJECT("change_partition_5") ||
-        action_change.rename_to_backups() ||
+        action_change.rename_parts() ||
         ERROR_INJECT("change_partition_6") ||
         write_log_drop_backup_frm(lpt) ||
         ERROR_INJECT("change_partition_7") ||

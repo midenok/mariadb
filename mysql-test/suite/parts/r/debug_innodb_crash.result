@@ -449,8 +449,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-shadow-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -530,8 +530,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-shadow-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -613,8 +613,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-shadow-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 # d,crash_drop_partition_7: AFTER recovery
 db.opt
@@ -692,8 +692,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-backup-4-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -773,8 +773,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-backup-4-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -854,8 +854,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-backup-4-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -935,8 +935,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-backup-4-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -1009,8 +1009,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-backup-4-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -1083,8 +1083,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-shadow-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
@@ -1164,8 +1164,8 @@ ALTER TABLE t1 DROP PARTITION p10, p20;
 #sql-shadow-t1.par
 db.opt
 t1#P#p0.ibd
-t1#P#p10#TMP#.ibd
-t1#P#p20#TMP#.ibd
+t1#P#p10#REN#.ibd
+t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
