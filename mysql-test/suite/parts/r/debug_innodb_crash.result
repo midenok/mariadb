@@ -890,7 +890,7 @@ a	b
 4	Original from partition p0
 DROP TABLE t1;
 SET SESSION debug_dbug=@save_dbug;
-SET SESSION debug_dbug="+d,crash_drop_partition_9";
+SET SESSION debug_dbug="+d,crash_done_partition_1";
 RESET MASTER;
 CREATE TABLE t1 (a INT, b VARCHAR(64))
 ENGINE = 'InnoDB'
@@ -900,7 +900,7 @@ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
 PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
 PARTITION p30 VALUES IN (31,32,33,34,35,36,37,38,39));
 INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
-# d,crash_drop_partition_9: BEFORE crash
+# d,crash_done_partition_1: BEFORE crash
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -930,7 +930,7 @@ a	b
 3	Original from partition p0
 4	Original from partition p0
 ALTER TABLE t1 DROP PARTITION p10, p20;
-# d,crash_drop_partition_9: AFTER crash
+# d,crash_done_partition_1: AFTER crash
 #sql-backup-4-t1.frm
 #sql-backup-4-t1.par
 db.opt
@@ -940,7 +940,7 @@ t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
-# d,crash_drop_partition_9: AFTER recovery
+# d,crash_done_partition_1: AFTER recovery
 db.opt
 t1#P#p0.ibd
 t1#P#p30.ibd
@@ -964,7 +964,7 @@ a	b
 master-bin.000001	#	Query	#	#	use `test`; ALTER TABLE t1 DROP PARTITION p10, p20
 DROP TABLE t1;
 SET SESSION debug_dbug=@save_dbug;
-SET SESSION debug_dbug="+d,crash_drop_partition_10";
+SET SESSION debug_dbug="+d,crash_done_partition_2";
 RESET MASTER;
 CREATE TABLE t1 (a INT, b VARCHAR(64))
 ENGINE = 'InnoDB'
@@ -974,7 +974,7 @@ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
 PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
 PARTITION p30 VALUES IN (31,32,33,34,35,36,37,38,39));
 INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
-# d,crash_drop_partition_10: BEFORE crash
+# d,crash_done_partition_2: BEFORE crash
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -1004,7 +1004,7 @@ a	b
 3	Original from partition p0
 4	Original from partition p0
 ALTER TABLE t1 DROP PARTITION p10, p20;
-# d,crash_drop_partition_10: AFTER crash
+# d,crash_done_partition_2: AFTER crash
 #sql-backup-4-t1.frm
 #sql-backup-4-t1.par
 db.opt
@@ -1014,7 +1014,7 @@ t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
-# d,crash_drop_partition_10: AFTER recovery
+# d,crash_done_partition_2: AFTER recovery
 db.opt
 t1#P#p0.ibd
 t1#P#p30.ibd
@@ -1038,7 +1038,7 @@ a	b
 master-bin.000001	#	Query	#	#	use `test`; ALTER TABLE t1 DROP PARTITION p10, p20
 DROP TABLE t1;
 SET SESSION debug_dbug=@save_dbug;
-SET SESSION debug_dbug="+d,fail_drop_partition_5,crash_drop_partition_11";
+SET SESSION debug_dbug="+d,fail_drop_partition_5,crash_fail_partition_1";
 RESET MASTER;
 CREATE TABLE t1 (a INT, b VARCHAR(64))
 ENGINE = 'InnoDB'
@@ -1048,7 +1048,7 @@ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
 PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
 PARTITION p30 VALUES IN (31,32,33,34,35,36,37,38,39));
 INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
-# d,fail_drop_partition_5,crash_drop_partition_11: BEFORE crash
+# d,fail_drop_partition_5,crash_fail_partition_1: BEFORE crash
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -1078,7 +1078,7 @@ a	b
 3	Original from partition p0
 4	Original from partition p0
 ALTER TABLE t1 DROP PARTITION p10, p20;
-# d,fail_drop_partition_5,crash_drop_partition_11: AFTER crash
+# d,fail_drop_partition_5,crash_fail_partition_1: AFTER crash
 #sql-shadow-t1.frm
 #sql-shadow-t1.par
 db.opt
@@ -1088,7 +1088,7 @@ t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
-# d,fail_drop_partition_5,crash_drop_partition_11: AFTER recovery
+# d,fail_drop_partition_5,crash_fail_partition_1: AFTER recovery
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -1119,7 +1119,7 @@ a	b
 4	Original from partition p0
 DROP TABLE t1;
 SET SESSION debug_dbug=@save_dbug;
-SET SESSION debug_dbug="+d,fail_drop_partition_5,crash_drop_partition_12";
+SET SESSION debug_dbug="+d,fail_drop_partition_5,crash_fail_partition_2";
 RESET MASTER;
 CREATE TABLE t1 (a INT, b VARCHAR(64))
 ENGINE = 'InnoDB'
@@ -1129,7 +1129,7 @@ PARTITION p10 VALUES IN (11,12,13,14,15,16,17,18,19),
 PARTITION p20 VALUES IN (21,22,23,24,25,26,27,28,29),
 PARTITION p30 VALUES IN (31,32,33,34,35,36,37,38,39));
 INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1");
-# d,fail_drop_partition_5,crash_drop_partition_12: BEFORE crash
+# d,fail_drop_partition_5,crash_fail_partition_2: BEFORE crash
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
@@ -1159,7 +1159,7 @@ a	b
 3	Original from partition p0
 4	Original from partition p0
 ALTER TABLE t1 DROP PARTITION p10, p20;
-# d,fail_drop_partition_5,crash_drop_partition_12: AFTER crash
+# d,fail_drop_partition_5,crash_fail_partition_2: AFTER crash
 #sql-shadow-t1.frm
 #sql-shadow-t1.par
 db.opt
@@ -1169,7 +1169,7 @@ t1#P#p20#REN#.ibd
 t1#P#p30.ibd
 t1.frm
 t1.par
-# d,fail_drop_partition_5,crash_drop_partition_12: AFTER recovery
+# d,fail_drop_partition_5,crash_fail_partition_2: AFTER recovery
 db.opt
 t1#P#p0.ibd
 t1#P#p10.ibd
