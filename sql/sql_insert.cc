@@ -4271,8 +4271,8 @@ bool select_insert::prepare_eof()
 
   if (unlikely(error))
   {
-    if (!(thd->transaction->stmt.modified_non_trans_table &&
-          !atomic_replace))
+    if (thd->transaction->stmt.modified_non_trans_table &&
+        !atomic_replace)
     {
       if (binlog_query())
         table->file->print_error(error,MYF(0));
