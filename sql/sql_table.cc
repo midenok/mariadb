@@ -4704,7 +4704,7 @@ int create_table_impl(THD *thd,
 
         TABLE_LIST table_list;
         TABLE *table= create_info->table;
-        table_list.init_one_table(&orig_db, &orig_table_name, 0, TL_WRITE_ALLOW_WRITE);
+        table_list.init_one_table(&orig_db, &orig_table_name, 0, TL_READ);
         table_list.table= table;
 
         if (check_if_log_table(&table_list, TRUE, "CREATE OR REPLACE"))
@@ -4721,7 +4721,7 @@ int create_table_impl(THD *thd,
           /* NOTE: here FK referencing is checked */
           if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
           {
-            Open_table_context ot_ctx(thd, TL_READ|MYSQL_OPEN_GET_NEW_TABLE);
+            Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN);
             if (!create_info->table)
             {
               if (open_table(thd, &table_list, &ot_ctx))

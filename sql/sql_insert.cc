@@ -3876,7 +3876,7 @@ select_create::select_create(THD *thd, TABLE_LIST *table_arg,
   m_plock(NULL), exit_done(0),
   saved_tmp_table_share(0)
 {
-  DBUG_ASSERT(create_info->default_table_charset);
+  DBUG_ASSERT(create_info_par->default_table_charset);
   bzero(&ddl_log_state_create, sizeof(ddl_log_state_create));
   bzero(&ddl_log_state_rm, sizeof(ddl_log_state_rm));
   create_info= create_info_par;
