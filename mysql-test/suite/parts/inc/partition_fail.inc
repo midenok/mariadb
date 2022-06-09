@@ -9,6 +9,14 @@ if ($log_bin)
   let $binlog_file=master-bin.000001;
 }
 
+if ($create_statement2)
+{
+  --eval $create_statement2
+}
+if ($insert_statement2)
+{
+  --eval $insert_statement2
+}
 --eval $create_statement
 --eval $insert_statement
 --let $dbug_flag= `select @@session.debug_dbug`
@@ -36,6 +44,17 @@ show warnings;
 SHOW CREATE TABLE t1;
 --sorted_result
 SELECT * FROM t1;
+if ($show_statement)
+{
+  --error 0,ER_NO_SUCH_TABLE
+  --eval $show_statement
+}
+if ($select_statement)
+{
+  --sorted_result
+  --error 0,ER_NO_SUCH_TABLE
+  --eval $select_statement
+}
 
 --source include/print_ddl_log.inc
 --disable_query_log
@@ -59,6 +78,14 @@ if ($log_bin)
 {
   RESET MASTER;
 }
+if ($create_statement2)
+{
+  --eval $create_statement2
+}
+if ($insert_statement2)
+{
+  --eval $insert_statement2
+}
 --eval $create_statement
 --eval $insert_statement
 --echo # $dbug_flag: BEFORE failure (under LOCK TABLE)
@@ -67,7 +94,14 @@ if ($log_bin)
 SHOW CREATE TABLE t1;
 --sorted_result
 SELECT * FROM t1;
-LOCK TABLE t1 WRITE;
+if (!$create_statement2)
+{
+  LOCK TABLE t1 WRITE;
+}
+if ($create_statement2)
+{
+  LOCK TABLES t1 WRITE, t2 WRITE;
+}
 --disable_abort_on_error
 --eval $fail_statement
 --enable_abort_on_error
@@ -78,6 +112,17 @@ show warnings;
 SHOW CREATE TABLE t1;
 --sorted_result
 SELECT * FROM t1;
+if ($show_statement)
+{
+  --error 0,ER_NO_SUCH_TABLE
+  --eval $show_statement
+}
+if ($select_statement)
+{
+  --sorted_result
+  --error 0,ER_NO_SUCH_TABLE
+  --eval $select_statement
+}
 if ($log_bin)
 {
   --source include/show_binlog_events.inc

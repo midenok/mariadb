@@ -79,6 +79,28 @@ if ($do_fail)
 }
 let $drop_statement= ;
 
+--source suite/parts/inc/define_points_convin.inc
+let $create_statement2= CREATE TABLE t2 (a INT, b VARCHAR(64)) ENGINE = $engine;
+let $insert_statement2= INSERT INTO t2 VALUES (40, "40 from t2"), (50, "50 from t2");
+let $crash_statement= ALTER TABLE t1 CONVERT TABLE t2 TO PARTITION p40 VALUES IN (40, 50);
+let $drop_statement= DROP TABLE IF EXISTS t2;
+let $show_statement= SHOW CREATE TABLE t2;
+let $select_statement= SELECT * FROM t2;
+if ($do_crash)
+{
+  --source suite/parts/inc/iterate_points_crash.inc
+}
+let $fail_statement= $crash_statement;
+if ($do_fail)
+{
+  --source suite/parts/inc/iterate_points_fail.inc
+}
+let $drop_statement= ;
+let $show_statement= ;
+let $select_statement= ;
+let $create_statement2= ;
+let $insert_statement2= ;
+
 --source suite/parts/inc/define_points_change.inc
 let $crash_statement= ALTER TABLE t1 REORGANIZE PARTITION p10, p20 INTO
 (PARTITION p10 VALUES IN (10,11,12,13,14,15,16),

@@ -1665,7 +1665,8 @@ int ha_partition::allocate_partitions()
   } while (++i < num_parts);
 
   m_new_file= new_file_array;
-  DBUG_RETURN(0);
+  DBUG_RETURN(ERROR_INJECT("alter_partition_alloc_parts") ?
+              HA_ERR_OUT_OF_MEM : 0);
 }
 
 

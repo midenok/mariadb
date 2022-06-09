@@ -6,6 +6,8 @@
 let $points= 'add_partition_1',
   'add_partition_2',
   'add_partition_3',
+  'alter_partition_alloc_parts',
+  'alter_partition_add',
   'add_partition_4',
   'add_partition_5',
   'add_partition_6',
