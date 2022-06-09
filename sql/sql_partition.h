@@ -59,7 +59,6 @@ typedef struct st_lock_param_type
   Alter_info *alter_info;
   Alter_table_ctx *alter_ctx;
   TABLE *table;
-  TABLE *table_from;
   KEY *key_info_buffer;
   LEX_CSTRING db;
   LEX_CSTRING table_name;

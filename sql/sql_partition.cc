@@ -6652,11 +6652,6 @@ static void alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt)
       close_all_tables_for_name(thd, table->s, HA_EXTRA_NOT_USED, NULL);
     }
   }
-  if (lpt->table_from)
-  {
-    close_all_tables_for_name(thd, lpt->table_from->s, HA_EXTRA_NOT_USED, NULL);
-    lpt->table_from= NULL;
-  }
   lpt->table= 0;
   lpt->table_list->table= 0;
 }
@@ -6670,30 +6665,18 @@ static void alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt)
   @return error code if external_unlock fails
 */
 
-static int alter_close_table(THD *thd, TABLE *table)
+static int alter_close_table(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
   int error= 0;
   DBUG_ENTER("alter_close_table");
 
-  if (table->db_stat)
+  if (lpt->table->db_stat)
   {
-    error= mysql_lock_remove(thd, thd->lock, table);
-    error= table->file->ha_close();
-    table->db_stat= 0;                        // Mark file closed
+    error= mysql_lock_remove(lpt->thd, lpt->thd->lock, lpt->table);
+    error= lpt->table->file->ha_close();
+    lpt->table->db_stat= 0;                        // Mark file closed
   }
   DBUG_RETURN(error);
-}
-
-
-inline
-static int alter_close_table(ALTER_PARTITION_PARAM_TYPE *lpt)
-{
-  int err= alter_close_table(lpt->thd, lpt->table);
-  if (err)
-    return err;
-  if (lpt->table_from)
-    err= alter_close_table(lpt->thd, lpt->table);
-  return err;
 }
 
 
@@ -6928,21 +6911,19 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   } /* CONVERT OUT */
   else if ((alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN))
   {
-    lpt->table_from= table_list->next_local->table;
-    lpt->table_from->mark_table_for_reopen();
+    TABLE *table_from= table_list->next_local->table;
+    table_from->mark_table_for_reopen();
     Alter_partition_change action_conv_in(lpt);
 
     if (wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
-        wait_while_table_is_used(thd, lpt->table_from, HA_EXTRA_PREPARE_FOR_RENAME) ||
+        wait_while_table_is_used(thd, table_from, HA_EXTRA_PREPARE_FOR_RENAME) ||
         ERROR_INJECT("convert_partition_1") ||
-        compare_table_with_partition(thd, lpt->table_from, table, NULL, 0) ||
+        compare_table_with_partition(thd, table_from, table, NULL, 0) ||
         ERROR_INJECT("convert_partition_2") ||
         check_table_data(lpt))
       goto err;
 
-    close_all_tables_for_name(lpt->thd, lpt->table_from->s,
-                              HA_EXTRA_NOT_USED, nullptr);
-    lpt->table_from= NULL;
+    close_all_tables_for_name(lpt->thd, table_from->s, HA_EXTRA_NOT_USED, NULL);
 
     if (write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT("convert_partition_3") ||
@@ -6992,10 +6973,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   else
   {
     /*
-      ADD HASH PARTITION/
-      COALESCE PARTITION/
-      REBUILD PARTITION/
       REORGANIZE PARTITION
+      REBUILD PARTITION/
+      COALESCE PARTITION
     */
 
     Alter_partition_change action_change(lpt);
