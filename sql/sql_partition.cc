@@ -6085,8 +6085,11 @@ public:
                                                     table->s->table_name.str,
                                                     MDL_EXCLUSIVE));
 
+    handlerton *ht= part_elem->engine_type ?
+                      part_elem->engine_type : part_info->default_engine_type;
+    DBUG_ASSERT(ht);
     lex_string_set(&ddl_log_entry.handler_name,
-                   ha_resolve_storage_engine_name(part_elem->engine_type));
+                   ha_resolve_storage_engine_name(ht));
     if (!sub_elem)
     {
       if (from_name_type != SKIP_PART_NAME &&
@@ -6258,7 +6261,6 @@ public:
     if (ddl_log_entry.action_type == DDL_LOG_RENAME_TABLE_ACTION)
     {
       int ha_err;
-      /* Rename partition to backup (protected by rollback_chain). */
       DBUG_ASSERT(table->file->ht->db_type == DB_TYPE_PARTITION_DB);
       handler *file= (phase & (RENAME_ADDED_PARTS|CONVERT_IN) ?
                       hp->get_new_handler(part_elem, sub_elem) :
@@ -6267,7 +6269,6 @@ public:
       if (ha_err ||
           ERROR_INJECT("alter_partition_rename_table"))
       {
-        // FIXME: test
         file->print_error(ha_err, MYF(0));
         return true;
       }
@@ -6373,13 +6374,26 @@ public:
       hp->print_error(ha_err, MYF(0));
       return true;
     }
+
+    /*
+      ha_enable_transaction() must be done before ha_create():
+      Maria stores born_transactional and uses it for copy data.
+     */
+    if ((ha_err= mysql_trans_prepare_alter_copy_data(thd)))
+    {
+      hp->print_error(ha_err, MYF(0));
+      return true;
+    }
+
     processed_state= (PART_TO_BE_ADDED|PART_CHANGED);
     if (iterate(ADD_PARTITIONS, TEMP_PART_NAME, SKIP_PART_NAME,
                 &part_info->partitions))
+    {
+      (void) mysql_trans_commit_alter_copy_data(thd, true);
       return true;
+    }
 
-    if ((ha_err= mysql_trans_prepare_alter_copy_data(thd)) ||
-        ERROR_INJECT("change_partition_add_parts_1") ||
+    if (ERROR_INJECT("change_partition_add_parts_1") ||
         (ha_err= hp->copy_partitions(&lpt->copied, &lpt->deleted)) ||
         ERROR_INJECT("change_partition_add_parts_2") ||
         (ha_err= mysql_trans_commit_alter_copy_data(thd, false)) ||
@@ -6408,15 +6422,13 @@ public:
     }
     processed_state= PART_CHANGED|PART_REORGED_DROPPED;
     if (iterate(RENAME_TO_BACKUPS, NORMAL_PART_NAME, RENAMED_PART_NAME,
-                &part_info->partitions))
-      return true;
-    if (ERROR_INJECT("change_partition_rename_parts_1"))
+                &part_info->partitions) ||
+        ERROR_INJECT("change_partition_rename_parts_1"))
       return true;
     processed_state= PART_TO_BE_ADDED|PART_CHANGED;
     if (iterate(RENAME_ADDED_PARTS, TEMP_PART_NAME, NORMAL_PART_NAME,
-                &part_info->partitions))
-      return true;
-    if (ERROR_INJECT("change_partition_rename_parts_2"))
+                &part_info->partitions) ||
+        ERROR_INJECT("change_partition_rename_parts_2"))
       return true;
     if (part_info->temp_partitions.elements)
     {
@@ -6625,7 +6637,6 @@ static void alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt)
                                         MDL_EXCLUSIVE) &&
         wait_while_table_is_used(thd, table, HA_EXTRA_FORCE_REOPEN))
     {
-      DBUG_ASSERT(0); // FIXME: this branch is not needed
       /*
         Did not succeed in getting exclusive access to the table.
 
@@ -6634,6 +6645,8 @@ static void alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt)
 
         Temporarily remove it from the locked table list, so that it will get
         reopened.
+
+        Note: tested by partition_special_myisam partition_special_innodb
       */
       thd->locked_tables_list.unlink_from_list(thd,
                                               table->pos_in_locked_tables,

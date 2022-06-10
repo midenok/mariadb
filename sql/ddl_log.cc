@@ -1364,7 +1364,10 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
   if (ddl_log_entry->handler_name.length)
   {
     if (!(file= create_handler(thd, mem_root, &handler_name)))
+    {
+      error= 1;
       goto end;
+    }
     hton= file->ht;
   }
 
@@ -2015,7 +2018,10 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
 
     if (!(org_file= create_handler(thd, mem_root,
                                    &ddl_log_entry->from_handler_name)))
+    {
+      error= 1;
       goto end;
+    }
     /* Handlerton of the final table and any temporary tables */
     org_hton= org_file->ht;
     /*
@@ -2327,7 +2333,10 @@ static int ddl_log_execute_action(THD *thd, MEM_ROOT *mem_root,
         Query length is stored in unique_id
       */
       if (recovery_state.query.alloc((size_t) (ddl_log_entry->unique_id+1)))
+      {
+        error= 1;
         goto end;
+      }
       recovery_state.query.length(0);
       recovery_state.db.copy(ddl_log_entry->db.str, ddl_log_entry->db.length,
                              system_charset_info);
