@@ -6912,7 +6912,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   else if ((alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN))
   {
     TABLE *table_from= table_list->next_local->table;
-    table_from->mark_table_for_reopen();
+    TABLE_LIST *tl_from= table_from->pos_in_locked_tables;
     Alter_partition_change action_conv_in(lpt);
 
     if (wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
@@ -6923,7 +6923,10 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         check_table_data(lpt))
       goto err;
 
-    close_all_tables_for_name(lpt->thd, table_from->s, HA_EXTRA_NOT_USED, NULL);
+    close_all_tables_for_name(lpt->thd, table_from->s,
+                              HA_EXTRA_PREPARE_FOR_RENAME, NULL);
+    if (tl_from)
+      tl_from->table= NULL;
 
     if (write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT("convert_partition_3") ||
@@ -6941,7 +6944,11 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("convert_partition_9") ||
         alter_partition_log_backup(lpt) ||
         alter_partition_binlog(lpt))
+    {
+      if (tl_from)
+        thd->locked_tables_list.add_back_last_deleted_lock(tl_from);
       goto fail;
+    }
   } /* CONVERT IN */
   else if ((alter_info->partition_flags & ALTER_PARTITION_ADD) &&
            (part_info->part_type == RANGE_PARTITION ||

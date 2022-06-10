@@ -114,13 +114,13 @@ SHOW CREATE TABLE t1;
 SELECT * FROM t1;
 if ($show_statement)
 {
-  --error 0,ER_NO_SUCH_TABLE
+  --error 0,ER_TABLE_NOT_LOCKED
   --eval $show_statement
 }
 if ($select_statement)
 {
   --sorted_result
-  --error 0,ER_NO_SUCH_TABLE
+  --error 0,ER_TABLE_NOT_LOCKED
   --eval $select_statement
 }
 if ($log_bin)
