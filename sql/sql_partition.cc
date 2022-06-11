@@ -6413,6 +6413,7 @@ public:
 
   bool rename_parts()
   {
+    DEBUG_SYNC(lpt->thd, "before_rename_partitions");
     if (part_info->temp_partitions.elements)
     {
       processed_state= PART_TO_BE_REORGED;
