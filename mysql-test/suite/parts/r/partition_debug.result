@@ -25,18 +25,6 @@ SET @save_dbug=@@debug_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_abort_1";
 CREATE TABLE t2 (a INT, b VARCHAR(64));
 INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
 (PARTITION p0 VALUES LESS THAN (10),
 PARTITION p1 VALUES LESS THAN MAXVALUE);
@@ -75,6 +63,18 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 # d,exchange_partition_abort_1: AFTER crash
 db.opt
@@ -121,7 +121,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -134,23 +133,12 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_abort_2";
 CREATE TABLE t2 (a INT, b VARCHAR(64));
 INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
 (PARTITION p0 VALUES LESS THAN (10),
 PARTITION p1 VALUES LESS THAN MAXVALUE);
@@ -189,6 +177,18 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 # d,exchange_partition_abort_2: AFTER crash
 db.opt
@@ -235,7 +235,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -248,23 +247,12 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_abort_3";
 CREATE TABLE t2 (a INT, b VARCHAR(64));
 INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
 (PARTITION p0 VALUES LESS THAN (10),
 PARTITION p1 VALUES LESS THAN MAXVALUE);
@@ -303,6 +291,18 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 # d,exchange_partition_abort_3: AFTER crash
 db.opt
@@ -349,7 +349,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -362,23 +361,12 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_abort_4";
 CREATE TABLE t2 (a INT, b VARCHAR(64));
 INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
 (PARTITION p0 VALUES LESS THAN (10),
 PARTITION p1 VALUES LESS THAN MAXVALUE);
@@ -417,6 +405,18 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 # d,exchange_partition_abort_4: AFTER crash
 #sql-exchange.frm
@@ -454,7 +454,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -467,23 +466,12 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_abort_5";
 CREATE TABLE t2 (a INT, b VARCHAR(64));
 INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
 (PARTITION p0 VALUES LESS THAN (10),
 PARTITION p1 VALUES LESS THAN MAXVALUE);
@@ -522,6 +510,18 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 # d,exchange_partition_abort_5: AFTER crash
 #sql-exchange.frm
@@ -559,7 +559,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -572,23 +571,12 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_abort_6";
 CREATE TABLE t2 (a INT, b VARCHAR(64));
 INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
 (PARTITION p0 VALUES LESS THAN (10),
 PARTITION p1 VALUES LESS THAN MAXVALUE);
@@ -627,6 +615,18 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 # d,exchange_partition_abort_6: AFTER crash
 #sql-exchange.frm
@@ -664,7 +664,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -677,23 +676,12 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_abort_7";
 CREATE TABLE t2 (a INT, b VARCHAR(64));
 INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
 (PARTITION p0 VALUES LESS THAN (10),
 PARTITION p1 VALUES LESS THAN MAXVALUE);
@@ -732,6 +720,18 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 # d,exchange_partition_abort_7: AFTER crash
 #sql-exchange.frm
@@ -769,7 +769,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -782,23 +781,12 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_abort_8";
 CREATE TABLE t2 (a INT, b VARCHAR(64));
 INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
 (PARTITION p0 VALUES LESS THAN (10),
 PARTITION p1 VALUES LESS THAN MAXVALUE);
@@ -837,6 +825,18 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 # d,exchange_partition_abort_8: AFTER crash
 db.opt
@@ -883,7 +883,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -896,23 +895,12 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_abort_9";
 CREATE TABLE t2 (a INT, b VARCHAR(64));
 INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
 (PARTITION p0 VALUES LESS THAN (10),
 PARTITION p1 VALUES LESS THAN MAXVALUE);
@@ -951,6 +939,18 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 # d,exchange_partition_abort_9: AFTER crash
 db.opt
@@ -997,7 +997,6 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1010,6 +1009,7 @@ a	b
 2	Original from partition p0
 3	Original from partition p0
 4	Original from partition p0
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET @save_dbug=@@debug_dbug;
@@ -1054,21 +1054,12 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 ERROR HY000: Error in DDL log
 # d,exchange_partition_fail_1: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
 db.opt
 t1#P#p0.MYD
 t1#P#p0.MYI
@@ -1102,7 +1093,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1115,6 +1105,105 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+#
+# Reading backup ddl log file
+#
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t2 (a INT, b VARCHAR(64));
+INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
+CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
+(PARTITION p0 VALUES LESS THAN (10),
+PARTITION p1 VALUES LESS THAN MAXVALUE);
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1"), (21, "Original from partition p1"), (22, "Original from partition p1"), (23, "Original from partition p1"), (24, "Original from partition p1");
+# d,exchange_partition_fail_1: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLES t1 WRITE, t2 WRITE;
+ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
+ERROR HY000: Error in DDL log
+# d,exchange_partition_fail_1: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
+UNLOCK TABLES;
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_fail_2";
@@ -1158,21 +1247,12 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 ERROR HY000: Error in DDL log
 # d,exchange_partition_fail_2: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
 db.opt
 t1#P#p0.MYD
 t1#P#p0.MYI
@@ -1206,7 +1286,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1219,6 +1298,105 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+#
+# Reading backup ddl log file
+#
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t2 (a INT, b VARCHAR(64));
+INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
+CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
+(PARTITION p0 VALUES LESS THAN (10),
+PARTITION p1 VALUES LESS THAN MAXVALUE);
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1"), (21, "Original from partition p1"), (22, "Original from partition p1"), (23, "Original from partition p1"), (24, "Original from partition p1");
+# d,exchange_partition_fail_2: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLES t1 WRITE, t2 WRITE;
+ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
+ERROR HY000: Error in DDL log
+# d,exchange_partition_fail_2: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
+UNLOCK TABLES;
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_fail_3";
@@ -1262,21 +1440,12 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
-ERROR HY000: Error on rename of './test/t2' to './test/#sql-exchange' (errno: 0 "Internal error/check (Not system error)")
+ERROR HY000: Error on rename of './test/t2' to '#TMP' (errno: 0 "Internal error/check (Not system error)")
 # d,exchange_partition_fail_3: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1025	Error on rename of './test/t2' to '#TMP' (errno: 0 "Internal error/check (Not system error)")
 db.opt
 t1#P#p0.MYD
 t1#P#p0.MYI
@@ -1310,7 +1479,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1323,6 +1491,105 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+#
+# Reading backup ddl log file
+#
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t2 (a INT, b VARCHAR(64));
+INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
+CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
+(PARTITION p0 VALUES LESS THAN (10),
+PARTITION p1 VALUES LESS THAN MAXVALUE);
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1"), (21, "Original from partition p1"), (22, "Original from partition p1"), (23, "Original from partition p1"), (24, "Original from partition p1");
+# d,exchange_partition_fail_3: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLES t1 WRITE, t2 WRITE;
+ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
+ERROR HY000: Error on rename of './test/t2' to '#TMP' (errno: 0 "Internal error/check (Not system error)")
+# d,exchange_partition_fail_3: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1025	Error on rename of './test/t2' to '#TMP' (errno: 0 "Internal error/check (Not system error)")
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
+UNLOCK TABLES;
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_fail_4";
@@ -1366,21 +1633,12 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 ERROR HY000: Error in DDL log
 # d,exchange_partition_fail_4: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
 db.opt
 t1#P#p0.MYD
 t1#P#p0.MYI
@@ -1414,7 +1672,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1427,6 +1684,105 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+#
+# Reading backup ddl log file
+#
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t2 (a INT, b VARCHAR(64));
+INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
+CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
+(PARTITION p0 VALUES LESS THAN (10),
+PARTITION p1 VALUES LESS THAN MAXVALUE);
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1"), (21, "Original from partition p1"), (22, "Original from partition p1"), (23, "Original from partition p1"), (24, "Original from partition p1");
+# d,exchange_partition_fail_4: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLES t1 WRITE, t2 WRITE;
+ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
+ERROR HY000: Error in DDL log
+# d,exchange_partition_fail_4: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
+UNLOCK TABLES;
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_fail_5";
@@ -1470,21 +1826,12 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 ERROR HY000: Error on rename of './test/t1#P#p0' to './test/t2' (errno: 0 "Internal error/check (Not system error)")
 # d,exchange_partition_fail_5: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1025	Error on rename of './test/t1#P#p0' to './test/t2' (errno: 0 "Internal error/check (Not system error)")
 db.opt
 t1#P#p0.MYD
 t1#P#p0.MYI
@@ -1518,7 +1865,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1531,6 +1877,105 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+#
+# Reading backup ddl log file
+#
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t2 (a INT, b VARCHAR(64));
+INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
+CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
+(PARTITION p0 VALUES LESS THAN (10),
+PARTITION p1 VALUES LESS THAN MAXVALUE);
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1"), (21, "Original from partition p1"), (22, "Original from partition p1"), (23, "Original from partition p1"), (24, "Original from partition p1");
+# d,exchange_partition_fail_5: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLES t1 WRITE, t2 WRITE;
+ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
+ERROR HY000: Error on rename of './test/t1#P#p0' to './test/t2' (errno: 0 "Internal error/check (Not system error)")
+# d,exchange_partition_fail_5: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1025	Error on rename of './test/t1#P#p0' to './test/t2' (errno: 0 "Internal error/check (Not system error)")
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
+UNLOCK TABLES;
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_fail_6";
@@ -1574,21 +2019,12 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 ERROR HY000: Error in DDL log
 # d,exchange_partition_fail_6: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
 db.opt
 t1#P#p0.MYD
 t1#P#p0.MYI
@@ -1622,7 +2058,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1635,6 +2070,105 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+#
+# Reading backup ddl log file
+#
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t2 (a INT, b VARCHAR(64));
+INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
+CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
+(PARTITION p0 VALUES LESS THAN (10),
+PARTITION p1 VALUES LESS THAN MAXVALUE);
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1"), (21, "Original from partition p1"), (22, "Original from partition p1"), (23, "Original from partition p1"), (24, "Original from partition p1");
+# d,exchange_partition_fail_6: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLES t1 WRITE, t2 WRITE;
+ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
+ERROR HY000: Error in DDL log
+# d,exchange_partition_fail_6: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
+UNLOCK TABLES;
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_fail_7";
@@ -1678,21 +2212,12 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
-ERROR HY000: Error on rename of './test/#sql-exchange' to './test/t1#P#p0' (errno: 0 "Internal error/check (Not system error)")
+ERROR HY000: Error on rename of '#TMP' to './test/t1#P#p0' (errno: 0 "Internal error/check (Not system error)")
 # d,exchange_partition_fail_7: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1025	Error on rename of '#TMP' to './test/t1#P#p0' (errno: 0 "Internal error/check (Not system error)")
 db.opt
 t1#P#p0.MYD
 t1#P#p0.MYI
@@ -1726,7 +2251,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1739,6 +2263,105 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+#
+# Reading backup ddl log file
+#
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t2 (a INT, b VARCHAR(64));
+INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
+CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
+(PARTITION p0 VALUES LESS THAN (10),
+PARTITION p1 VALUES LESS THAN MAXVALUE);
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1"), (21, "Original from partition p1"), (22, "Original from partition p1"), (23, "Original from partition p1"), (24, "Original from partition p1");
+# d,exchange_partition_fail_7: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLES t1 WRITE, t2 WRITE;
+ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
+ERROR HY000: Error on rename of '#TMP' to './test/t1#P#p0' (errno: 0 "Internal error/check (Not system error)")
+# d,exchange_partition_fail_7: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1025	Error on rename of '#TMP' to './test/t1#P#p0' (errno: 0 "Internal error/check (Not system error)")
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
+UNLOCK TABLES;
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_fail_8";
@@ -1782,21 +2405,12 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 ERROR HY000: Error in DDL log
 # d,exchange_partition_fail_8: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
 db.opt
 t1#P#p0.MYD
 t1#P#p0.MYI
@@ -1830,7 +2444,6 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1843,6 +2456,105 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
+#
+# Reading backup ddl log file
+#
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t2 (a INT, b VARCHAR(64));
+INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
+CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
+(PARTITION p0 VALUES LESS THAN (10),
+PARTITION p1 VALUES LESS THAN MAXVALUE);
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1"), (21, "Original from partition p1"), (22, "Original from partition p1"), (23, "Original from partition p1"), (24, "Original from partition p1");
+# d,exchange_partition_fail_8: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLES t1 WRITE, t2 WRITE;
+ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
+ERROR HY000: Error in DDL log
+# d,exchange_partition_fail_8: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
+UNLOCK TABLES;
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;
 SET SESSION debug_dbug="+d,exchange_partition_fail_9";
@@ -1886,21 +2598,12 @@ a	b
 24	Original from partition p1
 3	Original from partition p0
 4	Original from partition p0
-SHOW CREATE TABLE t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL,
-  `b` varchar(64) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT * FROM t2;
-a	b
-5	Original from table t2
-6	Original from table t2
-7	Original from table t2
-8	Original from table t2
 ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
 ERROR HY000: Error in DDL log
 # d,exchange_partition_fail_9: AFTER failure
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
 db.opt
 t1#P#p0.MYD
 t1#P#p0.MYI
@@ -1934,7 +2637,6 @@ a	b
 6	Original from table t2
 7	Original from table t2
 8	Original from table t2
-DROP TABLE t1;
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1947,5 +2649,104 @@ a	b
 2	Original from partition p0
 3	Original from partition p0
 4	Original from partition p0
+#
+# Reading backup ddl log file
+#
+DROP TABLE t1;
+DROP TABLE t2;
+CREATE TABLE t2 (a INT, b VARCHAR(64));
+INSERT INTO t2 VALUES (5, "Original from table t2"), (6, "Original from table t2"), (7, "Original from table t2"), (8, "Original from table t2");
+CREATE TABLE t1 (a INT, b VARCHAR(64)) PARTITION BY RANGE (a)
+(PARTITION p0 VALUES LESS THAN (10),
+PARTITION p1 VALUES LESS THAN MAXVALUE);
+INSERT INTO t1 VALUES (1, "Original from partition p0"), (2, "Original from partition p0"), (3, "Original from partition p0"), (4, "Original from partition p0"), (11, "Original from partition p1"), (12, "Original from partition p1"), (13, "Original from partition p1"), (14, "Original from partition p1"), (21, "Original from partition p1"), (22, "Original from partition p1"), (23, "Original from partition p1"), (24, "Original from partition p1");
+# d,exchange_partition_fail_9: BEFORE failure (under LOCK TABLE)
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+1	Original from partition p0
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+2	Original from partition p0
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+3	Original from partition p0
+4	Original from partition p0
+LOCK TABLES t1 WRITE, t2 WRITE;
+ALTER TABLE t1 EXCHANGE PARTITION p0 WITH TABLE t2;
+ERROR HY000: Error in DDL log
+# d,exchange_partition_fail_9: AFTER failure (under LOCK TABLE)
+show warnings;
+Level	Code	Message
+Error	1565	Error in DDL log
+db.opt
+t1#P#p0.MYD
+t1#P#p0.MYI
+t1#P#p1.MYD
+t1#P#p1.MYI
+t1.frm
+t1.par
+t2.MYD
+t2.MYI
+t2.frm
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+ PARTITION BY RANGE (`a`)
+(PARTITION `p0` VALUES LESS THAN (10) ENGINE = MyISAM,
+ PARTITION `p1` VALUES LESS THAN MAXVALUE ENGINE = MyISAM)
+SELECT * FROM t1;
+a	b
+11	Original from partition p1
+12	Original from partition p1
+13	Original from partition p1
+14	Original from partition p1
+21	Original from partition p1
+22	Original from partition p1
+23	Original from partition p1
+24	Original from partition p1
+5	Original from table t2
+6	Original from table t2
+7	Original from table t2
+8	Original from table t2
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  `b` varchar(64) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+SELECT * FROM t2;
+a	b
+1	Original from partition p0
+2	Original from partition p0
+3	Original from partition p0
+4	Original from partition p0
+UNLOCK TABLES;
+DROP TABLE t1;
 DROP TABLE t2;
 SET SESSION debug_dbug=@save_dbug;

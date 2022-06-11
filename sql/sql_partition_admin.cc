@@ -391,7 +391,7 @@ static bool exchange_name_with_ddl_log(THD *thd,
   */
   /* call rename table from table to tmp-name */
   DBUG_EXECUTE_IF("exchange_partition_fail_3",
-                  my_error(ER_ERROR_ON_RENAME, MYF(0), name, tmp_name, 0);
+                  my_error(ER_ERROR_ON_RENAME, MYF(0), name, "#TMP", 0);
                   error_set= TRUE;
                   goto err_rename;);
   DBUG_EXECUTE_IF("exchange_partition_abort_3", DBUG_SUICIDE(););
@@ -425,7 +425,7 @@ static bool exchange_name_with_ddl_log(THD *thd,
 
   /* call rename table from tmp-nam to partition */
   DBUG_EXECUTE_IF("exchange_partition_fail_7",
-                  my_error(ER_ERROR_ON_RENAME, MYF(0), tmp_name, from_name, 0);
+                  my_error(ER_ERROR_ON_RENAME, MYF(0), "#TMP", from_name, 0);
                   error_set= TRUE;
                   goto err_rename;);
   DBUG_EXECUTE_IF("exchange_partition_abort_7", DBUG_SUICIDE(););
@@ -706,13 +706,6 @@ bool Sql_cmd_alter_table_exchange_partition::
                                           temp_file_name, table_hton)))
     goto err;
 
-  /*
-    Reopen tables under LOCK TABLES. Ignore the return value for now. It's
-    better to keep master/slave in consistent state. Alternative would be to
-    try to revert the exchange operation and issue error.
-  */
-  (void) thd->locked_tables_list.reopen_tables(thd, false);
-
   if (force_if_exists)
     thd->variables.option_bits|= OPTION_IF_EXISTS;
 
@@ -740,6 +733,7 @@ bool Sql_cmd_alter_table_exchange_partition::
 err:
   if (thd->locked_tables_mode)
   {
+    (void) thd->locked_tables_list.reopen_tables(thd, false);
     if (swap_table_mdl_ticket)
       swap_table_mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
     if (part_table_mdl_ticket)

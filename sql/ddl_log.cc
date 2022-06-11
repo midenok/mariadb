@@ -3034,7 +3034,7 @@ void ddl_log_complete(DDL_LOG_STATE *state)
   This is called for failed rename table, create trigger or drop trigger.
 */
 
-bool ddl_log_revert(THD *thd, DDL_LOG_STATE *state)
+bool ddl_log_revert(THD *thd, DDL_LOG_STATE *state, bool report_error)
 {
   bool res= 0;
   DBUG_ENTER("ddl_log_revert");
@@ -3047,7 +3047,7 @@ bool ddl_log_revert(THD *thd, DDL_LOG_STATE *state)
   {
     res= ddl_log_execute_entry_no_lock(thd, state->list->entry_pos,
                                        state->execute_entry->entry_pos,
-                                       true);
+                                       report_error);
     ddl_log_disable_execute_entry(&state->execute_entry);
   }
   ddl_log_release_entries(state);
