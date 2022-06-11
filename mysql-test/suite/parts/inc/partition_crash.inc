@@ -9,6 +9,14 @@ if ($log_bin)
   RESET MASTER;
 }
 
+if ($create_statement2)
+{
+  --eval $create_statement2
+}
+if ($insert_statement2)
+{
+  --eval $insert_statement2
+}
 --eval $create_statement
 --eval $insert_statement
 --let $dbug_flag= `select @@session.debug_dbug`
@@ -21,6 +29,17 @@ if ($log_bin)
 SHOW CREATE TABLE t1;
 --sorted_result
 SELECT * FROM t1;
+if ($show_statement)
+{
+  --error 0,ER_NO_SUCH_TABLE
+  --eval $show_statement
+}
+if ($select_statement)
+{
+  --sorted_result
+  --error 0,ER_NO_SUCH_TABLE
+  --eval $select_statement
+}
 --exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --disable_reconnect
 # CR_SERVER_LOST
@@ -45,6 +64,17 @@ SELECT * FROM t1;
 SHOW CREATE TABLE t1;
 --sorted_result
 SELECT * FROM t1;
+if ($show_statement)
+{
+  --error 0,ER_NO_SUCH_TABLE
+  --eval $show_statement
+}
+if ($select_statement)
+{
+  --sorted_result
+  --error 0,ER_NO_SUCH_TABLE
+  --eval $select_statement
+}
 if ($log_bin)
 {
   --source include/show_binlog_events.inc
