@@ -3684,13 +3684,7 @@ fts_get_max_doc_id(
 
 	if (!page_is_empty(btr_pcur_get_page(&pcur))) {
 		const rec_t*    rec = NULL;
-		rec_offs	offsets_[REC_OFFS_NORMAL_SIZE];
-		rec_offs*	offsets = offsets_;
-		mem_heap_t*	heap = NULL;
-		ulint		len;
-		const void*	data;
-
-		rec_offs_init(offsets_);
+		const ulint	doc_id_len= 8;
 
 		do {
 			rec = btr_pcur_get_rec(&pcur);
@@ -3699,10 +3693,6 @@ fts_get_max_doc_id(
 				continue;
 			}
 
-			offsets = rec_get_offsets(
-				rec, index, offsets, index->n_core_fields,
-				ULINT_UNDEFINED, &heap);
-
 			if (index->n_uniq == 1) {
 				break;
 			}
@@ -3710,16 +3700,15 @@ fts_get_max_doc_id(
 			ut_ad(table->versioned());
 			ut_ad(index->n_uniq == 2);
 
-			ulint len;
-			const byte *data = rec_get_nth_field(rec, offsets, 1, &len);
+			const byte *data = rec + doc_id_len;
 			if (table->versioned_by_id()) {
-				ut_ad(len == sizeof trx_id_max_bytes);
-				if (0 == memcmp(data, trx_id_max_bytes, len)) {
+				if (0 == memcmp(data, trx_id_max_bytes,
+						sizeof trx_id_max_bytes)) {
 					break;
 				}
 			} else {
-				ut_ad(len == sizeof timestamp_max_bytes);
-				if (0 == memcmp(data, timestamp_max_bytes, len)) {
+				if (0 == memcmp(data, timestamp_max_bytes,
+						sizeof timestamp_max_bytes)) {
 					break;
 				}
 			}
@@ -3731,10 +3720,8 @@ fts_get_max_doc_id(
 
 		ut_ad(!rec_is_metadata(rec, index));
 
-		data = rec_get_nth_field(rec, offsets, 0, &len);
-
 		doc_id = static_cast<doc_id_t>(fts_read_doc_id(
-			static_cast<const byte*>(data)));
+			static_cast<const byte*>(rec)));
 	}
 
 func_exit:
