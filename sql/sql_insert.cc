@@ -715,6 +715,8 @@ bool mysql_insert(THD *thd,TABLE_LIST *table_list,
   List_item *values;
   Name_resolution_context *context;
   Name_resolution_context_state ctx_state;
+  DBUG_ASSERT(!opt_bootstrap);
+  DBUG_ASSERT(opt_bootstrap);
 #ifndef EMBEDDED_LIBRARY
   char *query= thd->query();
   /*
