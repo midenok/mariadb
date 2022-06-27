@@ -905,3 +905,19 @@ select * from information_schema.innodb_sys_foreign;
 ID	FOR_NAME	REF_NAME	N_COLS	TYPE
 select * from information_schema.innodb_sys_foreign_cols;
 ID	FOR_COL_NAME	REF_COL_NAME	POS
+#
+# MDEV-28956 Locking is broken if CREATE OR REPLACE fails under LOCK TABLES
+#
+# Atomic CREATE OR REPLACE part:
+#
+create table t1 (pk int primary key) engine=innodb;
+create or replace table t2 (a int primary key references t1 (pk)) engine=innodb;
+lock tables t1 write, t2 write;
+create or replace table t2 (c1 int not null, c1 varchar(255) ) engine=innodb;
+ERROR 42S21: Duplicate column name 'c1'
+select * from t1;
+pk
+select * from t2;
+a
+unlock tables;
+drop tables t2, t1;
