@@ -303,6 +303,9 @@ eval create or replace table child (
     on update cascade
 ) engine = innodb with system versioning;
 
+select * from information_schema.innodb_sys_foreign;
+select * from information_schema.innodb_sys_foreign_cols;
+
 create or replace table subchild (
   id int not null auto_increment primary key,
   parent_id smallint unsigned not null,
@@ -313,22 +316,25 @@ create or replace table subchild (
     on update cascade
 ) engine=innodb;
 
-insert into parent (value) values (23);
---enable_prepare_warnings
-select id, value from parent into @id, @value;
---disable_prepare_warnings
-insert into child values (default, @id, @value);
-insert into subchild values (default, @id, @value);
+select * from information_schema.innodb_sys_foreign;
+select * from information_schema.innodb_sys_foreign_cols;
 
-select parent_id from subchild;
-update parent set id = 11, value = value + 1;
-select parent_id from subchild;
-select * from child;
+#insert into parent (value) values (23);
+#--enable_prepare_warnings
+#select id, value from parent into @id, @value;
+#--disable_prepare_warnings
+#insert into child values (default, @id, @value);
+#insert into subchild values (default, @id, @value);
 
-delete from parent;
-select count(*) from child;
-select * from child for system_time all;
-select count(*) from subchild;
+#select parent_id from subchild;
+#update parent set id = 11, value = value + 1;
+#select parent_id from subchild;
+#select * from child;
+
+#delete from parent;
+#select count(*) from child;
+#select * from child for system_time all;
+#select count(*) from subchild;
 
 drop table subchild, child, parent;
 
