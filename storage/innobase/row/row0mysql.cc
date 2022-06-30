@@ -2763,7 +2763,7 @@ row_rename_table_for_mysql(
 			"         WHERE ID = foreign_id;\n"
 			"        id_len := LENGTH(foreign_id);\n"
 			"        foreign_id2 := foreign_id;\n"
-			"        IF (:old_is_tmp > 0 AND\n"
+			"        IF ("//:old_is_tmp > 0 AND\n"
 			"            (SUBSTR(foreign_id, 0, 5) = '#tmp-' OR\n"
 			"             SUBSTR(foreign_id, 0, 5) = '#bak-'))\n"
 			"        THEN\n"
