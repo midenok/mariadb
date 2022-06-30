@@ -289,6 +289,33 @@ test/fk_child_parent	parent_id	id	0
 test/fk_child_parent	parent_value	value	1
 test/fk_subchild_child_parent	parent_id	parent_id	0
 test/fk_subchild_child_parent	parent_value	parent_value	1
+insert into parent (value) values (23);
+select id, value from parent into @id, @value;
+Warnings:
+Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
+insert into child values (default, @id, @value);
+insert into subchild values (default, @id, @value);
+select parent_id from subchild;
+parent_id
+1
+update parent set id = 11, value = value + 1;
+select parent_id from subchild;
+parent_id
+11
+select * from child;
+id	parent_id	parent_value
+1	11	24
+delete from parent;
+select count(*) from child;
+count(*)
+0
+select * from child for system_time all;
+id	parent_id	parent_value
+1	1	23
+1	11	24
+select count(*) from subchild;
+count(*)
+0
 drop table subchild, child, parent;
 #
 # MDEV-18057 Assertion `(node->state == 5) || (node->state == 6)' failed in row_upd_sec_step upon DELETE after UPDATE failed due to FK violation
