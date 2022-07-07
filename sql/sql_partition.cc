@@ -6136,7 +6136,8 @@ public:
     bzero(&ddl_log_entry, sizeof(ddl_log_entry));
     ddl_log_entry.flags= DDL_LOG_FLAG_ALTER_PARTITION;
 
-    DBUG_ASSERT(lpt->thd->mdl_context.is_lock_owner(MDL_key::TABLE,
+    DBUG_ASSERT(table->s->tmp_table ||
+                lpt->thd->mdl_context.is_lock_owner(MDL_key::TABLE,
                                                     table->s->db.str,
                                                     table->s->table_name.str,
                                                     MDL_EXCLUSIVE));
@@ -6700,10 +6701,16 @@ static void alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt)
 {
   THD *thd= lpt->thd;
 
-  if (lpt->table)
+  TABLE *table= lpt->table;
+  if (table)
   {
-    TABLE *table= lpt->table;
-    if (!thd->mdl_context.is_lock_owner(MDL_key::TABLE, lpt->db.str,
+    if (table->s->tmp_table)
+    {
+      // FIXME: close tmp table?
+      ha_partition *hp= (ha_partition *) table->file;
+      hp->cleanup_new_partition();
+    }
+    else if (!thd->mdl_context.is_lock_owner(MDL_key::TABLE, lpt->db.str,
                                         lpt->table_name.str,
                                         MDL_EXCLUSIVE) &&
         wait_while_table_is_used(thd, table, HA_EXTRA_FORCE_REOPEN))
@@ -7069,10 +7076,14 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("add_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
         ERROR_INJECT("add_partition_2") ||
-        wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
+        // FIXME: only for ALTER_PARTITION_AUTO_HIST
+        (table->s->tmp_table ?
+          false :
+          wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED)) ||
         ERROR_INJECT("add_partition_3") ||
         action_add.add_parts() ||
         ERROR_INJECT("add_partition_4") ||
+        // FIXME: this closes all tables. 'from' should not be closed.
         alter_close_table(lpt) ||
         ERROR_INJECT("add_partition_5") ||
         write_log_drop_backup_frm(lpt) ||

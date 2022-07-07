@@ -11874,6 +11874,23 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   DBUG_ENTER("copy_data_between_tables");
 
   DBUG_ASSERT(to->s->tmp_table);
+  DBUG_ASSERT(!to->pos_in_table_list);
+  if (to->versioned() && to->part_info)
+  {
+    TABLE_LIST to_tl;
+    to_tl.init_one_table(&to->s->db, &to->s->table_name, &to->s->table_name,
+                         TL_WRITE);
+    to_tl.table= to;
+    to->pos_in_table_list= &to_tl;
+    TABLE *backup_open_tables= thd->open_tables;
+    thd->set_open_tables(NULL);
+    bool res= vers_create_partitions(thd, &to_tl, 30);
+    thd->set_open_tables(backup_open_tables);
+    // FIXME: reopen closed 'to';
+    to->pos_in_table_list= NULL;
+    if (res)
+      DBUG_RETURN(-1);
+  }
 
   /* Two or 3 stages; Sorting, copying data and update indexes */
   thd_progress_init(thd, 2 + MY_TEST(order));

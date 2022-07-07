@@ -940,7 +940,8 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts)
   DBUG_ASSERT(num_parts);
 
   {
-    DBUG_ASSERT(table->s->get_table_ref_type() == TABLE_REF_BASE_TABLE);
+    // FIXME: TABLE_REF_TMP_TABLE
+//     DBUG_ASSERT(table->s->get_table_ref_type() == TABLE_REF_BASE_TABLE);
     DBUG_ASSERT(table->versioned());
     DBUG_ASSERT(table->part_info);
     DBUG_ASSERT(table->part_info->vers_info);
@@ -950,6 +951,7 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts)
     create_info.alter_info= &alter_info;
     Alter_table_ctx alter_ctx(thd, tl, 1, &table->s->db, &table->s->table_name);
 
+    // FIXME: check if this is needed for tmp table in copy_data_between_tables()
     MDL_REQUEST_INIT(&tl->mdl_request, MDL_key::TABLE, tl->db.str,
                     tl->table_name.str, MDL_SHARED_NO_WRITE, MDL_TRANSACTION);
     if (thd->mdl_context.acquire_lock(&tl->mdl_request,
