@@ -5235,6 +5235,8 @@ public:
   TMP_TABLE_SHARE* save_tmp_table_share(TABLE *table);
   void restore_tmp_table_share(TMP_TABLE_SHARE *share);
   void close_unused_temporary_table_instances(const TABLE_LIST *tl);
+  void free_temporary_table(TABLE *table);
+  TABLE *open_temporary_table(TMP_TABLE_SHARE *share, const char *alias);
 
 private:
   /* Whether a lock has been acquired? */
@@ -5247,13 +5249,11 @@ private:
                                           const char *table_name);
   TABLE *find_temporary_table(const char *key, uint key_length,
                               Temporary_table_state state);
-  TABLE *open_temporary_table(TMP_TABLE_SHARE *share, const char *alias);
   bool find_and_use_tmp_table(const TABLE_LIST *tl, TABLE **out_table);
   bool use_temporary_table(TABLE *table, TABLE **out_table);
   void close_temporary_table(TABLE *table);
   bool log_events_and_free_tmp_shares();
   void free_tmp_table_share(TMP_TABLE_SHARE *share, bool delete_table);
-  void free_temporary_table(TABLE *table);
   bool lock_temporary_tables();
   void unlock_temporary_tables();
 
@@ -5263,13 +5263,13 @@ private:
                      share->table_cache_key.length - 4);
   }
 
+public:
   inline TMP_TABLE_SHARE *tmp_table_share(TABLE *table)
   {
     DBUG_ASSERT(table->s->tmp_table);
     return static_cast<TMP_TABLE_SHARE *>(table->s);
   }
 
-public:
   thd_async_state async_state;
 #ifdef HAVE_REPLICATION
   /*

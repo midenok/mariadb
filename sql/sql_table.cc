@@ -80,7 +80,7 @@ static bool make_unique_constraint_name(THD *, LEX_CSTRING *, const char *,
                                         List<Virtual_column_info> *, uint *);
 static const char *make_unique_invisible_field_name(THD *, const char *,
                                                     List<Create_field> *);
-static int copy_data_between_tables(THD *, TABLE *,TABLE *,
+static int copy_data_between_tables(THD *, TABLE *,TABLE **,
                                     List<Create_field> &, bool, uint, ORDER *,
                                     ha_rows *, ha_rows *,
                                     Alter_info::enum_enable_or_disable,
@@ -11332,7 +11332,7 @@ do_continue:;
       new_table->mark_columns_needed_for_insert();
       thd->binlog_write_table_map(new_table, 1);
     }
-    if (copy_data_between_tables(thd, table, new_table,
+    if (copy_data_between_tables(thd, table, &new_table,
                                  alter_info->create_list, ignore,
                                  order_num, order, &copied, &deleted,
                                  alter_info->keys_onoff,
@@ -11843,7 +11843,7 @@ int mysql_trans_commit_alter_copy_data(THD *thd, bool rollback)
 
 
 static int
-copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
+copy_data_between_tables(THD *thd, TABLE *from, TABLE **to_ptr,
 			 List<Create_field> &create, bool ignore,
 			 uint order_num, ORDER *order,
 			 ha_rows *copied, ha_rows *deleted,
@@ -11851,6 +11851,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
                          Alter_table_ctx *alter_ctx)
 {
   int error= 1;
+  TABLE *to= *to_ptr;
   Copy_field *copy= NULL, *copy_end;
   ha_rows found_count= 0, delete_count= 0;
   SORT_INFO  *file_sort= 0;
@@ -11878,6 +11879,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   if (to->versioned() && to->part_info)
   {
     TABLE_LIST to_tl;
+    TMP_TABLE_SHARE *to_share= thd->tmp_table_share(to);
     to_tl.init_one_table(&to->s->db, &to->s->table_name, &to->s->table_name,
                          TL_WRITE);
     to_tl.table= to;
@@ -11888,7 +11890,12 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     thd->set_open_tables(backup_open_tables);
     // FIXME: reopen closed 'to';
     to->pos_in_table_list= NULL;
-    if (res)
+    if (res) /* error reported */
+      DBUG_RETURN(-1);
+
+    to= thd->open_temporary_table(to_share, to_share->table_name.str);
+    *to_ptr= to;
+    if (!to) /* error reported */
       DBUG_RETURN(-1);
   }
 
