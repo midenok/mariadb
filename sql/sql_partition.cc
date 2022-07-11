@@ -6706,10 +6706,9 @@ static void alter_partition_lock_handling(ALTER_PARTITION_PARAM_TYPE *lpt)
   {
     if (table->s->tmp_table)
     {
-      // FIXME: close tmp table?
       ha_partition *hp= (ha_partition *) table->file;
       hp->cleanup_new_partition();
-      thd->free_temporary_table(table);
+      thd->drop_temporary_table(table, NULL, false);
     }
     else if (!thd->mdl_context.is_lock_owner(MDL_key::TABLE, lpt->db.str,
                                         lpt->table_name.str,

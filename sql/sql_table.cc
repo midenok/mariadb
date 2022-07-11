@@ -11879,7 +11879,6 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE **to_ptr,
   if (to->versioned() && to->part_info)
   {
     TABLE_LIST to_tl;
-    TMP_TABLE_SHARE *to_share= thd->tmp_table_share(to);
     to_tl.init_one_table(&to->s->db, &to->s->table_name, &to->s->table_name,
                          TL_WRITE);
     to_tl.table= to;
@@ -11893,7 +11892,12 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE **to_ptr,
     if (res) /* error reported */
       DBUG_RETURN(-1);
 
-    to= thd->open_temporary_table(to_share, to_share->table_name.str);
+    LEX_CUSTRING frm= {0,0};
+
+    to= thd->create_and_open_tmp_table(&frm, alter_ctx->get_tmp_path(),
+                                       alter_ctx->new_db.str,
+                                       alter_ctx->new_name.str, true);
+
     *to_ptr= to;
     if (!to) /* error reported */
       DBUG_RETURN(-1);
