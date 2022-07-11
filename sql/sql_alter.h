@@ -336,6 +336,7 @@ public:
   LEX_CSTRING  tmp_name;
   LEX_CSTRING  tmp_storage_engine_name;
   LEX_CUSTRING tmp_id, id;
+  LEX_CUSTRING frm;
   char         tmp_buff[80];
   uchar        id_buff[MY_UUID_SIZE];
   char         storage_engine_buff[NAME_LEN], tmp_storage_engine_buff[NAME_LEN];

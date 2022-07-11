@@ -259,7 +259,8 @@ Alter_info::algorithm(const THD *thd) const
 
 Alter_table_ctx::Alter_table_ctx()
   : db(null_clex_str), table_name(null_clex_str), alias(null_clex_str),
-    new_db(null_clex_str), new_name(null_clex_str), new_alias(null_clex_str)
+    new_db(null_clex_str), new_name(null_clex_str), new_alias(null_clex_str),
+    frm{0, 0}
 {
 }
 
@@ -273,7 +274,7 @@ Alter_table_ctx::Alter_table_ctx(THD *thd, TABLE_LIST *table_list,
                                  const LEX_CSTRING *new_db_arg,
                                  const LEX_CSTRING *new_name_arg)
   : tables_opened(tables_opened_arg),
-    new_db(*new_db_arg), new_name(*new_name_arg)
+    new_db(*new_db_arg), new_name(*new_name_arg), frm{0, 0}
 {
   /*
     Assign members db, table_name, new_db and new_name

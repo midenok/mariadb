@@ -9994,12 +9994,12 @@ static void cleanup_table_after_inplace_alter(TABLE *table)
 
 static int create_table_for_inplace_alter(THD *thd,
                                           const Alter_table_ctx &alter_ctx,
-                                          LEX_CUSTRING *frm,
                                           TABLE_SHARE *share,
                                           TABLE *table)
 {
   init_tmp_table_share(thd, share, alter_ctx.new_db.str, 0,
                        alter_ctx.new_name.str, alter_ctx.get_tmp_path());
+  const LEX_CUSTRING *frm= &alter_ctx.frm;
   if (share->init_from_binary_frm_image(thd, true, frm->str, frm->length) ||
       open_table_from_share(thd, share, &alter_ctx.new_name, 0,
                             EXTRA_RECORD, thd->open_options,
@@ -10265,7 +10265,7 @@ bool mysql_alter_table(THD *thd, const LEX_CSTRING *new_db,
   uint tables_opened;
   handlerton *new_db_type= create_info->db_type, *old_db_type;
   ha_rows copied=0, deleted=0;
-  LEX_CUSTRING frm= {0,0};
+  LEX_CUSTRING *frm;
   LEX_CSTRING backup_name;
   char index_file[FN_REFLEN], data_file[FN_REFLEN], backup_name_buff[60];
   uchar uuid_buffer[MY_UUID_SIZE];
@@ -10432,6 +10432,7 @@ bool mysql_alter_table(THD *thd, const LEX_CSTRING *new_db,
 #endif // WITH_WSREP
 
   Alter_table_ctx alter_ctx(thd, table_list, tables_opened, new_db, new_name);
+  frm= &alter_ctx.frm;
   mdl_ticket= table->mdl_ticket;
 
   /*
@@ -11008,7 +11009,7 @@ do_continue:;
                            alter_ctx.get_tmp_cstring_path(),
                            thd->lex->create_info, create_info, alter_info,
                            C_ALTER_TABLE_FRM_ONLY, NULL,
-                           &key_info, &key_count, &frm);
+                           &key_info, &key_count, frm);
   reenable_binlog(thd);
 
   debug_crash_here("ddl_log_alter_after_create_frm");
@@ -11079,7 +11080,7 @@ do_continue:;
     // We assume that the table is non-temporary.
     DBUG_ASSERT(!table->s->tmp_table);
 
-    if (create_table_for_inplace_alter(thd, alter_ctx, &frm, &altered_share,
+    if (create_table_for_inplace_alter(thd, alter_ctx, &altered_share,
                                        &altered_table))
       goto err_new_table_cleanup;
     /*
@@ -11154,7 +11155,7 @@ do_continue:;
 
     if (use_inplace)
     {
-      table->s->frm_image= &frm;
+      table->s->frm_image= frm;
       /*
         Set the truncated column values of thd as warning
         for alter table.
@@ -11249,7 +11250,7 @@ do_continue:;
 
   if (ha_create_table(thd, alter_ctx.get_tmp_path(),
                       alter_ctx.new_db.str, alter_ctx.new_name.str,
-                      create_info, &frm, frm_is_created))
+                      create_info, frm, frm_is_created))
     goto err_new_table_cleanup;
 
   debug_crash_here("ddl_log_alter_after_create_table");
@@ -11259,7 +11260,7 @@ do_continue:;
   DEBUG_SYNC(thd, "alter_table_intermediate_table_created");
 
   /* Open the table since we need to copy the data. */
-  new_table= thd->create_and_open_tmp_table(&frm,
+  new_table= thd->create_and_open_tmp_table(frm,
                                             alter_ctx.get_tmp_path(),
                                             alter_ctx.new_db.str,
                                             alter_ctx.new_name.str,
@@ -11711,7 +11712,7 @@ end_inplace:
   }
 
 end_temporary:
-  my_free(const_cast<uchar*>(frm.str));
+  my_free(const_cast<uchar*>(frm->str));
 
   thd->variables.option_bits&= ~OPTION_BIN_COMMIT_OFF;
 
@@ -11752,7 +11753,7 @@ err_new_table_cleanup:
                           alter_ctx.get_tmp_path());
   DEBUG_SYNC(thd, "alter_table_after_temp_table_drop");
 err_cleanup:
-  my_free(const_cast<uchar*>(frm.str));
+  my_free(const_cast<uchar*>(frm->str));
   ddl_log_complete(&ddl_log_state);
   if (inplace_alter_table_committed)
   {
