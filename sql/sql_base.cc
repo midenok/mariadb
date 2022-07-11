@@ -3459,7 +3459,8 @@ Open_table_context::recover_from_failed_open()
           }
 
           DBUG_ASSERT(vers_create_count);
-          result= vers_create_partitions(m_thd, m_failed_table, vers_create_count);
+          result= vers_create_partitions(m_thd, m_failed_table,
+                                         vers_create_count, NULL);
           vers_create_count= 0;
           if (!m_thd->transaction->stmt.is_empty())
             trans_commit_stmt(m_thd);

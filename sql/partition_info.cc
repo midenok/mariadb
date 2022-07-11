@@ -922,7 +922,8 @@ bool partition_info::vers_set_hist_part(THD *thd, uint *create_count)
 
   @param num_parts  Number of partitions to create
 */
-bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts)
+bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts,
+                            LEX_CUSTRING *frm)
 {
   bool result= true;
   Table_specification_st create_info;
@@ -935,6 +936,9 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts)
   thd->lex->reset_n_backup_query_tables_list(&save_query_tables);
   thd->lex->no_write_to_binlog= true;
   TABLE *table= tl->table;
+  Alter_table_ctx alter_ctx(thd, tl, 1, &table->s->db, &table->s->table_name);
+  if (frm)
+    *frm= alter_ctx.frm;
 
   DBUG_ASSERT(!thd->is_error());
   DBUG_ASSERT(num_parts);
@@ -949,7 +953,6 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts)
     alter_info.partition_flags= ALTER_PARTITION_ADD|ALTER_PARTITION_AUTO_HIST;
     create_info.init();
     create_info.alter_info= &alter_info;
-    Alter_table_ctx alter_ctx(thd, tl, 1, &table->s->db, &table->s->table_name);
 
     // FIXME: check if this is needed for tmp table in copy_data_between_tables()
     MDL_REQUEST_INIT(&tl->mdl_request, MDL_key::TABLE, tl->db.str,
@@ -1015,6 +1018,19 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts)
       goto exit;
     }
 
+    if (table->s->tmp_table)
+    {
+      /*
+        That was set by mysql_prepare_alter_table(). This option is translated
+        into HA_OPTION_TMP_TABLE which makes MYISAM_SHARE temporary
+        (cannot rename with HA_EXTRA_PREPARE_FOR_RENAME).
+
+        We never auto-create temporary partitions: even if the table share is
+        temporary the resulting table after ALTER will be permanent.
+      */
+      create_info.options&= ~HA_LEX_CREATE_TMP_TABLE;
+    }
+
     if (fast_alter_partition_table(thd, table, &alter_info, &alter_ctx,
                                    &create_info, tl))
     {
@@ -1035,6 +1051,10 @@ exit:
   thd->m_reprepare_observer= save_reprepare_observer;
   thd->lex->restore_backup_query_tables_list(&save_query_tables);
   thd->lex->no_write_to_binlog= save_no_write_to_binlog;
+  if (result || !frm)
+    my_free(const_cast<uchar*>(alter_ctx.frm.str));
+  else
+    *frm= alter_ctx.frm;
   return result;
 }
 

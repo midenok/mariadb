@@ -787,17 +787,25 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 
     int error= writefile(shadow_frm_name, lpt->db.str, lpt->table_name.str,
                          lpt->create_info->tmp_table(), frm.str, frm.length);
-    my_free(const_cast<uchar*>(frm.str));
 
     if (unlikely(error) ||
         unlikely(lpt->table->file->
                  ha_create_partitioning_metadata(shadow_path,
                                                  NULL, CHF_CREATE_FLAG)))
     {
+      my_free(const_cast<uchar*>(frm.str));
       mysql_file_delete(key_file_frm, shadow_frm_name, MYF(0));
       error= 1;
       goto end;
     }
+
+    if (lpt->table->s->tmp_table)
+    {
+      my_free(const_cast<uchar*>(lpt->alter_ctx->frm.str));
+      lpt->alter_ctx->frm= frm;
+    }
+    else
+      my_free(const_cast<uchar*>(frm.str));
   }
 #ifdef WITH_PARTITION_STORAGE_ENGINE
   if (flags & WFRM_WRITE_CONVERTED_TO)
@@ -11886,20 +11894,22 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE **to_ptr,
     to->pos_in_table_list= &to_tl;
     TABLE *backup_open_tables= thd->open_tables;
     thd->set_open_tables(NULL);
-    bool res= vers_create_partitions(thd, &to_tl, 30);
+    LEX_CUSTRING frm;
+    bool res= vers_create_partitions(thd, &to_tl, 30, &frm);
     thd->set_open_tables(backup_open_tables);
     // FIXME: reopen closed 'to';
     to->pos_in_table_list= NULL;
     if (res) /* error reported */
       DBUG_RETURN(-1);
 
-    LEX_CUSTRING frm= {0,0};
-
-    to= thd->create_and_open_tmp_table(&frm, alter_ctx->get_tmp_path(),
+    to= thd->create_and_open_tmp_table(&frm,
+                                       alter_ctx->get_tmp_path(),
                                        alter_ctx->new_db.str,
                                        alter_ctx->new_name.str, true);
 
     *to_ptr= to;
+    my_free(const_cast<uchar*>(alter_ctx->frm.str));
+    alter_ctx->frm= frm;
     if (!to) /* error reported */
       DBUG_RETURN(-1);
   }
