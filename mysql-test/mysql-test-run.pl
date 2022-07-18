@@ -142,6 +142,7 @@ my $opt_start_dirty;
 my $opt_start_exit;
 my $start_only;
 my $file_wsrep_provider;
+my $num_saved_cores= 0;  # Number of core files saved in vardir/log/ so far.
 
 our @global_suppressions;
 
@@ -559,7 +560,6 @@ sub main {
 sub run_test_server ($$$) {
   my ($server, $tests, $childs) = @_;
 
-  my $num_saved_cores= 0;  # Number of core files saved in vardir/log/ so far.
   my $num_saved_datadir= 0;  # Number of datadirs saved in vardir/log/ so far.
   my $num_failed_test= 0; # Number of tests failed so far
   my $test_failure= 0;    # Set true if test suite failed
@@ -3101,6 +3101,19 @@ sub mysql_install_db {
 	verbose       => $opt_verbose,
        ) != 0)
   {
+    find(
+    {
+      no_chdir => 1,
+      wanted => sub
+      {
+        My::CoreDump::core_wanted(\$num_saved_cores,
+                                  $opt_max_save_core,
+                                  @opt_cases == 0,
+                                  $exe_mysqld_bootstrap, $opt_parallel);
+      }
+    },
+    $install_datadir);
+
     my $data= mtr_grab_file($path_bootstrap_log);
     mtr_error("Error executing mysqld --bootstrap\n" .
               "Could not install system database from $bootstrap_sql_file\n" .
