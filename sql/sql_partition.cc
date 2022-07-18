@@ -3675,6 +3675,12 @@ uint32 get_partition_id_range_for_endpoint(partition_info *part_info,
     part_info->part_expr->val_int_endpoint(left_endpoint, &include_endpoint);
   if (part_info->vers_info)
   {
+    /*
+      NOTE: For HISTORY partitions it is "LESS THAN OR EQUAL TO" boundary
+            because of how vers_get_partition_id() works: boundary row_end gets
+            into lower partition.
+    */
+    include_endpoint= true;
     if (part_func_value < INT_MAX32) /* Historical query */
       max_partition--;
     else                             /* Current data query */
@@ -3687,6 +3693,7 @@ uint32 get_partition_id_range_for_endpoint(partition_info *part_info,
 
   if (part_info->part_expr->null_value)
   {
+    DBUG_ASSERT(!part_info->vers_info);
     /*
       Special handling for MONOTONIC functions that can return NULL for
       values that are comparable. I.e.
