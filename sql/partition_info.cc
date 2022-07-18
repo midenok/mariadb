@@ -866,7 +866,7 @@ int partition_info::vers_set_hist_part(THD *thd)
 
   if (vers_info->interval.is_set())
   {
-    if (vers_info->hist_part->range_value > thd->query_start())
+    if (vers_info->hist_part->range_value >= thd->query_start())
       return 0;
 
     partition_element *next= NULL;
@@ -877,7 +877,7 @@ int partition_info::vers_set_hist_part(THD *thd)
     while ((next= it++) != vers_info->now_part)
     {
       vers_info->hist_part= next;
-      if (next->range_value > thd->query_start())
+      if (next->range_value >= thd->query_start())
         return 0;
     }
   }
