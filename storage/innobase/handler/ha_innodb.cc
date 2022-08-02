@@ -5250,7 +5250,7 @@ normalize_table_name_c_low(
 	db_ptr = ptr + 1;
 
 	norm_len = db_len + name_len + sizeof "/";
-	ut_a(norm_len < FN_REFLEN - 1);
+	ut_a(norm_len < FN_REFLEN);
 
 	memcpy(norm_name, db_ptr, db_len);
 
@@ -12382,6 +12382,8 @@ create_table_info_t::create_foreign_keys()
 
 		if (fk->constraint_name.str) {
 			ulint db_len;
+			const bool tmp= m_create_info->is_atomic_replace();
+			constexpr auto prefix_len= LEN(CONSTR_TMP_PREFIX);
 
 			/* Catenate 'databasename/' to the constraint name
 			specified by the user: we conceive the constraint as
@@ -12392,12 +12394,17 @@ create_table_info_t::create_foreign_keys()
 
 			foreign->id = static_cast<char*>(mem_heap_alloc(
 				foreign->heap,
+				(tmp ? prefix_len : 0) +
 				db_len + fk->constraint_name.length + 2));
-
-			memcpy(foreign->id, table->name.m_name, db_len);
-			foreign->id[db_len] = '/';
-			strcpy(foreign->id + db_len + 1,
-			       fk->constraint_name.str);
+			char *pos = foreign->id;
+			if (tmp) {
+				memcpy(pos, CONSTR_TMP_PREFIX, prefix_len);
+				pos += prefix_len;
+			}
+			memcpy(pos, table->name.m_name, db_len);
+			pos += db_len;
+			*(pos++) = '/';
+			strcpy(pos, fk->constraint_name.str);
 		}
 
 		if (foreign->id == NULL) {
