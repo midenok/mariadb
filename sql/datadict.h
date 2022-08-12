@@ -71,19 +71,22 @@ enum extra2_field_flags
 
 uchar * extra2_write_len(uchar *pos, size_t len);
 uchar * extra2_write_str(uchar *pos, const LEX_CSTRING &str);
-inline
-uchar *
-extra2_write(uchar *pos, enum extra2_frm_value_type type, const LEX_CSTRING &str)
+
+inline uchar *
+extra2_write(uchar *pos, enum extra2_frm_value_type type,
+             const LEX_CSTRING &str)
 {
   *pos++ = type;
   return extra2_write_str(pos, str);
 }
-inline
-uchar *
-extra2_write(uchar *pos, enum extra2_frm_value_type type, const LEX_CUSTRING &str)
+
+inline uchar *
+extra2_write(uchar *pos, enum extra2_frm_value_type type,
+             const LEX_CUSTRING &str)
 {
   return extra2_write(pos, type, *reinterpret_cast<const LEX_CSTRING*>(&str));
 }
+
 uchar *
 extra2_write_field_properties(uchar *pos, List<Create_field> &create_fields);
 
@@ -100,7 +103,6 @@ struct Extra2_info
   LEX_CUSTRING field_data_type_info;
   LEX_CUSTRING without_overlaps;
   LEX_CUSTRING foreign_key_info;
-  // FIXME: move extra2_fields first in separate commit
   LEX_CUSTRING index_flags;
 
   uint read_size;
