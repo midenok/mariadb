@@ -287,6 +287,7 @@ SET(INNOBASE_SOURCES
 	read/read0read.cc
 	rem/rem0cmp.cc
 	rem/rem0rec.cc
+	row/rename_constraint_ids.sql
 	row/row0ext.cc
 	row/row0ftsort.cc
 	row/row0import.cc
