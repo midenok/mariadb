@@ -2,9 +2,9 @@ R"===(PROCEDURE RENAME_CONSTRAINT_IDS () IS
   gen_constr_prefix CHAR;
   new_db_name CHAR;
   foreign_id CHAR;
+  constr_name CHAR;
   new_foreign_id CHAR;
   old_db_name_len INT;
-  old_t_name_len INT;
   new_db_name_len INT;
   id_len INT;
   offset INT;
@@ -15,7 +15,6 @@ R"===(PROCEDURE RENAME_CONSTRAINT_IDS () IS
   new_db_name_len := INSTR(:new_table_name, '/')-1;
   new_db_name := SUBSTR(:new_table_name, 0,
                         new_db_name_len);
-  old_t_name_len := LENGTH(:old_table_name);
   gen_constr_prefix := CONCAT(:old_table_name_utf8,
                               '_ibfk_');
   WHILE found = 1 LOOP
@@ -41,10 +40,9 @@ R"===(PROCEDURE RENAME_CONSTRAINT_IDS () IS
               CONCAT(:new_table_utf8,
                      SUBSTR(foreign_id, offset, id_len - offset));
             ELSE
-              new_foreign_id :=
-              CONCAT(new_db_name,
-                     SUBSTR(foreign_id, old_db_name_len,
-                            id_len - old_db_name_len));
+              constr_name := SUBSTR(foreign_id, old_db_name_len,
+                                    id_len - old_db_name_len);
+              new_foreign_id := CONCAT(new_db_name, constr_name);
             END IF;
             UPDATE SYS_FOREIGN
               SET ID = new_foreign_id
