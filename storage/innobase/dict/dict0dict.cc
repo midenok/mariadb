@@ -207,7 +207,7 @@ dict_remove_db_name(
 	const char*	s = strchr(name, '/');
 	ut_a(s);
 
-	return(s + 1);
+	return s[1] == '\xff' ? (s + 2) : (s + 1);
 }
 
 /** Decrement the count of open handles */

@@ -2,6 +2,7 @@ R"===(PROCEDURE RENAME_CONSTRAINT_IDS () IS
   gen_constr_prefix CHAR;
   new_db_name CHAR;
   foreign_id CHAR;
+  foreign_id2 CHAR;
   constr_name CHAR;
   new_foreign_id CHAR;
   old_db_name_len INT;
@@ -31,6 +32,13 @@ R"===(PROCEDURE RENAME_CONSTRAINT_IDS () IS
       SET FOR_NAME = :new_table_name
       WHERE ID = foreign_id;
       id_len := LENGTH(foreign_id);
+      foreign_id2 := foreign_id;
+      offset := INSTR(foreign_id, ')===" "\xFF" R"===(');
+      IF (:old_is_tmp > 0 AND offset > 0) THEN
+        foreign_id := CONCAT(SUBSTR(foreign_id2, 0, offset - 1),
+                             SUBSTR(foreign_id2, offset, id_len - 1));
+        id_len := id_len - 1;
+      END IF;
       IF (INSTR(foreign_id, '/') > 0) THEN
             IF (INSTR(foreign_id,
                       gen_constr_prefix) > 0)
@@ -42,14 +50,19 @@ R"===(PROCEDURE RENAME_CONSTRAINT_IDS () IS
             ELSE
               constr_name := SUBSTR(foreign_id, old_db_name_len,
                                     id_len - old_db_name_len);
-              new_foreign_id := CONCAT(new_db_name, constr_name);
+              IF (:new_is_tmp > 0) THEN
+                new_foreign_id := CONCAT(new_db_name, ')===" "\xFF" R"===(',
+                                         constr_name);
+              ELSE
+                new_foreign_id := CONCAT(new_db_name, constr_name);
+              END IF;
             END IF;
             UPDATE SYS_FOREIGN
               SET ID = new_foreign_id
-              WHERE ID = foreign_id;
+              WHERE ID = foreign_id2;
             UPDATE SYS_FOREIGN_COLS
               SET ID = new_foreign_id
-              WHERE ID = foreign_id;
+              WHERE ID = foreign_id2;
       END IF;
     END IF;
   END LOOP;

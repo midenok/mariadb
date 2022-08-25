@@ -2724,6 +2724,14 @@ row_rename_table_for_mysql(
 		}
 
 		pars_info_add_str_literal(info, "new_table_utf8", new_table_name);
+		/* Constraint name is written like this:
+			db_name/\xFFtable_name */
+		pars_info_add_int4_literal(info, "old_is_tmp",
+					   (fk == RENAME_FK) && old_is_tmp);
+		/* Constraint name is written like this:
+			db_name\xFF/table_name */
+		pars_info_add_int4_literal(info, "new_is_tmp",
+					   (fk == RENAME_FK) && new_is_tmp);
 
 		err = que_eval_sql(
 			info,
