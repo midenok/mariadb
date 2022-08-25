@@ -1469,18 +1469,26 @@ static void innodb_drop_database(handlerton*, char *path)
 
     "END;\n";
 
-  innodb_drop_database_fk_report report{{namebuf, len + 1}, false};
-
   if (err == DB_SUCCESS)
   {
-    pars_info_t* pinfo = pars_info_create();
-    pars_info_bind_function(pinfo, "fk_report", trx->check_foreigns
-                            ? innodb_drop_database_fk
-                            : innodb_drop_database_ignore_fk, &report);
-    pars_info_add_str_literal(pinfo, "db", namebuf);
-    err= que_eval_sql(pinfo, drop_database, trx);
-    if (err == DB_SUCCESS && report.violated)
-      err= DB_CANNOT_DROP_CONSTRAINT;
+    auto eval_sql = [&err, trx, namebuf, len]()
+    {
+      innodb_drop_database_fk_report report{{namebuf, len + 1}, false};
+      pars_info_t* pinfo = pars_info_create();
+      pars_info_bind_function(pinfo, "fk_report", trx->check_foreigns
+                              ? innodb_drop_database_fk
+                              : innodb_drop_database_ignore_fk, &report);
+      pars_info_add_str_literal(pinfo, "db", namebuf);
+      err= que_eval_sql(pinfo, drop_database, trx);
+      if (err == DB_SUCCESS && report.violated)
+        err= DB_CANNOT_DROP_CONSTRAINT;
+    };
+    eval_sql();
+    if (err == DB_SUCCESS)
+    {
+      namebuf[len] = '\xFF';
+      eval_sql();
+    }
   }
 
   const trx_id_t trx_id= trx->id;
