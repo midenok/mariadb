@@ -1700,6 +1700,7 @@ dict_table_rename_in_cache(
 			}
 
 			strncpy(fkid, foreign->id, MAX_TABLE_NAME_LEN);
+			fkid[MAX_TABLE_NAME_LEN] = 0;
 
 			const bool on_tmp = dict_table_t::is_temporary_name(
 				fkid);
