@@ -2035,7 +2035,7 @@ static bool wsrep_prepare_keys_for_alter_add_fk(const char* child_table_db,
   List_iterator<Key> key_iterator(const_cast<Alter_info*>(alter_info)->key_list);
   while ((key= key_iterator++))
   {
-    if (key->type == Key::FOREIGN_KEY)
+    if (key->foreign)
     {
       Foreign_key *fk_key= (Foreign_key *)key;
       const char *db_name= fk_key->ref_db.str;
@@ -2201,7 +2201,7 @@ wsrep_prepare_keys_for_alter_add_fk(const char* child_table_db,
   List_iterator<Key> key_iterator(const_cast<Alter_info*>(alter_info)->key_list);
   while ((key= key_iterator++))
   {
-    if (key->type == Key::FOREIGN_KEY)
+    if (key->foreign)
     {
       Foreign_key *fk_key= (Foreign_key *)key;
       const char *db_name= fk_key->ref_db.str;

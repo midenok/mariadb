@@ -50,7 +50,7 @@ ERROR HY000: Cannot drop column 'a': needed in a foreign key constraint '1'
 SET FOREIGN_KEY_CHECKS=ON;
 ALTER TABLE t1 ADD b INT;
 ALTER TABLE t1 DROP a;
-ERROR HY000: Cannot drop index 'a': needed in a foreign key constraint
+ERROR HY000: Missing index for constraint 't1_ibfk_1' in the foreign table 't1'
 ALTER TABLE t1 ADD c INT;
 DROP TABLE t1, tx;
 #
