@@ -666,4 +666,39 @@ public:
 };
 
 
+static inline int cmp_ident(const Lex_ident_column a, const Lex_ident_column b)
+{
+  /*
+    NB: no my_strncasecmp() and therefore the below assertions must pass.
+  */
+  DBUG_ASSERT(strlen(a.str) == a.length);
+  DBUG_ASSERT(strlen(b.str) == b.length);
+  int ret= cmp_any(a.length, b.length);
+  if (ret)
+    return ret;
+  return my_strcasecmp_8bit(a.charset_info(), a.str, b.str);
+}
+
+static inline int cmp_table(const LEX_CSTRING a, const LEX_CSTRING b)
+{
+  /*
+    NB: no my_strncasecmp() and therefore the below assertions must pass.
+  */
+  DBUG_ASSERT(strlen(a.str) == a.length);
+  DBUG_ASSERT(strlen(b.str) == b.length);
+  int ret= cmp_any(a.length, b.length);
+  if (ret)
+    return ret;
+  return my_strcasecmp_8bit(table_alias_charset, a.str, b.str);
+}
+
+struct Lex_ident_lt
+{
+  bool operator() (const Lex_ident_column &lhs, const Lex_ident_column &rhs) const
+  {
+    return cmp_ident(lhs, rhs) < 0;
+  }
+};
+
+
 #endif // LEX_IDENT_INCLUDED
