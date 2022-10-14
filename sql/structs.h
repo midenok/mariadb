@@ -1025,5 +1025,9 @@ struct Table_name
   {
     return table_name.str;
   }
+  void clear()
+  {
+    table_name= {NULL, 0};
+  }
 };
 #endif /* STRUCTS_INCLUDED */

@@ -4638,6 +4638,7 @@ bool HA_CREATE_INFO::finalize_locked_tables(THD *thd, bool operation_failed)
   @retval 0 OK
   @retval 1 error
   @retval -1 table existed but IF NOT EXISTS was used
+  @retval -2 atomic C-O-R failed, retry non-atomic
 */
 
 static
@@ -4650,7 +4651,8 @@ int create_table_impl(THD *thd,
                       int create_table_mode, bool *is_trans, KEY **key_info,
                       uint *key_count, LEX_CUSTRING *frm)
 {
-  LEX_CSTRING	*alias= const_cast<LEX_CSTRING*>(table_case_name(create_info, &table_name));
+  LEX_CSTRING	*alias= const_cast<LEX_CSTRING*>(
+                          table_case_name(create_info, &orig_table_name));
   handler	*file= 0;
   int		error= 1;
   bool          frm_only= (create_table_mode & C_ALTER_TABLE_FRM_ONLY);
@@ -4785,29 +4787,52 @@ int create_table_impl(THD *thd,
 
         if (atomic_replace)
         {
+          Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN);
+          if (!create_info->table)
+          {
+            /*
+              Check if original table is OK to open, otherwise atomic C-O-R
+              will fail on rename to backup. First remove from cache, otherwise
+              open_table() may succeed while the disk version is already broken.
+            */
+            tdc_remove_table(thd, orig_db.str, orig_table_name.str);
+            if (open_table(thd, &table_list, &ot_ctx))
+            {
+              /*
+                If the original table is broken fall back to non-atomic C-O-R.
+              */
+              thd->clear_error();
+              error= -2;
+              /*
+                Remove from cache, otherwise that broken share will be used
+                by normal CREATE .. SELECT and it will fail on open_table().
+              */
+              tdc_remove_table(thd, orig_db.str, orig_table_name.str);
+              goto err;
+            }
+            table= table_list.table;
+          }
           /* NOTE: here FK referencing is checked */
           if (!(thd->variables.option_bits & OPTION_NO_FOREIGN_KEY_CHECKS))
           {
-            Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN);
-            if (!create_info->table)
-            {
-              if (open_table(thd, &table_list, &ot_ctx))
-                goto err;
-              table= table_list.table;
-            }
             FOREIGN_KEY_INFO *fk;
             bool res= table->referenced_by_foreign_table(thd, &fk);
-            if (!create_info->table)
-            {
-              (void) close_thread_table(thd, &thd->open_tables);
-              table= NULL;
-            }
             if (res)
             {
+              if (!create_info->table)
+              {
+                (void) close_thread_table(thd, &thd->open_tables);
+                table= NULL;
+              }
               if (fk)
                 my_error(ER_ROW_IS_REFERENCED_2, MYF(0), fk->foreign_table->str);
               goto err;
             }
+          }
+          if (!create_info->table)
+          {
+            (void) close_thread_table(thd, &thd->open_tables);
+            table= NULL;
           }
 
           if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
@@ -5081,6 +5106,8 @@ warn:
     0 ok
     -1 Table was used with IF NOT EXISTS and table existed (warning, not error)
 
+  @retval -2 atomic C-O-R failed, retry non-atomic
+
   TODO: input data: orig_db, orig_table_name, db, table_name
         and the output data: frm, path_out should be passed via Alter_ctx.
         That is already done as part of MDEV-20865 for 10.11.
@@ -5265,14 +5292,16 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
     goto err;
   }
 
-  if (mysql_create_table_no_lock(thd,
+retry_non_atomic:
+  result= mysql_create_table_no_lock(thd,
                                  &orig_table->db,
                                  &orig_table->table_name,
                                  &create_table->db,
                                  &create_table->table_name, create_info,
                                  alter_info,
                                  &is_trans, create_table_mode,
-                                 create_table) > 0)
+                                 create_table);
+  if (result > 0)
   {
     result= 1;
     goto err;
@@ -5282,7 +5311,12 @@ err:
   if (atomic_replace)
   {
     create_table= orig_table;
-    create_info->table= orig_table->table;
+    if (result == -2)
+    {
+      atomic_replace= false;
+      create_info->tmp_name.clear();
+      goto retry_non_atomic;
+    }
   }
 
   thd->abort_on_warning= 0;
@@ -5680,7 +5714,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
   uint not_used;
   int create_res;
   TABLE_LIST *orig_table= table;
-  const bool atomic_replace= create_info->is_atomic_replace();
+  bool atomic_replace= create_info->is_atomic_replace();
   int create_table_mode= C_ORDINARY_CREATE;
   LEX_CUSTRING frm= { NULL, 0 };
   char path_buf[FN_REFLEN + 1];
@@ -5808,6 +5842,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
       local_create_info.make_tmp_table_list(thd, &table, &create_table_mode))
     goto err_no_atomic;
 
+retry_non_atomic:
   res= ((create_res=
          mysql_create_table_no_lock(thd,
                                     &orig_table->db,
@@ -5816,6 +5851,17 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
                                     &local_create_info, &local_alter_info,
                                     &is_trans, create_table_mode,
                                     table, &frm, &path)) > 0);
+  if (create_res == -2)
+  {
+    DBUG_ASSERT(atomic_replace);
+    table= orig_table;
+    atomic_replace= false;
+    local_create_info.tmp_name.clear();
+    DBUG_ASSERT(!frm.str);
+    path= {path_buf, sizeof(path_buf)};
+    goto retry_non_atomic;
+  }
+
   /* Remember to log if we deleted something */
   do_logging= thd->log_current_statement();
   if (res)

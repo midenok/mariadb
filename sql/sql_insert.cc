@@ -4593,6 +4593,7 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
   bool save_table_creation_was_logged;
   int create_table_mode= C_ORDINARY_CREATE;
   LEX_CUSTRING frm= {0, 0};
+  int error;
   DBUG_ENTER("select_create::create_table_from_items");
 
   tmp_table.s= &share;
@@ -4687,14 +4688,16 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
     open_table().
   */
 
-  if (!mysql_create_table_no_lock(thd,
-                                  &orig_table->db,
-                                  &orig_table->table_name,
-                                  &table_list->db,
-                                  &table_list->table_name,
-                                  create_info, alter_info, NULL,
-                                  create_table_mode, table_list,
-                                  atomic_replace ? &frm : NULL))
+retry_non_atomic:
+  error= mysql_create_table_no_lock(thd,
+                                    &orig_table->db,
+                                    &orig_table->table_name,
+                                    &table_list->db,
+                                    &table_list->table_name,
+                                    create_info, alter_info, NULL,
+                                    create_table_mode, table_list,
+                                    atomic_replace ? &frm : NULL);
+  if (!error)
   {
     DEBUG_SYNC(thd,"create_table_select_before_open");
 
@@ -4797,6 +4800,15 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
         DBUG_ASSERT(0);
       }
     }
+  }
+  else if (error == -2)
+  {
+    DBUG_ASSERT(atomic_replace);
+    table_list= orig_table;
+    create_info->tmp_name.clear();
+    atomic_replace= false;
+    DBUG_ASSERT(!frm.str);
+    goto retry_non_atomic;
   }
   else
     table_list->table= 0;                     // Create failed
