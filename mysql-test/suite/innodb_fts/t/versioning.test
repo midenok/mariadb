@@ -1,32 +1,63 @@
 --source include/have_innodb.inc
+--source include/not_windows.inc
+--source include/not_embedded.inc
 
+# Combinations
 #
-# Set this to build location of previous revision:
+# upgrade: test upgrade on prepared databases from std_data.
+# prepare: requires $OLD_BINDIR, test upgrade and downgrade with old-version
+#          server. Also prepare std_data files during the run in the source
+#          directory (you just have to commit or reject them).
 #
-#   let $OLD_BINDIR= /home/midenok/src/mariadb/10.3b/build;
-#
-# or you can set it as exported shell environment variable:
+# Examples
 #
 #   export OLD_BINDIR="/home/midenok/src/mariadb/10.3b/build"
+#   mtr innodb_fts.versioning,orig_stopword,prepare
 #
 
-if (!$OLD_BINDIR)
+if ($MTR_COMBINATION_PREPARE)
 {
-  --skip Requires OLD_BINDIR parameter (see test comment)
+  if (!$OLD_BINDIR)
+  {
+    --skip Requires OLD_BINDIR parameter (see test comment)
+  }
 }
 
---echo # Upgrade test
-let $restart_bindir= $OLD_BINDIR;
---source include/restart_mysqld.inc
+--let $server_id= `select @@server_id`
+--let $tmpdir= /tmp/mtr.$server_id.innodb_fts.data
+--let $datadir= `select @@datadir`
 
-let $create_options= with system versioning;
-let $basic_stage= create_table;
---source basic.inc
-let $basic_stage= insert_1;
---source basic.inc
+--echo # Upgrade test 1
 
+if ($MTR_COMBINATION_PREPARE)
+{
+  let $restart_bindir= $OLD_BINDIR;
+  --source include/restart_mysqld.inc
+
+  let $create_options= with system versioning;
+  let $basic_stage= create_table;
+  source basic.inc;
+  let $basic_stage= insert_1;
+  source basic.inc;
+
+  --source include/shutdown_mysqld.inc
+  if (!$MTR_COMBINATION_VERS_SW)
+  {
+    --exec rm -rf $tmpdir
+    --exec mkdir -p $tmpdir/test std_data/versioning
+    --exec cp -a $datadir/ib* $tmpdir
+    --exec cp -a $datadir/test/*.ibd $datadir/test/*.frm $tmpdir/test
+    --exec tar -C $tmpdir -czf std_data/versioning/fts.01.tgz .
+  }
+}
+
+if ($MTR_COMBINATION_UPGRADE)
+{
+  --source include/shutdown_mysqld.inc
+  --exec tar -C $datadir -xzf std_data/versioning/fts.01.tgz
+}
 let $restart_bindir=;
---source include/restart_mysqld.inc
+--source include/start_mysqld.inc
 
 --error ER_INDEX_CORRUPT
 SELECT * FROM articles WHERE MATCH (title,body)
@@ -38,70 +69,134 @@ flush tables;
 show create table articles;
 
 let $basic_stage= select_1;
---source basic.inc
+source basic.inc;
 
---echo # Downgrade test
-let $restart_bindir= $OLD_BINDIR;
---source include/restart_mysqld.inc
+if ($MTR_COMBINATION_PREPARE)
+{
+  --echo # Downgrade test 1
+  let $restart_bindir= $OLD_BINDIR;
+  --source include/restart_mysqld.inc
 
-alter table articles force;
-flush tables;
-show create table articles;
+  alter table articles force;
+  flush tables;
+  show create table articles;
+  let $basic_stage= select_1;
+  source basic.inc;
 
-let $basic_stage= select_1;
---source basic.inc
+  let $basic_stage= insert_2;
+  --disable_query_log
+  --source basic.inc
+  --enable_query_log
 
---echo # Upgrade test
-let $basic_stage= insert_2;
---source basic.inc
+  --source include/shutdown_mysqld.inc
+  if (!$MTR_COMBINATION_VERS_SW)
+  {
+    --exec rm -rf $tmpdir
+    --exec mkdir -p $tmpdir/test std_data/versioning
+    --exec cp -a $datadir/ib* $tmpdir
+    --exec cp -a $datadir/test/*.ibd $datadir/test/*.frm $tmpdir/test
+    --exec tar -C $tmpdir -czf std_data/versioning/fts.02.tgz .
+  }
+}
 
+--echo # Upgrade test 2
+
+if ($MTR_COMBINATION_UPGRADE)
+{
+  --source include/shutdown_mysqld.inc
+  --exec tar -C $datadir -xzf std_data/versioning/fts.02.tgz
+}
 let $restart_bindir=;
---source include/restart_mysqld.inc
+--source include/start_mysqld.inc
 
 alter table articles force;
 let $basic_stage= select_2;
---source basic.inc
+source basic.inc;
 
---echo # Downgrade test
-let $restart_bindir= $OLD_BINDIR;
---source include/restart_mysqld.inc
+if ($MTR_COMBINATION_PREPARE)
+{
+  --echo # Downgrade test 2
+  let $restart_bindir= $OLD_BINDIR;
+  --source include/restart_mysqld.inc
 
-alter table articles force;
-let $basic_stage= select_2;
---source basic.inc
+  alter table articles force;
+  let $basic_stage= select_2;
+  source basic.inc;
 
---echo # Upgrade test
-let $basic_stage= insert_3;
---source basic.inc
+  let $basic_stage= insert_3;
+  --disable_query_log
+  --source basic.inc
+  --enable_query_log
 
+  --source include/shutdown_mysqld.inc
+  if (!$MTR_COMBINATION_VERS_SW)
+  {
+    --exec rm -rf $tmpdir
+    --exec mkdir -p $tmpdir/test std_data/versioning
+    --exec cp -a $datadir/ib* $tmpdir
+    --exec cp -a $datadir/test/*.ibd $datadir/test/*.frm $tmpdir/test
+    --exec tar -C $tmpdir -czf std_data/versioning/fts.03.tgz .
+  }
+}
+
+--echo # Upgrade test 3
+
+if ($MTR_COMBINATION_UPGRADE)
+{
+  --source include/shutdown_mysqld.inc
+  --exec tar -C $datadir -xzf std_data/versioning/fts.03.tgz
+}
 let $restart_bindir=;
---source include/restart_mysqld.inc
+--source include/start_mysqld.inc
 
 alter table articles force;
 let $basic_stage= select_3;
---source basic.inc
+source basic.inc;
 
---echo # Downgrade test
-let $restart_bindir= $OLD_BINDIR;
---source include/restart_mysqld.inc
+let $sw_ext=;
+if ($MTR_COMBINATION_VERS_SW)
+{
+  let $sw_ext=.vers_sw;
+}
 
-alter table articles force;
-let $basic_stage= select_3;
---source basic.inc
+if ($MTR_COMBINATION_PREPARE)
+{
+  --echo # Downgrade test 3
+  let $restart_bindir= $OLD_BINDIR;
+  --source include/restart_mysqld.inc
 
-drop table articles;
+  alter table articles force;
+  let $basic_stage= select_3;
+  source basic.inc;
 
---echo # Upgrade test (stopword)
-let $stopword_stage= create_table;
---source stopword.inc
-insert into articles (title, body)
-values ('test for stopwords','this is it...');
-insert into user_stopword values("the");
-delete from user_stopword;
-insert into user_stopword values("this");
+  --disable_query_log
+  drop table articles;
+  let $stopword_stage= create_table;
+  --source stopword.inc
+  insert into articles (title, body)
+  values ('test for stopwords','this is it...');
+  insert into user_stopword values("the");
+  delete from user_stopword;
+  insert into user_stopword values("this");
+  --enable_query_log
 
+  --source include/shutdown_mysqld.inc
+  --exec rm -rf $tmpdir
+  --exec mkdir -p $tmpdir/test std_data/versioning
+  --exec cp -a $datadir/ib* $tmpdir
+  --exec cp -a $datadir/test/*.ibd $datadir/test/*.frm $tmpdir/test
+  --exec tar -C $tmpdir -czf std_data/versioning/fts.04$sw_ext.tgz .
+}
+
+--echo # Upgrade test 4 (stopword)
+
+if ($MTR_COMBINATION_UPGRADE)
+{
+  --source include/shutdown_mysqld.inc
+  --exec tar -C $datadir -xzf std_data/versioning/fts.04$sw_ext.tgz
+}
 let $restart_bindir=;
---source include/restart_mysqld.inc
+--source include/start_mysqld.inc
 
 set global innodb_ft_server_stopword_table= "test/user_stopword";
 let $stopword_stage= select_1;
@@ -110,21 +205,26 @@ drop index idx on articles;
 create fulltext index idx on articles(title, body);
 --source stopword.inc
 
---echo # Downgrade test (stopword)
-let $restart_bindir= $OLD_BINDIR;
---source include/restart_mysqld.inc
+if ($MTR_COMBINATION_PREPARE)
+{
+  --echo # Downgrade test 4 (stopword)
 
-set global innodb_ft_server_stopword_table= "test/user_stopword";
-let $stopword_stage= select_1;
-# Downgrade faults with assertion "dict_index_get_n_unique(index) == 1"
-# until we rebuilt the index:
-drop index idx on articles;
-create fulltext index idx on articles(title, body);
---source stopword.inc
+  let $restart_bindir= $OLD_BINDIR;
+  --source include/restart_mysqld.inc
 
+  set global innodb_ft_server_stopword_table= "test/user_stopword";
+  let $stopword_stage= select_1;
+  # Downgrade faults with assertion "dict_index_get_n_unique(index) == 1"
+  # until we rebuilt the index:
+  drop index idx on articles;
+  create fulltext index idx on articles(title, body);
+  source stopword.inc;
 
-let $restart_bindir=;
---source include/restart_mysqld.inc
+  let $restart_bindir=;
+  --source include/restart_mysqld.inc
+}
+
+--echo # Cleanup
 drop table articles;
 drop table user_stopword;
 
