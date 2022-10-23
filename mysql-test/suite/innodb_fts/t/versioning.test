@@ -40,24 +40,41 @@ if ($MTR_COMBINATION_PREPARE)
   let $basic_stage= insert_1;
   source basic.inc;
 
+  if (!$MTR_COMBINATION_VERS_SW)
+  {
+    --disable_query_log
+    flush tables articles for export;
+    --enable_query_log
+  }
   --source include/shutdown_mysqld.inc
   if (!$MTR_COMBINATION_VERS_SW)
   {
     --exec rm -rf $tmpdir
     --exec mkdir -p $tmpdir/test std_data/versioning
-    --exec cp -a $datadir/ib* $tmpdir
-    --exec cp -a $datadir/test/*.ibd $datadir/test/*.frm $tmpdir/test
+    --exec cp -a $datadir/test/*.ibd $datadir/test/*.cfg $tmpdir/test
     --exec tar -C $tmpdir -czf std_data/versioning/fts.01.tgz .
   }
 }
 
 if ($MTR_COMBINATION_UPGRADE)
 {
+  let $create_options= with system versioning;
+  let $basic_stage= create_table;
+  --disable_query_log
+  --source basic.inc
+  alter table articles discard tablespace;
+  --enable_query_log
   --source include/shutdown_mysqld.inc
   --exec tar -C $datadir -xzf std_data/versioning/fts.01.tgz
 }
 let $restart_bindir=;
 --source include/start_mysqld.inc
+if ($MTR_COMBINATION_UPGRADE)
+{
+  --disable_query_log
+  alter table articles import tablespace;
+  --enable_query_log
+}
 
 --error ER_INDEX_CORRUPT
 SELECT * FROM articles WHERE MATCH (title,body)
