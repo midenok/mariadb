@@ -13026,7 +13026,7 @@ bool fk_prepare_create_table(THD *thd, Alter_info *alter_info,
 
   /** Preacquire shares */
   for (const FK_info &fk: foreign_keys)
-    if (fk.get_referenced_share(thd, &ref_shares))
+    if (fk.get_referenced_share(thd, &ref_shares, MYF(0)))
       return true;
 
   for (FK_info &fk: foreign_keys)

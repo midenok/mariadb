@@ -1982,8 +1982,7 @@ public:
   Table_name ref_table(MEM_ROOT *mem_root) const;
   void print(String &out);
 
-  bool get_referenced_share(THD *thd, Share_acquire *sa) const;
-  bool get_referenced_share(THD *thd, Share_map *ref_shares) const;
+  bool get_referenced_share(THD *thd, Share_map *ref_shares, myf MyFlags) const;
   KEY * find_referenced_idx(TABLE_SHARE *ref_share) const;
   KEY * find_idx(KEY *key_info, uint keys, bool foreign_idx);
 };

@@ -8218,7 +8218,7 @@ get_referential_constraints_record(THD *thd, TABLE_LIST *tables,
     Share_map ref_shares;
     for (const FK_info &fk: show_table->s->foreign_keys)
       // FIXME: push warning instead error
-      if (fk.get_referenced_share(thd, &ref_shares))
+      if (fk.get_referenced_share(thd, &ref_shares, ME_WARNING))
         return true;
 
     for (const FK_info &fk: show_table->s->foreign_keys)

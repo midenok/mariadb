@@ -9916,42 +9916,12 @@ void FK_info::print(String& out)
 
 
 /**
-  @brief Acquire referenced share for table name.
+  @brief Check if share exists in ref_shares.
+         Otherwise acquire and put the share into ref_shares.
 */
 
 bool
-FK_info::get_referenced_share(THD *thd, Share_acquire *sa) const
-{
-  if (self_ref())
-    return false;
-
-  Table_name ref(ref_db(), referenced_table);
-  /*
-    TODO: maybe lowercase() in Table_name ctor?
-          Maybe keep that already lowercased in FK_info?
-  */
-  if (lower_case_table_names)
-    ref.lowercase(thd->mem_root);
-
-  sa->acquire(thd, ref);
-  if (sa->fk_error(thd))
-  {
-    my_error(ER_WRONG_FK_DEF, MYF(0), ref.name.str,
-              "referenced table not found");
-    return true;
-  }
-
-  return false;
-}
-
-
-/**
-  @brief Similar to above version, but don't acquire if share already exists
-         in ref_shares. Otherwise put acquired share into ref_shares.
-*/
-
-bool
-FK_info::get_referenced_share(THD *thd, Share_map *ref_shares) const
+FK_info::get_referenced_share(THD *thd, Share_map *ref_shares, myf MyFlags) const
 {
   if (self_ref())
     return false;
@@ -9969,9 +9939,8 @@ FK_info::get_referenced_share(THD *thd, Share_map *ref_shares) const
   Share_acquire sa(thd, ref);
   if (sa.fk_error(thd))
   {
-    my_error(ER_WRONG_FK_DEF, MYF(0), ref.name.str,
-              "referenced table not found");
-    return true;
+    my_error(ER_WRONG_FK_DEF, MyFlags, ref.name.str, "referenced table not found");
+    return MyFlags & (ME_WARNING | ME_NOTE) ? false : true;
   }
   if (!sa.share)
   {
@@ -9998,14 +9967,13 @@ FK_info::get_referenced_share(THD *thd, Share_map *ref_shares) const
 
 KEY * FK_info::find_referenced_idx(TABLE_SHARE *ref_share) const
 {
-  uint i; // FIXME: remove i?
-  KEY *key;
+  KEY *key, *end;
   const Type_handler *fk_type;
 
   DBUG_ASSERT(foreign_fields.elements == referenced_fields.elements);
   DBUG_ASSERT(foreign_idx->user_defined_key_parts >= foreign_fields.elements);
 
-  for (i= 0, key= ref_share->key_info; i < ref_share->keys; i++, key++)
+  for (key= ref_share->key_info, end= key + ref_share->keys; key < end; key++)
   {
     if (key->user_defined_key_parts < referenced_fields.elements)
       continue;
