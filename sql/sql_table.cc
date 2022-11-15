@@ -2799,7 +2799,7 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
   List_iterator<Create_field> it2(alter_info->create_list);
   uint total_uneven_bit_length= 0;
   int select_field_count= C_CREATE_SELECT(create_table_mode);
-  bool tmp_table= create_table_mode == C_ALTER_TABLE;
+  const bool tmp_table= create_table_mode == C_ALTER_TABLE;
   const bool create_simple= thd->lex->create_simple();
   bool is_hash_field_needed= false;
   const Column_derived_attributes dattr(create_info->default_table_charset);
@@ -3157,6 +3157,7 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
       if (key->foreign)
       {
         FK_info *fk;
+        Foreign_key &fkey= static_cast<Foreign_key &>(*key);
         /*
           ignore_reason2 is set for SQLCOM_ALTER_TABLE, SQLCOM_CREATE_INDEX,
           SQLCOM_DROP_INDEX.
@@ -3175,7 +3176,6 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
         {
           DBUG_ASSERT(key->ignore_reason);
           fk= new (thd->mem_root) FK_info();
-          Foreign_key &fkey= static_cast<Foreign_key &>(*key);
           fk->assign(fkey, new_name);
           if (!fk->foreign_id.str)
           {
@@ -3192,6 +3192,20 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
         }
         if (!fkey_names.insert(fk->foreign_id))
           DBUG_RETURN(true);				// Out of memory
+
+        /*
+           Prepare check referenced index for CREATE TABLE.
+           NB: for ALTER TABLE it is done in mysql_prepare_alter_table().
+        */
+        if (create_table_mode >= C_ORDINARY_CREATE &&
+            !fk->self_ref())
+        {
+          Table_name t(fk->ref_db(), fk->referenced_table);
+          if (lower_case_table_names)
+            t.lowercase(thd->mem_root);
+          if (alter_ctx->fk_added.push_back({t, &fkey}))
+            DBUG_RETURN(true);
+        }
       }
       continue;
     }
@@ -3248,6 +3262,19 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
       {
         my_error(ER_OUT_OF_RESOURCES, MYF(0));
         DBUG_RETURN(TRUE);
+      }
+      /*
+          Prepare check referenced index for CREATE TABLE.
+          NB: for ALTER TABLE it is done in mysql_prepare_alter_table().
+      */
+      if (create_table_mode >= C_ORDINARY_CREATE &&
+          !fk->self_ref())
+      {
+        Table_name t(fk->ref_db(), fk->referenced_table);
+        if (lower_case_table_names)
+          t.lowercase(thd->mem_root);
+        if (alter_ctx->fk_added.push_back({t, &fkey}))
+          DBUG_RETURN(true);
       }
     }
     key_info->name= key_name;

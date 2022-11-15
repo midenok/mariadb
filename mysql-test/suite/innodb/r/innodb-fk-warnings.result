@@ -22,21 +22,17 @@ Warning	1022	Can't write; duplicate key in table 't2'
 drop table t1;
 create table t1(a int) engine=innodb;
 create table t2(a int, constraint a foreign key a (a) references t1(a)) engine=innodb;
-ERROR HY000: Can't create table `test`.`t2` (errno: 150 "Foreign key constraint is incorrectly formed")
+ERROR HY000: Missing index for constraint 't2.a' in the referenced table 't1'
 show warnings;
 Level	Code	Message
-Warning	150	Create  table `test`.`t2` with foreign key `a` constraint failed. There is no index in the referenced table where the referenced columns appear as the first columns.
-Error	1005	Can't create table `test`.`t2` (errno: 150 "Foreign key constraint is incorrectly formed")
-Warning	1215	Cannot add foreign key constraint for `t2`
+Error	1822	Missing index for constraint 't2.a' in the referenced table 't1'
 drop table t1;
 create table t1(a int unique, b int) engine=innodb;
 create table t2(a int, b int, foreign key (a) references t1(a), foreign key (b) references t1(b)) engine=innodb;
-ERROR HY000: Can't create table `test`.`t2` (errno: 150 "Foreign key constraint is incorrectly formed")
+ERROR HY000: Missing index for constraint 't2.t2_ibfk_2' in the referenced table 't1'
 show warnings;
 Level	Code	Message
-Warning	150	Create  table `test`.`t2` with foreign key `t2_ibfk_2` constraint failed. There is no index in the referenced table where the referenced columns appear as the first columns.
-Error	1005	Can't create table `test`.`t2` (errno: 150 "Foreign key constraint is incorrectly formed")
-Warning	1215	Cannot add foreign key constraint for `t2`
+Error	1822	Missing index for constraint 't2.t2_ibfk_2' in the referenced table 't1'
 drop table t1;
 create table t1(a int not null primary key, b int) engine=innodb;
 create table t2(a int, b int, constraint a foreign key a (a) references t1(a),

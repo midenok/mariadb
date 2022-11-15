@@ -3,7 +3,7 @@ create table t2 (
 a int unique, c int unique);
 create table t3 (
 a int unique, c int unique, d int unique,
-r int references t3(d));
+r int references t3(d), index (c, d));
 create table t1 (
 a int not null references t2,
 b int not null constraint t2_c references t2 (c),

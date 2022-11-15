@@ -9998,7 +9998,7 @@ KEY * FK_info::find_referenced_idx(TABLE_SHARE *ref_share) const
       else
         fk_type= fkp->field->type_handler();
 
-      if (rkp->field->type_handler() != fk_type)
+      if (rkp->field->type_handler()->cmp_type() != fk_type->cmp_type())
       {
         found= false;
         break;
