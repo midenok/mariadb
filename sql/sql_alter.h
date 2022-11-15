@@ -412,6 +412,9 @@ public:
   char         storage_engine_buff[NAME_LEN], tmp_storage_engine_buff[NAME_LEN];
   bool         storage_engine_partitioned;
   bool         tmp_storage_engine_name_partitioned;
+  // TODO: remove key_info_buffer, key_count args from mysql_prepare_create_table(), etc
+  KEY          *key_info;
+  uint         keys;
 
   /**
     Indicates that if a row is deleted during copying of data from old version
@@ -447,20 +450,24 @@ public:
   {
     Table_name ref;
     Foreign_key *fk;
+    bool self_ref() const
+    {
+      return ref.name.is_empty();
+    }
   };
   struct FK_drop_old
   {
     Table_name ref;
     const FK_info *fk;
   };
+  mbd::vector<FK_add_new> fk_added; /* can contain self-refs */
   /*
-    These six contain only non-self-refs. They are used to update info in
+    These five contain only non-self-refs. They are used to update info in
     referenced tables.
   */
   // NB: multiple foreign keys can utilize same column (see fk_prepare_rename())
   mbd::set<FK_rename_col> fk_renamed_cols;
   mbd::set<FK_rename_col> rk_renamed_cols;
-  mbd::vector<FK_add_new> fk_added;
   mbd::vector<FK_drop_old> fk_dropped;
   mbd::vector<Table_name> fk_renamed_table;
   mbd::vector<Table_name> rk_renamed_table;

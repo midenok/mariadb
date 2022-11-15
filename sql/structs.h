@@ -33,6 +33,7 @@
 struct TABLE;
 class Type_handler;
 class Field;
+class Create_field;
 class Index_statistics;
 
 class THD;

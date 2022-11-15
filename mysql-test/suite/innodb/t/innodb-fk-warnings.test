@@ -37,13 +37,13 @@ drop table t1;
 # No index for referenced columns
 #
 create table t1(a int) engine=innodb;
---error ER_CANT_CREATE_TABLE
+--error ER_FK_NO_INDEX_PARENT
 create table t2(a int, constraint a foreign key a (a) references t1(a)) engine=innodb;
 show warnings;
 drop table t1;
 
 create table t1(a int unique, b int) engine=innodb;
---error ER_CANT_CREATE_TABLE
+--error ER_FK_NO_INDEX_PARENT
 create table t2(a int, b int, foreign key (a) references t1(a), foreign key (b) references t1(b)) engine=innodb;
 show warnings;
 drop table t1;

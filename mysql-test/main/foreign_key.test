@@ -14,7 +14,7 @@ create table t2 (
 
 create table t3 (
   a int unique, c int unique, d int unique,
-  r int references t3(d));
+  r int references t3(d), index (c, d));
 
 create table t1 (
 	a int not null references t2,
@@ -506,7 +506,7 @@ set default_storage_engine= default;
 
 --echo # Prohibit wrong references and fix field name case
 --error ER_WRONG_FK_DEF
-create table t1 (A int unique key, x timestamp references t1(a));
+create table t1 (A int unique key, x timestamp references t1(a)) engine innodb;
 --error ER_FK_NO_INDEX_PARENT
 create table t1 (A int unique key, x int references t1(b));
 create table t1 (A int unique key, x int references t1(a));
@@ -549,3 +549,153 @@ alter table t1 partition by hash(x) partitions 3;
 --error ER_FEATURE_NOT_SUPPORTED_WITH_PARTITIONING
 alter table t2 partition by hash(y) partitions 3;
 drop tables t2, t1;
+
+create table t1 (a varchar(255) unique) engine innodb;
+create or replace table t2 (
+  a varchar(5) references t1(a)) engine innodb;
+create or replace  table t2 (
+  a char(5) references t1(a)) engine innodb;
+--echo # Different character set is not allowed
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a char(5) character set utf8 references t1(a)) engine innodb;
+--echo # Different collation is not allowed
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a char(5) collate latin1_german2_ci references t1(a)) engine innodb;
+--echo # Binary and non-binary are prihibited
+--error ER_WRONG_FK_DEF
+create or replace  table t2 (
+  a varbinary(255) references t1(a)) engine innodb;
+drop tables if exists t2, t1;
+
+--echo # Foreign-referenced types compatibility
+
+--echo # BLOB or TEXT are prefix indexes, they can not be used in FK
+create table t1 (a blob(255) unique) engine innodb;
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a text(5) references t1(a)) engine innodb;
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a blob(255) references t1(a)) engine innodb;
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a binary(255) references t1(a)) engine innodb;
+drop tables if exists t2, t1;
+
+--echo # GEOMETRY types are prohibited
+create table t1 (a point unique) engine innodb;
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a point references t1(a)) engine innodb;
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a blob(255) references t1(a)) engine innodb;
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a binary(255) references t1(a)) engine innodb;
+drop tables if exists t2, t1;
+
+create table t1 (a int(10) unique) engine innodb;
+--echo # Storage length is different (4 vs 1)
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a tinyint references t1(a)) engine innodb;
+--echo # DECIMAL is different type (DATA_FIXBINARY)
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a decimal(10) references t1(a)) engine innodb;
+--echo # Different signs are not allowed
+--error ER_WRONG_FK_DEF
+create or replace table t2 (
+  a int unsigned references t1(a)) engine innodb;
+drop tables if exists t2, t1;
+
+--echo # DATE and YEAR are DATA_INT types
+create table t1 (a mediumint unique) engine innodb;
+create or replace table t2 (
+  a date references t1(a)) engine innodb;
+drop tables if exists t2, t1;
+create table t1 (a tinyint unsigned unique) engine innodb;
+create or replace table t2 (
+  a year references t1(a)) engine innodb;
+drop tables if exists t2, t1;
+
+--echo # This is all compatible binary types in terms of InnoDB
+create table t1 (a binary(10) unique) engine innodb;
+create or replace table t2 (
+  a varbinary(5) references t1(a)) engine innodb;
+create or replace table t2 (
+  a decimal(7) references t1(a)) engine innodb;
+create or replace table t2 (
+  a uuid references t1(a)) engine innodb;
+create or replace table t2 (
+  a inet6 references t1(a)) engine innodb;
+create or replace table t2 (
+  a timestamp references t1(a)) engine innodb;
+create or replace table t2 (
+  a datetime references t1(a)) engine innodb;
+create or replace table t2 (
+  a time references t1(a)) engine innodb;
+drop tables if exists t2, t1;
+
+--echo # All the above for self-refs
+create table t1 (
+  a varchar(254) unique,
+  b varchar(6) references t1(a),
+  c char(6) references t1(a)) engine innodb;
+--echo # Different collation is not allowed
+--error ER_WRONG_FK_DEF
+create or replace table t1 (
+  a varchar(254) unique,
+  b char(6) collate latin1_german2_ci references t1(a)) engine innodb;
+--echo # Binary and non-binary are prihibited
+--error ER_WRONG_FK_DEF
+create or replace table t1 (
+  a varchar(254) unique,
+  b varbinary(254) references t1(a)) engine innodb;
+--echo # BLOB or TEXT are prefix indexes, they can not be used in FK
+--error ER_WRONG_FK_DEF
+create or replace table t1 (
+  a blob(254) unique,
+  b varbinary(6) references t1(a)) engine innodb;
+--echo # GEOMETRY types are prohibited
+--error ER_WRONG_FK_DEF
+create or replace table t1 (
+  a point unique,
+  b binary(6) references t1(a)) engine innodb;
+--echo # Storage length is different (4 vs 1)
+--error ER_WRONG_FK_DEF
+create or replace table t1 (
+  a int unique,
+  b tinyint references t1(a)) engine innodb;
+--echo # DECIMAL is different type (DATA_FIXBINARY)
+--error ER_WRONG_FK_DEF
+create or replace table t1 (
+  a int unique,
+  b decimal(10) references t1(a)) engine innodb;
+--echo # Different signs are not allowed
+--error ER_WRONG_FK_DEF
+create or replace table t1 (
+  a int unique,
+  b int unsigned references t1(a)) engine innodb;
+--echo # DATE and YEAR are DATA_INT types
+create or replace table t1 (
+  a mediumint unique,
+  b date references t1(a)) engine innodb;
+create or replace table t1 (
+  a tinyint unsigned unique,
+  b year references t1(a)) engine innodb;
+drop table if exists t1;
+--echo # This is all compatible binary types in terms of InnoDB
+create or replace table t1 (
+  a binary(10) unique,
+  b varbinary(5) references t1(a),
+  c decimal(7) references t1(a),
+  d uuid references t1(a),
+  e inet6 references t1(a),
+  f timestamp references t1(a),
+  g datetime references t1(a),
+  h time references t1(a)) engine innodb;
+drop tables if exists t2, t1;

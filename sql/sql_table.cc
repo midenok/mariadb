@@ -2799,7 +2799,7 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
   List_iterator<Create_field> it2(alter_info->create_list);
   uint total_uneven_bit_length= 0;
   int select_field_count= C_CREATE_SELECT(create_table_mode);
-  bool tmp_table= create_table_mode == C_ALTER_TABLE;
+  const bool tmp_table= create_table_mode == C_ALTER_TABLE;
   const bool create_simple= thd->lex->create_simple();
   bool is_hash_field_needed= false;
   const Column_derived_attributes dattr(create_info->default_table_charset);
@@ -3157,6 +3157,7 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
       if (key->foreign)
       {
         FK_info *fk;
+        Foreign_key &fkey= static_cast<Foreign_key &>(*key);
         /*
           ignore_reason2 is set for SQLCOM_ALTER_TABLE, SQLCOM_CREATE_INDEX,
           SQLCOM_DROP_INDEX.
@@ -3175,7 +3176,6 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
         {
           DBUG_ASSERT(key->ignore_reason);
           fk= new (thd->mem_root) FK_info();
-          Foreign_key &fkey= static_cast<Foreign_key &>(*key);
           fk->assign(fkey, new_name);
           if (!fk->foreign_id.str)
           {
@@ -3192,6 +3192,23 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
         }
         if (!fkey_names.insert(fk->foreign_id))
           DBUG_RETURN(true);				// Out of memory
+
+        /*
+           Prepare check referenced index for CREATE TABLE.
+           NB: for ALTER TABLE it is done in mysql_prepare_alter_table().
+        */
+        if (create_table_mode >= C_ORDINARY_CREATE)
+        {
+          Table_name t;
+          if (!fk->self_ref())
+          {
+            t= {fk->ref_db(), fk->referenced_table};
+            if (lower_case_table_names)
+              t.lowercase(thd->mem_root);
+          }
+          if (alter_ctx->fk_added.push_back({t, &fkey}))
+            DBUG_RETURN(true);
+        }
       }
       continue;
     }
@@ -3248,6 +3265,22 @@ mysql_prepare_create_table(THD *thd, Alter_table_ctx *alter_ctx,
       {
         my_error(ER_OUT_OF_RESOURCES, MYF(0));
         DBUG_RETURN(TRUE);
+      }
+      /*
+          Prepare check referenced index for CREATE TABLE.
+          NB: for ALTER TABLE it is done in mysql_prepare_alter_table().
+      */
+      if (create_table_mode >= C_ORDINARY_CREATE)
+      {
+        Table_name t;
+        if (!fk->self_ref())
+        {
+          t= {fk->ref_db(), fk->referenced_table};
+          if (lower_case_table_names)
+            t.lowercase(thd->mem_root);
+        }
+        if (alter_ctx->fk_added.push_back({t, &fkey}))
+          DBUG_RETURN(true);
       }
     }
     key_info->name= key_name;
@@ -4003,6 +4036,9 @@ without_overlaps_err:
         DBUG_RETURN(TRUE);
     }
   }
+
+  alter_ctx->key_info= *key_info_buffer;
+  alter_ctx->keys= *key_count;
 
   /* Check foreign keys */ // TODO: put alter_info into alter_ctx
   if (fk_prepare_create_table(thd, alter_info, alter_ctx))
@@ -9156,6 +9192,11 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
             const_cast<FK_table_to_lock *>(x)->fail= true;
           }
         }
+        else
+        {
+          if (alter_ctx->fk_added.push_back({Table_name(), fk}))
+            goto err;
+        }
         if (key->name.str)
         {
           for (const Key &k: new_key_list)
@@ -11805,7 +11846,7 @@ err_new_table_cleanup:
                           (FN_IS_TMP | (no_ha_table ? NO_HA_TABLE : 0)),
                           alter_ctx.get_tmp_path());
 #if 0
-  // FIXME:
+  // FIXME: what was that?
   if (table->mdl_ticket && table->mdl_ticket->get_type() == MDL_EXCLUSIVE)
     goto err_with_mdl;
 #endif
@@ -13073,16 +13114,6 @@ bool fk_prepare_create_table(THD *thd, Alter_info *alter_info,
                    "referenced field not found");
           return true;
         }
-        // Do we really need cmp_type() and not result_type() here?
-        // FIXME: this check is done also in find_referenced_key(), remove here
-        if (cf->cmp_type() != ref_field->cmp_type())
-        {
-          if (!check_foreign)
-            continue;
-          my_error(ER_WRONG_FK_DEF, MYF(0), ff.str,
-                   "foreign-referenced fields type mismatch");
-          return true;
-        }
         /* NB: case may be different. Let's store correct case. */
         if (rf.strdup(thd->mem_root, LEX_STRING_WITH_LEN(ref_field->field_name)))
         {
@@ -13108,16 +13139,6 @@ bool fk_prepare_create_table(THD *thd, Alter_info *alter_info,
                    "referenced field not found");
           return true;
         }
-        // Do we really need cmp_type() and not result_type() here?
-        // FIXME: this check is done also in find_referenced_key(), remove here
-        if (cf->cmp_type() != ref_field->cmp_type())
-        {
-          if (!check_foreign)
-            continue;
-          my_error(ER_WRONG_FK_DEF, MYF(0), ff.str,
-                   "foreign-referenced fields type mismatch");
-          return true;
-        }
         /* NB: case may be different. Let's store correct case. */
         if (rf.strdup(thd->mem_root, LEX_STRING_WITH_LEN(ref_field->field_name)))
         {
@@ -13140,12 +13161,11 @@ bool fk_prepare_create_table(THD *thd, Alter_info *alter_info,
         {
           /* foreign_idx was set by mysql_prepare_create_table() */
           DBUG_ASSERT(fk.foreign_idx);
-          // FIXME: check referenced index, remove dict_foreign_find_index() for
-          // referenced table.
-          if (!fk.find_referenced_idx(ref_share))
+          // FIXME: remove dict_foreign_find_index() ?
+          if (new_fk.self_ref() ?
+              !fk.find_referenced_idx(alter_ctx->key_info, alter_ctx->keys, MYF(0)) :
+              !fk.find_referenced_idx(ref_share, MYF(0)))
           {
-            my_error(ER_FK_NO_INDEX_PARENT, MYF(0), fk.foreign_table.str,
-                     fk.foreign_id.str, fk.referenced_table.str);
             return true;
           }
           break;
@@ -13373,6 +13393,8 @@ bool Alter_table_ctx::fk_handle_alter(THD *thd)
 
   for (const FK_add_new &new_fk: fk_added)
   {
+    if (new_fk.self_ref())
+      continue;
     auto i= fk_shares.find(new_fk.ref);
     if (i == fk_shares.end())
     {

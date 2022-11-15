@@ -334,7 +334,7 @@ drop table t_keyword;
 #
 # Test behaviour with a simple select.
 #
-create table t1 (id int, first_name varchar(100), last_name varchar(100), score double);
+create table t1 (id int key, first_name varchar(100), last_name varchar(100), score double);
 insert into t1 values
 (1, 'Alice', 'Fowler', 5),
 (2, 'John', 'Doe', 6),

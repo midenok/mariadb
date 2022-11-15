@@ -1983,7 +1983,11 @@ public:
   void print(String &out);
 
   bool get_referenced_share(THD *thd, Share_map *ref_shares, myf MyFlags) const;
-  KEY * find_referenced_idx(TABLE_SHARE *ref_share) const;
+  KEY * find_referenced_idx(KEY *key_info, uint keys, myf MyFlags) const;
+  KEY * find_referenced_idx(TABLE_SHARE *ref_share, myf MyFlags) const
+  {
+    return find_referenced_idx(ref_share->key_info, ref_share->keys, MyFlags);
+  }
   KEY * find_idx(KEY *key_info, uint keys, bool foreign_idx);
 };
 

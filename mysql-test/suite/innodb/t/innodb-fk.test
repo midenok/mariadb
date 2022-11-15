@@ -231,7 +231,7 @@ DROP TABLE `bor#oda`;
 --echo # MDEV-21127 Assertion `(size_t)(ptr - buf) < MAX_TEXT - 4' failed in key_text::key_text
 --echo #
 create table tx (ax char(255) unique, bx char(255) unique) engine innodb;
---error ER_CANT_CREATE_TABLE
+--error ER_FK_NO_INDEX_PARENT
 CREATE TABLE t1 (
     a012345678901234567890123456789012345678901 char(255),
     b char(255),

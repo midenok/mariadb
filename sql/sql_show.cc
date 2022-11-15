@@ -8217,7 +8217,6 @@ get_referential_constraints_record(THD *thd, TABLE_LIST *tables,
     /** Preacquire shares */
     Share_map ref_shares;
     for (const FK_info &fk: show_table->s->foreign_keys)
-      // FIXME: push warning instead error
       if (fk.get_referenced_share(thd, &ref_shares, ME_WARNING))
         return true;
 
@@ -8241,16 +8240,8 @@ get_referential_constraints_record(THD *thd, TABLE_LIST *tables,
 
       if (ref_share)
       {
-        if (KEY *k= fk.find_referenced_idx(ref_share))
+        if (KEY *k= fk.find_referenced_idx(ref_share, ME_WARNING))
           ref_key_name= k->name;
-        else
-        {
-          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                              ER_FK_NO_INDEX_PARENT,
-                              ER_THD(thd, ER_FK_NO_INDEX_PARENT),
-                              fk.foreign_table.str, fk.foreign_id.str,
-                              fk.referenced_table.str);
-        }
       }
 
       restore_record(table, s->default_values);

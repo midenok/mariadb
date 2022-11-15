@@ -9957,6 +9957,163 @@ FK_info::get_referenced_share(THD *thd, Share_map *ref_shares, myf MyFlags) cons
 }
 
 
+struct Create_field_or_Field
+{
+  Create_field *create_field= NULL;
+  Field *field= NULL;
+  bool binary= false;
+
+  LEX_CSTRING field_name() const
+  {
+    return field ? field->field_name : create_field->field_name;
+  }
+  CHARSET_INFO *charset() const
+  {
+    return field ? field->charset() : create_field->charset;
+  }
+  uint32 pack_length() const
+  {
+    return field ? field->pack_length() : create_field->pack_length;
+  }
+  uint32 flags() const
+  {
+    return field ? field->flags : create_field->flags;
+  }
+  const Type_handler *type_handler() const
+  {
+    return field ? field->type_handler() : create_field->type_handler();
+  }
+  Create_field_or_Field(KEY_PART_INFO *kp)
+  {
+    if (kp->key_part_flag & HA_CREATE_TABLE)
+      create_field= (Create_field *) kp->field;
+    else
+      field= kp->field;
+    binary= kp->key_type & FIELDFLAG_BINARY;
+  }
+};
+
+
+/* Compatibility with InnoDB foreign-referenced key types check */
+
+class FK_InnoDB_Compat
+{
+  enum
+  {
+    DATA_CHAR,
+    DATA_BINARY,
+    DATA_INT,
+    DATA_FLOAT,
+    DATA_DOUBLE,
+    DATA_DECIMAL
+  };
+
+  /*
+     Adaptation of get_innobase_type_from_mysql_type(). Some return
+     values are merged down for the sake of simplicity as they don't
+     matter for the comparison algorithm.
+  */
+
+  static
+  uint8_t get_innobase_type_from_mysql_type(bool *unsigned_flag,
+                                            const Create_field_or_Field *field)
+  {
+    if (field->flags() & UNSIGNED_FLAG)
+      *unsigned_flag= true;
+    else
+      *unsigned_flag= false;
+
+    const Type_handler *type_handler= field->type_handler();
+
+    if (type_handler->real_field_type() == MYSQL_TYPE_ENUM ||
+        type_handler->real_field_type() == MYSQL_TYPE_SET)
+    {
+      *unsigned_flag= true;
+      return (DATA_INT);
+    }
+
+    switch (type_handler->field_type())
+    {
+    case MYSQL_TYPE_VAR_STRING:
+    case MYSQL_TYPE_VARCHAR:
+      if (field->binary) // BINARY, VARBINARY
+        return (DATA_BINARY);
+      else
+        return (DATA_CHAR);
+    case MYSQL_TYPE_BIT:
+    case MYSQL_TYPE_STRING:
+      if (field->binary) // INET6, UUID
+        return (DATA_BINARY);
+      else
+        return (DATA_CHAR);
+    case MYSQL_TYPE_NEWDECIMAL:
+      return (DATA_BINARY); // DECIMAL
+    case MYSQL_TYPE_LONG:
+    case MYSQL_TYPE_LONGLONG:
+    case MYSQL_TYPE_TINY:
+    case MYSQL_TYPE_SHORT:
+    case MYSQL_TYPE_INT24:
+    case MYSQL_TYPE_DATE:
+    case MYSQL_TYPE_YEAR:
+    case MYSQL_TYPE_NEWDATE:
+      return (DATA_INT);
+    case MYSQL_TYPE_TIME:
+    case MYSQL_TYPE_DATETIME:
+    case MYSQL_TYPE_TIMESTAMP:
+      return (DATA_BINARY);
+    case MYSQL_TYPE_FLOAT:
+      return (DATA_FLOAT);
+    case MYSQL_TYPE_DOUBLE:
+      return (DATA_DOUBLE);
+    case MYSQL_TYPE_DECIMAL:
+      return (DATA_DECIMAL);
+    case MYSQL_TYPE_NULL:
+    case MYSQL_TYPE_GEOMETRY:
+    case MYSQL_TYPE_TINY_BLOB:
+    case MYSQL_TYPE_MEDIUM_BLOB:
+    case MYSQL_TYPE_BLOB:
+    case MYSQL_TYPE_LONG_BLOB:
+    default:
+      DBUG_ASSERT(0);
+    }
+
+    return (0);
+  }
+
+public:
+
+  /*
+     Adaptation of cmp_cols_are_equal()
+  */
+
+  static
+  bool cmp_cols_are_equal(KEY_PART_INFO *kp1, KEY_PART_INFO *kp2)
+  {
+    bool unsigned_flag1, unsigned_flag2;
+    Create_field_or_Field field1(kp1);
+    Create_field_or_Field field2(kp2);
+
+    uint8_t mtype1= get_innobase_type_from_mysql_type(&unsigned_flag1, &field1);
+    uint8_t mtype2= get_innobase_type_from_mysql_type(&unsigned_flag2, &field2);
+
+    if (mtype1 == DATA_CHAR && mtype2 == DATA_CHAR)
+      /* Note: different collation is different charset */
+      return (field1.charset() == field2.charset());
+
+    if (mtype1 == DATA_BINARY && mtype2 == DATA_BINARY)
+      return (TRUE);
+
+    if (mtype1 != mtype2)
+      return (FALSE);
+
+    if (mtype1 == DATA_INT && unsigned_flag1 != unsigned_flag2)
+      return (FALSE);
+
+    return (mtype1 != DATA_INT || field1.pack_length() == field2.pack_length());
+  }
+};
+
+
 /**
   @brief SQL layer adaptation of dict_foreign_find_index()
 
@@ -9965,54 +10122,64 @@ FK_info::get_referenced_share(THD *thd, Share_map *ref_shares, myf MyFlags) cons
   @return KEY which FK_info is referring to or NULL if not found.
 */
 
-KEY * FK_info::find_referenced_idx(TABLE_SHARE *ref_share) const
+KEY * FK_info::find_referenced_idx(KEY *key_info, uint keys, myf MyFlags) const
 {
   KEY *key, *end;
-  const Type_handler *fk_type;
 
   DBUG_ASSERT(foreign_fields.elements == referenced_fields.elements);
   DBUG_ASSERT(foreign_idx->user_defined_key_parts >= foreign_fields.elements);
 
-  for (key= ref_share->key_info, end= key + ref_share->keys; key < end; key++)
+  for (key= key_info, end= key + keys; key < end; key++)
   {
     if (key->user_defined_key_parts < referenced_fields.elements)
       continue;
     KEY_PART_INFO *rkp= key->key_part;
     KEY_PART_INFO *fkp= foreign_idx->key_part;
-    bool found= true;
+    bool found;
+    List_iterator_fast<Lex_cstring> ff_it(*(
+      const_cast<List<Lex_cstring> *>(&foreign_fields)));
     for (const Lex_cstring &rf: referenced_fields)
     {
-      // FIXME: skip column prefix index (see dict_foreign_find_index())
-      if (0 != cmp_ident(rkp->field->field_name, rf))
+      const Lex_cstring *ff= ff_it++;
+      Create_field_or_Field rkp_field(rkp);
+      LEX_CSTRING field_name= rkp_field.field_name();
+      if (0 != cmp_ident(field_name, rf))
       {
         found= false;
         break;
       }
 
-      /* field is Create_field */
-      if (fkp->key_part_flag & HA_CREATE_TABLE)
+      if (fkp->key_type & (FIELDFLAG_BLOB|FIELDFLAG_GEOM))
       {
-        Create_field *field= (Create_field *) fkp->field;
-        fk_type= field->type_handler();
+        my_error(ER_WRONG_FK_DEF, MyFlags, ff->str,
+                 "foreign key by blob or geometry is not supported");
+        return NULL;
       }
-      else
-        fk_type= fkp->field->type_handler();
+      else if (rkp->key_type & (FIELDFLAG_BLOB|FIELDFLAG_GEOM))
+      {
+        my_error(ER_WRONG_FK_DEF, MyFlags, ff->str,
+                 "referenced key by blob or geometry is not supported");
+        return NULL;
+      }
 
-      if (rkp->field->type_handler() != fk_type)
+      found= FK_InnoDB_Compat::cmp_cols_are_equal(rkp, fkp);
+
+      if (!found)
       {
-        found= false;
-        break;
+        my_error(ER_WRONG_FK_DEF, MyFlags, ff->str,
+                 "foreign-referenced fields type mismatch");
+        return NULL;
       }
-      // FIXME: test different charsets after match?
-      // Note: fkp->field is not initialized
-      // DBUG_ASSERT(rkp->field->result_type() == fkp->field->result_type());
-      // DBUG_ASSERT(rkp->field->cmp_type() == fkp->field->cmp_type());
       rkp++, fkp++;
     }
     if (!found)
       continue; /* not found */
     return key;
   }
+
+  my_error(ER_FK_NO_INDEX_PARENT, MyFlags, foreign_table.str, foreign_id.str,
+           referenced_table.str);
+
   return NULL;
 }
 
@@ -10049,7 +10216,7 @@ KEY * FK_info::find_idx(KEY *key_info, uint keys, bool foreign_idx)
         found= false;
         break;
       }
-            kp++;
+      kp++;
     }
     if (found)
       return key;
