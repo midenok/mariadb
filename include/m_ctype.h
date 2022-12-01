@@ -1190,6 +1190,7 @@ extern MYSQL_PLUGIN_IMPORT struct charset_info_st my_charset_latin1;
 extern MYSQL_PLUGIN_IMPORT struct charset_info_st my_charset_latin1_nopad;
 extern MYSQL_PLUGIN_IMPORT struct charset_info_st my_charset_filename;
 extern MYSQL_PLUGIN_IMPORT struct charset_info_st my_charset_utf8mb3_general_ci;
+extern MYSQL_PLUGIN_IMPORT struct charset_info_st my_charset_numeric;
 
 extern struct charset_info_st my_charset_big5_bin;
 extern struct charset_info_st my_charset_big5_chinese_ci;

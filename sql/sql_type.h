@@ -96,8 +96,6 @@ class ST_FIELD_INFO;
 class Type_collection;
 class Create_func;
 
-#define my_charset_numeric      my_charset_latin1
-
 enum protocol_send_type_t
 {
   PROTOCOL_SEND_STRING,

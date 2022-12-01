@@ -193,6 +193,7 @@ my_bool init_compiled_charsets(myf flags __attribute__((unused)))
   add_compiled_collation(&my_charset_latin1_bin);
   add_compiled_collation(&my_charset_latin1_nopad_bin);
   add_compiled_collation(&my_charset_latin1_german2_ci);
+  add_compiled_collation(&my_charset_numeric);
 
 #ifdef HAVE_CHARSET_big5
   add_compiled_collation(&my_charset_big5_chinese_ci);
