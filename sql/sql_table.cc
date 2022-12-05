@@ -11760,7 +11760,7 @@ end_inplace:
                                             partial_alter);
     thd->binlog_xid= 0;
     if (tmp_error)
-      goto err_cleanup; // FIXME: in patch was err_with_mdl
+      goto err_cleanup;
   }
 
   /*
@@ -11845,11 +11845,6 @@ err_new_table_cleanup:
                           &alter_ctx.new_db, &alter_ctx.tmp_name,
                           (FN_IS_TMP | (no_ha_table ? NO_HA_TABLE : 0)),
                           alter_ctx.get_tmp_path());
-#if 0
-  // FIXME: what was that?
-  if (table->mdl_ticket && table->mdl_ticket->get_type() == MDL_EXCLUSIVE)
-    goto err_with_mdl;
-#endif
 
   DEBUG_SYNC(thd, "alter_table_after_temp_table_drop");
 err_cleanup:
