@@ -734,7 +734,7 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     We set tmp_table to avoid get errors on naming of primary key index.
   */
   int error= 0;
-  char path[FN_REFLEN+1];
+  const char *path= lpt->path;
   char shadow_path[FN_REFLEN+1];
   char shadow_frm_name[FN_REFLEN+1];
   char frm_name[FN_REFLEN+1];
@@ -867,8 +867,6 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
   }
   if (flags == WFRM_BACKUP_ORIGINAL)
   {
-    build_table_filename(path, sizeof(path) - 1, lpt->db.str,
-                         lpt->table_name.str, "", 0);
     strxnmov(frm_name, sizeof(frm_name), path, reg_ext, NullS);
 
     build_table_shadow_filename(bak_path, sizeof(bak_path) - 1, lpt, true);
@@ -900,8 +898,6 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     /*
       Build frm file name
     */
-    build_table_filename(path, sizeof(path) - 1, lpt->db.str,
-                         lpt->table_name.str, "", 0);
     strxnmov(frm_name, sizeof(frm_name), path, reg_ext, NullS);
     /*
       When we are changing to use new frm file we need to ensure that we
