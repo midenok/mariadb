@@ -373,7 +373,7 @@ bool ddl_log_store_query(THD *thd, DDL_LOG_STATE *ddl_log_state,
 bool ddl_log_delete_frm(DDL_LOG_STATE *ddl_state, const char *to_path);
 bool ddl_log_rename_frm(DDL_LOG_STATE *ddl_state,
                         const char *from_path, const char *to_path);
-void ddl_log_link_chains(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state);
+bool ddl_log_link_chains(DDL_LOG_STATE *state, DDL_LOG_STATE *master_state);
 void ddl_log_start_atomic_block(DDL_LOG_STATE *state);
 bool ddl_log_commit_atomic_block(DDL_LOG_STATE *state);
 extern mysql_mutex_t LOCK_gdl;

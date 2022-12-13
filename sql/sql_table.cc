@@ -4437,7 +4437,8 @@ bool HA_CREATE_INFO::finalize_atomic_replace(THD *thd, TABLE_LIST *orig_table)
       Cleanup chain (ddl_log_state_rm) will not be executed unless
       rollback chain (ddl_log_state_create) is active.
     */
-    ddl_log_link_chains(ddl_log_state_rm, ddl_log_state_create);
+    if (ddl_log_link_chains(ddl_log_state_rm, ddl_log_state_create))
+      return true;
 
     cpath.length= build_table_filename(path, sizeof(path) - 1,
                                        backup_name.db.str,
