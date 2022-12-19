@@ -80,6 +80,7 @@ use Cwd ;
 use POSIX ":sys_wait_h";
 use Getopt::Long qw(:config bundling);
 use My::File::Path; # Patched version of File::Path
+use My::File::Config;
 use File::Basename;
 use File::Copy;
 use File::Find;
@@ -1210,8 +1211,16 @@ sub command_line_setup {
              My::CoreDump::options()
            );
 
-  # fix options (that take an optional argument and *only* after = sign
+  # 1. Merge config file into @ARGV. Options from command-line take precedence,
+  #    they come after the config file options.
+  My::File::Config::load_defaults({
+    conf_file => $ENV{MTR_CONFIG},
+    groups => ['mtr']});
+
+  # 2. Fix options (that take an optional argument and *only* after = sign
   @ARGV = My::Debugger::fix_options(@ARGV);
+
+  # 3. Run GetOptions() on the merged config (config file + command-line)
   GetOptions(%options) or usage("Can't read options");
   usage("") if $opt_usage;
   list_options(\%options) if $opt_list_options;
