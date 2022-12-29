@@ -51,19 +51,22 @@ sys_trx_start SYS_DATATYPE as row start invisible,
 sys_trx_end SYS_DATATYPE as row end invisible,
 period for system_time (sys_trx_start, sys_trx_end))
 with system versioning;
+set timestamp= unix_timestamp('2000-01-01 00:00:00');
 insert into t1 values(1, 1, 1);
-set @ins_t= now(6);
 select sys_trx_start into @tmp1 from t1;
+set timestamp= unix_timestamp('2000-01-01 01:00:00');
 update t1 set x= 11, y= 11 where id = 1;
 select @tmp1 < sys_trx_start as A1, x, y from t1;
 A1	x	y
 1	11	11
 select sys_trx_start into @tmp1 from t1;
+set timestamp= unix_timestamp('2000-01-01 02:00:00');
 update t1 set y= 1 where id = 1;
 select @tmp1 = sys_trx_start as A2, x from t1;
 A2	x
 1	11
 drop table t1;
+set timestamp= default;
 create table t1 (
 x int,
 y int,
