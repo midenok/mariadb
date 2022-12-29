@@ -8389,7 +8389,8 @@ calc_row_difference(
 	uchar*		upd_buff,
 	ulint		buff_len,
 	row_prebuilt_t*	prebuilt,
-	ib_uint64_t&	auto_inc)
+	ib_uint64_t&	auto_inc,
+	int		sql_command)
 {
 	uchar*		original_upd_buff = upd_buff;
 	Field*		field;
@@ -8412,6 +8413,7 @@ calc_row_difference(
 	trx_t* const	trx = prebuilt->trx;
 	doc_id_t	doc_id = FTS_NULL_DOC_ID;
 	ulint		num_v = 0;
+	prebuilt->versioned_write = table->versioned_write(VERS_TRX_ID);
 	const bool skip_virtual = ha_innobase::omits_virtual_cols(*table->s);
 
 	ut_ad(!srv_read_only_mode);
@@ -8563,9 +8565,15 @@ calc_row_difference(
 			}
 		}
 
+		const bool add_anyway= prebuilt->versioned_write
+					&& !field->vers_update_unversioned();
 		if (o_len != n_len || (o_len != 0 && o_len != UNIV_SQL_NULL
-				       && 0 != memcmp(o_ptr, n_ptr, o_len))) {
-			/* The field has changed */
+				       && (add_anyway ||
+				           0 != memcmp(o_ptr, n_ptr, o_len)))) {
+			/* The field has changed or it is trx-versioned write
+			which must write history for affects_versioned() rows
+			for UPDATE with versioned fields even when the value
+			was not changed (MDEV-23446) */
 
 			ufield = uvect->fields + n_changed;
 			MEM_UNDEFINED(ufield, sizeof *ufield);
@@ -8761,6 +8769,17 @@ calc_row_difference(
 
 	ut_a(buf <= (byte*) original_upd_buff + buff_len);
 
+	/* Used to avoid history in FK check on DELETE (see MDEV-16210). */
+	prebuilt->upd_node->is_delete =
+		((sql_command == SQLCOM_DELETE
+		  || sql_command == SQLCOM_DELETE_MULTI)
+		 && table->versioned(VERS_TIMESTAMP))
+		? VERSIONED_DELETE : NO_DELETE;
+
+	if (prebuilt->versioned_write && uvect->affects_versioned()) {
+		prebuilt->upd_node->vers_make_update(trx);
+	}
+
 	ut_ad(uvect->validate());
 	return(DB_SUCCESS);
 }
@@ -8904,7 +8923,7 @@ ha_innobase::update_row(
 
 	error = calc_row_difference(
 		uvect, old_row, new_row, table, m_upd_buf, m_upd_buf_size,
-		m_prebuilt, autoinc);
+		m_prebuilt, autoinc, thd_sql_command(m_user_thd));
 
 	if (error != DB_SUCCESS) {
 		goto func_exit;
@@ -8915,48 +8934,25 @@ ha_innobase::update_row(
 		MySQL that the row is not really updated and it
 		should not increase the count of updated rows.
 		This is fix for http://bugs.mysql.com/29157 */
-		if (m_prebuilt->versioned_write
-		    && thd_sql_command(m_user_thd) != SQLCOM_ALTER_TABLE
-		    /* Multiple UPDATE of same rows in single transaction create
-		       historical rows only once. */
-		    && trx->id != table->vers_start_id()) {
-			error = row_insert_for_mysql((byte*) old_row,
-						     m_prebuilt,
-						     ROW_INS_HISTORICAL);
-			if (error != DB_SUCCESS) {
-				goto func_exit;
-			}
-			innobase_srv_conc_exit_innodb(m_prebuilt);
-			innobase_active_small();
-		}
 		DBUG_RETURN(HA_ERR_RECORD_IS_THE_SAME);
 	} else {
-		const bool vers_set_fields = m_prebuilt->versioned_write
-			&& m_prebuilt->upd_node->update->affects_versioned();
-		const bool vers_ins_row = vers_set_fields
-			&& thd_sql_command(m_user_thd) != SQLCOM_ALTER_TABLE;
-
-                TABLE_LIST *tl= table->pos_in_table_list;
-                uint8 op_map= tl->trg_event_map | tl->slave_fk_event_map;
-		/* This is not a delete */
-		m_prebuilt->upd_node->is_delete =
-			(vers_set_fields && !vers_ins_row) ||
-			(op_map & trg2bit(TRG_EVENT_DELETE) &&
-				table->versioned(VERS_TIMESTAMP))
-			? VERSIONED_DELETE
-			: NO_DELETE;
-
 		innobase_srv_conc_enter_innodb(m_prebuilt);
 
 		if (m_prebuilt->upd_node->is_delete) {
 			trx->fts_next_doc_id = 0;
 		}
+		/* See vers_make_update() inside for versioned_write for how
+		row_start/row_end updated */
 		error = row_update_for_mysql(m_prebuilt);
 
-		if (error == DB_SUCCESS && vers_ins_row
+		if (error == DB_SUCCESS && m_prebuilt->versioned_write
+		    && uvect->affects_versioned()
 		    /* Multiple UPDATE of same rows in single transaction create
 		       historical rows only once. */
 		    && trx->id != table->vers_start_id()) {
+			/* UPDATE is not used by ALTER TABLE. Just precaution
+			as we don't need history generation for ALTER TABLE. */
+			ut_ad(thd_sql_command(m_user_thd) != SQLCOM_ALTER_TABLE);
 			error = row_insert_for_mysql((byte*) old_row,
 						     m_prebuilt,
 						     ROW_INS_HISTORICAL);
