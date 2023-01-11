@@ -8389,8 +8389,7 @@ calc_row_difference(
 	uchar*		upd_buff,
 	ulint		buff_len,
 	row_prebuilt_t*	prebuilt,
-	ib_uint64_t&	auto_inc,
-	int		sql_command)
+	ib_uint64_t&	auto_inc)
 {
 	uchar*		original_upd_buff = upd_buff;
 	Field*		field;
@@ -8769,11 +8768,12 @@ calc_row_difference(
 
 	ut_a(buf <= (byte*) original_upd_buff + buff_len);
 
-	/* Used to avoid history in FK check on DELETE (see MDEV-16210). */
+	const TABLE_LIST *tl= table->pos_in_table_list;
+	const uint8 op_map= tl->trg_event_map | tl->slave_fk_event_map;
+	/* Used to avoid reading history in FK check on DELETE (see MDEV-16210). */
 	prebuilt->upd_node->is_delete =
-		((sql_command == SQLCOM_DELETE
-		  || sql_command == SQLCOM_DELETE_MULTI)
-		 && table->versioned(VERS_TIMESTAMP))
+		(op_map & trg2bit(TRG_EVENT_DELETE)
+		 /*&& table->versioned(VERS_TIMESTAMP)*/)
 		? VERSIONED_DELETE : NO_DELETE;
 
 	if (prebuilt->versioned_write && uvect->affects_versioned()) {
@@ -8923,7 +8923,7 @@ ha_innobase::update_row(
 
 	error = calc_row_difference(
 		uvect, old_row, new_row, table, m_upd_buf, m_upd_buf_size,
-		m_prebuilt, autoinc, thd_sql_command(m_user_thd));
+		m_prebuilt, autoinc);
 
 	if (error != DB_SUCCESS) {
 		goto func_exit;
