@@ -645,6 +645,7 @@ THD_list server_threads;
 Rpl_filter* cur_rpl_filter;
 Rpl_filter* global_rpl_filter;
 Rpl_filter* binlog_filter;
+Rpl_filter* ordered_filter;
 
 struct system_variables global_system_variables;
 /**
@@ -2034,6 +2035,7 @@ static void clean_up(bool print_message)
   wsrep_thr_deinit();
   my_uuid_end();
   delete type_handler_data;
+  delete ordered_filter;
   delete binlog_filter;
   delete global_rpl_filter;
   end_ssl();
@@ -3955,7 +3957,8 @@ static int init_common_variables()
 
   global_rpl_filter= new Rpl_filter;
   binlog_filter= new Rpl_filter;
-  if (!global_rpl_filter || !binlog_filter)
+  ordered_filter= new Rpl_filter;
+  if (!global_rpl_filter || !binlog_filter || !ordered_filter)
   {
     sql_perror("Could not allocate replication and binlog filters");
     exit(1);
