@@ -2134,22 +2134,40 @@ rpl_parallel_thread_pool::release_thread(rpl_parallel_thread *rpt)
 */
 rpl_parallel_thread *
 rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
-                                  PSI_stage_info *old_stage, bool reuse)
+                                  PSI_stage_info *old_stage,
+                                  Gtid_log_event *gtid_ev,
+                                  enum_slave_parallel_mode mode)
 {
   uint32 idx;
   Relay_log_info *rli= rgi->rli;
   rpl_parallel_thread *thr;
 
-  if (!reuse)
+  if (gtid_ev)
   {
-    idx= rpl_thread_idx;
-    ++idx;
-    if (idx >= rpl_thread_max - 1)
-      idx= 0;
-    rpl_thread_idx= idx;
+    const uchar gtid_flags= gtid_ev->flags2;
+    if (likely(current_gco) &&
+        (mode >= SLAVE_PARALLEL_OPTIMISTIC) &&
+        (mode < SLAVE_PARALLEL_AGGRESSIVE) &&
+        !(gtid_flags & Gtid_log_event::FL_DDL) &&
+        !(current_gco->flags & group_commit_orderer::FORCE_SWITCH) &&
+        (!(gtid_flags & Gtid_log_event::FL_ALLOW_PARALLEL) ||
+          (gtid_flags & Gtid_log_event::FL_WAITED)))
+    {
+      idx= rpl_thread_max - 1;
+      was_ordered= true;
+    }
+    else
+    {
+      was_ordered= false;
+      idx= rpl_thread_idx;
+      ++idx;
+      if (idx >= rpl_thread_max - 1)
+        idx= 0;
+      rpl_thread_idx= idx;
+    }
   }
   else
-    idx= rpl_thread_max - 1;
+    idx= was_ordered ? rpl_thread_max - 1 : rpl_thread_idx;
   thr= rpl_threads[idx];
   if (thr)
   {
@@ -2453,7 +2471,7 @@ rpl_parallel_entry::queue_master_restart(rpl_group_info *rgi,
     Thus there is no need for the full complexity of choose_thread(). We only
     need to check if we have a current worker thread, and queue for it if so.
   */
-  idx= rpl_thread_idx;
+  idx= was_ordered ? rpl_thread_max - 1 : rpl_thread_idx;
   thr= rpl_threads[idx];
   if (!thr)
     return 0;
@@ -2591,6 +2609,7 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   rpl_group_info *rgi= NULL;
   Relay_log_info *rli= serial_rgi->rli;
   enum Log_event_type typ;
+  Gtid_log_event *gtid_ev= NULL;
   bool is_group_event;
   bool did_enter_cond= false;
   PSI_stage_info old_stage;
@@ -2725,7 +2744,7 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   if (typ == GTID_EVENT)
   {
     rpl_gtid gtid;
-    Gtid_log_event *gtid_ev= static_cast<Gtid_log_event *>(ev);
+    gtid_ev= static_cast<Gtid_log_event *>(ev);
     uint32 domain_id= (rli->mi->using_gtid == Master_info::USE_GTID_NO ||
                        rli->mi->parallel_mode <= SLAVE_PARALLEL_MINIMAL ?
                        0 : gtid_ev->domain_id);
@@ -2765,7 +2784,7 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   */
   cur_thread=
     e->choose_thread(serial_rgi, &did_enter_cond, &old_stage,
-                     typ != GTID_EVENT);
+                     gtid_ev, rli->mi->parallel_mode);
   if (!cur_thread)
   {
     /* This means we were killed. The error is already signalled. */
@@ -2781,9 +2800,8 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
     return 1;
   }
 
-  if (typ == GTID_EVENT)
+  if (gtid_ev)
   {
-    Gtid_log_event *gtid_ev= static_cast<Gtid_log_event *>(ev);
     bool new_gco;
     enum_slave_parallel_mode mode= rli->mi->parallel_mode;
     uchar gtid_flags= gtid_ev->flags2;
