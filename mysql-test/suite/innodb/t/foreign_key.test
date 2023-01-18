@@ -1257,4 +1257,19 @@ set foreign_key_checks = on;
 create or replace table t1 (a int) engine=innodb;
 drop tables t1, t2;
 
+--echo #
+--echo # MDEV-29783 ER_NO_SUCH_TABLE_IN_ENGINE after failed CREATE OR REPLACE with FK violation
+--echo #
+create table t1 (a int, key (a)) engine=innodb;
+create table t2 (b int, foreign key (b) references t1 (a)) engine=innodb;
+# Error is introduced by MDEV-34392
+--error ER_FK_COLUMN_CANNOT_CHANGE_CHILD
+set statement foreign_key_checks=off for alter table t1 modify a varchar(8);
+show create table t1;
+--error ER_ROW_IS_REFERENCED_2
+create or replace table t1 (c int) engine=innodb;
+show create table t1;
+# cleanup
+drop table t2, t1;
+
 --source include/wait_until_count_sessions.inc

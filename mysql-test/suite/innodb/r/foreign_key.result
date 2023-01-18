@@ -1219,3 +1219,25 @@ ERROR HY000: Cannot change column 'a': used in a foreign key constraint 't1_ibfk
 set foreign_key_checks = on;
 create or replace table t1 (a int) engine=innodb;
 drop tables t1, t2;
+#
+# MDEV-29783 ER_NO_SUCH_TABLE_IN_ENGINE after failed CREATE OR REPLACE with FK violation
+#
+create table t1 (a int, key (a)) engine=innodb;
+create table t2 (b int, foreign key (b) references t1 (a)) engine=innodb;
+set statement foreign_key_checks=off for alter table t1 modify a varchar(8);
+ERROR HY000: Cannot change column 'a': used in a foreign key constraint 't2_ibfk_1' of table 'test.t2'
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  KEY `a` (`a`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+create or replace table t1 (c int) engine=innodb;
+ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails (t2)
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  KEY `a` (`a`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+drop table t2, t1;
