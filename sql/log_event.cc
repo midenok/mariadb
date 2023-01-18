@@ -7430,7 +7430,6 @@ int Load_log_event::do_apply_event(NET* net, rpl_group_info *rgi,
       // TODO: this is a bug - this needs to be moved to the I/O thread
       if (net)
         skip_load_data_infile(net);
-      DBUG_ASSERT(0);
     }
     else
     {
@@ -12955,10 +12954,7 @@ check_table_map(rpl_group_info *rgi, RPL_TABLE_LIST *table_list)
         IF_WSREP((WSREP(rgi->thd) && rgi->thd->wsrep_applier), 0)) &&
       (!rli->mi->rpl_filter->db_ok(table_list->db.str) ||
        (rli->mi->rpl_filter->is_on() && !rli->mi->rpl_filter->tables_ok("", table_list))))
-  {
-//     DBUG_ASSERT(0);
     res= FILTERED_OUT;
-  }
   else
   {
     RPL_TABLE_LIST *ptr= static_cast<RPL_TABLE_LIST*>(rgi->tables_to_lock);

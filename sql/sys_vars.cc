@@ -5172,9 +5172,9 @@ static Sys_var_rpl_filter Sys_replicate_wild_ignore_table(
        "match the given wildcard pattern.");
 
 
-static Sys_var_rpl_filter Sys_replicate_ordered(
-       "replicate_ordered", OPT_REPLICATE_ORDERED,
-       "Tells the slave thread to do ordered replication for specified tables");
+// static Sys_var_rpl_filter Sys_replicate_ordered(
+//        "replicate_ordered", OPT_REPLICATE_ORDERED,
+//        "Tells the slave thread to do ordered replication for specified tables");
 
 static Sys_var_charptr Sys_slave_load_tmpdir(
        "slave_load_tmpdir", "The location where the slave should put "
