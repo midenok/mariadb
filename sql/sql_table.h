@@ -145,9 +145,11 @@ struct rename_param
   LEX_CUSTRING old_version;
   handlerton *from_table_hton;
   int rename_flags; /* FN_FROM_IS_TMP, FN_TO_IS_TMP, etc */
+  bool lock_triggers; /* Acquire MDL_EXCLUSIVE for triggers */
   rename_param() :
     from_table_hton(NULL),
-    rename_flags(0) {}
+    rename_flags(0),
+    lock_triggers(false) {}
 
   int reverse_flags()
   {
