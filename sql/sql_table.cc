@@ -67,6 +67,7 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "wsrep_trans_observer.h" /* wsrep transaction hooks */
 
 /** RAII class for temporarily enabling wsrep_ctas in the connection. */
 class Enable_wsrep_ctas_guard
@@ -4785,6 +4786,20 @@ bool HA_CREATE_INFO::finalize_locked_tables(THD *thd, bool operation_failed)
   DBUG_ASSERT(pos_in_locked_tables);
   DBUG_ASSERT(thd->locked_tables_mode);
   DBUG_ASSERT(thd->variables.option_bits & OPTION_TABLE_LOCK);
+
+#ifdef WITH_WSREP
+  /*
+    finalize_locked_tables() is done after commit. Cleanup wsrep transaction
+    state (s_committed) before reopen_tables() starts new transaction.
+  */
+  if (WSREP_NNULL(thd) && wsrep_thd_is_local(thd) &&
+      wsrep_after_statement(thd))
+  {
+    thd->locked_tables_list.unlink_all_closed_tables(thd, NULL, 0);
+    return true;
+  }
+#endif
+
   if (!operation_failed)
   {
     /*
