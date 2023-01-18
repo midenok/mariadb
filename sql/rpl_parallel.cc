@@ -2613,6 +2613,14 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   bool is_group_event;
   bool did_enter_cond= false;
   PSI_stage_info old_stage;
+  rpl_group_info::enum_speculation speculation= rpl_group_info::SPECULATE_NO;
+  enum_slave_parallel_mode mode;
+  uchar gtid_flags;
+  group_commit_orderer *gco;
+  bool new_gco= true;
+  uint8 force_switch_flag= 0;
+
+
 
   DBUG_EXECUTE_IF("slave_crash_if_parallel_apply", DBUG_SUICIDE(););
   /* Handle master log name change, seen in Rotate_log_event. */
@@ -2772,71 +2780,9 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
       delete_or_keep_event_post_apply(serial_rgi, typ, ev);
       return 0;
     }
-  }
-  else
-    e= current;
+    mode= rli->mi->parallel_mode;
+    gtid_flags= gtid_ev->flags2;
 
-  /*
-    Find a worker thread to queue the event for.
-    Prefer a new thread, so we maximise parallelism (at least for the group
-    commit). But do not exceed a limit of --slave-domain-parallel-threads;
-    instead re-use a thread that we queued for previously.
-  */
-  cur_thread=
-    e->choose_thread(serial_rgi, &did_enter_cond, &old_stage,
-                     gtid_ev, rli->mi->parallel_mode);
-  if (!cur_thread)
-  {
-    /* This means we were killed. The error is already signalled. */
-    delete ev;
-    return 1;
-  }
-
-  if (!(qev= cur_thread->get_qev(ev, event_size, rli)))
-  {
-    abandon_worker_thread(rli->sql_driver_thd, cur_thread,
-                          &did_enter_cond, &old_stage);
-    delete ev;
-    return 1;
-  }
-
-  if (gtid_ev)
-  {
-    bool new_gco;
-    enum_slave_parallel_mode mode= rli->mi->parallel_mode;
-    uchar gtid_flags= gtid_ev->flags2;
-    group_commit_orderer *gco;
-    uint8 force_switch_flag;
-    enum rpl_group_info::enum_speculation speculation;
-
-    if (!(rgi= cur_thread->get_rgi(rli, gtid_ev, e, event_size)))
-    {
-      cur_thread->free_qev(qev);
-      abandon_worker_thread(rli->sql_driver_thd, cur_thread,
-                            &did_enter_cond, &old_stage);
-      delete ev;
-      return 1;
-    }
-
-    /*
-      We queue the event group in a new worker thread, to run in parallel
-      with previous groups.
-
-      To preserve commit order within the replication domain, we set up
-      rgi->wait_commit_sub_id to make the new group commit only after the
-      previous group has committed.
-
-      Event groups that group-committed together on the master can be run
-      in parallel with each other without restrictions. But one batch of
-      group-commits may not start before all groups in the previous batch
-      have initiated their commit phase; we set up rgi->gco to ensure that.
-    */
-    rgi->wait_commit_sub_id= e->current_sub_id;
-    rgi->wait_commit_group_info= e->current_group_info;
-
-    speculation= rpl_group_info::SPECULATE_NO;
-    new_gco= true;
-    force_switch_flag= 0;
     gco= e->current_gco;
     if (likely(gco))
     {
@@ -2895,12 +2841,66 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
           speculation= rpl_group_info::SPECULATE_OPTIMISTIC;
       }
       gco->flags= flags;
-    }
+    } /* if (gco) */
     else
     {
       if (gtid_flags & Gtid_log_event::FL_DDL)
         force_switch_flag= group_commit_orderer::FORCE_SWITCH;
+    } /* else (!gco) */
+  } /* if (typ == GTID_EVENT) */
+  else
+    e= current;
+
+  /*
+    Find a worker thread to queue the event for.
+    Prefer a new thread, so we maximise parallelism (at least for the group
+    commit). But do not exceed a limit of --slave-domain-parallel-threads;
+    instead re-use a thread that we queued for previously.
+  */
+  cur_thread=
+    e->choose_thread(serial_rgi, &did_enter_cond, &old_stage,
+                     gtid_ev, rli->mi->parallel_mode);
+  if (!cur_thread)
+  {
+    /* This means we were killed. The error is already signalled. */
+    delete ev;
+    return 1;
+  }
+
+  if (!(qev= cur_thread->get_qev(ev, event_size, rli)))
+  {
+    abandon_worker_thread(rli->sql_driver_thd, cur_thread,
+                          &did_enter_cond, &old_stage);
+    delete ev;
+    return 1;
+  }
+
+  if (gtid_ev)
+  {
+    if (!(rgi= cur_thread->get_rgi(rli, gtid_ev, e, event_size)))
+    {
+      cur_thread->free_qev(qev);
+      abandon_worker_thread(rli->sql_driver_thd, cur_thread,
+                            &did_enter_cond, &old_stage);
+      delete ev;
+      return 1;
     }
+
+    /*
+      We queue the event group in a new worker thread, to run in parallel
+      with previous groups.
+
+      To preserve commit order within the replication domain, we set up
+      rgi->wait_commit_sub_id to make the new group commit only after the
+      previous group has committed.
+
+      Event groups that group-committed together on the master can be run
+      in parallel with each other without restrictions. But one batch of
+      group-commits may not start before all groups in the previous batch
+      have initiated their commit phase; we set up rgi->gco to ensure that.
+    */
+    rgi->wait_commit_sub_id= e->current_sub_id;
+    rgi->wait_commit_group_info= e->current_group_info;
     rgi->speculation= speculation;
 
     if (gtid_flags & Gtid_log_event::FL_GROUP_COMMIT_ID)
