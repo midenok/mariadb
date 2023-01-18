@@ -291,6 +291,7 @@ struct rpl_parallel_entry {
     to us before re-using (rpl_thread::current_owner).
   */
   rpl_parallel_thread **rpl_threads;
+  rpl_parallel_thread *ordered_thread;
   uint32 rpl_thread_max;
   uint32 rpl_thread_idx;
   /*

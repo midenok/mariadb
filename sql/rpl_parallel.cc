@@ -2136,26 +2136,27 @@ rpl_parallel_thread *
 rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
                                   PSI_stage_info *old_stage, bool reuse)
 {
-  uint32 idx;
   Relay_log_info *rli= rgi->rli;
   rpl_parallel_thread *thr;
+  rpl_parallel_thread **thr_ptr;
 
-  idx= rpl_thread_idx;
-  if (!reuse)
+  if (reuse)
+    thr_ptr= &ordered_thread;
+  else
   {
-    ++idx;
-    if (idx >= rpl_thread_max)
-      idx= 0;
-    rpl_thread_idx= idx;
+    ++rpl_thread_idx;
+    if (rpl_thread_idx >= rpl_thread_max)
+      rpl_thread_idx= 0;
+    thr_ptr= &rpl_threads[rpl_thread_idx];
   }
-  thr= rpl_threads[idx];
+  thr= *thr_ptr;
   if (thr)
   {
     *did_enter_cond= false;
     mysql_mutex_lock(&thr->LOCK_rpl_thread);
     for (;;)
     {
-      if (thr->current_owner != &rpl_threads[idx])
+      if (thr->current_owner != thr_ptr)
       {
         /*
           The worker thread became idle, and returned to the free list and
@@ -2219,8 +2220,7 @@ rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
     }
   }
   if (!thr)
-    rpl_threads[idx]= thr= global_rpl_thread_pool.get_thread(&rpl_threads[idx],
-                                                             this);
+    *thr_ptr= thr= global_rpl_thread_pool.get_thread(thr_ptr, this);
 
   return thr;
 }
@@ -2287,6 +2287,7 @@ rpl_parallel::find(uint32 domain_id)
       return NULL;
     }
     e->rpl_threads= p;
+    e->ordered_thread= NULL;
     e->rpl_thread_max= count;
     e->domain_id= domain_id;
     e->stop_on_error_sub_id= (uint64)ULONGLONG_MAX;
