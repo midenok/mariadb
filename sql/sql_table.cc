@@ -5214,7 +5214,16 @@ warn:
                              or any positive number (for C_CREATE_SELECT).
                              If set to C_ALTER_TABLE_FRM_ONY then no frm or
                              table is created, only the frm image in memory.
-  @param[out] frm            The frm image.
+  @param[out] frm            The FRM image stored into allocated buffer. This
+                             buffer must be freed by the caller. If pointer is
+                             NULL nothing is returned. The FRM file created by
+                             the function is binary equal to this image.
+  @param[in,out] path_out    Path to FRM file created by the function without
+                             .frm extension. If NULL nothing is returned.
+                             Otherwise on input LEX_CSTRING must contain a
+                             pointer to the valid buffer and its length. On
+                             output the path is written to this buffer and the
+                             length is updated.
 
   @result
     1 unspecifed error
@@ -5222,7 +5231,9 @@ warn:
     0 ok
     -1 Table was used with IF NOT EXISTS and table existed (warning, not error)
 
-  TODO: orig_db, orig_table_name, db, table_name should be moved to create_info
+  TODO: input data: orig_db, orig_table_name, db, table_name
+        and the output data: frm, path_out should be passed via Alter_ctx.
+        That is already done as part of MDEV-20865 for 10.11.
 */
 
 int mysql_create_table_no_lock(THD *thd, const Lex_ident_db *orig_db,
@@ -5230,13 +5241,14 @@ int mysql_create_table_no_lock(THD *thd, const Lex_ident_db *orig_db,
                                Table_specification_st *create_info,
                                Alter_info *alter_info, bool *is_trans,
                                int create_table_mode, TABLE_LIST *table_list,
-                               LEX_CUSTRING *frm)
+                               LEX_CUSTRING *frm, LEX_CSTRING *path_out)
 {
   KEY *not_used_1;
   uint not_used_2;
   int res;
   uint path_length;
-  char path[FN_REFLEN + 1];
+  char path_local[FN_REFLEN + 1];
+  char *path;
   const Lex_ident_db *db= &table_list->db;
   const Lex_ident_table *table_name= &table_list->table_name;
   LEX_CUSTRING frm_local;
@@ -5248,24 +5260,29 @@ int mysql_create_table_no_lock(THD *thd, const Lex_ident_db *orig_db,
     frm= &frm_local;
   }
 
+  path= path_out ? const_cast<char *>(path_out->str) : path_local;
+  constexpr size_t max_path= sizeof(path_local);
+  DBUG_ASSERT(!path_out || path_out->length >= max_path);
   DBUG_ASSERT(create_info->default_table_charset);
 
   if (create_info->tmp_table())
-    path_length= build_tmptable_filename(thd, path, sizeof(path));
+    path_length= build_tmptable_filename(thd, path, max_path);
   else
   {
     const LEX_CSTRING *alias= table_case_name(create_info, table_name);
     uint flags= (create_info->options & HA_CREATE_TMP_ALTER) ? FN_IS_TMP : 0;
-    path_length= build_table_filename(path, sizeof(path) - 1, db->str,
+    path_length= build_table_filename(path, max_path - 1, db->str,
                                       alias->str, "", flags);
     // Check if we hit FN_REFLEN bytes along with file extension.
     if (path_length+reg_ext_length > FN_REFLEN)
     {
-      my_error(ER_IDENT_CAUSES_TOO_LONG_PATH, MYF(0), (int) sizeof(path)-1,
+      my_error(ER_IDENT_CAUSES_TOO_LONG_PATH, MYF(0), (int) max_path - 1,
                path);
       return true;
     }
   }
+  if (path_out)
+    path_out->length= path_length;
 
   LEX_CSTRING cpath= { path, path_length };
   res= create_table_impl(thd, *orig_db, *orig_table_name, *db, *table_name,
@@ -5441,7 +5458,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   bool is_trans= FALSE;
   int result;
   TABLE_LIST *orig_table= create_table;
-  const bool atomic_replace= create_info->is_atomic_replace();
+  bool atomic_replace= create_info->is_atomic_replace();
   DBUG_ENTER("mysql_create_table");
 
   DBUG_ASSERT(create_info->default_table_charset);
@@ -5471,6 +5488,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
     {
       /* Table existed in distributed engine. Log query to binary log */
       result= 0;
+      atomic_replace= false;
       goto err;
     }
     /* is_error() may be 0 if table existed and we generated a warning */
@@ -5502,6 +5520,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
       create_info->make_tmp_table_list(thd, &create_table, &create_table_mode))
   {
     result= 1;
+    atomic_replace= false;
     goto err;
   }
 
@@ -5962,6 +5981,9 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
   TABLE_LIST *orig_table= table;
   const bool atomic_replace= create_info->is_atomic_replace();
   int create_table_mode= C_ORDINARY_CREATE;
+  LEX_CUSTRING frm= { NULL, 0 };
+  char path_buf[FN_REFLEN + 1];
+  LEX_CSTRING path= { path_buf, sizeof(path_buf) };
   DBUG_ENTER("mysql_create_like_table");
 
   bzero(&ddl_log_state_create, sizeof(ddl_log_state_create));
@@ -5996,7 +6018,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
     /* is_error() may be 0 if table existed and we generated a warning */
     res= thd->is_error();
     src_table_exists= !res;
-    goto err;
+    goto err_no_atomic;
   }
   /* Ensure we don't try to create something from which we select from */
   if (create_info->or_replace() && !create_info->tmp_table())
@@ -6006,7 +6028,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
     {
       update_non_unique_table_error(src_table, "CREATE", duplicate);
       res= 1;
-      goto err;
+      goto err_no_atomic;
     }
   }
 
@@ -6033,7 +6055,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
   DBUG_ASSERT(create_info->convert_charset_collation.is_empty());
   if (mysql_prepare_alter_table(thd, src_table->table, &local_create_info,
                                 &local_alter_info, &local_alter_ctx))
-    goto err;
+    goto err_no_atomic;
 #ifdef WITH_PARTITION_STORAGE_ENGINE
   /* Partition info is not handled by mysql_prepare_alter_table() call. */
   if (src_table->table->part_info)
@@ -6071,7 +6093,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
       local_create_info.vers_info.fix_create_like(local_alter_info, local_create_info,
                                                   *src_table, *table))
   {
-    goto err;
+    goto err_no_atomic;
   }
 
   /* The following is needed only in case of lock tables */
@@ -6083,7 +6105,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
 
   if (atomic_replace &&
       local_create_info.make_tmp_table_list(thd, &table, &create_table_mode))
-    goto err;
+    goto err_no_atomic;
 
   res= ((create_res=
          mysql_create_table_no_lock(thd,
@@ -6091,7 +6113,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
                                     &orig_table->table_name,
                                     &local_create_info, &local_alter_info,
                                     &is_trans, create_table_mode,
-                                    table)) > 0);
+                                    table, &frm, &path)) > 0);
   /* Remember to log if we deleted something */
   do_logging= thd->log_current_statement();
   if (res)
@@ -6184,43 +6206,39 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
         }
         if (!table->table)
         {
-          TABLE_LIST::enum_open_strategy save_open_strategy;
-          int open_res;
           /* Force the newly created table to be opened */
-          save_open_strategy= table->open_strategy;
-          table->open_strategy= TABLE_LIST::OPEN_NORMAL;
 
           if (atomic_replace)
           {
-            /*
-               NOTE: We acquire explicit lock for temporary table just to make
-               close_thread_table() happy. We open it like a normal table
-               because it's too complex to open it like tmp_table here.
-            */
-            table->mdl_request.duration= MDL_EXPLICIT;
-            if (thd->mdl_context.acquire_lock(&table->mdl_request,
-                                            thd->variables.lock_wait_timeout))
+            table->table= thd->create_and_open_tmp_table(&frm, path.str, table->db,
+                                                         table->table_name, false);
+            if (!table->table)
             {
               res= 1;
               goto err;
             }
+            table->table->pos_in_table_list= table;
           }
-
-          /*
-            In order for show_create_table() to work we need to open
-            destination table if it is not already open (i.e. if it
-            has not existed before). We don't need acquire metadata
-            lock in order to do this as we already hold exclusive
-            lock on this table. The table will be closed by
-            close_thread_table() at the end of this branch.
-          */
-          open_res= open_table(thd, table, &ot_ctx);
-          /* Restore */
-          table->open_strategy= save_open_strategy;
-          if (open_res)
+          else
           {
-            res= 1;
-            goto err;
+            TABLE_LIST::enum_open_strategy save_open_strategy= table->open_strategy;
+            table->open_strategy= TABLE_LIST::OPEN_NORMAL;
+            /*
+              In order for show_create_table() to work we need to open
+              destination table if it is not already open (i.e. if it
+              has not existed before). We don't need acquire metadata
+              lock in order to do this as we already hold exclusive
+              lock on this table. The table will be closed by
+              close_thread_table() at the end of this branch.
+            */
+            int open_res= open_table(thd, table, &ot_ctx);
+            /* Restore */
+            table->open_strategy= save_open_strategy;
+            if (open_res)
+            {
+              res= 1;
+              goto err;
+            }
           }
           opened_new_table= TRUE;
         }
@@ -6277,20 +6295,25 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
 
           if (opened_new_table)
           {
-            DBUG_ASSERT(thd->open_tables == table->table);
-            /*
-              When opening the table, we ignored the locked tables
-              (MYSQL_OPEN_GET_NEW_TABLE). Now we can close the table
-              without risking to close some locked table.
-
-              For atomic_replace we must remove TABLE and TABLE_SHARE
-              from cache since they are the objects for temporary table.
-            */
             if (atomic_replace)
-              table->table->s->tdc->flushed= true;
-            close_thread_table(thd, &thd->open_tables);
-            if (atomic_replace)
-              thd->mdl_context.release_lock(table->mdl_request.ticket);
+            {
+              DBUG_ASSERT(table->table->s->tmp_table);
+              if (thd->drop_temporary_table(table->table, NULL, false))
+              {
+                res= 1;
+                goto err;
+              }
+            }
+            else
+            {
+              DBUG_ASSERT(thd->open_tables == table->table);
+              /*
+                When opening the table, we ignored the locked tables
+                (MYSQL_OPEN_GET_NEW_TABLE). Now we can close the table
+                without risking to close some locked table.
+              */
+              close_thread_table(thd, &thd->open_tables);
+            }
           }
         }
       }
@@ -6339,6 +6362,7 @@ err:
     }
   }
 
+err_no_atomic:
   if (do_logging)
   {
     thd->binlog_xid= thd->query_id;
@@ -6397,6 +6421,7 @@ err:
       create_info->or_replace())
     res|= (int) local_create_info.finalize_locked_tables(thd, res);
 
+  my_free((void *) frm.str);
   DBUG_RETURN(res != 0);
 }
 
