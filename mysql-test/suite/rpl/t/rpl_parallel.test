@@ -1674,7 +1674,7 @@ CHANGE MASTER TO master_use_gtid=slave_pos;
 --connection server_2
 --source include/stop_slave.inc
 SET GLOBAL slave_parallel_threads=0;
-SET GLOBAL slave_parallel_threads=3;
+SET GLOBAL slave_parallel_threads=4;
 SET GLOBAL debug_dbug="+d,rpl_parallel_simulate_temp_err_xid";
 --source include/start_slave.inc
 
@@ -1768,7 +1768,7 @@ SET GLOBAL slave_parallel_threads=10;
 --connection server_2
 --source include/stop_slave.inc
 SET GLOBAL slave_parallel_threads=0;
-SET GLOBAL slave_parallel_threads=3;
+SET GLOBAL slave_parallel_threads=4;
 SET GLOBAL debug_dbug="+d,rpl_parallel_simulate_temp_err_xid";
 --source include/start_slave.inc
 
@@ -1869,7 +1869,7 @@ SET GLOBAL slave_parallel_threads=10;
 
 --connection server_2
 --source include/stop_slave.inc
-SET GLOBAL slave_parallel_threads=1;
+SET GLOBAL slave_parallel_threads=2;
 SET @old_dbug= @@GLOBAL.debug_dbug;
 SET GLOBAL debug_dbug="+d,slave_discard_xid_for_gtid_0_x_1000";
 CALL mtr.add_suppression("Unexpected break of being relay-logged GTID");
