@@ -294,6 +294,12 @@ struct rpl_parallel_entry {
   uint32 rpl_thread_max;
   uint32 rpl_thread_idx;
   bool was_ordered;
+
+  uint32 last_idx() const
+  {
+    return was_ordered ? rpl_thread_max - 1 : rpl_thread_idx;
+  }
+
   /*
     The sub_id of the last transaction to commit within this domain_id.
     Must be accessed under LOCK_parallel_entry protection.

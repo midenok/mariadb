@@ -786,7 +786,7 @@ CHANGE MASTER TO master_use_gtid=slave_pos;
 --source include/stop_slave.inc
 SET GLOBAL binlog_format=@old_format;
 SET GLOBAL slave_parallel_threads=0;
-SET GLOBAL slave_parallel_threads=4;
+SET GLOBAL slave_parallel_threads=5;
 --source include/start_slave.inc
 
 
@@ -1093,7 +1093,7 @@ SET GLOBAL slave_parallel_threads=10;
 # to the free list, which is what triggered the bug.
 --source include/stop_slave.inc
 SET GLOBAL replicate_ignore_table="test.t3";
-SET GLOBAL slave_parallel_threads=2;
+SET GLOBAL slave_parallel_threads=3;
 --source include/start_slave.inc
 
 --connection server_1
@@ -1337,7 +1337,7 @@ SELECT "ROW FOUND" AS `Is the row found?`
 --echo *** MDEV-5938: Exec_master_log_pos not updated at log rotate in parallel replication ***
 --connection server_2
 --source include/stop_slave.inc
-SET GLOBAL slave_parallel_threads=1;
+SET GLOBAL slave_parallel_threads=2;
 SET DEBUG_SYNC= 'RESET';
 --source include/start_slave.inc
 
