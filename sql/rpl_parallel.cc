@@ -333,6 +333,7 @@ register_wait_for_prior_event_group_commit(rpl_group_info *rgi,
   have reached the commit phase that are not safe to run in parallel with.
 */
 static bool
+// FIXME: remove redundant gco arg, use rgi->gco
 do_gco_wait(rpl_group_info *rgi, group_commit_orderer *gco,
             bool *did_enter_cond, PSI_stage_info *old_stage)
 {
@@ -2167,7 +2168,7 @@ rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
     }
   }
   else
-    idx= was_ordered ? rpl_thread_max - 1 : rpl_thread_idx;
+    idx= last_idx();
   thr= rpl_threads[idx];
   if (thr)
   {
@@ -2471,7 +2472,7 @@ rpl_parallel_entry::queue_master_restart(rpl_group_info *rgi,
     Thus there is no need for the full complexity of choose_thread(). We only
     need to check if we have a current worker thread, and queue for it if so.
   */
-  idx= was_ordered ? rpl_thread_max - 1 : rpl_thread_idx;
+  idx= last_idx();
   thr= rpl_threads[idx];
   if (!thr)
     return 0;
@@ -2867,6 +2868,9 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
     return 1;
   }
 
+  DBUG_ASSERT(e->rpl_threads[e->last_idx()] == cur_thread);
+  DBUG_ASSERT(!e->was_ordered || speculation == rpl_group_info::SPECULATE_WAIT);
+
   if (!(qev= cur_thread->get_qev(ev, event_size, rli)))
   {
     abandon_worker_thread(rli->sql_driver_thd, cur_thread,
@@ -2987,6 +2991,29 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   else
   {
     qev->rgi= e->current_group_info;
+  }
+
+  if (typ == GTID_EVENT)
+  {
+    DBUG_PRINT("rpl",
+              ("pos: %llu  "
+               "GTID %u-%u-%llu  "
+               "cid=%llu  "
+               "idx: %u  "
+               "spcl: %u  fsf: %u  ng: %u  "
+               "groups_q: %llu",
+               ev->log_pos,
+               gtid_ev->domain_id, gtid_ev->server_id, gtid_ev->seq_no,
+               gtid_ev->commit_id,
+               e->last_idx(),
+               speculation, force_switch_flag, new_gco,
+               e->count_queued_event_groups));
+  }
+  else
+  {
+    DBUG_PRINT("rpl",
+              ("pos: %llu  type: %u  idx: %u",
+               ev->log_pos, typ, e->last_idx()));
   }
 
   /*
