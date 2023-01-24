@@ -2591,6 +2591,11 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   enum Log_event_type typ;
   bool is_group_event;
   bool did_enter_cond= false;
+  bool new_gco= true;
+  uint8 force_switch_flag= 0;
+  enum rpl_group_info::enum_speculation speculation= rpl_group_info::SPECULATE_NO;
+  Gtid_log_event *gtid_ev;
+
   PSI_stage_info old_stage;
 
   DBUG_EXECUTE_IF("slave_crash_if_parallel_apply", DBUG_SUICIDE(););
@@ -2723,7 +2728,7 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   if (typ == GTID_EVENT)
   {
     rpl_gtid gtid;
-    Gtid_log_event *gtid_ev= static_cast<Gtid_log_event *>(ev);
+    gtid_ev= static_cast<Gtid_log_event *>(ev);
     uint32 domain_id= (rli->mi->using_gtid == Master_info::USE_GTID_NO ||
                        rli->mi->parallel_mode <= SLAVE_PARALLEL_MINIMAL ?
                        0 : gtid_ev->domain_id);
@@ -2782,12 +2787,9 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   if (typ == GTID_EVENT)
   {
     Gtid_log_event *gtid_ev= static_cast<Gtid_log_event *>(ev);
-    bool new_gco;
     enum_slave_parallel_mode mode= rli->mi->parallel_mode;
     uchar gtid_flags= gtid_ev->flags2;
     group_commit_orderer *gco;
-    uint8 force_switch_flag;
-    enum rpl_group_info::enum_speculation speculation;
 
     if (!(rgi= cur_thread->get_rgi(rli, gtid_ev, e, event_size)))
     {
@@ -2814,9 +2816,6 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
     rgi->wait_commit_sub_id= e->current_sub_id;
     rgi->wait_commit_group_info= e->current_group_info;
 
-    speculation= rpl_group_info::SPECULATE_NO;
-    new_gco= true;
-    force_switch_flag= 0;
     gco= e->current_gco;
     if (likely(gco))
     {
@@ -2967,6 +2966,29 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   else
   {
     qev->rgi= e->current_group_info;
+  }
+
+  if (typ == GTID_EVENT)
+  {
+    DBUG_PRINT("rpl",
+              ("pos: %llu [%llu] "
+               "GTID %u-%u-%llu  "
+               "cid=%llu  "
+               "idx: %u  "
+               "spcl: %u  fsf: %u  ng: %u  "
+               "groups_q: %llu",
+               ev->log_pos, ev->log_pos - ev->data_written,
+               gtid_ev->domain_id, gtid_ev->server_id, gtid_ev->seq_no,
+               gtid_ev->commit_id,
+               e->rpl_thread_idx,
+               speculation, force_switch_flag, new_gco,
+               e->count_queued_event_groups));
+  }
+  else
+  {
+    DBUG_PRINT("rpl",
+              ("pos: %llu  type: %u  idx: %u",
+               ev->log_pos, typ, e->rpl_thread_idx));
   }
 
   /*
