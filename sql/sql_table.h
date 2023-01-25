@@ -80,6 +80,8 @@ static constexpr uint QRMT_DEFAULT=   QRMT_FRM | QRMT_HANDLER;
 static constexpr uint SKIP_SYMDIR_ACCESS= 1 << 5;
 /** Don't check foreign key constraints while renaming table */
 static constexpr uint NO_FK_CHECKS=    1 << 6;
+/* Tell the file operation to do as much as possible (f.ex. ignore stat errors on rename) */
+static constexpr uint DDL_LOG=         1 << 7;
 
 uint filename_to_tablename(const char *from, char *to, size_t to_length,
                            bool stay_quiet = false);
