@@ -1,0 +1,67 @@
+--source include/have_binlog_format_statement.inc
+--let $rpl_topology=1->2
+--source include/rpl_init.inc
+
+--connection server_2
+set @old_parallel_threads=@@global.slave_parallel_threads;
+--source include/stop_slave.inc
+set global slave_parallel_threads= 5;
+--source include/start_slave.inc
+
+--connection server_1
+# parallel_do_db
+# parallel_do_table
+# parallel_ignore_db
+# parallel_ignore_table
+# parallel_wild_do_table
+# parallel_wild_ignore_table
+
+set @_parallel_do_db=             @@global.parallel_do_db;
+set @_parallel_ignore_db=         @@global.parallel_ignore_db;
+
+set @@global.parallel_do_db=      "db_parallel";
+set @@global.parallel_ignore_db=  "db_serial";
+
+select @@global.parallel_do_db;
+select @@global.replicate_do_db;
+
+create database db_parallel;
+create database db_serial;
+create database db_not_mentioned;
+
+use db_parallel;
+create table t1 (a int);
+insert into t1 values (1);
+
+use db_serial;
+create table t2 (a int);
+insert into t2 values (2);
+
+use db_not_mentioned;
+create table t3 (a int);
+insert into t3 values (3);
+
+--save_master_pos
+
+--connection server_2
+--sync_with_master
+
+show databases;
+
+--connection server_2
+--source include/stop_slave.inc
+set global slave_parallel_threads=@old_parallel_threads;
+--source include/start_slave.inc
+
+show thread status;
+
+--connection server_1
+drop database db_parallel;
+drop database db_serial;
+drop database db_not_mentioned;
+use test;
+
+set @@global.parallel_do_db=      @_parallel_do_db;
+set @@global.parallel_ignore_db=  @_parallel_ignore_db;
+
+--source include/rpl_end.inc
