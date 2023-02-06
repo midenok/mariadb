@@ -18693,6 +18693,7 @@ create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
   reclength+=null_pack_length;
   if (!reclength)
     reclength=1;				// Dummy select
+  share->stored_rec_length= reclength;
   /* Use packed rows if there is blobs or a lot of space to gain */
   if (blob_count ||
       (string_total_length >= STRING_TOTAL_LENGTH_TO_PACK_ROWS &&
