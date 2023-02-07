@@ -108,6 +108,10 @@ explain select * from t1 where pk1 != 0  and key1 = 1	{
                     }
                   ],
                   "setup_range_conditions": [],
+                  "group_index_range": {
+                    "chosen": false,
+                    "cause": "no group by or distinct"
+                  },
                   "analyzing_range_alternatives": {
                     "range_scan_alternatives": [
                       {
@@ -117,7 +121,7 @@ explain select * from t1 where pk1 != 0  and key1 = 1	{
                         "using_mrr": false,
                         "index_only": false,
                         "rows": 1000,
-                        "cost": 201.65,
+                        "cost": 204.27,
                         "chosen": true
                       },
                       {
@@ -137,8 +141,8 @@ explain select * from t1 where pk1 != 0  and key1 = 1	{
                           "index": "key1",
                           "index_scan_cost": 1.0001,
                           "cumulated_index_scan_cost": 1.0001,
-                          "disk_sweep_cost": 1.0014,
-                          "cumulative_total_cost": 2.0015,
+                          "disk_sweep_cost": 1.0042,
+                          "cumulative_total_cost": 2.0043,
                           "usable": true,
                           "matching_rows_now": 1,
                           "intersect_covering_with_this_index": false,
@@ -154,10 +158,6 @@ explain select * from t1 where pk1 != 0  and key1 = 1	{
                     },
                     "analyzing_index_merge_union": []
                   },
-                  "group_index_range": {
-                    "chosen": false,
-                    "cause": "no group by or distinct"
-                  },
                   "chosen_range_access_summary": {
                     "range_access_plan": {
                       "type": "range_scan",
@@ -172,14 +172,24 @@ explain select * from t1 where pk1 != 0  and key1 = 1	{
                 }
               },
               {
-                "selectivity_for_indexes": [
+                "table": "t1",
+                "rowid_filters": [
                   {
-                    "index_name": "PRIMARY",
-                    "selectivity_from_index": 1
-                  },
+                    "key": "key1",
+                    "build_cost": 0.1301,
+                    "rows": 1
+                  }
+                ]
+              },
+              {
+                "selectivity_for_indexes": [
                   {
                     "index_name": "key1",
                     "selectivity_from_index": 0.001
+                  },
+                  {
+                    "index_name": "PRIMARY",
+                    "selectivity_from_index": 1
                   }
                 ],
                 "selectivity_for_columns": [],
@@ -212,8 +222,7 @@ explain select * from t1 where pk1 != 0  and key1 = 1	{
                     "type": "ref",
                     "records": 1,
                     "cost": 1.1251,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 1,

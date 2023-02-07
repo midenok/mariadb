@@ -93,6 +93,10 @@ explain select * from t1 where a=1 or b=1	{
                     }
                   ],
                   "setup_range_conditions": [],
+                  "group_index_range": {
+                    "chosen": false,
+                    "cause": "no group by or distinct"
+                  },
                   "analyzing_range_alternatives": {
                     "range_scan_alternatives": [],
                     "analyzing_roworder_intersect": {
@@ -164,10 +168,6 @@ explain select * from t1 where a=1 or b=1	{
                       }
                     ]
                   },
-                  "group_index_range": {
-                    "chosen": false,
-                    "cause": "no group by or distinct"
-                  },
                   "chosen_range_access_summary": {
                     "range_access_plan": {
                       "type": "index_roworder_union",
@@ -217,8 +217,7 @@ explain select * from t1 where a=1 or b=1	{
                     "type": "index_merge",
                     "records": 2,
                     "cost": 2.4849,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 2,

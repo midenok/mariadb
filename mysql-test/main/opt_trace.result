@@ -108,6 +108,7 @@ select * from v1	{
                 "selectivity_for_columns": [
                   {
                     "column_name": "a",
+                    "ranges": ["1 <= a <= 1"],
                     "selectivity_from_histogram": 0.5
                   }
                 ],
@@ -140,8 +141,7 @@ select * from v1	{
                     "type": "scan",
                     "records": 1,
                     "cost": 2.2044,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 1,
@@ -254,6 +254,7 @@ select * from (select * from t1 where t1.a=1)q	{
                 "selectivity_for_columns": [
                   {
                     "column_name": "a",
+                    "ranges": ["1 <= a <= 1"],
                     "selectivity_from_histogram": 0.5
                   }
                 ],
@@ -286,8 +287,7 @@ select * from (select * from t1 where t1.a=1)q	{
                     "type": "scan",
                     "records": 1,
                     "cost": 2.2044,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 1,
@@ -405,6 +405,7 @@ select * from v2	{
                       "selectivity_for_columns": [
                         {
                           "column_name": "a",
+                          "ranges": ["1 <= a <= 1"],
                           "selectivity_from_histogram": 0.5
                         }
                       ],
@@ -438,12 +439,12 @@ select * from v2	{
                           "type": "scan",
                           "records": 1,
                           "cost": 2.2044,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 1,
                       "cost_for_plan": 2.4044,
+                      "cost_for_sorting": 1,
                       "estimated_join_cardinality": 1
                     }
                   ]
@@ -505,8 +506,7 @@ select * from v2	{
                     "type": "scan",
                     "records": 2,
                     "cost": 2,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 2,
@@ -645,8 +645,7 @@ explain select * from v2	{
                     "type": "scan",
                     "records": 10,
                     "cost": 2.022,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 10,
@@ -765,12 +764,12 @@ explain select * from v1	{
                           "type": "scan",
                           "records": 10,
                           "cost": 2.022,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 10,
                       "cost_for_plan": 4.022,
+                      "cost_for_sorting": 10,
                       "estimated_join_cardinality": 10
                     }
                   ]
@@ -832,8 +831,7 @@ explain select * from v1	{
                     "type": "scan",
                     "records": 10,
                     "cost": 10,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 10,
@@ -1004,8 +1002,7 @@ explain select * from t1,t2 where t1.a=t2.b+2 and t2.a= t1.b	{
                     "type": "scan",
                     "records": 100,
                     "cost": 2.3174,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 100,
@@ -1036,8 +1033,7 @@ explain select * from t1,t2 where t1.a=t2.b+2 and t2.a= t1.b	{
                         "type": "ref",
                         "records": 1,
                         "cost": 200.06,
-                        "uses_join_buffering": false,
-                        "filter_used": false
+                        "uses_join_buffering": false
                       }
                     },
                     "rows_for_plan": 100,
@@ -1062,8 +1058,7 @@ explain select * from t1,t2 where t1.a=t2.b+2 and t2.a= t1.b	{
                     "type": "scan",
                     "records": 100,
                     "cost": 2.3174,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 100,
@@ -1094,8 +1089,7 @@ explain select * from t1,t2 where t1.a=t2.b+2 and t2.a= t1.b	{
                         "type": "ref",
                         "records": 1,
                         "cost": 200.06,
-                        "uses_join_buffering": false,
-                        "filter_used": false
+                        "uses_join_buffering": false
                       }
                     },
                     "rows_for_plan": 100,
@@ -1266,8 +1260,7 @@ EXPLAIN SELECT DISTINCT a FROM t1	{
                     "type": "index_merge",
                     "records": 5,
                     "cost": 6.25,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 5,
@@ -1388,13 +1381,6 @@ EXPLAIN SELECT MIN(d) FROM t1 where b=2 and c=3  group by a	{
                     "chosen": true
                   },
                   "setup_range_conditions": [],
-                  "analyzing_range_alternatives": {
-                    "range_scan_alternatives": [],
-                    "analyzing_roworder_intersect": {
-                      "cause": "too few roworder scans"
-                    },
-                    "analyzing_index_merge_union": []
-                  },
                   "group_index_range": {
                     "potential_group_range_indexes": [
                       {
@@ -1418,6 +1404,13 @@ EXPLAIN SELECT MIN(d) FROM t1 where b=2 and c=3  group by a	{
                     "key_parts_used_for_access": ["a", "b", "c"],
                     "ranges": ["(2,3) <= (b,c) <= (2,3)"],
                     "chosen": true
+                  },
+                  "analyzing_range_alternatives": {
+                    "range_scan_alternatives": [],
+                    "analyzing_roworder_intersect": {
+                      "cause": "too few roworder scans"
+                    },
+                    "analyzing_index_merge_union": []
                   },
                   "chosen_range_access_summary": {
                     "range_access_plan": {
@@ -1459,12 +1452,12 @@ EXPLAIN SELECT MIN(d) FROM t1 where b=2 and c=3  group by a	{
                     "type": "index_merge",
                     "records": 8,
                     "cost": 2.2,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 8,
                 "cost_for_plan": 3.8,
+                "cost_for_sorting": 8,
                 "estimated_join_cardinality": 8
               }
             ]
@@ -1582,13 +1575,6 @@ EXPLAIN SELECT id,MIN(a),MAX(a) FROM t1 WHERE a>=20010104e0 GROUP BY id	{
                     "chosen": true
                   },
                   "setup_range_conditions": [],
-                  "analyzing_range_alternatives": {
-                    "range_scan_alternatives": [],
-                    "analyzing_roworder_intersect": {
-                      "cause": "too few roworder scans"
-                    },
-                    "analyzing_index_merge_union": []
-                  },
                   "group_index_range": {
                     "potential_group_range_indexes": [
                       {
@@ -1612,6 +1598,13 @@ EXPLAIN SELECT id,MIN(a),MAX(a) FROM t1 WHERE a>=20010104e0 GROUP BY id	{
                     "key_parts_used_for_access": ["id"],
                     "ranges": ["(2001-01-04) <= (a)"],
                     "chosen": true
+                  },
+                  "analyzing_range_alternatives": {
+                    "range_scan_alternatives": [],
+                    "analyzing_roworder_intersect": {
+                      "cause": "too few roworder scans"
+                    },
+                    "analyzing_index_merge_union": []
                   },
                   "chosen_range_access_summary": {
                     "range_access_plan": {
@@ -1653,12 +1646,12 @@ EXPLAIN SELECT id,MIN(a),MAX(a) FROM t1 WHERE a>=20010104e0 GROUP BY id	{
                     "type": "index_merge",
                     "records": 9,
                     "cost": 2.35,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 9,
                 "cost_for_plan": 4.15,
+                "cost_for_sorting": 9,
                 "estimated_join_cardinality": 9
               }
             ]
@@ -1765,13 +1758,6 @@ EXPLAIN SELECT * FROM t1 WHERE a = 20010104e0 GROUP BY id	{
                     "chosen": true
                   },
                   "setup_range_conditions": [],
-                  "analyzing_range_alternatives": {
-                    "range_scan_alternatives": [],
-                    "analyzing_roworder_intersect": {
-                      "cause": "too few roworder scans"
-                    },
-                    "analyzing_index_merge_union": []
-                  },
                   "group_index_range": {
                     "potential_group_range_indexes": [
                       {
@@ -1795,6 +1781,13 @@ EXPLAIN SELECT * FROM t1 WHERE a = 20010104e0 GROUP BY id	{
                     "key_parts_used_for_access": ["id", "a"],
                     "ranges": ["(2001-01-04) <= (a) <= (2001-01-04)"],
                     "chosen": true
+                  },
+                  "analyzing_range_alternatives": {
+                    "range_scan_alternatives": [],
+                    "analyzing_roworder_intersect": {
+                      "cause": "too few roworder scans"
+                    },
+                    "analyzing_index_merge_union": []
                   },
                   "chosen_range_access_summary": {
                     "range_access_plan": {
@@ -1836,12 +1829,12 @@ EXPLAIN SELECT * FROM t1 WHERE a = 20010104e0 GROUP BY id	{
                     "type": "index_merge",
                     "records": 9,
                     "cost": 2.35,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 9,
                 "cost_for_plan": 4.15,
+                "cost_for_sorting": 9,
                 "estimated_join_cardinality": 9
               }
             ]
@@ -1999,6 +1992,10 @@ explain  select * from t1 where a=1 and b=2 order by c limit 1	{
                     }
                   ],
                   "setup_range_conditions": [],
+                  "group_index_range": {
+                    "chosen": false,
+                    "cause": "no group by or distinct"
+                  },
                   "analyzing_range_alternatives": {
                     "range_scan_alternatives": [
                       {
@@ -2027,10 +2024,6 @@ explain  select * from t1 where a=1 and b=2 order by c limit 1	{
                     },
                     "analyzing_index_merge_union": []
                   },
-                  "group_index_range": {
-                    "chosen": false,
-                    "cause": "no group by or distinct"
-                  },
                   "chosen_range_access_summary": {
                     "range_access_plan": {
                       "type": "range_scan",
@@ -2045,6 +2038,21 @@ explain  select * from t1 where a=1 and b=2 order by c limit 1	{
                 }
               },
               {
+                "table": "t1",
+                "rowid_filters": [
+                  {
+                    "key": "a_b",
+                    "build_cost": 0.8868,
+                    "rows": 21
+                  },
+                  {
+                    "key": "a_c",
+                    "build_cost": 10.522,
+                    "rows": 180
+                  }
+                ]
+              },
+              {
                 "selectivity_for_indexes": [
                   {
                     "index_name": "a_b",
@@ -2054,10 +2062,12 @@ explain  select * from t1 where a=1 and b=2 order by c limit 1	{
                 "selectivity_for_columns": [
                   {
                     "column_name": "a",
+                    "ranges": ["1 <= a <= 1"],
                     "selectivity_from_histogram": 0.1797
                   },
                   {
                     "column_name": "b",
+                    "ranges": ["2 <= b <= 2"],
                     "selectivity_from_histogram": 0.0156
                   }
                 ],
@@ -2098,8 +2108,7 @@ explain  select * from t1 where a=1 and b=2 order by c limit 1	{
                     "type": "ref",
                     "records": 21,
                     "cost": 21.142,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 21,
@@ -2181,6 +2190,10 @@ explain  select * from t1 where a=1 and b=2 order by c limit 1	{
                 }
               ],
               "setup_range_conditions": [],
+              "group_index_range": {
+                "chosen": false,
+                "cause": "no group by or distinct"
+              },
               "analyzing_range_alternatives": {
                 "range_scan_alternatives": [
                   {
@@ -2198,10 +2211,6 @@ explain  select * from t1 where a=1 and b=2 order by c limit 1	{
                   "cause": "too few roworder scans"
                 },
                 "analyzing_index_merge_union": []
-              },
-              "group_index_range": {
-                "chosen": false,
-                "cause": "no group by or distinct"
               },
               "chosen_range_access_summary": {
                 "range_access_plan": {
@@ -2339,8 +2348,7 @@ select t1.a from t1 left join t2 on t1.a=t2.a	{
                     "type": "scan",
                     "records": 4,
                     "cost": 2.0068,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 4,
@@ -2466,8 +2474,7 @@ explain select * from t1 left join t2 on t2.a=t1.a	{
                     "type": "scan",
                     "records": 4,
                     "cost": 2.0068,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 4,
@@ -2496,8 +2503,7 @@ explain select * from t1 left join t2 on t2.a=t1.a	{
                         "type": "eq_ref",
                         "records": 1,
                         "cost": 4,
-                        "uses_join_buffering": false,
-                        "filter_used": false
+                        "uses_join_buffering": false
                       }
                     },
                     "rows_for_plan": 4,
@@ -2657,8 +2663,7 @@ explain select t1.a from t1 left join (t2 join t3 on t2.b=t3.b) on t2.a=t1.a and
                     "type": "scan",
                     "records": 4,
                     "cost": 2.0068,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 4,
@@ -2860,8 +2865,7 @@ explain extended select * from t1 where a in (select pk from t10)	{
                           "type": "scan",
                           "records": 10,
                           "cost": 2.022,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 10,
@@ -2891,8 +2895,7 @@ explain extended select * from t1 where a in (select pk from t10)	{
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0066,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -2915,8 +2918,7 @@ explain extended select * from t1 where a in (select pk from t10)	{
                         "type": "scan",
                         "records": 10,
                         "cost": 2.022,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 30,
@@ -2961,8 +2963,7 @@ explain extended select * from t1 where a in (select pk from t10)	{
                     "type": "scan",
                     "records": 10,
                     "cost": 2.022,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 10,
@@ -3167,6 +3168,10 @@ explain select * from t1 where pk = 2 and a=5 and b=1	{
                     "chosen": true
                   },
                   "setup_range_conditions": [],
+                  "group_index_range": {
+                    "chosen": false,
+                    "cause": "no group by or distinct"
+                  },
                   "analyzing_range_alternatives": {
                     "range_scan_alternatives": [
                       {
@@ -3234,10 +3239,6 @@ explain select * from t1 where pk = 2 and a=5 and b=1	{
                     },
                     "analyzing_index_merge_union": []
                   },
-                  "group_index_range": {
-                    "chosen": false,
-                    "cause": "no group by or distinct"
-                  },
                   "chosen_range_access_summary": {
                     "range_access_plan": {
                       "type": "range_scan",
@@ -3252,6 +3253,26 @@ explain select * from t1 where pk = 2 and a=5 and b=1	{
                 }
               },
               {
+                "table": "t1",
+                "rowid_filters": [
+                  {
+                    "key": "pk",
+                    "build_cost": 0.1306,
+                    "rows": 1
+                  },
+                  {
+                    "key": "pk_a",
+                    "build_cost": 0.1308,
+                    "rows": 1
+                  },
+                  {
+                    "key": "pk_a_b",
+                    "build_cost": 0.1311,
+                    "rows": 1
+                  }
+                ]
+              },
+              {
                 "selectivity_for_indexes": [
                   {
                     "index_name": "pk_a_b",
@@ -3261,10 +3282,12 @@ explain select * from t1 where pk = 2 and a=5 and b=1	{
                 "selectivity_for_columns": [
                   {
                     "column_name": "a",
+                    "ranges": ["5 <= a <= 5"],
                     "selectivity_from_histogram": 0.1
                   },
                   {
                     "column_name": "b",
+                    "ranges": ["1 <= b <= 1"],
                     "selectivity_from_histogram": 0.1
                   }
                 ],
@@ -3314,8 +3337,7 @@ explain select * from t1 where pk = 2 and a=5 and b=1	{
                     "type": "ref",
                     "records": 1,
                     "cost": 0.1261,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 1,
@@ -3439,8 +3461,7 @@ select f1(a) from t1	{
                     "type": "scan",
                     "records": 4,
                     "cost": 2.0068,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 4,
@@ -3538,8 +3559,7 @@ select f2(a) from t1	{
                     "type": "scan",
                     "records": 4,
                     "cost": 2.0068,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 4,
@@ -3591,7 +3611,7 @@ a
 2
 select length(trace) from INFORMATION_SCHEMA.OPTIMIZER_TRACE;
 length(trace)
-2205
+2163
 set optimizer_trace_max_mem_size=100;
 select * from t1;
 a
@@ -3605,7 +3625,7 @@ select * from t1	{
       "join_preparation": {
         "select_id": 1,
         "steps": [
-        	2105	0
+        	2063	0
 set optimizer_trace_max_mem_size=0;
 select * from t1;
 a
@@ -3613,7 +3633,7 @@ a
 2
 select * from INFORMATION_SCHEMA.OPTIMIZER_TRACE;
 QUERY	TRACE	MISSING_BYTES_BEYOND_MAX_MEM_SIZE	INSUFFICIENT_PRIVILEGES
-select * from t1		2205	0
+select * from t1		2163	0
 drop table t1;
 set optimizer_trace='enabled=off';
 set @@optimizer_trace_max_mem_size= @save_optimizer_trace_max_mem_size;
@@ -3648,6 +3668,10 @@ explain delete from t0 where t0.a<3	{
           }
         ],
         "setup_range_conditions": [],
+        "group_index_range": {
+          "chosen": false,
+          "cause": "no join"
+        },
         "analyzing_range_alternatives": {
           "range_scan_alternatives": [
             {
@@ -3662,10 +3686,6 @@ explain delete from t0 where t0.a<3	{
             }
           ],
           "analyzing_index_merge_union": []
-        },
-        "group_index_range": {
-          "chosen": false,
-          "cause": "no join"
         },
         "chosen_range_access_summary": {
           "range_access_plan": {
@@ -3791,6 +3811,10 @@ explain delete t0,t1 from t0, t1 where t0.a=t1.a and t1.a<3	{
                     "chosen": true
                   },
                   "setup_range_conditions": [],
+                  "group_index_range": {
+                    "chosen": false,
+                    "cause": "not single_table"
+                  },
                   "analyzing_range_alternatives": {
                     "range_scan_alternatives": [
                       {
@@ -3808,10 +3832,6 @@ explain delete t0,t1 from t0, t1 where t0.a=t1.a and t1.a<3	{
                       "cause": "too few roworder scans"
                     },
                     "analyzing_index_merge_union": []
-                  },
-                  "group_index_range": {
-                    "chosen": false,
-                    "cause": "not single_table"
                   },
                   "chosen_range_access_summary": {
                     "range_access_plan": {
@@ -3856,6 +3876,10 @@ explain delete t0,t1 from t0, t1 where t0.a=t1.a and t1.a<3	{
                     "chosen": true
                   },
                   "setup_range_conditions": [],
+                  "group_index_range": {
+                    "chosen": false,
+                    "cause": "not single_table"
+                  },
                   "analyzing_range_alternatives": {
                     "range_scan_alternatives": [
                       {
@@ -3873,10 +3897,6 @@ explain delete t0,t1 from t0, t1 where t0.a=t1.a and t1.a<3	{
                       "cause": "too few roworder scans"
                     },
                     "analyzing_index_merge_union": []
-                  },
-                  "group_index_range": {
-                    "chosen": false,
-                    "cause": "not single_table"
                   },
                   "chosen_range_access_summary": {
                     "range_access_plan": {
@@ -3921,8 +3941,7 @@ explain delete t0,t1 from t0, t1 where t0.a=t1.a and t1.a<3	{
                     "type": "range",
                     "records": 3,
                     "cost": 0.7468,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -3952,8 +3971,7 @@ explain delete t0,t1 from t0, t1 where t0.a=t1.a and t1.a<3	{
                         "type": "ref",
                         "records": 1,
                         "cost": 3.0018,
-                        "uses_join_buffering": false,
-                        "filter_used": false
+                        "uses_join_buffering": false
                       }
                     },
                     "rows_for_plan": 3,
@@ -3978,8 +3996,7 @@ explain delete t0,t1 from t0, t1 where t0.a=t1.a and t1.a<3	{
                     "type": "range",
                     "records": 3,
                     "cost": 0.7468,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -4009,8 +4026,7 @@ explain delete t0,t1 from t0, t1 where t0.a=t1.a and t1.a<3	{
                         "type": "ref",
                         "records": 2,
                         "cost": 3.0035,
-                        "uses_join_buffering": false,
-                        "filter_used": false
+                        "uses_join_buffering": false
                       }
                     },
                     "rows_for_plan": 6,
@@ -4149,8 +4165,7 @@ explain select * from (select rand() from t1)q	{
                           "type": "scan",
                           "records": 3,
                           "cost": 2.0051,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 3,
@@ -4216,8 +4231,7 @@ explain select * from (select rand() from t1)q	{
                     "type": "scan",
                     "records": 3,
                     "cost": 3,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -4425,8 +4439,7 @@ explain select * from t1 where a in (select t_inner_1.a from t1 t_inner_1, t1 t_
                           "type": "scan",
                           "records": 3,
                           "cost": 2.0051,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 3,
@@ -4448,8 +4461,7 @@ explain select * from t1 where a in (select t_inner_1.a from t1 t_inner_1, t1 t_
                               "type": "scan",
                               "records": 3,
                               "cost": 2.0051,
-                              "uses_join_buffering": true,
-                              "filter_used": false
+                              "uses_join_buffering": true
                             }
                           },
                           "rows_for_plan": 9,
@@ -4474,8 +4486,7 @@ explain select * from t1 where a in (select t_inner_1.a from t1 t_inner_1, t1 t_
                           "type": "scan",
                           "records": 3,
                           "cost": 2.0051,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 3,
@@ -4505,8 +4516,7 @@ explain select * from t1 where a in (select t_inner_1.a from t1 t_inner_1, t1 t_
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0051,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -4529,8 +4539,7 @@ explain select * from t1 where a in (select t_inner_1.a from t1 t_inner_1, t1 t_
                         "type": "scan",
                         "records": 3,
                         "cost": 2.0051,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 9,
@@ -4553,8 +4562,7 @@ explain select * from t1 where a in (select t_inner_1.a from t1 t_inner_1, t1 t_
                             "type": "scan",
                             "records": 3,
                             "cost": 2.0051,
-                            "uses_join_buffering": true,
-                            "filter_used": false
+                            "uses_join_buffering": true
                           }
                         },
                         "rows_for_plan": 27,
@@ -4599,8 +4607,7 @@ explain select * from t1 where a in (select t_inner_1.a from t1 t_inner_1, t1 t_
                         "type": "scan",
                         "records": 3,
                         "cost": 2.0051,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 9,
@@ -4626,8 +4633,7 @@ explain select * from t1 where a in (select t_inner_1.a from t1 t_inner_1, t1 t_
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0051,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -4651,8 +4657,7 @@ explain select * from t1 where a in (select t_inner_1.a from t1 t_inner_1, t1 t_
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0051,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -4960,8 +4965,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0051,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -4984,8 +4988,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 3,
                         "cost": 2.0051,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 9,
@@ -5008,8 +5011,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                             "type": "scan",
                             "records": 9,
                             "cost": 2.0154,
-                            "uses_join_buffering": true,
-                            "filter_used": false
+                            "uses_join_buffering": true
                           }
                         },
                         "rows_for_plan": 81,
@@ -5046,8 +5048,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 27,
@@ -5075,8 +5076,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 3,
                                     "cost": 2.0051,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 81,
@@ -5105,8 +5105,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                         "type": "scan",
                                         "records": 9,
                                         "cost": 2.0154,
-                                        "uses_join_buffering": true,
-                                        "filter_used": false
+                                        "uses_join_buffering": true
                                       }
                                     },
                                     "rows_for_plan": 729,
@@ -5151,8 +5150,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 243,
@@ -5178,8 +5176,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 3,
                                 "cost": 2.0051,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 9,
@@ -5207,8 +5204,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 81,
@@ -5237,8 +5233,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                         "type": "scan",
                                         "records": 9,
                                         "cost": 2.0154,
-                                        "uses_join_buffering": true,
-                                        "filter_used": false
+                                        "uses_join_buffering": true
                                       }
                                     },
                                     "rows_for_plan": 729,
@@ -5278,8 +5273,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 81,
@@ -5305,8 +5299,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 27,
@@ -5332,8 +5325,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                             "type": "scan",
                             "records": 9,
                             "cost": 2.0154,
-                            "uses_join_buffering": true,
-                            "filter_used": false
+                            "uses_join_buffering": true
                           }
                         },
                         "rows_for_plan": 81,
@@ -5356,8 +5348,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 729,
@@ -5394,8 +5385,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 3,
                                     "cost": 2.0051,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 81,
@@ -5424,8 +5414,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                         "type": "scan",
                                         "records": 9,
                                         "cost": 2.0154,
-                                        "uses_join_buffering": true,
-                                        "filter_used": false
+                                        "uses_join_buffering": true
                                       }
                                     },
                                     "rows_for_plan": 729,
@@ -5465,8 +5454,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 243,
@@ -5492,8 +5480,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 3,
                                 "cost": 2.0051,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 243,
@@ -5521,8 +5508,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 2187,
@@ -5551,8 +5537,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 2187,
@@ -5578,8 +5563,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 729,
@@ -5607,8 +5591,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 3,
                                     "cost": 2.0051,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 2187,
@@ -5646,8 +5629,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 6561,
@@ -5675,8 +5657,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                             "type": "scan",
                             "records": 3,
                             "cost": 2.0051,
-                            "uses_join_buffering": true,
-                            "filter_used": false
+                            "uses_join_buffering": true
                           }
                         },
                         "rows_for_plan": 27,
@@ -5699,8 +5680,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 243,
@@ -5728,8 +5708,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 2187,
@@ -5758,8 +5737,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 2187,
@@ -5785,8 +5763,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 243,
@@ -5810,8 +5787,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 243,
@@ -5837,8 +5813,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                             "type": "scan",
                             "records": 9,
                             "cost": 2.0154,
-                            "uses_join_buffering": true,
-                            "filter_used": false
+                            "uses_join_buffering": true
                           }
                         },
                         "rows_for_plan": 81,
@@ -5861,8 +5836,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 729,
@@ -5890,8 +5864,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 3,
                                     "cost": 2.0051,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 2187,
@@ -5920,8 +5893,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 6561,
@@ -5947,8 +5919,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 3,
                                 "cost": 2.0051,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 243,
@@ -5976,8 +5947,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 2187,
@@ -6006,8 +5976,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 2187,
@@ -6033,8 +6002,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 729,
@@ -6062,8 +6030,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 9,
                         "cost": 2.0154,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 27,
@@ -6087,8 +6054,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 9,
                         "cost": 2.0154,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 27,
@@ -6112,8 +6078,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 3,
                         "cost": 2.0051,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 9,
@@ -6137,8 +6102,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 9,
                         "cost": 2.0154,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 27,
@@ -6164,8 +6128,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0051,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -6189,8 +6152,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 9,
                     "cost": 2.0154,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 9,
@@ -6214,8 +6176,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 9,
                     "cost": 2.0154,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 9,
@@ -6239,8 +6200,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0051,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -6264,8 +6224,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 9,
                     "cost": 2.0154,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 9,
@@ -6579,8 +6538,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                           "type": "scan",
                           "records": 3,
                           "cost": 2.0051,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 3,
@@ -6602,8 +6560,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                               "type": "scan",
                               "records": 9,
                               "cost": 2.0154,
-                              "uses_join_buffering": true,
-                              "filter_used": false
+                              "uses_join_buffering": true
                             }
                           },
                           "rows_for_plan": 27,
@@ -6628,8 +6585,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                           "type": "scan",
                           "records": 9,
                           "cost": 2.0154,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 9,
@@ -6656,8 +6612,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                           "type": "scan",
                           "records": 3,
                           "cost": 2.0051,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 3,
@@ -6679,8 +6634,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                               "type": "scan",
                               "records": 9,
                               "cost": 2.0154,
-                              "uses_join_buffering": true,
-                              "filter_used": false
+                              "uses_join_buffering": true
                             }
                           },
                           "rows_for_plan": 27,
@@ -6705,8 +6659,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                           "type": "scan",
                           "records": 9,
                           "cost": 2.0154,
-                          "uses_join_buffering": false,
-                          "filter_used": false
+                          "uses_join_buffering": false
                         }
                       },
                       "rows_for_plan": 9,
@@ -6736,8 +6689,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0051,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -6760,8 +6712,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 3,
                         "cost": 2.0051,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 9,
@@ -6784,8 +6735,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                             "type": "scan",
                             "records": 9,
                             "cost": 2.0154,
-                            "uses_join_buffering": true,
-                            "filter_used": false
+                            "uses_join_buffering": true
                           }
                         },
                         "rows_for_plan": 81,
@@ -6827,8 +6777,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 27,
@@ -6856,8 +6805,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 3,
                                     "cost": 2.0051,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 81,
@@ -6886,8 +6834,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                         "type": "scan",
                                         "records": 9,
                                         "cost": 2.0154,
-                                        "uses_join_buffering": true,
-                                        "filter_used": false
+                                        "uses_join_buffering": true
                                       }
                                     },
                                     "rows_for_plan": 729,
@@ -6937,8 +6884,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 243,
@@ -6964,8 +6910,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 3,
                                 "cost": 2.0051,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 9,
@@ -6993,8 +6938,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 81,
@@ -7023,8 +6967,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                     "type": "scan",
                                     "records": 9,
                                     "cost": 2.0154,
-                                    "uses_join_buffering": true,
-                                    "filter_used": false
+                                    "uses_join_buffering": true
                                   }
                                 },
                                 "rows_for_plan": 81,
@@ -7050,8 +6993,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                                 "type": "scan",
                                 "records": 9,
                                 "cost": 2.0154,
-                                "uses_join_buffering": true,
-                                "filter_used": false
+                                "uses_join_buffering": true
                               }
                             },
                             "rows_for_plan": 27,
@@ -7077,8 +7019,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                             "type": "scan",
                             "records": 9,
                             "cost": 2.0154,
-                            "uses_join_buffering": true,
-                            "filter_used": false
+                            "uses_join_buffering": true
                           }
                         },
                         "rows_for_plan": 81,
@@ -7102,8 +7043,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                             "type": "scan",
                             "records": 3,
                             "cost": 2.0051,
-                            "uses_join_buffering": true,
-                            "filter_used": false
+                            "uses_join_buffering": true
                           }
                         },
                         "rows_for_plan": 27,
@@ -7127,8 +7067,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                             "type": "scan",
                             "records": 9,
                             "cost": 2.0154,
-                            "uses_join_buffering": true,
-                            "filter_used": false
+                            "uses_join_buffering": true
                           }
                         },
                         "rows_for_plan": 81,
@@ -7154,8 +7093,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 9,
                         "cost": 2.0154,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 27,
@@ -7179,8 +7117,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 9,
                         "cost": 2.0154,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 27,
@@ -7204,8 +7141,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 3,
                         "cost": 2.0051,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 9,
@@ -7229,8 +7165,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                         "type": "scan",
                         "records": 9,
                         "cost": 2.0154,
-                        "uses_join_buffering": true,
-                        "filter_used": false
+                        "uses_join_buffering": true
                       }
                     },
                     "rows_for_plan": 27,
@@ -7256,8 +7191,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0051,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -7281,8 +7215,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 9,
                     "cost": 2.0154,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 9,
@@ -7306,8 +7239,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 9,
                     "cost": 2.0154,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 9,
@@ -7331,8 +7263,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 3,
                     "cost": 2.0051,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 3,
@@ -7356,8 +7287,7 @@ t_outer_2.a in (select t_inner_3.a from t2 t_inner_3, t1 t_inner_4)	{
                     "type": "scan",
                     "records": 9,
                     "cost": 2.0154,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                   }
                 },
                 "rows_for_plan": 9,
@@ -8050,8 +7980,7 @@ JSON_DETAILED(JSON_EXTRACT(trace, '$**.considered_execution_plans'))
                     "type": "scan",
                     "records": 5.9375,
                     "cost": 2.8296,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                 }
             },
             "rows_for_plan": 5.9375,
@@ -8082,8 +8011,7 @@ JSON_DETAILED(JSON_EXTRACT(trace, '$**.considered_execution_plans'))
                             "type": "scan",
                             "records": 804.69,
                             "cost": 256.85,
-                            "uses_join_buffering": false,
-                            "filter_used": false
+                            "uses_join_buffering": false
                         }
                     },
                     "rows_for_plan": 4777.8,
@@ -8115,8 +8043,7 @@ JSON_DETAILED(JSON_EXTRACT(trace, '$**.considered_execution_plans'))
                     "type": "scan",
                     "records": 804.69,
                     "cost": 43.26,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                 }
             },
             "rows_for_plan": 804.69,
@@ -8159,8 +8086,7 @@ JSON_DETAILED(JSON_EXTRACT(trace, '$**.considered_execution_plans'))
                     "type": "scan",
                     "records": 10,
                     "cost": 2.0171,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                 }
             },
             "rows_for_plan": 10,
@@ -8201,8 +8127,7 @@ JSON_DETAILED(JSON_EXTRACT(trace, '$**.considered_execution_plans'))
                             "type": "ref",
                             "records": 1,
                             "cost": 20.006,
-                            "uses_join_buffering": false,
-                            "filter_used": false
+                            "uses_join_buffering": false
                         }
                     },
                     "rows_for_plan": 10,
@@ -8235,8 +8160,7 @@ JSON_DETAILED(JSON_EXTRACT(trace, '$**.considered_execution_plans'))
                     "type": "scan",
                     "records": 804.69,
                     "cost": 43.26,
-                    "uses_join_buffering": false,
-                    "filter_used": false
+                    "uses_join_buffering": false
                 }
             },
             "rows_for_plan": 804.69,
@@ -8316,4 +8240,328 @@ JSON_DETAILED(JSON_EXTRACT(trace, '$**.semijoin_table_pullout'))
     }
 ]
 drop table t1,t2,t3;
+#
+# MDEV-22401: Optimizer trace: multi-component range is not printed correctly
+#
+create table t1 (kp1 int, kp2 int, key(kp1, kp2));
+insert into t1 values (1,1),(1,5),(5,1),(5,5);
+set optimizer_trace=1;
+select * from t1 force index(kp1) where (kp1=2 and kp2 >=4);
+kp1	kp2
+select JSON_DETAILED(JSON_EXTRACT(trace, '$**.range_scan_alternatives')) from INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+JSON_DETAILED(JSON_EXTRACT(trace, '$**.range_scan_alternatives'))
+[
+    
+    [
+        
+        {
+            "index": "kp1",
+            "ranges": 
+            [
+                "(2,4) <= (kp1,kp2) <= (2)"
+            ],
+            "rowid_ordered": false,
+            "using_mrr": false,
+            "index_only": true,
+            "rows": 1,
+            "cost": 0.3458,
+            "chosen": true
+        }
+    ]
+]
+drop table t1;
+#
+# MDEV-21626: Optimizer misses the details about the picked join order
+#
+CREATE TABLE t1(a INT, b INT, key(a));
+INSERT INTO t1 SELECT seq, seq from seq_1_to_10;
+CREATE TABLE t2(a INT, b INT, key(a));
+INSERT INTO t2 SELECT seq, seq from seq_1_to_100;
+SET OPTIMIZER_TRACE=1;
+EXPLAIN SELECT * FROM t1, t2 WHERE t1.a=t2.a ORDER BY t2.b;
+id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
+1	SIMPLE	t1	ALL	a	NULL	NULL	NULL	10	Using where; Using temporary; Using filesort
+1	SIMPLE	t2	ref	a	a	5	test.t1.a	1	
+select JSON_DETAILED(JSON_EXTRACT(trace, '$**.considered_execution_plans')) from INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+JSON_DETAILED(JSON_EXTRACT(trace, '$**.considered_execution_plans'))
+[
+    
+    [
+        
+        {
+            "plan_prefix": 
+            [
+            ],
+            "table": "t1",
+            "best_access_path": 
+            {
+                "considered_access_paths": 
+                [
+                    
+                    {
+                        "access_type": "scan",
+                        "resulting_rows": 10,
+                        "cost": 2.022,
+                        "chosen": true
+                    }
+                ],
+                "chosen_access_method": 
+                {
+                    "type": "scan",
+                    "records": 10,
+                    "cost": 2.022,
+                    "uses_join_buffering": false
+                }
+            },
+            "rows_for_plan": 10,
+            "cost_for_plan": 4.022,
+            "rest_of_plan": 
+            [
+                
+                {
+                    "plan_prefix": 
+                    [
+                        "t1"
+                    ],
+                    "table": "t2",
+                    "best_access_path": 
+                    {
+                        "considered_access_paths": 
+                        [
+                            
+                            {
+                                "access_type": "ref",
+                                "index": "a",
+                                "used_range_estimates": false,
+                                "cause": "not available",
+                                "rows": 1,
+                                "cost": 20.006,
+                                "chosen": true
+                            },
+                            
+                            {
+                                "access_type": "scan",
+                                "resulting_rows": 100,
+                                "cost": 2.2197,
+                                "chosen": false
+                            }
+                        ],
+                        "chosen_access_method": 
+                        {
+                            "type": "ref",
+                            "records": 1,
+                            "cost": 20.006,
+                            "uses_join_buffering": false
+                        }
+                    },
+                    "rows_for_plan": 10,
+                    "cost_for_plan": 26.028,
+                    "cost_for_sorting": 10,
+                    "estimated_join_cardinality": 10
+                }
+            ]
+        },
+        
+        {
+            "plan_prefix": 
+            [
+            ],
+            "table": "t2",
+            "best_access_path": 
+            {
+                "considered_access_paths": 
+                [
+                    
+                    {
+                        "access_type": "scan",
+                        "resulting_rows": 100,
+                        "cost": 2.2197,
+                        "chosen": true,
+                        "use_tmp_table": true
+                    }
+                ],
+                "chosen_access_method": 
+                {
+                    "type": "scan",
+                    "records": 100,
+                    "cost": 2.2197,
+                    "uses_join_buffering": false
+                }
+            },
+            "rows_for_plan": 100,
+            "cost_for_plan": 22.22,
+            "rest_of_plan": 
+            [
+                
+                {
+                    "plan_prefix": 
+                    [
+                        "t2"
+                    ],
+                    "table": "t1",
+                    "best_access_path": 
+                    {
+                        "considered_access_paths": 
+                        [
+                            
+                            {
+                                "access_type": "ref",
+                                "index": "a",
+                                "used_range_estimates": false,
+                                "cause": "not available",
+                                "rows": 1,
+                                "cost": 200.06,
+                                "chosen": true
+                            },
+                            
+                            {
+                                "access_type": "scan",
+                                "resulting_rows": 10,
+                                "cost": 2.022,
+                                "chosen": true
+                            }
+                        ],
+                        "chosen_access_method": 
+                        {
+                            "type": "scan",
+                            "records": 10,
+                            "cost": 2.022,
+                            "uses_join_buffering": true
+                        }
+                    },
+                    "rows_for_plan": 1000,
+                    "cost_for_plan": 224.24,
+                    "pruned_by_cost": true
+                }
+            ]
+        }
+    ]
+]
+DROP TABLE t1,t2;
+#
+# MDEV-22665: Print ranges in the optimizer trace created for non-indexed columns when
+# optimizer_use_condition_selectivity >2
+#
+CREATE TABLE t1(a INT, b INT);
+INSERT INTO t1 SELECT seq, seq from seq_1_to_100;
+SET optimizer_trace=1;
+ANALYZE TABLE t1 PERSISTENT FOR ALL;
+Table	Op	Msg_type	Msg_text
+test.t1	analyze	status	Engine-independent statistics collected
+test.t1	analyze	status	OK
+EXPLAIN EXTENDED SELECT * from t1 WHERE a between 1 and 5 and b <= 5;
+id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	100	0.22	Using where
+Warnings:
+Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where `test`.`t1`.`a` between 1 and 5 and `test`.`t1`.`b` <= 5
+select JSON_DETAILED(JSON_EXTRACT(trace, '$**.selectivity_for_columns')) from INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+JSON_DETAILED(JSON_EXTRACT(trace, '$**.selectivity_for_columns'))
+[
+    
+    [
+        
+        {
+            "column_name": "a",
+            "ranges": 
+            [
+                "1 <= a <= 5"
+            ],
+            "selectivity_from_histogram": 0.0469
+        },
+        
+        {
+            "column_name": "b",
+            "ranges": 
+            [
+                "NULL < b <= 5"
+            ],
+            "selectivity_from_histogram": 0.0469
+        }
+    ]
+]
+EXPLAIN EXTENDED SELECT * from t1 WHERE a != 5;
+id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	100	100.00	Using where
+Warnings:
+Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where `test`.`t1`.`a` <> 5
+select JSON_DETAILED(JSON_EXTRACT(trace, '$**.selectivity_for_columns')) from INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+JSON_DETAILED(JSON_EXTRACT(trace, '$**.selectivity_for_columns'))
+[
+    
+    [
+        
+        {
+            "column_name": "a",
+            "ranges": 
+            [
+                "NULL < a < 5",
+                "5 < a"
+            ],
+            "selectivity_from_histogram": 1
+        }
+    ]
+]
+EXPLAIN EXTENDED SELECT * from t1 WHERE b >= 10 and b < 25;
+id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	100	15.62	Using where
+Warnings:
+Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where `test`.`t1`.`b` >= 10 and `test`.`t1`.`b` < 25
+select JSON_DETAILED(JSON_EXTRACT(trace, '$**.selectivity_for_columns')) from INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+JSON_DETAILED(JSON_EXTRACT(trace, '$**.selectivity_for_columns'))
+[
+    
+    [
+        
+        {
+            "column_name": "b",
+            "ranges": 
+            [
+                "10 <= b < 25"
+            ],
+            "selectivity_from_histogram": 0.1562
+        }
+    ]
+]
+drop table t1;
+#
+# MDEV-22910:SIGSEGV in Opt_trace_context::is_started & SIGSEGV in Json_writer::add_table_name
+# (on optimized builds)
+#
+CREATE TABLE t1( a INT, b INT, PRIMARY KEY( a ) );
+SELECT sum(b), row_number() OVER (order by b) FROM t1 WHERE a = 101;
+sum(b)	row_number() OVER (order by b)
+NULL	1
+UPDATE t1 SET b=10 WHERE a=1;
+SELECT JSON_DETAILED(JSON_EXTRACT(trace, '$**.range_scan_alternatives')) from INFORMATION_SCHEMA.OPTIMIZER_TRACE;
+JSON_DETAILED(JSON_EXTRACT(trace, '$**.range_scan_alternatives'))
+[
+    
+    [
+        
+        {
+            "index": "PRIMARY",
+            "ranges": 
+            [
+                "(1) <= (a) <= (1)"
+            ],
+            "rowid_ordered": true,
+            "using_mrr": false,
+            "index_only": false,
+            "rows": 0,
+            "cost": 0.145,
+            "chosen": true
+        }
+    ]
+]
+DROP TABLE t1;
 set optimizer_trace='enabled=off';
+#
+# MDEV-24975 Server consumes extra 4G memory upon querying INFORMATION_SCHEMA.OPTIIMIZER_TRACE
+#
+set max_session_mem_used=1024*1024*1024;
+select count(*) from information_schema.optimizer_trace;
+select * from information_schema.optimizer_trace;
+set max_session_mem_used=default;
+#
+# End of 10.4 tests
+#
