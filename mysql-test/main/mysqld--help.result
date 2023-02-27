@@ -1295,6 +1295,32 @@ The following specify which files/extra groups are read (specified before remain
  Log slow queries to given log file. Defaults logging to
  'hostname'-slow.log. Must be enabled to activate other
  slow log options
+ --sn-order-by-limit-optimize-level=# 
+ Controls the level of optimization performed for select
+ queries  that has a order by limit clause. Meaning: 0 -
+ Do not reconsider access paths for index ordering. 1 -
+ Consider access paths for index ordering in order by. but
+ do not take key parts into account when selecting the
+ best plan.  Only consider cost when selecting a best
+ plan.2 - (Default) Consider access paths for index
+ ordering in order by. Use both the cost and the key parts
+ when selecting the best plan. 3 - Same as 0, except the
+ second pass for order byis executed if the row estimate
+ is less than the threshold specified by
+ sn_order_by_limit_row_threshold.4 - (Experimental) Same
+ as 0, except the second pass for order byis executed if
+ the cost for the referral key differs from the costfor
+ the key part analysis by a factor of
+ sn_order_by_factor_threshold. Not implemented.5 - Same as
+ 0, except the second pass for order by isexecuted if
+ reference key's access type is ALL. The second pass only
+ uses cost comparison.
+ --sn-order-by-limit-row-threshold=# 
+ To be used with sn_order_by_limit_optimize_level=3
+ Evaluates the second phase of the order by optimizationif
+ sn_order_by_row_threshold <= row estimate. (In other
+ words, if sn_order_by_row_threshold > row estimate, then,
+ skip evaluatingthe second phase of order by).
  --socket=name       Socket file to use for connection
  --sort-buffer-size=# 
  Each thread that needs to do a sort allocates a buffer of
@@ -1803,6 +1829,8 @@ slave-transaction-retry-interval 0
 slave-type-conversions 
 slow-launch-time 2
 slow-query-log FALSE
+sn-order-by-limit-optimize-level 2
+sn-order-by-limit-row-threshold 300000
 sort-buffer-size 2097152
 sql-mode STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 sql-safe-updates FALSE

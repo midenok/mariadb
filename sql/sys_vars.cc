@@ -2715,6 +2715,38 @@ static Sys_var_ulong Sys_optimizer_use_condition_selectivity(
        SESSION_VAR(optimizer_use_condition_selectivity), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(1, 5), DEFAULT(4), BLOCK_SIZE(1));
 
+static Sys_var_ulong Sys_optimizer_sn_order_by_limit_optimize_level(
+        "sn_order_by_limit_optimize_level",
+        "Controls the level of optimization performed for select queries "
+        " that has a order by limit clause. "
+        "Meaning: "
+        "0 - Do not reconsider access paths for index ordering. "
+        "1 - Consider access paths for index ordering in order by. "
+        "but do not take key parts into account when selecting the best plan. "
+        " Only consider cost when selecting a best plan."
+        "2 - (Default) Consider access paths for index ordering in order by. "
+        "Use both the cost and the key parts when selecting the best plan. "
+        "3 - Same as 0, except the second pass for order by"
+        "is executed if the row estimate is less than the threshold specified by sn_order_by_limit_row_threshold."
+        "4 - (Experimental) Same as 0, except the second pass for order by"
+        "is executed if the cost for the referral key differs from the cost"
+        "for the key part analysis by a factor of sn_order_by_factor_threshold. Not implemented."
+        "5 - Same as 0, except the second pass for order by is"
+        "executed if reference key's access type is ALL. The second pass only"
+        " uses cost comparison.",
+        SESSION_VAR(sn_order_by_limit_optimize_level), CMD_LINE(REQUIRED_ARG),
+        VALID_RANGE(0, 5), DEFAULT(2), BLOCK_SIZE(1));
+
+static Sys_var_ulong Sys_optimizer_sn_order_by_row_threshold(
+        "sn_order_by_limit_row_threshold",
+        "To be used with sn_order_by_limit_optimize_level=3 "
+        "Evaluates the second phase of the order by optimization"
+        "if sn_order_by_row_threshold <= row estimate. (In other words,"
+        " if sn_order_by_row_threshold > row estimate, then, skip evaluating"
+        "the second phase of order by).",
+        SESSION_VAR(sn_order_by_row_threshold), CMD_LINE(REQUIRED_ARG),
+        VALID_RANGE(0, ULONG_MAX), DEFAULT(300000), BLOCK_SIZE(1));
+
 static Sys_var_ulong Sys_optimizer_search_depth(
        "optimizer_search_depth",
        "Maximum depth of search performed by the query optimizer. Values "

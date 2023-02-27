@@ -1,0 +1,44 @@
+CREATE TABLE `task` (
+`sys_id` char(32) NOT NULL DEFAULT '',
+`sys_class_name` varchar(80) DEFAULT NULL,
+`sys_domain_path` varchar(255) DEFAULT NULL,
+`sys_created_on` datetime DEFAULT NULL,
+`active` tinyint(1) DEFAULT NULL,
+`assignment_group` varchar(32) DEFAULT NULL,
+`number` varchar(130) DEFAULT NULL,
+PRIMARY KEY (`sys_id`),
+KEY `task_ref2` (`assignment_group`,`active`),
+KEY `task_task_class_created` (`sys_class_name`,`sys_created_on`),
+KEY `sys_class_name_2` (`sys_class_name`,`number`,`sys_domain_path`),
+KEY `active` (`active`,`sys_class_name`,`number`),
+KEY `all_k` (`active`,`sys_class_name`,`assignment_group`,`number`)
+);
+select count(*) from task;
+count(*)
+10617
+# Should select all_k -- only using cost
+SET sn_order_by_limit_optimize_level = 1;
+explain format=json SELECT task0.sys_id FROM task task0 WHERE task0.sys_class_name = 'sn_customerservice_case' AND task0.active = 1 AND task0.assignment_group = '58280f58584120006863f2dea01f7f04' ORDER BY task0.number LIMIT 0, 20;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "task0",
+      "access_type": "range",
+      "possible_keys": [
+        "task_ref2",
+        "task_task_class_created",
+        "sys_class_name_2",
+        "active",
+        "all_k"
+      ],
+      "key": "all_k",
+      "key_length": "120",
+      "used_key_parts": ["active", "sys_class_name", "assignment_group"],
+      "rows": 1,
+      "filtered": 100,
+      "attached_condition": "task0.assignment_group <=> '58280f58584120006863f2dea01f7f04' and task0.active <=> 1 and task0.sys_class_name = 'sn_customerservice_case' and task0.assignment_group = '58280f58584120006863f2dea01f7f04'"
+    }
+  }
+}

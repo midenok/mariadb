@@ -24159,6 +24159,37 @@ void compute_part_of_sort_key_for_equals(JOIN *join, TABLE *table,
   }
 }
 
+/* Do not reconsider access paths for index ordering.*/
+#define SKIP_PLAN_CONSIDERATION_FOR_ORDER_BY 0
+/**
+ * Consider access paths for index ordering in order by. "
+        "but do not take key parts into account when selecting the best plan. "
+        " Only consider cost when selecting a best plan.
+ */
+#define KEY_PARTS_NOT_CONSIDERED_IN_PLAN_SELECTION 1
+/**
+ * (Default) Consider access paths for index ordering in order by. "
+        "Use both the cost and the key parts when selecting the best plan.
+ */
+#define KEY_PARTS_AND_COST_CONSIDERED_IN_PLAN_SELECTION 2
+/**
+ * (Experimental) Same as 0, except the second pass for order by"
+        "is executed if the row threshold specified by sn_order_by_row_threshold exceeds"
+        "the row estimate for the table.
+ */
+#define SKIP_PLAN_CONSIDERATION_FOR_ORDER_BY_BASED_ON_ROW_THRESHOLD 3
+/**
+ * (Experimental) Same as 0, except the second pass for order by"
+        "is executed if the cost for the referral key differs from the cost"
+        "for the key part analysis by a factor of sn_order_by_factor_threshold."
+ */
+#define SKIP_PLAN_CONSIDERATION_FOR_ORDER_BY_BASED_ON_COST_COMPARISON 4
+/**
+ * (Experimental) Same as 0, except the second pass for order by is"
+        "executed if reference key's access type is range. The second pass only"
+        " uses cost comparison."
+ */
+#define SKIP_PLAN_CONSIDERATION_FOR_ORDER_BY_BASED_ON_ACCESS_TYPE 5
 
 /**
   Test if we can skip the ORDER BY by using an index.
@@ -24196,11 +24227,12 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
   bool orig_cond_saved= false;
   int best_key= -1;
   bool changed_key= false;
+  THD* thd = tab->join->thd;
   DBUG_ENTER("test_if_skip_sort_order");
 
   /* Check that we are always called with first non-const table */
   DBUG_ASSERT(tab == tab->join->join_tab + tab->join->const_tables);
-
+  DBUG_ASSERT(thd != NULL);
   /*
     Keys disabled by ALTER TABLE ... DISABLE KEYS should have already
     been taken into account.
@@ -24407,11 +24439,38 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
     JOIN *join= tab->join;
     ha_rows table_records= table->stat_records();
 
-    test_if_cheaper_ordering(tab, order, table, usable_keys,
-                             ref_key, select_limit,
-                             &best_key, &best_key_direction,
-                             &select_limit, &best_key_parts,
-                             &saved_best_key_parts);
+    bool skip_reconsidering_for_order_by = false;
+
+    // if force index, we are not skipping ...
+    if (!table->force_index) {
+      // no force index -- evaluate sn_order_by_limit_optimize_level value ...
+      // sn_order_by_limit_optimize_level = 0 -- just skip
+      if (thd->variables.sn_order_by_limit_optimize_level == SKIP_PLAN_CONSIDERATION_FOR_ORDER_BY)
+        skip_reconsidering_for_order_by = true;
+      else if (thd->variables.sn_order_by_limit_optimize_level
+          == SKIP_PLAN_CONSIDERATION_FOR_ORDER_BY_BASED_ON_ROW_THRESHOLD) {
+        // compare table records to decide whether to skip ...
+        // if table records greater than the defined threshold, then, skip ...
+        if (table_records >= thd->variables.sn_order_by_row_threshold)
+          skip_reconsidering_for_order_by = true;
+
+      } else if (thd->variables.sn_order_by_limit_optimize_level
+          == SKIP_PLAN_CONSIDERATION_FOR_ORDER_BY_BASED_ON_ACCESS_TYPE) {
+        // if access type is ALL, evaluate the second phase -- usually ALL is slow, therefore
+        // order by is better with an index ...
+        // for other cases skip the second phase ...
+        if (tab->type != JT_ALL)
+          skip_reconsidering_for_order_by = true;
+      }
+    }
+
+    if (!skip_reconsidering_for_order_by) {
+      test_if_cheaper_ordering(tab, order, table, usable_keys,
+                               ref_key, select_limit,
+                               &best_key, &best_key_direction,
+                               &select_limit, &best_key_parts,
+                               &saved_best_key_parts);
+    }
 
     /*
       filesort() and join cache are usually faster than reading in 
@@ -29515,10 +29574,35 @@ test_if_cheaper_ordering(const JOIN_TAB *tab, ORDER *order, TABLE *table,
           if (table->opt_range_keys.is_set(nr))
             quick_records= table->opt_range[nr].rows;
           possible_key.add("records", quick_records);
-          if (best_key < 0 ||
-              (select_limit <= MY_MIN(quick_records,best_records) ?
+
+          /**
+           * (select_limit <= MY_MIN(quick_records,best_records) ?
                keyinfo->user_defined_key_parts < best_key_parts :
-               quick_records < best_records) ||
+               quick_records < best_records)
+           */
+
+          bool better_index_found = false;
+
+          if (thd->variables.sn_order_by_limit_optimize_level == KEY_PARTS_AND_COST_CONSIDERED_IN_PLAN_SELECTION) {
+            possible_key.add("key_parts_considered", true);
+            if (select_limit <= MY_MIN(quick_records,best_records)) {
+              // questionable why keyparts is compared here ...
+              if (keyinfo->user_defined_key_parts < best_key_parts)
+                better_index_found = true;
+              else if (keyinfo->user_defined_key_parts == best_key_parts) {
+                if (quick_records < best_records)
+                  better_index_found = true;
+              }
+            } else if (quick_records < best_records)
+              better_index_found = true;
+          } else {
+            // plan selected only based on the cost ...
+            possible_key.add("cost_only_comparison", true);
+            if (quick_records < best_records)
+              better_index_found = true;
+          }
+
+          if (best_key < 0 || better_index_found ||
               (!is_best_covering && is_covering))
           {
             possible_key.add("chosen", true);

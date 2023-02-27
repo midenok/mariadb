@@ -1,0 +1,42 @@
+# Should select kb_knowledge_CHG1600394
+SET SESSION sn_order_by_limit_optimize_level = 5;
+explain format=json SELECT kb_knowledge0.`sys_id` FROM kb_knowledge kb_knowledge0  WHERE (kb_knowledge0.`short_description` LIKE '%planned duration%' OR kb_knowledge0.`text` LIKE '%planned duration%' OR kb_knowledge0.`u_internal_notes_str` LIKE '%planned duration%') AND (kb_knowledge0.`sys_domain_path` = '/' OR kb_knowledge0.`sys_domain_path` LIKE '!!!/!!#/!!$/%' OR kb_knowledge0.`sys_domain_path` LIKE '!!!/!!!/%') ORDER BY kb_knowledge0.`number` limit 0,50;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "kb_knowledge0",
+      "access_type": "index",
+      "possible_keys": ["sys_domain_path"],
+      "key": "kb_knowledge_CHG1600394",
+      "key_length": "123",
+      "used_key_parts": ["number"],
+      "rows": 1,
+      "filtered": 100,
+      "attached_condition": "(kb_knowledge0.short_description like '%planned duration%' or kb_knowledge0.`text` like '%planned duration%' or kb_knowledge0.u_internal_notes_str like '%planned duration%') and (kb_knowledge0.sys_domain_path = '/' or kb_knowledge0.sys_domain_path like '!!!/!!#/!!$/%' or kb_knowledge0.sys_domain_path like '!!!/!!!/%')"
+    }
+  }
+}
+# Should select ALL - table scan
+SET SESSION sn_order_by_limit_optimize_level = 0;
+explain format=json SELECT kb_knowledge0.`sys_id` FROM kb_knowledge kb_knowledge0  WHERE (kb_knowledge0.`short_description` LIKE '%planned duration%' OR kb_knowledge0.`text` LIKE '%planned duration%' OR kb_knowledge0.`u_internal_notes_str` LIKE '%planned duration%') AND (kb_knowledge0.`sys_domain_path` = '/' OR kb_knowledge0.`sys_domain_path` LIKE '!!!/!!#/!!$/%' OR kb_knowledge0.`sys_domain_path` LIKE '!!!/!!!/%') ORDER BY kb_knowledge0.`number` limit 0,50;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "kb_knowledge0.`number`",
+        "table": {
+          "table_name": "kb_knowledge0",
+          "access_type": "ALL",
+          "possible_keys": ["sys_domain_path"],
+          "rows": 1,
+          "filtered": 100,
+          "attached_condition": "(kb_knowledge0.short_description like '%planned duration%' or kb_knowledge0.`text` like '%planned duration%' or kb_knowledge0.u_internal_notes_str like '%planned duration%') and (kb_knowledge0.sys_domain_path = '/' or kb_knowledge0.sys_domain_path like '!!!/!!#/!!$/%' or kb_knowledge0.sys_domain_path like '!!!/!!!/%')"
+        }
+      }
+    }
+  }
+}

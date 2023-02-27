@@ -1,0 +1,54 @@
+# Defect DEF0370542
+--source include/have_innodb.inc
+--source include/have_stat_tables.inc
+
+--disable_query_log
+--disable_result_log
+
+set @save_use_stat_tables=@@use_stat_tables;
+set @save_tmp_cond_selectivity= @@optimizer_use_condition_selectivity;
+set @save_sn_order_by_limit_optimize_level= @@sn_order_by_limit_optimize_level;
+
+set @save_optimizer_switch_for_selectivity_test=@@optimizer_switch;
+
+SET optimizer_use_condition_selectivity = 1;
+set optimizer_switch='rowid_filter=off';
+set use_stat_tables='never';
+
+CREATE TABLE `kb_knowledge` (
+ `sys_id` char(32) NOT NULL DEFAULT '',
+ `short_description` varchar(255) DEFAULT NULL,
+ `text` mediumtext DEFAULT NULL,
+ `u_internal_notes_str` mediumtext DEFAULT NULL,
+ `sys_domain_path` varchar(255) DEFAULT NULL,
+ `number` varchar(40) DEFAULT NULL,
+ PRIMARY KEY (`sys_id`),
+ KEY `kb_knowledge_CHG1600394` (`number`),
+ KEY `sys_domain_path` (`sys_domain_path`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+--enable_result_log
+--enable_query_log
+
+echo # Should select kb_knowledge_CHG1600394;
+SET SESSION sn_order_by_limit_optimize_level = 5;
+explain format=json SELECT kb_knowledge0.`sys_id` FROM kb_knowledge kb_knowledge0  WHERE (kb_knowledge0.`short_description` LIKE '%planned duration%' OR kb_knowledge0.`text` LIKE '%planned duration%' OR kb_knowledge0.`u_internal_notes_str` LIKE '%planned duration%') AND (kb_knowledge0.`sys_domain_path` = '/' OR kb_knowledge0.`sys_domain_path` LIKE '!!!/!!#/!!$/%' OR kb_knowledge0.`sys_domain_path` LIKE '!!!/!!!/%') ORDER BY kb_knowledge0.`number` limit 0,50;
+
+echo # Should select ALL - table scan;
+SET SESSION sn_order_by_limit_optimize_level = 0;
+explain format=json SELECT kb_knowledge0.`sys_id` FROM kb_knowledge kb_knowledge0  WHERE (kb_knowledge0.`short_description` LIKE '%planned duration%' OR kb_knowledge0.`text` LIKE '%planned duration%' OR kb_knowledge0.`u_internal_notes_str` LIKE '%planned duration%') AND (kb_knowledge0.`sys_domain_path` = '/' OR kb_knowledge0.`sys_domain_path` LIKE '!!!/!!#/!!$/%' OR kb_knowledge0.`sys_domain_path` LIKE '!!!/!!!/%') ORDER BY kb_knowledge0.`number` limit 0,50;
+
+--disable_query_log
+--disable_result_log
+
+# cleanup ...
+SET optimizer_use_condition_selectivity = @save_tmp_cond_selectivity;
+SET optimizer_switch = @save_optimizer_switch_for_selectivity_test;
+SET optimizer_trace='enabled=off';
+SET sn_order_by_limit_optimize_level = @save_sn_order_by_limit_optimize_level;
+SET use_stat_tables=@save_use_stat_tables;
+
+drop table kb_knowledge;
+
+--enable_result_log
+--enable_query_log
