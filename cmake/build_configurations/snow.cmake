@@ -67,7 +67,7 @@ endmacro()
 
 # Default type is BOOL. Must specify type for non-yet-existent cached variables.
 # This could be much better if normal variables worked like -D
-setc(DISABLE_SHARED ON)
+setc(DISABLE_SHARED OFF)
 setc(ENABLED_PROFILING OFF)
 setc(ENABLE_DTRACE OFF)
 setc(MAX_INDEXES 128 STRING)
@@ -89,6 +89,7 @@ setc(WITH_UNIT_TESTS OFF)
 
 set(plugins_exclude
   PLUGIN_CONNECT
+  PLUGIN_CRACKLIB_PASSWORD_CHECK
   PLUGIN_OQGRAPH
   PLUGIN_MROONGA
   PLUGIN_TOKUDB
@@ -99,8 +100,8 @@ set(plugins_exclude
   PLUGIN_SEMISYNC_SLAVE
   PLUGIN_AUDIT_NULL
   PLUGIN_AUTH_0X0100
+  PLUGIN_AUTH_PAM_V1
   PLUGIN_AUTH_ED25519
-  PLUGIN_AUTH_PAM
   PLUGIN_AUTH_SOCKET
   PLUGIN_AUTH_TEST_PLUGIN
   PLUGIN_BLACKHOLE
@@ -110,14 +111,45 @@ set(plugins_exclude
   PLUGIN_DISKS
   PLUGIN_EXAMPLE
   PLUGIN_EXAMPLE_KEY_MANAGEMENT
+  PLUGIN_FEDERATED
+  PLUGIN_FEDERATEDX
+  PLUGIN_FEEDBACK
+  PLUGIN_FILE_KEY_MANAGEMENT
   PLUGIN_FTEXAMPLE
+  PLUGIN_HANDLERSOCKET
+  PLUGIN_LOCALES
+  PLUGIN_METADATA_LOCK_INFO
   PLUGIN_QA_AUTH_CLIENT
   PLUGIN_QA_AUTH_INTERFACE
   PLUGIN_QA_AUTH_SERVER
+  PLUGIN_SERVER_AUDIT
   PLUGIN_SIMPLE_PASSWORD_CHECK
   PLUGIN_TEST_SQL_DISCOVERY
+  PLUGIN_TEST_VERSIONING
 )
 
 foreach(plugin ${plugins_exclude})
   setc(${plugin} NO)
 endforeach()
+
+function(convert_dynamic_to_static)
+  get_cmake_property(vars VARIABLES)
+  list (SORT vars)
+  foreach (var ${vars})
+    string(REGEX MATCH ^PLUGIN_ m ${var})
+    if (m)
+      string(REGEX MATCH ^DYNAMIC$ m "${${var}}")
+      if (m)
+        setc(${var} STATIC STRING)
+      endif()
+    endif()
+  endforeach()
+endfunction()
+
+if (DISABLE_SHARED)
+  # Make DYNAMIC plugins STATIC because of DISABLE_SHARED
+  convert_dynamic_to_static()
+else()
+  # PAM plugin does not compile as static (see MODULE_ONLY in auth_pam/CMakeLists.txt)
+  setc(PLUGIN_AUTH_PAM DYNAMIC STRING)
+endif()
