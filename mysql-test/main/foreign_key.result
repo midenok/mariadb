@@ -157,25 +157,25 @@ test.t1	check	status	OK
 test.t2	check	Note	Found 1 foreign keys
 test.t2	check	status	OK
 drop table t2, t1;
-create database D;
-create table D.T1(id int primary key);
-create table t2(id int primary key, f1 int references D.T1(id));
-select * from D.T1;
+create database Test_MariaDB;
+create table Test_MariaDB.T1(id int primary key);
+create table t2(id int primary key, f1 int references Test_MariaDB.T1(id));
+select * from Test_MariaDB.T1;
 id
-check table D.T1;
+check table Test_MariaDB.T1;
 Table	Op	Msg_type	Msg_text
-D.T1	check	Note	Found 1 referenced keys
-D.T1	check	status	OK
+Test_MariaDB.T1	check	Note	Found 1 referenced keys
+Test_MariaDB.T1	check	status	OK
 drop table t2;
-check table D.T1;
+check table Test_MariaDB.T1;
 Table	Op	Msg_type	Msg_text
-D.T1	check	status	OK
+Test_MariaDB.T1	check	status	OK
 flush tables;
-check table D.T1;
+check table Test_MariaDB.T1;
 Table	Op	Msg_type	Msg_text
-D.T1	check	status	OK
-drop table D.T1;
-drop database D;
+Test_MariaDB.T1	check	status	OK
+drop table Test_MariaDB.T1;
+drop database Test_MariaDB;
 # Check rename column, lock tables
 create or replace table t1 (id int primary key);
 create or replace table t2 (id int primary key);

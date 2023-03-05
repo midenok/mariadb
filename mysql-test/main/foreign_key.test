@@ -175,20 +175,20 @@ flush tables;
 check tables t1, t2;
 drop table t2, t1;
 
-create database D;
-create table D.T1(id int primary key);
-create table t2(id int primary key, f1 int references D.T1(id));
-select * from D.T1;
---replace_result d.t1 D.T1
-check table D.T1;
+create database Test_MariaDB;
+create table Test_MariaDB.T1(id int primary key);
+create table t2(id int primary key, f1 int references Test_MariaDB.T1(id));
+select * from Test_MariaDB.T1;
+--replace_result test_mariadb.t1 Test_MariaDB.T1
+check table Test_MariaDB.T1;
 drop table t2;
---replace_result d.t1 D.T1
-check table D.T1;
+--replace_result test_mariadb.t1 Test_MariaDB.T1
+check table Test_MariaDB.T1;
 flush tables;
---replace_result d.t1 D.T1
-check table D.T1;
-drop table D.T1;
-drop database D;
+--replace_result test_mariadb.t1 Test_MariaDB.T1
+check table Test_MariaDB.T1;
+drop table Test_MariaDB.T1;
+drop database Test_MariaDB;
 
 --echo # Check rename column, lock tables
 create or replace table t1 (id int primary key);
