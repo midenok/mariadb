@@ -5734,6 +5734,11 @@ int Query_log_event::do_apply_event(rpl_group_info *rgi,
            thd->variables.sql_log_slow= !MY_TEST(global_system_variables.log_slow_disabled_statements & LOG_SLOW_DISABLE_SLAVE);
          }
 
+        DBUG_PRINT("rpl",
+                    ("GTID %u-%u-%llu  "
+                    "thread_id: %llu  query: %s",
+                    rgi->current_gtid.domain_id, rgi->current_gtid.server_id,
+                    rgi->current_gtid.seq_no, thd->thread_id, thd->query()));
         mysql_parse(thd, thd->query(), thd->query_length(), &parser_state,
                     FALSE, FALSE);
         /* Finalize server status flags after executing a statement. */
