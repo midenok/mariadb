@@ -104,6 +104,7 @@ struct rpl_parallel_thread {
   mysql_cond_t COND_rpl_thread_stop;
   struct rpl_parallel_thread *next;             /* For free list. */
   struct rpl_parallel_thread_pool *pool;
+  enum enum_server_command command;
   THD *thd;
   /*
     Who owns the thread, if any (it's a pointer into the

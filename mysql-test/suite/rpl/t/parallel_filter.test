@@ -29,31 +29,44 @@ create database db_parallel;
 create database db_serial;
 create database db_not_mentioned;
 
-use db_parallel;
-create table t1 (a int);
-insert into t1 values (1);
-
-use db_serial;
-create table t2 (a int);
-insert into t2 values (2);
-
-use db_not_mentioned;
-create table t3 (a int);
-insert into t3 values (3);
-
+create table db_parallel.t1 (a int);
+create table db_serial.t2 (b int);
+create table db_not_mentioned.t3(c int);
 --save_master_pos
 
 --connection server_2
 --sync_with_master
 
-show databases;
+--connect (master1,localhost,root,,test,$SERVER_MYPORT_1,)
+use db_parallel;
+send insert into t1 values (1);
+
+--connect (master2,localhost,root,,test,$SERVER_MYPORT_1,)
+use db_serial;
+send insert into t2 values (2);
+
+--connect (master3,localhost,root,,test,$SERVER_MYPORT_1,)
+use db_not_mentioned;
+send insert into t3 values (3);
+
+
+--connection server_2
+show processlist;
+
+--connection master1
+reap;
+disconnect master1;
+--connection master2
+reap;
+disconnect master2;
+--connection master3
+reap;
+disconnect master3;
 
 --connection server_2
 --source include/stop_slave.inc
 set global slave_parallel_threads=@old_parallel_threads;
 --source include/start_slave.inc
-
-show thread status;
 
 --connection server_1
 drop database db_parallel;

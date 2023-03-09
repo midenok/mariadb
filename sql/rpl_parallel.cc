@@ -1109,7 +1109,7 @@ handle_rpl_parallel_thread(void *arg)
   rpt->running= true;
   mysql_cond_signal(&rpt->COND_rpl_thread);
 
-  thd->set_command(COM_SLAVE_WORKER);
+  thd->set_command(rpt->command);
 #ifdef WITH_WSREP
   wsrep_open(thd);
   if (wsrep_before_command(thd))
@@ -2243,6 +2243,7 @@ rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
     rpl_threads[idx]= thr= global_rpl_thread_pool.get_thread(&rpl_threads[idx],
                                                              this);
 
+  thr->command= was_ordered ? COM_SLAVE_WORKER : COM_SLAVE_ORDERED;
   return thr;
 }
 
