@@ -1148,6 +1148,8 @@ handle_rpl_parallel_thread(void *arg)
     thd->EXIT_COND(&old_stage);
 
   more_events:
+    thd->set_command(rpt->command);
+
     for (qev= events; qev; qev= next_qev)
     {
       Log_event_type event_type;
@@ -2243,7 +2245,7 @@ rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
     rpl_threads[idx]= thr= global_rpl_thread_pool.get_thread(&rpl_threads[idx],
                                                              this);
 
-  thr->command= was_ordered ? COM_SLAVE_WORKER : COM_SLAVE_ORDERED;
+  thr->command= was_ordered ? COM_SLAVE_ORDERED : COM_SLAVE_WORKER;
   return thr;
 }
 
