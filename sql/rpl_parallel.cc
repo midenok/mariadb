@@ -2872,7 +2872,8 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   }
 
   DBUG_ASSERT(e->rpl_threads[e->last_idx()] == cur_thread);
-  DBUG_ASSERT(!e->was_ordered || speculation == rpl_group_info::SPECULATE_WAIT);
+  DBUG_ASSERT(typ != GTID_EVENT || !e->was_ordered ||
+              speculation == rpl_group_info::SPECULATE_WAIT);
 
   if (!(qev= cur_thread->get_qev(ev, event_size, rli)))
   {

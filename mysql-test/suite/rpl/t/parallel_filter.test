@@ -67,8 +67,8 @@ send insert into t3 values (3);
 --connection server_2
 set debug_sync= 'now wait_for ha_write_row_entering_t3';
 
-show processlist;
-# select * from information_schema.processlist;
+#show processlist;
+select Command, db, State, Info from information_schema.processlist where Command like 'Slave_%' order by db, Info;
 set debug_sync= 'now signal ha_write_row_continue_t1';
 set debug_sync= 'now wait_for ha_write_row_continued_t1';
 set debug_sync= 'now signal ha_write_row_continue_t2';

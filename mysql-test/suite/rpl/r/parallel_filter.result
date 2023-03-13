@@ -44,32 +44,19 @@ use db_not_mentioned;
 insert into t3 values (3);
 connection server_2;
 set debug_sync= 'now wait_for ha_write_row_entering_t3';
-show processlist;
-Id	User	Host	db	Command	Time	State	Info	Progress
-1	system user		NULL	Daemon	NULL	InnoDB purge worker	NULL	0.000
-2	system user		NULL	Daemon	NULL	InnoDB purge coordinator	NULL	0.000
-3	system user		NULL	Daemon	NULL	InnoDB purge worker	NULL	0.000
-4	system user		NULL	Daemon	NULL	InnoDB purge worker	NULL	0.000
-5	system user		NULL	Daemon	NULL	InnoDB shutdown handler	NULL	0.000
-10	root	localhost:37150	test	Query	0	Init	show processlist	0.000
-11	root	localhost:37164	test	Sleep	1		NULL	0.000
-14	system user		NULL	Slave_IO	0	Waiting for master to send event	NULL	0.000
-16	system user		NULL	Sleep	0	Waiting for work from SQL thread	NULL	0.000
-17	system user		db_parallel	Slave_worker	0	debug sync point: now	insert into t1 values (1)	0.000
-18	system user		NULL	Sleep	0	Waiting for work from SQL thread	NULL	0.000
-19	system user		db_serial	Slave_worker	0	debug sync point: now	insert into t2 values (2)	0.000
-20	system user		db_not_mentioned	Slave_worker	0	debug sync point: now	insert into t3 values (3)	0.000
-15	system user		NULL	Slave_SQL	0	Slave has read all relay log; waiting for the slave I/O thread to update it	NULL	0.000
+select Command, db, State, Info from information_schema.processlist where Command like 'Slave_%' order by db, Info;
+Command	db	State	Info
+Slave_SQL	NULL	Slave has read all relay log; waiting for the slave I/O thread t	NULL
+Slave_IO	NULL	Waiting for master to send event	NULL
+Slave_worker	db_not_mentioned	debug sync point: now	insert into t3 values (3)
+Slave_worker	db_parallel	debug sync point: now	insert into t1 values (1)
+Slave_worker	db_serial	debug sync point: now	insert into t2 values (2)
 set debug_sync= 'now signal ha_write_row_continue_t1';
 set debug_sync= 'now wait_for ha_write_row_continued_t1';
 set debug_sync= 'now signal ha_write_row_continue_t2';
 set debug_sync= 'now wait_for ha_write_row_continued_t2';
-Warnings:
-Warning	1639	debug sync point wait timed out
 set debug_sync= 'now signal ha_write_row_continue_t3';
 set debug_sync= 'now wait_for ha_write_row_continued_t3';
-Warnings:
-Warning	1639	debug sync point wait timed out
 connection master1;
 disconnect master1;
 connection master2;
