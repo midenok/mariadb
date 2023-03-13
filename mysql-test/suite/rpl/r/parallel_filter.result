@@ -1,0 +1,93 @@
+include/rpl_init.inc [topology=1->2]
+connection server_2;
+set @old_parallel_threads=    @@global.slave_parallel_threads;
+set @old_slave_parallel_mode= @@global.slave_parallel_mode;
+set @old_dbug=                @@global.debug_dbug;
+include/stop_slave.inc
+set global slave_parallel_threads=  5;
+set global slave_parallel_mode=     'optimistic';
+include/start_slave.inc
+connection server_1;
+set @_parallel_do_db=             @@global.parallel_do_db;
+set @_parallel_ignore_db=         @@global.parallel_ignore_db;
+set @@global.parallel_do_db=      "db_parallel";
+set @@global.parallel_ignore_db=  "db_serial";
+select @@global.parallel_do_db;
+@@global.parallel_do_db
+db_parallel
+select @@global.replicate_do_db;
+@@global.replicate_do_db
+
+create database db_parallel;
+create database db_serial;
+create database db_not_mentioned;
+create table db_parallel.t1 (a int) engine innodb;
+create table db_serial.t2 (b int) engine innodb;
+create table db_not_mentioned.t3 (c int) engine innodb;
+connect  master1,localhost,root,,test,$SERVER_MYPORT_1,;
+connect  master2,localhost,root,,test,$SERVER_MYPORT_1,;
+connect  master3,localhost,root,,test,$SERVER_MYPORT_1,;
+connection server_2;
+set global debug_dbug= '+d,ha_write_row_start';
+connection master1;
+use db_parallel;
+insert into t1 values (1);
+connection server_2;
+set debug_sync= 'now wait_for ha_write_row_entering_t1';
+connection master2;
+use db_serial;
+insert into t2 values (2);
+connection server_2;
+set debug_sync= 'now wait_for ha_write_row_entering_t2';
+connection master3;
+use db_not_mentioned;
+insert into t3 values (3);
+connection server_2;
+set debug_sync= 'now wait_for ha_write_row_entering_t3';
+show processlist;
+Id	User	Host	db	Command	Time	State	Info	Progress
+1	system user		NULL	Daemon	NULL	InnoDB purge worker	NULL	0.000
+2	system user		NULL	Daemon	NULL	InnoDB purge coordinator	NULL	0.000
+3	system user		NULL	Daemon	NULL	InnoDB purge worker	NULL	0.000
+4	system user		NULL	Daemon	NULL	InnoDB purge worker	NULL	0.000
+5	system user		NULL	Daemon	NULL	InnoDB shutdown handler	NULL	0.000
+10	root	localhost:37150	test	Query	0	Init	show processlist	0.000
+11	root	localhost:37164	test	Sleep	1		NULL	0.000
+14	system user		NULL	Slave_IO	0	Waiting for master to send event	NULL	0.000
+16	system user		NULL	Sleep	0	Waiting for work from SQL thread	NULL	0.000
+17	system user		db_parallel	Slave_worker	0	debug sync point: now	insert into t1 values (1)	0.000
+18	system user		NULL	Sleep	0	Waiting for work from SQL thread	NULL	0.000
+19	system user		db_serial	Slave_worker	0	debug sync point: now	insert into t2 values (2)	0.000
+20	system user		db_not_mentioned	Slave_worker	0	debug sync point: now	insert into t3 values (3)	0.000
+15	system user		NULL	Slave_SQL	0	Slave has read all relay log; waiting for the slave I/O thread to update it	NULL	0.000
+set debug_sync= 'now signal ha_write_row_continue_t1';
+set debug_sync= 'now wait_for ha_write_row_continued_t1';
+set debug_sync= 'now signal ha_write_row_continue_t2';
+set debug_sync= 'now wait_for ha_write_row_continued_t2';
+Warnings:
+Warning	1639	debug sync point wait timed out
+set debug_sync= 'now signal ha_write_row_continue_t3';
+set debug_sync= 'now wait_for ha_write_row_continued_t3';
+Warnings:
+Warning	1639	debug sync point wait timed out
+connection master1;
+disconnect master1;
+connection master2;
+disconnect master2;
+connection master3;
+disconnect master3;
+connection server_2;
+include/stop_slave.inc
+set global slave_parallel_threads=  @old_parallel_threads;
+set global slave_parallel_mode=     @old_slave_parallel_mode;
+include/start_slave.inc
+set @@global.debug_dbug= @old_dbug;
+set debug_sync= reset;
+connection server_1;
+drop database db_parallel;
+drop database db_serial;
+drop database db_not_mentioned;
+use test;
+set @@global.parallel_do_db=      @_parallel_do_db;
+set @@global.parallel_ignore_db=  @_parallel_ignore_db;
+include/rpl_end.inc
