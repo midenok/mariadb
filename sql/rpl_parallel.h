@@ -357,7 +357,7 @@ struct rpl_parallel_entry {
   rpl_parallel_thread * choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
                                       PSI_stage_info *old_stage,
                                       Gtid_log_event *gtid_ev,
-                                      enum_slave_parallel_mode mode);
+                                      bool ordered_thread);
   int queue_master_restart(rpl_group_info *rgi,
                            Format_description_log_event *fdev);
 };

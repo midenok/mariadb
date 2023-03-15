@@ -5186,7 +5186,8 @@ static Sys_var_rpl_filter Sys_replicate_wild_ignore_table(
 static Sys_var_rpl_filter Sys_parallel_do_db(
        "parallel_do_db", OPT_PARALLEL_DO_DB,
        "Tell the master to restrict parallel replication to databases "
-       "whose names appear in the comma-separated list.");
+       "whose names appear in the comma-separated list. Other databases will be "
+       "in serial replication, no matter parallel_ignore_db is used or not.");
 
 static Sys_var_rpl_filter Sys_parallel_do_table(
        "parallel_do_table", OPT_PARALLEL_DO_TABLE,
@@ -5196,7 +5197,8 @@ static Sys_var_rpl_filter Sys_parallel_do_table(
 static Sys_var_rpl_filter Sys_parallel_ignore_db(
        "parallel_ignore_db", OPT_PARALLEL_IGNORE_DB,
        "Tell the master to restrict parallel replication to databases "
-       "whose names do not appear in the comma-separated list.");
+       "whose names do not appear in the comma-separated list. "
+       "If parallel_do_db is used this directive is ignored.");
 
 static Sys_var_rpl_filter Sys_parallel_ignore_table(
        "parallel_ignore_table", OPT_PARALLEL_IGNORE_TABLE,
@@ -5214,6 +5216,12 @@ static Sys_var_rpl_filter Sys_parallel_wild_ignore_table(
        "Tells the master to restrict parallel replication to statements "
        "where none of the updated tables match the specified database "
        "and table name patterns.");
+
+static Sys_var_mybool Sys_slave_ordered_dont_wait(
+       "slave_ordered_dont_wait",
+       "Slave ordered events don't wait previous groups unless they have explicit WAIT flag",
+       GLOBAL_VAR(opt_slave_ordered_dont_wait),
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
 static Sys_var_charptr Sys_slave_load_tmpdir(
        "slave_load_tmpdir", "The location where the slave should put "

@@ -2139,7 +2139,7 @@ rpl_parallel_thread *
 rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
                                   PSI_stage_info *old_stage,
                                   Gtid_log_event *gtid_ev,
-                                  enum_slave_parallel_mode mode)
+                                  bool ordered_thread)
 {
   uint32 idx;
   Relay_log_info *rli= rgi->rli;
@@ -2147,14 +2147,7 @@ rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
 
   if (gtid_ev)
   {
-    const uchar gtid_flags= gtid_ev->flags2;
-    if (likely(current_gco) &&
-        (mode >= SLAVE_PARALLEL_OPTIMISTIC) &&
-        (mode < SLAVE_PARALLEL_AGGRESSIVE) &&
-        !(gtid_flags & Gtid_log_event::FL_DDL) &&
-        !(current_gco->flags & group_commit_orderer::FORCE_SWITCH) &&
-        (!(gtid_flags & Gtid_log_event::FL_ALLOW_PARALLEL) ||
-          (gtid_flags & Gtid_log_event::FL_WAITED)))
+    if (ordered_thread)
     {
       idx= rpl_thread_max - 1;
       was_ordered= true;
@@ -2622,6 +2615,7 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   uchar gtid_flags;
   group_commit_orderer *gco;
   bool new_gco= true;
+  bool ordered_thread= false;
   uint8 force_switch_flag= 0;
 
 
@@ -2839,7 +2833,11 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
             new group_commit_orderer, since we still want following transactions
             to run in parallel with transactions prior to this one.
           */
-          speculation= rpl_group_info::SPECULATE_WAIT;
+          if (opt_slave_ordered_dont_wait && !(gtid_flags & Gtid_log_event::FL_WAITED))
+            speculation= rpl_group_info::SPECULATE_OPTIMISTIC;
+          else
+            speculation= rpl_group_info::SPECULATE_WAIT;
+          ordered_thread= true;
         }
         else
           speculation= rpl_group_info::SPECULATE_OPTIMISTIC;
@@ -2863,7 +2861,7 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   */
   cur_thread=
     e->choose_thread(serial_rgi, &did_enter_cond, &old_stage,
-                     gtid_ev, rli->mi->parallel_mode);
+                     gtid_ev, ordered_thread);
   if (!cur_thread)
   {
     /* This means we were killed. The error is already signalled. */
@@ -2872,8 +2870,6 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
   }
 
   DBUG_ASSERT(e->rpl_threads[e->last_idx()] == cur_thread);
-  DBUG_ASSERT(typ != GTID_EVENT || !e->was_ordered ||
-              speculation == rpl_group_info::SPECULATE_WAIT);
 
   if (!(qev= cur_thread->get_qev(ev, event_size, rli)))
   {

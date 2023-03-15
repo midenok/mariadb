@@ -7,9 +7,13 @@
 set @old_parallel_threads=    @@global.slave_parallel_threads;
 set @old_slave_parallel_mode= @@global.slave_parallel_mode;
 set @old_dbug=                @@global.debug_dbug;
+set @old_slave_ordered_dont_wait= @@global.slave_ordered_dont_wait;
+
+
 --source include/stop_slave.inc
 set global slave_parallel_threads=  5;
 set global slave_parallel_mode=     'optimistic';
+set global slave_ordered_dont_wait= 1;
 --source include/start_slave.inc
 
 --connection server_1
@@ -24,6 +28,8 @@ set @_parallel_do_db=             @@global.parallel_do_db;
 set @_parallel_ignore_db=         @@global.parallel_ignore_db;
 
 set @@global.parallel_do_db=      "db_parallel";
+# Note: in this case db_serial and db_not_mentioned is the same as we have
+#       parallel_do_db not empty.
 set @@global.parallel_ignore_db=  "db_serial";
 
 select @@global.parallel_do_db;
@@ -35,61 +41,89 @@ create database db_not_mentioned;
 
 create table db_parallel.t1 (a int) engine innodb;
 create table db_serial.t2 (b int) engine innodb;
-create table db_not_mentioned.t3 (c int) engine innodb;
+create table db_parallel.t3 (c int) engine innodb;
+create table db_not_mentioned.t4 (c int) engine innodb;
 --save_master_pos
 
---connect (master1,localhost,root,,test,$SERVER_MYPORT_1,)
---connect (master2,localhost,root,,test,$SERVER_MYPORT_1,)
---connect (master3,localhost,root,,test,$SERVER_MYPORT_1,)
+--connect (m1,localhost,root,,test,$SERVER_MYPORT_1,)
+--connect (m2,localhost,root,,test,$SERVER_MYPORT_1,)
+--connect (m3,localhost,root,,test,$SERVER_MYPORT_1,)
+--connect (m4,localhost,root,,test,$SERVER_MYPORT_1,)
 
 --connection server_2
 --sync_with_master
 set global debug_dbug= '+d,ha_write_row_start';
 
---connection master1
+--connection m1
 use db_parallel;
 send insert into t1 values (1);
 
 --connection server_2
 set debug_sync= 'now wait_for ha_write_row_entering_t1';
 
---connection master2
+--connection m2
 use db_serial;
 send insert into t2 values (2);
 
 --connection server_2
 set debug_sync= 'now wait_for ha_write_row_entering_t2';
 
---connection master3
-use db_not_mentioned;
+--connection m3
+use db_parallel;
 send insert into t3 values (3);
+
+--connection m4
+use db_not_mentioned;
+send insert into t4 values (4);
+
+# FIXME: test with share->no_replicate and share->can_do_row_logging
+# see:
+#
+# 4216      if (share->no_replicate || !binlog_filter->db_ok(share->db.str))
+# 4217        share->can_do_row_logging= 0;   // No row based replication
+#
+# Optimization:
+#
+# binlog_filter->db_ok(share->db.str) is called multiple times in one statement
 
 --connection server_2
 set debug_sync= 'now wait_for ha_write_row_entering_t3';
-
 #show processlist;
 select Command, db, State, Info from information_schema.processlist where Command like 'Slave_%' order by db, Info;
-set debug_sync= 'now signal ha_write_row_continue_t1';
-set debug_sync= 'now wait_for ha_write_row_continued_t1';
+
 set debug_sync= 'now signal ha_write_row_continue_t2';
 set debug_sync= 'now wait_for ha_write_row_continued_t2';
+
+--connection server_2
+set debug_sync= 'now wait_for ha_write_row_entering_t4';
+select Command, db, State, Info from information_schema.processlist where Command like 'Slave_%' order by db, Info;
+
+set debug_sync= 'now signal ha_write_row_continue_t1';
+set debug_sync= 'now wait_for ha_write_row_continued_t1';
 set debug_sync= 'now signal ha_write_row_continue_t3';
 set debug_sync= 'now wait_for ha_write_row_continued_t3';
+set debug_sync= 'now signal ha_write_row_continue_t4';
+set debug_sync= 'now wait_for ha_write_row_continued_t4';
 
---connection master1
+--connection m1
 reap;
-disconnect master1;
---connection master2
+--connection m2
 reap;
-disconnect master2;
---connection master3
+--connection m3
 reap;
-disconnect master3;
+--connection m4
+reap;
+
+disconnect m1;
+disconnect m2;
+disconnect m3;
+disconnect m4;
 
 --connection server_2
 --source include/stop_slave.inc
 set global slave_parallel_threads=  @old_parallel_threads;
 set global slave_parallel_mode=     @old_slave_parallel_mode;
+set global slave_ordered_dont_wait= @old_slave_ordered_dont_wait;
 --source include/start_slave.inc
 set @@global.debug_dbug= @old_dbug;
 set debug_sync= reset;
