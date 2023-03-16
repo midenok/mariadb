@@ -6250,11 +6250,16 @@ finish:
       if (all_tables && thd->variables.option_bits & OPTION_BIN_LOG)
       {
         TABLE_LIST *table;
+        /* Transaction can be parallel as long as all tables allow parallel */
         bool can_parallel= true;
         for (table= all_tables; can_parallel && table; table= table->next_global)
+        {
+          if (!table->updating)
+            continue;
           can_parallel= parallel_filter->db_ok(table->db.str);
+        }
         if (can_parallel)
-          can_parallel= parallel_filter->tables_ok(any_db, all_tables);
+          can_parallel= parallel_filter->tables_ok(thd->db.str, all_tables);
         thd->rpl_ordered= !can_parallel;
       }
       /* If commit fails, we should be able to reset the OK status. */
