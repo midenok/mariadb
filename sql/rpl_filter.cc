@@ -86,8 +86,8 @@ Rpl_filter::~Rpl_filter()
     (I could not find an equivalent in the regex library MySQL uses).
 
   RETURN VALUES
-    0           should not be logged/replicated
-    1           should be logged/replicated                  
+    0           should not be logged/replicated (all tables not matched)
+    1           should be logged/replicated (any table matched)
 */
 
 bool 
@@ -106,11 +106,13 @@ Rpl_filter::tables_ok(const char* db, TABLE_LIST* tables)
     /* Bit 2 (4) is set in case of no lists inited */
     /* Bit 3 (8) is set in case of no lists match */
     int res= table_ok(db, tables);
-    if (!(res & 0xfc))
-      return (res & 1);
-    if (res & 4)
+    /* This table matched against some list, return result */
+    if (!(res & NOT_IN_ANY_LIST))
+      return (res & ALLOWED);
+    /* No lists set, no need to check more */
+    if (res & NO_LISTS_SET)
       break;
-    DBUG_ASSERT(res & 8);
+    DBUG_ASSERT(res & NOT_MATCHED);
   }
 
   /*
@@ -134,7 +136,7 @@ int Rpl_filter::table_ok(const char* db, TABLE_LIST* tables)
       !ignore_table_inited &&
       !wild_do_table_inited &&
       !wild_ignore_table_inited)
-    return 5;
+    return (NO_LISTS_SET | ALLOWED);
 
   end= strmov(hash_key, tables->db.str ? tables->db.str : db);
   *end++= '.';
@@ -142,21 +144,21 @@ int Rpl_filter::table_ok(const char* db, TABLE_LIST* tables)
   if (do_table_inited) // if there are any do's
   {
     if (my_hash_search(&do_table, (uchar*) hash_key, len))
-      return 1;
+      return ALLOWED;
   }
   if (ignore_table_inited) // if there are any ignores
   {
     if (my_hash_search(&ignore_table, (uchar*) hash_key, len))
-      return 0;
+      return IGNORED;
   }
   if (wild_do_table_inited &&
       find_wild(&wild_do_table, hash_key, len))
-    return 3;
+    return (WILDCARD | ALLOWED);
   if (wild_ignore_table_inited &&
       find_wild(&wild_ignore_table, hash_key, len))
-    return 2;
+    return (WILDCARD | IGNORED);
 
-  return 8;
+  return NOT_MATCHED;
 }
 
 #endif

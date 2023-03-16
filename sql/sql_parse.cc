@@ -6256,10 +6256,12 @@ finish:
         {
           if (!table->updating)
             continue;
-          can_parallel= parallel_filter->db_ok(table->db.str);
+          int res= parallel_filter->table_ok(thd->db.str, table);
+          if (!(res & Rpl_filter::NOT_IN_ANY_LIST))
+            can_parallel= (res & Rpl_filter::ALLOWED);
+          else /* Table did not match any lists, check database lists */
+            can_parallel= parallel_filter->db_ok(table->db.str);
         }
-        if (can_parallel)
-          can_parallel= parallel_filter->tables_ok(thd->db.str, all_tables);
         thd->rpl_ordered= !can_parallel;
       }
       /* If commit fails, we should be able to reset the OK status. */
