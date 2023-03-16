@@ -12,7 +12,7 @@ set @old_slave_ordered_dont_wait= @@global.slave_ordered_dont_wait;
 create procedure processlist()
   select Command, db, State, Info
   from information_schema.processlist
-  where Command like 'Slave_%'
+  where Command like 'Slave_%' and db is not null
   order by db, Info;
 
 --source include/stop_slave.inc
@@ -147,7 +147,8 @@ reap;
 
 --echo # db_parallel.t1 is parallel again
 --connection m1
-set @@global.parallel_do_table= "db_parallel.t1";
+# spaces after comma are ignored (but not before!)
+set @@global.parallel_do_table= "db_serial.t3,  db_parallel.t1";
 send insert into db_parallel.t1 values (8);
 --connection server_2
 set debug_sync= 'now wait_for ha_write_row_entering_t1';

@@ -7,8 +7,8 @@ set @old_slave_ordered_dont_wait= @@global.slave_ordered_dont_wait;
 create procedure processlist()
 select Command, db, State, Info
 from information_schema.processlist
-where Command like 'Slave_%'
-  order by db, Info;
+where Command like 'Slave_%' and db is not null
+order by db, Info;
 include/stop_slave.inc
 set global slave_parallel_threads=  5;
 set global slave_parallel_mode=     'optimistic';
@@ -55,8 +55,6 @@ connection server_2;
 set debug_sync= 'now wait_for ha_write_row_entering_t3';
 call processlist;
 Command	db	State	Info
-Slave_SQL	NULL	Slave has read all relay log; waiting for the slave I/O thread t	NULL
-Slave_IO	NULL	Waiting for master to send event	NULL
 Slave_worker	test	debug sync point: now	insert into db_parallel.t1 values (1)
 Slave_ordered	test	debug sync point: now	insert into db_serial.t2 values (2)
 Slave_worker	test	debug sync point: now	insert into db_serial.t3 values (3)
@@ -77,9 +75,6 @@ connection server_2;
 set debug_sync= 'now wait_for ha_write_row_entering_t3';
 call processlist;
 Command	db	State	Info
-Slave_SQL	NULL	Slave has read all relay log; waiting for the slave I/O thread t	NULL
-Slave_worker	NULL	Waiting for prior transaction to commit	NULL
-Slave_IO	NULL	Waiting for master to send event	NULL
 Slave_ordered	test	debug sync point: now	insert into db_not_mentioned.t4 values (4)
 Slave_worker	test	debug sync point: now	insert into db_parallel.t1 values (5)
 Slave_worker	test	debug sync point: now	insert into db_serial.t3 values (6)
@@ -101,28 +96,18 @@ connection server_2;
 set debug_sync= 'now wait_for ha_write_row_entering_t1';
 call processlist;
 Command	db	State	Info
-Slave_SQL	NULL	Slave has read all relay log; waiting for the slave I/O thread t	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_IO	NULL	Waiting for master to send event	NULL
 Slave_ordered	test	debug sync point: now	insert into db_parallel.t1 values (7)
 set debug_sync= 'now signal ha_write_row_continue_t1';
 set debug_sync= 'now wait_for ha_write_row_continued_t1';
 connection m1;
 # db_parallel.t1 is parallel again
 connection m1;
-set @@global.parallel_do_table= "db_parallel.t1";
+set @@global.parallel_do_table= "db_serial.t3,db_parallel.t1";
 insert into db_parallel.t1 values (8);
 connection server_2;
 set debug_sync= 'now wait_for ha_write_row_entering_t1';
 call processlist;
 Command	db	State	Info
-Slave_SQL	NULL	Slave has read all relay log; waiting for the slave I/O thread t	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_ordered	NULL	Waiting for work from SQL thread	NULL
-Slave_IO	NULL	Waiting for master to send event	NULL
 Slave_worker	test	debug sync point: now	insert into db_parallel.t1 values (8)
 set debug_sync= 'now signal ha_write_row_continue_t1';
 set debug_sync= 'now wait_for ha_write_row_continued_t1';
@@ -138,21 +123,11 @@ commit;
 connection server_2;
 call processlist;
 Command	db	State	Info
-Slave_SQL	NULL	Slave has read all relay log; waiting for the slave I/O thread t	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_ordered	NULL	Waiting for work from SQL thread	NULL
-Slave_IO	NULL	Waiting for master to send event	NULL
 Slave_worker	test	debug sync point: now	insert into db_parallel.t1 values (9)
 set debug_sync= 'now signal ha_write_row_continue_t1';
 set debug_sync= 'now wait_for ha_write_row_entering_t3';
 call processlist;
 Command	db	State	Info
-Slave_SQL	NULL	Slave has read all relay log; waiting for the slave I/O thread t	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_ordered	NULL	Waiting for work from SQL thread	NULL
-Slave_IO	NULL	Waiting for master to send event	NULL
 Slave_worker	test	debug sync point: now	insert into db_serial.t3 values (10)
 set debug_sync= 'now signal ha_write_row_continue_t3';
 set debug_sync= 'now wait_for ha_write_row_continued_t3';
@@ -168,22 +143,12 @@ commit;
 connection server_2;
 call processlist;
 Command	db	State	Info
-Slave_SQL	NULL	Slave has read all relay log; waiting for the slave I/O thread t	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_ordered	NULL	Waiting for work from SQL thread	NULL
-Slave_IO	NULL	Waiting for master to send event	NULL
-Slave_worker	test	debug sync point: now	insert into db_parallel.t1 values (11)
+Slave_ordered	test	debug sync point: now	insert into db_parallel.t1 values (11)
 set debug_sync= 'now signal ha_write_row_continue_t1';
 set debug_sync= 'now wait_for ha_write_row_entering_t2';
 call processlist;
 Command	db	State	Info
-Slave_SQL	NULL	Slave has read all relay log; waiting for the slave I/O thread t	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_worker	NULL	Waiting for work from SQL thread	NULL
-Slave_ordered	NULL	Waiting for work from SQL thread	NULL
-Slave_IO	NULL	Waiting for master to send event	NULL
-Slave_worker	test	debug sync point: now	insert into db_serial.t2 values (12)
+Slave_ordered	test	debug sync point: now	insert into db_serial.t2 values (12)
 set debug_sync= 'now signal ha_write_row_continue_t2';
 set debug_sync= 'now wait_for ha_write_row_continued_t2';
 connection m1;

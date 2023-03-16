@@ -108,7 +108,7 @@ Rpl_filter::tables_ok(const char* db, TABLE_LIST* tables)
     int res= table_ok(db, tables);
     /* This table matched against some list, return result */
     if (!(res & NOT_IN_ANY_LIST))
-      return (res & ALLOWED);
+      DBUG_RETURN(res & ALLOWED);
     /* No lists set, no need to check more */
     if (res & NO_LISTS_SET)
       break;

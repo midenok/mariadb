@@ -6247,7 +6247,11 @@ finish:
     }
     else
     {
-      if (all_tables && thd->variables.option_bits & OPTION_BIN_LOG)
+      /*
+        In multi-statement transaction if one statement sets rpl_ordered, it stays
+        for the whole transaction.
+      */
+      if (all_tables && !thd->rpl_ordered && thd->variables.option_bits & OPTION_BIN_LOG)
       {
         TABLE_LIST *table;
         /* Transaction can be parallel as long as all tables allow parallel */
@@ -7560,7 +7564,8 @@ void THD::reset_for_next_command(bool do_clear_error)
   binlog_unsafe_warning_flags= 0;
 
   save_prep_leaf_list= false;
-  rpl_ordered= false;
+  if (!in_multi_stmt_transaction_mode())
+    rpl_ordered= false;
 
 #ifdef WITH_WSREP
 #if !defined(DBUG_OFF)
