@@ -36,6 +36,7 @@ set @@global.parallel_do_db=      "db_parallel";
 # Note: in this case db_serial and db_not_mentioned is the same as we have
 #       parallel_do_db not empty.
 set @@global.parallel_ignore_db=  "db_serial";
+set @@global.parallel_do_table= "db_serial.t3";
 
 select @@global.parallel_do_db;
 select @@global.replicate_do_db;
@@ -46,7 +47,7 @@ create database db_not_mentioned;
 
 create table db_parallel.t1 (a int) engine innodb;
 create table db_serial.t2 (b int) engine innodb;
-create table db_parallel.t3 (c int) engine innodb;
+create table db_serial.t3 (c int) engine innodb;
 create table db_not_mentioned.t4 (c int) engine innodb;
 --save_master_pos
 
@@ -72,7 +73,7 @@ send insert into db_serial.t2 values (2);
 set debug_sync= 'now wait_for ha_write_row_entering_t2';
 
 --connection m3
-send insert into db_parallel.t3 values (3);
+send insert into db_serial.t3 values (3);
 
 --connection m4
 send insert into db_not_mentioned.t4 values (4);
@@ -109,7 +110,7 @@ set debug_sync= 'now wait_for ha_write_row_entering_t1';
 
 --connection m2
 reap;
-send insert into db_parallel.t3 values (6);
+send insert into db_serial.t3 values (6);
 
 --connection server_2
 set debug_sync= 'now wait_for ha_write_row_entering_t3';
@@ -130,6 +131,68 @@ reap;
 --connection m3
 reap;
 --connection m4
+reap;
+
+--echo # db_parallel.t1 is now ordered
+--connection m1
+set @@global.parallel_ignore_table= "db_parallel.t1";
+send insert into db_parallel.t1 values (7);
+--connection server_2
+set debug_sync= 'now wait_for ha_write_row_entering_t1';
+call processlist;
+set debug_sync= 'now signal ha_write_row_continue_t1';
+set debug_sync= 'now wait_for ha_write_row_continued_t1';
+--connection m1
+reap;
+
+--echo # db_parallel.t1 is parallel again
+--connection m1
+set @@global.parallel_do_table= "db_parallel.t1";
+send insert into db_parallel.t1 values (8);
+--connection server_2
+set debug_sync= 'now wait_for ha_write_row_entering_t1';
+call processlist;
+set debug_sync= 'now signal ha_write_row_continue_t1';
+set debug_sync= 'now wait_for ha_write_row_continued_t1';
+--connection m1
+reap;
+
+--echo # Transaction contains 2 parallel DML
+--connection server_2
+send set debug_sync= 'now wait_for ha_write_row_entering_t1';
+--connection m1
+start transaction;
+insert into db_parallel.t1 values (9);
+insert into db_serial.t3 values (10);
+send commit;
+--connection server_2
+reap;
+call processlist;
+set debug_sync= 'now signal ha_write_row_continue_t1';
+set debug_sync= 'now wait_for ha_write_row_entering_t3';
+call processlist;
+set debug_sync= 'now signal ha_write_row_continue_t3';
+set debug_sync= 'now wait_for ha_write_row_continued_t3';
+--connection m1
+reap;
+
+--echo # Transaction contains 1 parallel DML and 1 ordered DML
+--connection server_2
+send set debug_sync= 'now wait_for ha_write_row_entering_t1';
+--connection m1
+start transaction;
+insert into db_parallel.t1 values (11);
+insert into db_serial.t2 values (12);
+send commit;
+--connection server_2
+reap;
+call processlist;
+set debug_sync= 'now signal ha_write_row_continue_t1';
+set debug_sync= 'now wait_for ha_write_row_entering_t2';
+call processlist;
+set debug_sync= 'now signal ha_write_row_continue_t2';
+set debug_sync= 'now wait_for ha_write_row_continued_t2';
+--connection m1
 reap;
 
 disconnect m1;
