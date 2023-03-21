@@ -372,6 +372,7 @@ bool opt_bin_log, opt_bin_log_used=0, opt_ignore_builtin_innodb= 0;
 bool opt_bin_log_compress;
 uint opt_bin_log_compress_min_len;
 my_bool opt_log, debug_assert_if_crashed_table= 0, opt_help= 0;
+my_bool opt_slave_ordered_thread= 0;
 my_bool opt_slave_ordered_dont_wait= 0;
 my_bool debug_assert_on_not_freed_memory= 0;
 my_bool disable_log_notes, opt_support_flashback= 0;

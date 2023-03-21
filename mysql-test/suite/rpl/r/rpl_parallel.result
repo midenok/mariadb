@@ -730,12 +730,8 @@ SET debug_sync='now SIGNAL d1_cont';
 SET debug_sync='now WAIT_FOR t3_waiting';
 SET debug_sync='now SIGNAL d2_cont';
 SET debug_sync='now WAIT_FOR t4_waiting';
-Warnings:
-Warning	1639	debug sync point wait timed out
 KILL THD_ID;
 SET debug_sync='now WAIT_FOR t3_killed';
-Warnings:
-Warning	1639	debug sync point wait timed out
 SET debug_sync='now SIGNAL t1_cont';
 include/wait_for_slave_sql_error.inc [errno=1317,1927,1964]
 STOP SLAVE IO_THREAD;
@@ -1240,7 +1236,7 @@ include/start_slave.inc
 connection server_2;
 include/stop_slave.inc
 SET GLOBAL slave_parallel_threads=0;
-SET GLOBAL slave_parallel_threads=4;
+SET GLOBAL slave_parallel_threads=3;
 SET GLOBAL debug_dbug="+d,rpl_parallel_simulate_temp_err_xid";
 include/start_slave.inc
 connection server_1;
@@ -1302,7 +1298,7 @@ include/start_slave.inc
 connection server_2;
 include/stop_slave.inc
 SET GLOBAL slave_parallel_threads=0;
-SET GLOBAL slave_parallel_threads=4;
+SET GLOBAL slave_parallel_threads=3;
 SET GLOBAL debug_dbug="+d,rpl_parallel_simulate_temp_err_xid";
 include/start_slave.inc
 connection server_1;
@@ -1379,7 +1375,7 @@ include/start_slave.inc
 *** MDEV-7335: Potential parallel slave deadlock with specific binlog corruption ***
 connection server_2;
 include/stop_slave.inc
-SET GLOBAL slave_parallel_threads=2;
+SET GLOBAL slave_parallel_threads=1;
 SET @old_dbug= @@GLOBAL.debug_dbug;
 SET GLOBAL debug_dbug="+d,slave_discard_xid_for_gtid_0_x_1000";
 connection server_1;

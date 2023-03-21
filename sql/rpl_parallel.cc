@@ -2136,7 +2136,15 @@ rpl_parallel_entry::choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
 
   if (gtid_ev)
   {
-    if (ordered_thread)
+    if (!opt_slave_ordered_thread)
+    {
+      idx= rpl_thread_idx;
+      ++idx;
+      if (idx >= rpl_thread_max)
+        idx= 0;
+      rpl_thread_idx= idx;
+    }
+    else if (ordered_thread)
     {
       idx= rpl_thread_max - 1;
       was_ordered= true;

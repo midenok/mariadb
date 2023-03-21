@@ -5214,6 +5214,12 @@ static Sys_var_rpl_filter Sys_parallel_wild_ignore_table(
        "where none of the updated tables match the specified database "
        "and table name patterns.");
 
+static Sys_var_mybool Sys_slave_ordered_thread(
+       "slave_ordered_thread",
+       "Per-domain dedicated thread on slave for processing ordered events",
+       GLOBAL_VAR(opt_slave_ordered_thread),
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+
 static Sys_var_mybool Sys_slave_ordered_dont_wait(
        "slave_ordered_dont_wait",
        "Slave ordered events don't wait previous groups unless they have explicit WAIT flag",

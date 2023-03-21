@@ -3,6 +3,7 @@ connection server_2;
 set @old_parallel_threads=    @@global.slave_parallel_threads;
 set @old_slave_parallel_mode= @@global.slave_parallel_mode;
 set @old_dbug=                @@global.debug_dbug;
+set @old_slave_ordered_thread=    @@global.slave_ordered_thread;
 set @old_slave_ordered_dont_wait= @@global.slave_ordered_dont_wait;
 create procedure processlist()
 select Command, State, Info
@@ -12,6 +13,7 @@ order by db, Info;
 include/stop_slave.inc
 set global slave_parallel_threads=  5;
 set global slave_parallel_mode=     'optimistic';
+set global slave_ordered_thread=    1;
 set global slave_ordered_dont_wait= 1;
 include/start_slave.inc
 connection server_1;
@@ -163,6 +165,7 @@ drop procedure processlist;
 include/stop_slave.inc
 set global slave_parallel_threads=  @old_parallel_threads;
 set global slave_parallel_mode=     @old_slave_parallel_mode;
+set global slave_ordered_thread=    @old_slave_ordered_thread;
 set global slave_ordered_dont_wait= @old_slave_ordered_dont_wait;
 include/start_slave.inc
 set @@global.debug_dbug= @old_dbug;
