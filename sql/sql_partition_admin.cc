@@ -748,6 +748,11 @@ bool Sql_cmd_alter_table_exchange_partition::
 err:
   if (thd->locked_tables_mode)
   {
+    /*
+      Reopen tables under LOCK TABLES. Ignore the return value for now. It's
+      better to keep master/slave in consistent state. Alternative would be to
+      try to revert the exchange operation and issue error.
+    */
     (void) thd->locked_tables_list.reopen_tables(thd, false);
     if (swap_table_mdl_ticket)
       swap_table_mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
