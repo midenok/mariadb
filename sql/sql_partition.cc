@@ -6768,7 +6768,7 @@ bool write_log_drop_shadow_frm(ALTER_PARTITION_PARAM_TYPE *lpt)
   build_table_shadow_filename(path, sizeof(path) - 1, lpt);
 
   bool res= write_log_drop_frm(&lpt->rollback_chain, path, 0);
-  /* Store this entry number so we can disable it if write shadow frm fails*/
+  /* Store this entry number so we can disable it if write shadow frm fails */
   if (!res)
     lpt->drop_shadow_frm= lpt->rollback_chain.main_entry;
   return res;

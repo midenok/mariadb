@@ -222,7 +222,9 @@ bool quick_rm_table(THD *thd, handlerton *base, const LEX_CSTRING *db,
                     const char *table_path=0);
 void close_cached_table(THD *thd, TABLE *table);
 void sp_prepare_create_field(THD *thd, Column_definition *sql_field);
+#ifdef WITH_PARTITION_STORAGE_ENGINE
 bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags);
+#endif
 int write_bin_log(THD *thd, bool clear_error,
                   char const *query, ulong query_length,
                   bool is_trans= FALSE);

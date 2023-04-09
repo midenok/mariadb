@@ -720,6 +720,7 @@ uint build_table_shadow_filename(char *buff, size_t bufflen,
   TODO: Partitioning atomic DDL refactoring: WFRM_WRITE_SHADOW
   should be merged with create_table_impl(frm_only == true).
 */
+#ifdef WITH_PARTITION_STORAGE_ENGINE
 bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
 {
   /*
@@ -732,13 +733,11 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
   char shadow_path[FN_REFLEN+1];
   char shadow_frm_name[FN_REFLEN+1];
   char frm_name[FN_REFLEN+1];
-#ifdef WITH_PARTITION_STORAGE_ENGINE
   char bak_path[FN_REFLEN+1];
   char bak_frm_name[FN_REFLEN+1];
   char *part_syntax_buf;
   uint syntax_len;
   partition_info *part_info= lpt->part_info;
-#endif
   DDL_LOG_STATE *rollback_chain= &lpt->rollback_chain;
   DBUG_ENTER("mysql_write_frm");
 
@@ -756,7 +755,6 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     {
       DBUG_RETURN(TRUE);
     }
-#ifdef WITH_PARTITION_STORAGE_ENGINE
     {
       partition_info *part_info= lpt->table->part_info;
       if (part_info)
@@ -769,7 +767,6 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
         part_info->part_info_len= syntax_len;
       }
     }
-#endif
     /* Write shadow frm file */
     lpt->create_info->table_options= lpt->db_options;
     LEX_CUSTRING frm= build_frm_image(lpt->thd, lpt->table_name,
@@ -797,7 +794,6 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
       goto end;
     }
   }
-#ifdef WITH_PARTITION_STORAGE_ENGINE
   if (flags & WFRM_WRITE_CONVERTED_TO)
   {
     THD *thd= lpt->thd;
@@ -884,7 +880,6 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
                                                           CHF_RENAME_FLAG))
       DBUG_RETURN(TRUE);
   }
-#endif /* !WITH_PARTITION_STORAGE_ENGINE */
   if (flags & WFRM_BACKUP_AND_INSTALL)
   {
     /*
@@ -902,10 +897,8 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
       deactivate it.
     */
     if (mysql_file_rename(key_file_frm, shadow_frm_name, frm_name, MYF(MY_WME))
-#ifdef WITH_PARTITION_STORAGE_ENGINE
         || lpt->table->file->ha_create_partitioning_metadata(path, shadow_path,
                                                           CHF_RENAME_FLAG)
-#endif
       )
     {
       error= 1;
@@ -913,17 +906,16 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     }
 
 err:
-#ifdef WITH_PARTITION_STORAGE_ENGINE
     ddl_log_increment_phase(lpt->drop_shadow_frm->entry_pos);
     lpt->drop_shadow_frm= NULL;
     (void) ddl_log_sync();
-#endif
     ;
   }
 
 end:
   DBUG_RETURN(error);
 }
+#endif /* WITH_PARTITION_STORAGE_ENGINE */
 
 
 /*
