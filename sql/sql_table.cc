@@ -862,7 +862,6 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
     build_table_shadow_filename(bak_path, sizeof(bak_path) - 1, lpt, "backup");
     strxmov(bak_frm_name, bak_path, reg_ext, NullS);
 
-    DDL_LOG_MEMORY_ENTRY *main_entry= rollback_chain->main_entry;
     mysql_mutex_lock(&LOCK_gdl);
     if (ddl_log_rename_frm(&lpt->rollback_chain,
                            (const char*) bak_path, (const char*) path) ||
@@ -873,7 +872,6 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
       DBUG_RETURN(TRUE);
     }
     mysql_mutex_unlock(&LOCK_gdl);
-    rollback_chain->main_entry= main_entry;
     if (mysql_file_rename(key_file_frm, frm_name, bak_frm_name, MYF(MY_WME)))
       DBUG_RETURN(TRUE);
     if (lpt->table->file->ha_create_partitioning_metadata(bak_path, path,
