@@ -286,8 +286,7 @@ bool ddl_log_write_execute_entry(uint first_entry, uint cond_entry,
 bool ddl_log_disable_execute_entry(DDL_LOG_MEMORY_ENTRY **active_entry);
 
 void ddl_log_complete(DDL_LOG_STATE *ddl_log_state);
-bool ddl_log_revert(THD *thd, DDL_LOG_STATE *ddl_log_state,
-                    bool report_error);
+bool ddl_log_revert(THD *thd, DDL_LOG_STATE *ddl_log_state);
 
 bool ddl_log_update_phase(DDL_LOG_STATE *entry, uchar phase);
 bool ddl_log_add_flag(DDL_LOG_STATE *entry, uint16 flag);

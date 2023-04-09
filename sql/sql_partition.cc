@@ -7370,7 +7370,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   ddl_log_complete(rollback_chain);
   CRASH_INJECT("done_partition_2");
   alter_partition_lock_handling(lpt);
-  (void) ddl_log_revert(thd, cleanup_chain, true);
+  (void) ddl_log_revert(thd, cleanup_chain);
 
   if (thd->locked_tables_mode &&
       (ERROR_INJECT("done_partition_3") ||
@@ -7393,7 +7393,7 @@ fail:
   /* We may fail to drop partitions due to existing locking,
      so must unlock first */
   alter_partition_lock_handling(lpt);
-  (void) ddl_log_revert(thd, rollback_chain, true);
+  (void) ddl_log_revert(thd, rollback_chain);
 
   if (thd->locked_tables_mode &&
       thd->locked_tables_list.reopen_tables(thd, false))
