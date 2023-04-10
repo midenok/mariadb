@@ -6275,7 +6275,7 @@ public:
 #ifdef DBUG_OFF
 #define DEBUG_CRASH_OR_FAIL false
 #else
-#define DEBUG_CRASH_OR_FAIL debug_crash_or_fail
+#define DEBUG_CRASH_OR_FAIL debug_crash_or_fail()
   bool debug_crash_or_fail()
   {
     switch (phase)
@@ -6300,7 +6300,7 @@ public:
 #endif
 
 #ifdef DBUG_OFF
-#define DEBUG_ASSERT_STATES(A) false
+#define DEBUG_ASSERT_STATES(A) do { } while(0)
 #else
 #define DEBUG_ASSERT_STATES(A) debug_assert_states(A)
   void debug_assert_states(partition_element *part_elem)
@@ -6416,7 +6416,7 @@ public:
       }
     }
 
-    return DEBUG_CRASH_OR_FAIL();
+    return DEBUG_CRASH_OR_FAIL;
   }
 };
 
