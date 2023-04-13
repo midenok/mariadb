@@ -900,14 +900,8 @@ bool mysql_write_frm(ALTER_PARTITION_PARAM_TYPE *lpt, uint flags)
       )
     {
       error= 1;
-      goto err;
+      goto end;
     }
-
-err:
-    ddl_log_increment_phase(lpt->drop_shadow_frm->entry_pos);
-    lpt->drop_shadow_frm= NULL;
-    (void) ddl_log_sync();
-    ;
   }
 
 end:
