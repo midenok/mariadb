@@ -750,6 +750,7 @@ char *opt_logname, *opt_slow_logname, *opt_bin_logname;
 char *opt_binlog_index_name=0;
 
 #ifdef HAVE_REPLICATION
+char default_slave_retries_log[FN_REFLEN];
 char *opt_slave_retries_log= NULL;
 FILE *slave_retries_file= NULL;
 uint opt_slave_retries_max_log= 0;
@@ -5033,17 +5034,30 @@ static int init_server_components()
 
   if (opt_slave_retries_log)
   {
-    slave_retries_file= fopen(opt_slave_retries_log, "a");
-    if (!slave_retries_file)
+    if (!opt_slave_retries_log[0])
     {
-      sql_print_error("Open of log_slave_retries '%s' failed: %s (%d)",
-                      opt_slave_retries_log, strerror(errno), errno);
-      unireg_abort(1);
+      fn_format(default_slave_retries_log, pidfile_name, mysql_data_home, "-retries.err",
+                MY_REPLACE_EXT);
+      if (!default_slave_retries_log[0])
+        opt_slave_retries_log= NULL;
+      else
+        opt_slave_retries_log= default_slave_retries_log;
     }
-    else
+
+    if (opt_slave_retries_log)
     {
-      slave_retries_print("%s (mariadbd %s) starting as process %lu ...",
-                          my_progname, server_version, (ulong) getpid());
+      slave_retries_file= fopen(opt_slave_retries_log, "a");
+      if (!slave_retries_file)
+      {
+        sql_print_error("Open of log_slave_retries '%s' failed: %s (%d)",
+                        opt_slave_retries_log, strerror(errno), errno);
+        unireg_abort(1);
+      }
+      else
+      {
+        slave_retries_print("%s (mariadbd %s) starting as process %lu ...",
+                            my_progname, server_version, (ulong) getpid());
+      }
     }
   }
 #endif
