@@ -707,15 +707,16 @@ is_group_ending(Log_event *ev, Log_event_type event_type)
 
 static int
 retry_event_group(rpl_group_info *rgi, rpl_parallel_thread *rpt,
-                  rpl_parallel_thread::queued_event *orig_qev)
+                  rpl_parallel_thread::queued_event *orig_qev,
+                  my_off_t log_pos)
 {
   IO_CACHE rlog;
   LOG_INFO linfo;
   File fd= (File)-1;
   const char *errmsg= NULL;
   inuse_relaylog *ir= rgi->relay_log;
-  uint64 event_count= 1;
-  uint64 events_to_execute= rgi->retry_event_count;
+  uint64 event_count;
+  uint64 events_to_execute= event_count= rgi->retry_event_count;
   Relay_log_info *rli= rgi->rli;
   int err;
   ulonglong cur_offset, old_offset;
@@ -724,15 +725,16 @@ retry_event_group(rpl_group_info *rgi, rpl_parallel_thread *rpt,
   rpl_parallel_entry *entry= rgi->parallel_entry;
   ulong retries= 0;
   Format_description_log_event *description_event= NULL;
+  Log_event *ev;
 
 do_retry:
   if (!opt_slave_retries_max_log || retries < opt_slave_retries_max_log || errmsg)
-    slave_retries_print("[R%lu] event: %lu of %lu  offset: %lu  query_id: %ld  GTID: %u-%u-%llu  reason: %u%s%s%s",
+    slave_retries_print("[R%lu] event: %lu of %lu  log_pos: %lu  GTID: %u-%u-%llu  query_id: %ld  reason: %u%s%s%s",
                         retries + 1, event_count, events_to_execute,
-                        rgi->retry_start_offset,
-                        thd->query_id,
+                        log_pos,
                         rgi->current_gtid.domain_id, rgi->current_gtid.server_id,
                         rgi->current_gtid.seq_no,
+                        thd->query_id,
                         thd->get_stmt_da()->sql_errno(),
                         (errmsg ? "  binlog error: " : ""),
                         (errmsg ? errmsg : ""),
@@ -906,7 +908,6 @@ do_retry:
   do
   {
     Log_event_type event_type;
-    Log_event *ev;
     rpl_parallel_thread::queued_event *qev;
 
     /* The loop is here so we can try again the next relay log file on EOF. */
@@ -974,6 +975,7 @@ do_retry:
       /* Loop to try again on the new log file. */
     }
 
+    log_pos= ev->log_pos;
     event_type= ev->get_type_code();
     if (event_type == FORMAT_DESCRIPTION_EVENT)
     {
@@ -1051,10 +1053,10 @@ check_retry:
 err:
 
   if (!err || errmsg)
-    slave_retries_print("[R%lu] nevents: %lu  query_id: %ld  GTID: %u-%u-%llu%s%s",
-                        retries + 1, events_to_execute, thd->query_id,
+    slave_retries_print("[R%lu] nevents: %lu  log_pos: %lu  GTID: %u-%u-%llu  query_id: %ld%s%s",
+                        retries + 1, events_to_execute, log_pos,
                         rgi->current_gtid.domain_id, rgi->current_gtid.server_id,
-                        rgi->current_gtid.seq_no,
+                        rgi->current_gtid.seq_no, thd->query_id,
                         (errmsg ? "  binlog error: " : "  SUCCESS"),
                         (errmsg ? errmsg : ""));
 
@@ -1383,6 +1385,7 @@ handle_rpl_parallel_thread(void *arg)
           else
             err= rpt_handle_event(qev, rpt);
         }
+        my_off_t log_pos= qev->ev->log_pos;
         delete_or_keep_event_post_apply(rgi, event_type, qev->ev);
         DBUG_EXECUTE_IF("rpl_parallel_simulate_temp_err_gtid_0_x_100",
                         err= dbug_simulate_tmp_error(rgi, thd););
@@ -1390,7 +1393,7 @@ handle_rpl_parallel_thread(void *arg)
         {
           convert_kill_to_deadlock_error(rgi);
           if (has_temporary_error(thd) && slave_trans_retries > 0)
-            err= retry_event_group(rgi, rpt, qev);
+            err= retry_event_group(rgi, rpt, qev, log_pos);
         }
       }
       else
