@@ -5664,51 +5664,75 @@ static void rename_force(const char *from, const char *to) {
 
 
 /**
- * Given an ibd file path, this returns the space id.
- * @param file The ibd file
- * @return space id for the ibd file, -1 if an error.
- */
+ Given an ibd file path, this returns the space id.
+ @param file The ibd file
+ @return space id for the ibd file
+*/
 static
-ulint get_space_id(const char *file) {
-	// make sure this is an ibd file ...
-	if (!ends_with(file, ".ibd"))
-		die("Error: Requesting space id for a non-ibd file: %s", file);;
+ulint get_space_id(const char *file_name)
+{
+	pfs_os_file_t	file;
+	byte*		buf;
+	byte*		page;
+	bool		ret;
+	ulint		space_id;
+	ulint		fsp_flags;
 
-	int fd = open(file, O_RDONLY, 0);
-	if (fd < 0)
-		die("Error: Unable to open file for reading: %s", file);
+	// make sure this is an ibd file ...
+	if (!ends_with(file_name, ".ibd")) {
+		die("Error: Requesting space id for a non-ibd file: %s", file_name);
+	}
+
+	file = os_file_create(0, file_name, OS_FILE_OPEN,
+                              OS_FILE_NORMAL, OS_DATA_FILE, true, &ret);
+
+	if (!ret) {
+		die("Error opening %s", file_name);
+	}
+
+	buf = static_cast<byte*>(ut_malloc_nokey(2U << srv_page_size_shift));
+	page = static_cast<byte*>(ut_align(buf, srv_page_size));
 
 	// read first page to the buffer ...
 	// we are reading the base backup ibd file, therefore,
 	// srv_page_size should work (no need to read page size
 	// from delta meta file)
-	unsigned char *page = new unsigned char[srv_page_size];
-	memset(page, 0, srv_page_size);
-
-	ulong bytes_read;
-	if ((bytes_read = read(fd, page, srv_page_size)) == srv_page_size) {
-		// read the space id ...
-		ulint space_id = mach_read_from_4(
-				page + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-
-		delete[] page;
-		close(fd);
-
-		return space_id;
-	} else {
-		delete[] page;
-		close(fd);
-
-		die("Error: Unable to open file for reading: %s", file);
+	if (os_file_read(IORequestRead, file, page, 0, srv_page_size)
+	    != DB_SUCCESS) {
+		die("Reading first page failed.\n");
 	}
+
+	fsp_flags = mach_read_from_4(
+			page + FSP_HEADER_OFFSET + FSP_SPACE_FLAGS);
+
+	if (os_file_read(IORequestRead, file, page,
+			 TRX_SYS_PAGE_NO << srv_page_size_shift,
+			 srv_page_size) != DB_SUCCESS) {
+		die("Reading TRX_SYS page failed.");
+	}
+
+	/* TRX_SYS page can't be compressed or encrypted. */
+	if (buf_page_is_corrupted(false, page, fsp_flags)) {
+		die("mariabackup: TRX_SYS page corrupted.\n");
+	}
+
+	space_id = mach_read_from_4(
+			page + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+
+	ut_free(buf);
+	ret = os_file_close(file);
+	ut_a(ret);
+
+	return space_id;
 }
 
 
 /** Very similar to rename_force except if file exists,
- * then, rename it to xtrabackup#<space_id> and populate it to
- * .new existing set.*/
+ then, rename it to xtrabackup#<space_id> and populate it to
+ .new existing set. */
 static
-void safe_rename(const char *from, const char *to, const char *dest_db_dir) {
+void safe_rename(const char *from, const char *to, const char *dest_db_dir)
+{
 	if (access(to, R_OK) == 0) {
 		ulint to_space_id = get_space_id(to);
 
