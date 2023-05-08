@@ -7464,6 +7464,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   lpt->pack_frm_data= NULL;
   lpt->pack_frm_len= 0;
 
+  const bool keep_open= (alter_info->partition_flags & ALTER_PARTITION_KEEP_OPEN);
+  DBUG_ASSERT(!keep_open || (alter_info->partition_flags & ALTER_PARTITION_ADD));
+
   /* Add IF EXISTS to binlog if shared table */
   if (table->file->partition_ht()->flags & HTON_TABLE_MAY_NOT_EXIST_ON_SLAVE)
     thd->variables.option_bits|= OPTION_IF_EXISTS;
@@ -7775,7 +7778,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       handle_alter_part_error(lpt, action_completed, FALSE, frm_install, true);
       goto err;
     }
-    if (alter_partition_lock_handling(lpt))
+    if (!keep_open && alter_partition_lock_handling(lpt))
       goto err;
   }
   else
@@ -7877,7 +7880,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     A final step is to write the query to the binlog and send ok to the
     user
   */
-  DBUG_RETURN(fast_end_partition(thd, lpt->copied, lpt->deleted, table_list));
+  DBUG_RETURN(!keep_open &&
+              fast_end_partition(thd, lpt->copied, lpt->deleted, table_list));
 err:
   thd->variables.option_bits= save_option_bits;
   downgrade_mdl_if_lock_tables_mode(thd, mdl_ticket, MDL_SHARED_NO_READ_WRITE);
