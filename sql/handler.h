@@ -845,7 +845,6 @@ typedef bool Log_func(THD*, TABLE*, bool, const uchar*, const uchar*);
 #define ALTER_PARTITION_CONVERT_OUT (1ULL << 14)
 // Set for vers_add_auto_hist_parts() operation
 #define ALTER_PARTITION_AUTO_HIST   (1ULL << 15)
-#define ALTER_PARTITION_KEEP_OPEN   (1ULL << 16)
 
 /*
   This is master database for most of system tables. However there

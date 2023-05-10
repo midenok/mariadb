@@ -7464,9 +7464,6 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   lpt->pack_frm_data= NULL;
   lpt->pack_frm_len= 0;
 
-  const bool keep_open= (alter_info->partition_flags & ALTER_PARTITION_KEEP_OPEN);
-  DBUG_ASSERT(!keep_open || (alter_info->partition_flags & ALTER_PARTITION_ADD));
-
   /* Add IF EXISTS to binlog if shared table */
   if (table->file->partition_ht()->flags & HTON_TABLE_MAY_NOT_EXIST_ON_SLAVE)
     thd->variables.option_bits|= OPTION_IF_EXISTS;
@@ -7520,7 +7517,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       goto err;
     }
   }
-  else if (alter_info->partition_flags & ALTER_PARTITION_DROP)
+  else if ((alter_info->partition_flags & ALTER_PARTITION_DROP) &&
+           !(alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST))
   {
     /*
       Now after all checks and setting state on dropped partitions we can
@@ -7714,8 +7712,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   */
   else if ((alter_info->partition_flags & ALTER_PARTITION_ADD) &&
            (part_info->part_type == RANGE_PARTITION ||
-            part_info->part_type == LIST_PARTITION ||
-            alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST))
+            part_info->part_type == LIST_PARTITION/* ||
+            alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST*/))
   {
     DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN));
     /*
@@ -7778,7 +7776,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       handle_alter_part_error(lpt, action_completed, FALSE, frm_install, true);
       goto err;
     }
-    if (!keep_open && alter_partition_lock_handling(lpt))
+    if (alter_partition_lock_handling(lpt))
       goto err;
   }
   else
@@ -7843,7 +7841,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("change_partition_2") ||
         write_log_add_change_partition(lpt) ||
         ERROR_INJECT("change_partition_3") ||
-        mysql_change_partitions(lpt, true) ||
+        mysql_change_partitions(lpt, !(alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST)) ||
         ERROR_INJECT("change_partition_4") ||
         wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
         ERROR_INJECT("change_partition_5") ||
@@ -7880,8 +7878,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     A final step is to write the query to the binlog and send ok to the
     user
   */
-  DBUG_RETURN(!keep_open &&
-              fast_end_partition(thd, lpt->copied, lpt->deleted, table_list));
+  DBUG_RETURN(fast_end_partition(thd, lpt->copied, lpt->deleted, table_list));
 err:
   thd->variables.option_bits= save_option_bits;
   downgrade_mdl_if_lock_tables_mode(thd, mdl_ticket, MDL_SHARED_NO_READ_WRITE);

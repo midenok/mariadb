@@ -921,7 +921,7 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts)
     DBUG_ASSERT(table->part_info);
     DBUG_ASSERT(table->part_info->vers_info);
     alter_info.reset();
-    alter_info.partition_flags= ALTER_PARTITION_ADD|ALTER_PARTITION_AUTO_HIST|ALTER_PARTITION_KEEP_OPEN;
+    alter_info.partition_flags= ALTER_PARTITION_ADD|ALTER_PARTITION_AUTO_HIST;
     create_info.init();
     create_info.alter_info= &alter_info;
     Alter_table_ctx alter_ctx(thd, tl, 1, &table->s->db, &table->s->table_name);
@@ -989,25 +989,12 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint num_parts)
       goto exit;
     }
 
-    if (fast_alter_partition_table(thd, table, &alter_info, &alter_ctx,
-                                   &create_info, tl))
-    {
-      my_error(ER_VERS_HIST_PART_FAILED, MYF(ME_WARNING),
-               tl->db.str, tl->table_name.str);
-      goto exit;
-    }
-
-    alter_info.partition_flags= ALTER_PARTITION_DROP|ALTER_PARTITION_AUTO_HIST;
+    // FIXME: move to top, handle real need of drop
+    alter_info.partition_flags|= ALTER_PARTITION_DROP;
     partition_element *el= (partition_element *) table->part_info->partitions.first_node()->info;
     el->part_state= PART_TO_BE_DROPPED;
     table->part_info->num_parts--;
 
-    List_iterator_fast <partition_element> part_it(table->part_info->partitions);
-    while ((el= part_it++))
-    {
-      if (el->part_state == PART_IS_ADDED)
-        el->part_state= PART_NORMAL;
-    }
     if (fast_alter_partition_table(thd, table, &alter_info, &alter_ctx,
                                    &create_info, tl))
     {
