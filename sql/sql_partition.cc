@@ -2653,6 +2653,12 @@ char *generate_partition_syntax(THD *thd, partition_info *part_info,
       DBUG_ASSERT(vers_info->interval.is_set() ||
                   vers_info->limit);
       err+= str.append(STRING_WITH_LEN(" AUTO"));
+      if (vers_info->max_parts)
+      {
+        DBUG_ASSERT(vers_info->max_parts > 1);
+        err+= str.append(' ');
+        err+= str.append_ulonglong(vers_info->max_parts);
+      }
     }
   }
   else if (part_info->part_expr)
