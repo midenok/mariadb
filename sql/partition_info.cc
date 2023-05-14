@@ -912,9 +912,10 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
   thd->lex->no_write_to_binlog= true;
   TABLE *table= tl->table;
   partition_info *tab_part_info= table->part_info;
+  auto vers_info= tab_part_info->vers_info;
   DBUG_ASSERT(tab_part_info);
-  DBUG_ASSERT(tab_part_info->vers_info);
-  const uint max_parts= tab_part_info->vers_info->max_parts;
+  DBUG_ASSERT(vers_info);
+  const uint max_parts= vers_info->max_parts;
   const uint tot_parts= tab_part_info->num_parts + add_parts;
 
   DBUG_ASSERT(!thd->is_error());
@@ -999,10 +1000,27 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
       alter_info.partition_flags|= ALTER_PARTITION_DROP;
       const uint to_drop= tot_parts - max_parts;
       List_iterator_fast<partition_element> part_it(tab_part_info->partitions);
+      MYSQL_TIME start;
+      const bool handle_interval= vers_info->interval.is_set();
+      if (handle_interval)
+        my_tz_OFFSET0->gmt_sec_to_TIME(&start, vers_info->interval.start);
+
       for (uint i= 0; i < to_drop; ++i)
       {
         partition_element *el= part_it++;
         el->part_state= PART_TO_BE_DROPPED;
+        if (handle_interval &&
+            date_add_interval(thd, &start, vers_info->interval.type,
+                              vers_info->interval.step))
+          goto exit;
+      }
+
+      if (handle_interval)
+      {
+        uint err= 0;
+        vers_info->interval.start= my_tz_OFFSET0->TIME_to_gmt_sec(&start, &err);
+        if (err)
+          goto exit;
       }
       table->part_info->num_parts-= to_drop;
     }

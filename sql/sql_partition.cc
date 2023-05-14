@@ -7524,7 +7524,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
     }
   }
   else if ((alter_info->partition_flags & ALTER_PARTITION_DROP) &&
-           !(alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST))
+           !(alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST)) // FIXME: cleanup
   {
     /*
       Now after all checks and setting state on dropped partitions we can
@@ -7719,7 +7719,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   else if ((alter_info->partition_flags & ALTER_PARTITION_ADD) &&
            (part_info->part_type == RANGE_PARTITION ||
             part_info->part_type == LIST_PARTITION/* ||
-            alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST*/))
+            alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST*/)) // FIXME: cleanup
   {
     DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN));
     /*
