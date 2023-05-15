@@ -7712,14 +7712,9 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         ERROR_INJECT("convert_partition_11"))
       goto err;
   }
-  /*
-    TODO: would be good if adding new empty VERSIONING partitions would always
-    go this way, auto or not.
-  */
   else if ((alter_info->partition_flags & ALTER_PARTITION_ADD) &&
            (part_info->part_type == RANGE_PARTITION ||
-            part_info->part_type == LIST_PARTITION/* ||
-            alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST*/)) // FIXME: cleanup
+            part_info->part_type == LIST_PARTITION))
   {
     DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_CONVERT_IN));
     /*
@@ -7791,7 +7786,8 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       ADD HASH PARTITION/
       COALESCE PARTITION/
       REBUILD PARTITION/
-      REORGANIZE PARTITION
+      REORGANIZE PARTITION/
+      ADD or auto-create history partitions
  
       In this case all records are still around after the change although
       possibly organised into new partitions, thus by ensuring that all
@@ -7820,15 +7816,15 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
 
       0) Write an entry that removes the shadow frm file if crash occurs.
       1) Write the shadow frm file of new partitioning.
-      2) Log such that temporary partitions added in change phase are
-         removed in a crash situation.
-      3) Add the new partitions.
-         Copy from the reorganised partitions to the new partitions.
-      4) Get an exclusive metadata lock on the table (waits for all active
+      2) Get an exclusive metadata lock on the table (waits for all active
          transactions using this table). This ensures that we
          can release all other locks on the table and since no one can open
          the table, there can be no new threads accessing the table. They
          will be hanging on this exclusive lock.
+      3) Log such that temporary partitions added in change phase are
+         removed in a crash situation.
+      4) Add the new partitions.
+         Copy from the reorganised partitions to the new partitions.
       5) Close the table.
       6) Log that operation is completed and log all complete actions
          needed to complete operation from here.
@@ -7841,15 +7837,19 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       12) Write to binlog
       13) Complete query.
     */
+
+    const bool copy_data= !(alter_info->partition_flags & ALTER_PARTITION_ADD) ||
+      !(alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST);
+
     if (write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT("change_partition_1") ||
         mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
         ERROR_INJECT("change_partition_2") ||
-        write_log_add_change_partition(lpt) ||
-        ERROR_INJECT("change_partition_3") ||
-        mysql_change_partitions(lpt, !(alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST)) ||
-        ERROR_INJECT("change_partition_4") ||
         wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
+        ERROR_INJECT("change_partition_3") ||
+        write_log_add_change_partition(lpt) ||
+        ERROR_INJECT("change_partition_4") ||
+        mysql_change_partitions(lpt, copy_data) ||
         ERROR_INJECT("change_partition_5") ||
         alter_close_table(lpt) ||
         ERROR_INJECT("change_partition_6") ||
