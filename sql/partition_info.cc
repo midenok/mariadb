@@ -900,6 +900,9 @@ bool partition_info::vers_set_hist_part(THD *thd, uint *create_count)
 */
 bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
 {
+  DBUG_ASSERT(!thd->is_error());
+  DBUG_ASSERT(add_parts);
+
   bool result= true;
   Table_specification_st create_info;
   Alter_info alter_info;
@@ -915,11 +918,34 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
   auto vers_info= tab_part_info->vers_info;
   DBUG_ASSERT(tab_part_info);
   DBUG_ASSERT(vers_info);
-  const uint max_parts= vers_info->max_parts;
-  const uint tot_parts= tab_part_info->num_parts + add_parts;
-
-  DBUG_ASSERT(!thd->is_error());
-  DBUG_ASSERT(add_parts);
+  const uint max_hist= vers_info->max_parts ? vers_info->max_parts - 1 : 0;
+  uint create_parts= add_parts;
+  uint drop_parts= 0;
+  uint interval_shift= 0;
+  /*
+    Calculate create_parts and drop_parts: how much we create and drop partitions
+    according to max_hist. interval_shift will tell how many intervals we add
+    to STARTS directive.
+  */
+  if (max_hist)
+  {
+    if (add_parts >= max_hist)
+    {
+      drop_parts= tab_part_info->num_parts - 1;
+      /*
+        We drop all old history partitions, so we don't need more than one new
+        empty partition.
+      */
+      create_parts= 1;
+      interval_shift= add_parts - create_parts;
+    }
+    else
+    {
+      uint hist_parts= tab_part_info->num_parts - 1 + create_parts;
+      if (hist_parts > max_hist)
+        drop_parts= hist_parts - max_hist;
+    }
+  }
 
   {
     DBUG_ASSERT(table->s->get_table_ref_type() == TABLE_REF_BASE_TABLE);
@@ -952,7 +978,7 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
     }
     part_info->use_default_num_partitions= false;
     part_info->use_default_num_subpartitions= false;
-    part_info->num_parts= add_parts;
+    part_info->num_parts= create_parts;
     part_info->num_subparts= tab_part_info->num_subparts;
     part_info->subpart_type= tab_part_info->subpart_type;
     if (unlikely(part_info->vers_init_info(thd)))
@@ -963,7 +989,7 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
 
     thd->work_part_info= part_info;
     if (part_info->set_up_defaults_for_partitioning(thd, table->file, NULL,
-                                    tab_part_info->next_part_no(add_parts)))
+                                    tab_part_info->next_part_no(create_parts)))
     {
       my_error(ER_VERS_HIST_PART_FAILED, MYF(ME_WARNING),
                tl->db.str, tl->table_name.str);
@@ -993,36 +1019,39 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
       goto exit;
     }
 
-    // FIXME: move to top?
-    if (max_parts && max_parts < tot_parts)
+    /*
+      Handle auto-drop: update part_state, interval.start and num_parts.
+    */
+    if (drop_parts)
     {
-      DBUG_ASSERT(max_parts > 1); // Limited by parser
       alter_info.partition_flags|= ALTER_PARTITION_DROP;
-      const uint to_drop= tot_parts - max_parts;
       List_iterator_fast<partition_element> part_it(tab_part_info->partitions);
       MYSQL_TIME start;
       const bool handle_interval= vers_info->interval.is_set();
       if (handle_interval)
         my_tz_OFFSET0->gmt_sec_to_TIME(&start, vers_info->interval.start);
 
-      for (uint i= 0; i < to_drop; ++i)
+      for (uint i= 0; i < drop_parts; ++i)
       {
         partition_element *el= part_it++;
         el->part_state= PART_TO_BE_DROPPED;
-        if (handle_interval &&
-            date_add_interval(thd, &start, vers_info->interval.type,
-                              vers_info->interval.step))
-          goto exit;
+        ++interval_shift;
       }
 
       if (handle_interval)
       {
+        for (uint i= 0; i < interval_shift; ++i)
+        {
+          if (date_add_interval(thd, &start, vers_info->interval.type,
+                                vers_info->interval.step))
+            goto exit;
+        }
         uint err= 0;
         vers_info->interval.start= my_tz_OFFSET0->TIME_to_gmt_sec(&start, &err);
         if (err)
           goto exit;
       }
-      table->part_info->num_parts-= to_drop;
+      table->part_info->num_parts-= drop_parts;
     }
 
     if (fast_alter_partition_table(thd, table, &alter_info, &alter_ctx,

@@ -5183,10 +5183,13 @@ opt_vers_drop_part:
        | ulong_num
          {
            if (unlikely($1 < 2))
-             // FIXME: throw error
+           {
+             my_error(ER_PART_WRONG_VALUE, MYF(0),
+                      Lex->create_last_non_select_table->table_name.str, "AUTO");
              MYSQL_YYABORT;
-           Vers_part_info *vers_info= Lex->part_info->vers_info;
-           vers_info->max_parts= (uint) $1;
+           }
+           partition_info *part_info= Lex->part_info;
+           part_info->vers_info->max_parts= (uint) $1;
            $$= $1;
          }
        ;
