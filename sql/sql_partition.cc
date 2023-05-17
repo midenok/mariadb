@@ -7531,8 +7531,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       goto err;
     }
   }
-  else if ((alter_info->partition_flags & ALTER_PARTITION_DROP) &&
-           !(alter_info->partition_flags & ALTER_PARTITION_AUTO_HIST)) // FIXME: cleanup
+  else if (alter_info->partition_flags & ALTER_PARTITION_DROP)
   {
     /*
       Now after all checks and setting state on dropped partitions we can

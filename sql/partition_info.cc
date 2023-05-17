@@ -1026,7 +1026,6 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
     */
     if (drop_parts)
     {
-      alter_info.partition_flags|= ALTER_PARTITION_DROP;
       List_iterator_fast<partition_element> part_it(tab_part_info->partitions);
       MYSQL_TIME start;
       const bool handle_interval= vers_info->interval.is_set();
