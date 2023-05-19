@@ -1026,7 +1026,8 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
     */
     if (drop_parts)
     {
-      List_iterator_fast<partition_element> part_it(tab_part_info->partitions);
+      List<partition_element> parts;
+      List_iterator<partition_element> part_it(tab_part_info->partitions);
       MYSQL_TIME start;
       const bool handle_interval= vers_info->interval.is_set();
       if (handle_interval)
@@ -1036,8 +1037,20 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
       {
         partition_element *el= part_it++;
         el->part_state= PART_TO_BE_DROPPED;
+//         parts.push_back(el);
+//         part_it.remove();
         ++interval_shift;
       }
+
+//       tab_part_info->partitions.append(&parts);
+
+      /*
+        PART_TO_BE_DROPPED partitions must be at their own place, accessed
+        via m_file[position in partitions].
+
+        PART_TO_BE_ADDED is prepared from new_file_array.
+        new_file_array is what m_file will be in new table (skips dropped partitions);
+      */
 
       if (handle_interval)
       {
@@ -1052,7 +1065,7 @@ bool vers_create_partitions(THD *thd, TABLE_LIST* tl, uint add_parts)
         if (err)
           goto exit;
       }
-      table->part_info->num_parts-= drop_parts;
+//       table->part_info->num_parts-= drop_parts;
     }
 
     if (fast_alter_partition_table(thd, table, &alter_info, &alter_ctx,

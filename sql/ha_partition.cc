@@ -2153,12 +2153,7 @@ int ha_partition::change_partitions(HA_CREATE_INFO *create_info,
   m_new_file= new_file_array;
   for (i= 0; i < part_count; i++)
     m_added_file[i]->extra(HA_EXTRA_BEGIN_ALTER_COPY);
-  {
-    uint old_num_parts= m_part_info->num_parts;
-    m_part_info->num_parts= num_parts;
-    error= copy_partitions(copied, deleted);
-    m_part_info->num_parts= old_num_parts;
-  }
+  error= copy_partitions(copied, deleted);
   for (i= 0; i < part_count; i++)
     m_added_file[i]->extra(HA_EXTRA_END_ALTER_COPY);
   if (unlikely(error))
