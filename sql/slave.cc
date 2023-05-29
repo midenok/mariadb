@@ -2558,6 +2558,7 @@ after_set_capability:
     my_bool overflow;
     query.length(0);
 
+//     DBUG_ASSERT(0);
     query.append(STRING_WITH_LEN("SELECT binlog_gtid_pos('"));
     quote_length= escape_quotes_for_mysql(&my_charset_bin, quote_buf,
                                           sizeof(quote_buf),

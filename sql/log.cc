@@ -5603,6 +5603,7 @@ end2:
 bool MYSQL_BIN_LOG::write_event(Log_event *ev, binlog_cache_data *cache_data,
                                 IO_CACHE *file)
 {
+  DBUG_PRINT("binlog", ("write_event: %llu", my_b_safe_tell(file)));
   Log_event_writer writer(file, cache_data, &crypto);
   if (crypto.scheme && file == &log_file)
   {
@@ -6497,8 +6498,66 @@ MYSQL_BIN_LOG::write_gtid_event(THD *thd, bool standalone,
   }
 #endif
 
+  mysql_mutex_assert_owner(&LOCK_log);
+  my_off_t my_org_b_tell= my_b_safe_tell(&log_file);
+  HASH hash;
+
+#if 0
+my_bool my_hash_init2(PSI_memory_key psi_key, HASH *hash, size_t growth_size,
+                      CHARSET_INFO *charset, size_t default_array_elements,
+                      size_t key_offset, size_t key_length,
+                      my_hash_get_key get_key, my_hash_function hash_function,
+                      void (*free_element)(void*), uint flags);
+
+  my_hash_init(PSI_INSTRUMENT_ME, &hash, &my_charset_bin, 32,
+               offsetof(gtid_pos_element, gtid) + offsetof(rpl_gtid, domain_id),
+               sizeof(uint32), NULL, my_free, HASH_UNIQUE);
+#endif
+  struct pos_gtid
+  {
+    my_off_t pos;
+    rpl_gtid gtid;
+  } p;
+
+  if (my_hash_init(PSI_INSTRUMENT_ME, &hash, &my_charset_bin, 1024,
+                   offsetof(pos_gtid, pos), sizeof(my_off_t), 0, 0, MYF(0)))
+    DBUG_RETURN(true);
+
+  uchar *rec;
+
+  p.pos= my_org_b_tell;
+  rec= (uchar *) &p;
+
+  domain_id= thd->variables.gtid_domain_id;
+//   local_server_id= thd->variables.server_id;
+
+  // FIXME: Maybe make find_most_recent_nolock() or use find_nolock() ?
+  rpl_gtid *g= rpl_global_gtid_binlog_state.find_most_recent(domain_id);
+  if (!g)
+  {
+    // FIXME: error
+    DBUG_RETURN(true);
+  }
+  p.gtid= *g;
+
+  if ((err= my_hash_insert(&hash, rec)))
+  {
+//     my_free(entry);
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    DBUG_RETURN(true);
+  }
+
+  if ((rec= my_hash_search(&hash, (const uchar *)&my_org_b_tell,
+                            sizeof(my_org_b_tell))))
+  {
+    pos_gtid *p= (pos_gtid *) rec;
+    DBUG_PRINT("binlog", ("write_gtid: %lld", p->pos));
+  }
+
   if (write_event(&gtid_event))
     DBUG_RETURN(true);
+
+//   DBUG_ASSERT(log_file.write_buffer == log_file.write_pos);
   status_var_add(thd->status_var.binlog_bytes_written, gtid_event.data_written);
 
   DBUG_RETURN(false);
@@ -6826,6 +6885,7 @@ bool MYSQL_BIN_LOG::write(Log_event *event_info, my_bool *with_annotate)
           commit_id= entry->val_int(&null_value);
         });
       res= write_gtid_event(thd, true, using_trans, commit_id);
+//       DBUG_ASSERT(my_org_b_tell == log_file.pos_in_file);
       if (mdl_request.ticket)
         thd->mdl_context.release_lock(mdl_request.ticket);
       thd->backup_commit_lock= 0;
