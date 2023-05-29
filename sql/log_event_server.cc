@@ -879,6 +879,9 @@ err:
   return res;
 }
 
+
+extern rpl_binlog_state rpl_global_gtid_binlog_state;
+
 int Log_event_writer::write_header(uchar *pos, size_t len)
 {
   DBUG_ENTER("Log_event_writer::write_header");
@@ -894,6 +897,14 @@ int Log_event_writer::write_header(uchar *pos, size_t len)
     pos[FLAGS_OFFSET]&= ~LOG_EVENT_BINLOG_IN_USE_F;
     crc= my_checksum(0, pos, len);
     pos[FLAGS_OFFSET]= save;
+  }
+
+  if (!cache_data)
+  {
+    DBUG_PRINT("binlog", ("write_header: %llu", my_b_tell(file)));
+    my_off_t offset= my_b_tell(file);
+    if (rpl_global_gtid_binlog_state.push_pos_hash(offset, pos[EVENT_TYPE_OFFSET]))
+      return true;
   }
 
   if (ctx)
@@ -4045,6 +4056,11 @@ Gtid_list_log_event::write()
   packet.length(0);
   if (to_packet(&packet))
     return true;
+
+  if (count &&
+      rpl_global_gtid_binlog_state.push_gtids_array(list, count))
+    return true;
+
   return write_header(get_data_size()) ||
          write_data(packet.ptr(), packet.length()) ||
          write_footer();

@@ -18,6 +18,7 @@
 
 #include "hash.h"
 #include "queues.h"
+#include "sql_list.h"
 #include <atomic>
 
 /* Definitions for MariaDB global transaction ID (GTID). */
@@ -45,6 +46,11 @@ inline bool operator==(const rpl_gtid& lhs, const rpl_gtid& rhs)
     lhs.server_id == rhs.server_id &&
     lhs.seq_no    == rhs.seq_no;
 };
+
+inline bool operator!=(const rpl_gtid& lhs, const rpl_gtid& rhs)
+{
+  return !(lhs == rhs);
+}
 
 inline bool operator<(const rpl_gtid& lhs, const rpl_gtid& rhs)
 {
@@ -316,6 +322,58 @@ struct rpl_binlog_state
   /* Auxiliary buffer to sort gtid list. */
   DYNAMIC_ARRAY gtid_sort_array;
 
+  struct pos_hash_element
+  {
+    my_off_t pos;
+    size_t gtids_idx;
+  };
+
+  struct binlog_hash_element
+  {
+    char filename_buf[FN_REFLEN];
+    LEX_CSTRING filename;
+    /* Ordered array of gtids as they appear in binlog */
+    DYNAMIC_ARRAY gtids;
+    /* Map of file position to index in gtids array */
+    HASH pos_hash;
+    /* Currently used only for DBUG_ASSERT, but can be used for read-through caching */
+    my_off_t max_pos;
+
+    binlog_hash_element() : max_pos(0)
+    {
+      my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtids, sizeof(rpl_gtid), 8, 8, MYF(0));
+      my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
+                   offsetof(pos_hash_element, pos), sizeof(my_off_t), 0,
+                   my_free, HASH_UNIQUE);
+    }
+
+    ~binlog_hash_element()
+    {
+      delete_dynamic(&gtids);
+      my_hash_free(&pos_hash);
+    }
+
+    static void free(void *ptr)
+    {
+      delete static_cast<binlog_hash_element *>(ptr);
+    }
+
+    static
+    uchar* get_key(binlog_hash_element *el, size_t *length,
+                   my_bool not_used __attribute__((unused)))
+    {
+      *length= el->filename.length;
+      return (uchar*) el->filename.str;
+    }
+  };
+
+  HASH binlog_hash;
+  /* Used for binlog_hash rotation */
+  List<binlog_hash_element> binlog_list;
+  MEM_ROOT mem_root;
+  /* Current binlog element, NULL means no caching is done */
+  binlog_hash_element *binlog_element;
+
    rpl_binlog_state() :initialized(0) {}
   ~rpl_binlog_state();
 
@@ -344,6 +402,12 @@ struct rpl_binlog_state
   rpl_gtid *find(uint32 domain_id, uint32 server_id);
   rpl_gtid *find_most_recent(uint32 domain_id);
   const char* drop_domain(DYNAMIC_ARRAY *ids, Gtid_list_log_event *glev, char*);
+  /* binlog_gtid_pos() caching methods */
+  bool rotate_binlog(const char *filename);
+  bool push_gtids_array(const rpl_gtid *gtid, uint32 count);
+  bool push_pos_hash(my_off_t pos, uchar event_type);
+  int check_pos_hash(const char *filename, my_off_t pos,
+                     rpl_gtid **gtid_array, uint32 *array_size);
 };
 
 

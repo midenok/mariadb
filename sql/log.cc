@@ -162,7 +162,7 @@ static MYSQL_BIN_LOG::xid_count_per_binlog *
 
 static bool start_binlog_background_thread();
 
-static rpl_binlog_state rpl_global_gtid_binlog_state;
+rpl_binlog_state rpl_global_gtid_binlog_state;
 
 void setup_log_handling()
 {
@@ -3884,6 +3884,9 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
       if (!s.is_valid())
         goto err;
       s.dont_set_created= null_created_arg;
+      if (!is_relay_log &&
+          rpl_global_gtid_binlog_state.rotate_binlog(log_file_name))
+        goto err;
       if (write_event(&s))
         goto err;
       bytes_written+= s.data_written;
@@ -6476,6 +6479,9 @@ MYSQL_BIN_LOG::write_gtid_event(THD *thd, bool standalone,
     seq_no= gtid.seq_no;
   }
   if (err)
+    DBUG_RETURN(true);
+
+  if (rpl_global_gtid_binlog_state.push_gtids_array(&gtid, 1))
     DBUG_RETURN(true);
 
   thd->set_last_commit_gtid(gtid);

@@ -1515,6 +1515,12 @@ void rpl_binlog_state::init()
   my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtid_sort_array, sizeof(rpl_gtid), 8, 8, MYF(0));
   mysql_mutex_init(key_LOCK_binlog_state, &LOCK_binlog_state,
                    MY_MUTEX_INIT_SLOW);
+  my_hash_init(PSI_INSTRUMENT_ME, &binlog_hash, files_charset_info, 10, 0, 0,
+               (my_hash_get_key) binlog_hash_element::get_key,
+               binlog_hash_element::free, HASH_UNIQUE);
+  binlog_list.empty();
+  init_alloc_root(PSI_INSTRUMENT_ME, &mem_root, 1024, 0, MYF(0));
+  binlog_element= NULL;
   initialized= 1;
 }
 
@@ -1547,6 +1553,8 @@ void rpl_binlog_state::free()
     my_hash_free(&hash);
     delete_dynamic(&gtid_sort_array);
     mysql_mutex_destroy(&LOCK_binlog_state);
+    my_hash_free(&binlog_hash);
+    free_root(&mem_root, MYF(0));
   }
 }
 
@@ -2283,6 +2291,193 @@ end:
 
   DBUG_RETURN(errmsg);
 }
+
+
+bool rpl_binlog_state::rotate_binlog(const char *filename)
+{
+  binlog_hash_element *el;
+  DBUG_ASSERT(binlog_hash.records == binlog_list.elements);
+
+  /* If turned off clear and return */
+  if (!opt_binlog_gtid_pos_cache)
+  {
+    if (binlog_hash.records)
+    {
+      DBUG_PRINT("binlog", ("Cleared all %lu records", binlog_hash.records));
+      binlog_list.empty();
+      my_hash_reset(&binlog_hash);
+      free_root(&mem_root, MYF(0));
+      binlog_element= NULL;
+    }
+    return false;
+  }
+
+  /* Rotate binlog_hash if needed */
+  if (binlog_hash.records >= opt_binlog_gtid_pos_cache)
+  {
+    const ulong drop_size= binlog_hash.records - opt_binlog_gtid_pos_cache + 1;
+    if (drop_size == binlog_hash.records)
+    {
+      binlog_list.empty();
+      my_hash_reset(&binlog_hash);
+      free_root(&mem_root, MYF(0));
+    }
+    else
+    {
+      for (ulong n= 0; n < drop_size; n++)
+      {
+        el= binlog_list.pop();
+        DBUG_PRINT("binlog", ("Rotated: %s", el->filename));
+        if (my_hash_delete(&binlog_hash, (uchar *) el))
+          DBUG_ASSERT(0);
+      }
+    }
+    DBUG_PRINT("binlog", ("Cleared %lu records", drop_size));
+  }
+
+  /* Push new element */
+  el= new (std::nothrow) binlog_hash_element();
+  if (!el)
+  {
+    my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
+    return true;
+  }
+  size_t len= strlen(filename);
+  memcpy(el->filename_buf, filename, len + 1);
+  el->filename.str= el->filename_buf;
+  el->filename.length= len;
+
+  /* NOTE: data changes are done under LOCK_log taken in trx_group_commit_leader() */
+  if (my_hash_insert(&binlog_hash, (uchar *) el))
+  {
+    delete el;
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+
+  /* Note: I_List cannot pop() */
+  if (binlog_list.push_back(el, &mem_root))
+  {
+    if (my_hash_delete(&binlog_hash, (uchar *) el))
+      DBUG_ASSERT(0);
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+
+  binlog_element= el;
+  return false;
+}
+
+
+bool rpl_binlog_state::push_gtids_array(const rpl_gtid *gtid, uint32 count)
+{
+  if (!binlog_element)
+    return false;
+  DBUG_ASSERT(count > 0);
+  DYNAMIC_ARRAY *gtids= &binlog_element->gtids;
+  DBUG_PRINT("binlog", ("Push GTID: [%llu] GTID %u-%u-%llu", gtids->elements,
+                        gtid->domain_id, gtid->server_id, gtid->seq_no));
+#ifndef DBUG_OFF
+  if (gtids->elements)
+  {
+    rpl_gtid *last= dynamic_element(gtids, gtids->elements - 1, rpl_gtid *);
+    DBUG_ASSERT(*last != *gtid);
+  }
+#endif
+  for (uint32 i= 0; i < count; ++i)
+    if (insert_dynamic(gtids, (const void *) (gtid + i)))
+    {
+      my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*gtid));
+      return true;
+    }
+  return false;
+}
+
+
+bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
+{
+  if (!binlog_element)
+    return false;
+  pos_hash_element *el;
+  DYNAMIC_ARRAY *gtids= &binlog_element->gtids;
+  HASH *pos_hash= &binlog_element->pos_hash;
+  /* For gtids->elements == 0 we store SIZE_T_MAX to indicate no GTIDs */
+  size_t last_idx= gtids->elements - 1;
+  if (event_type == GTID_EVENT)
+  {
+    DBUG_ASSERT(gtids->elements);
+    /* New GTID event does not include this new GTID, only next event includes it */
+    last_idx--;
+  }
+  else if (gtids->elements && event_type == GTID_LIST_EVENT)
+  {
+    /* Update all preceding events with GTID list */
+    for (size_t idx= 0; idx < pos_hash->records; idx++)
+    {
+      el= (pos_hash_element *) my_hash_element(pos_hash, idx);
+      el->gtids_idx= last_idx;
+    }
+  }
+  DBUG_PRINT("binlog", ("Push pos: {%llu} -> [%llu]", pos, last_idx));
+
+#ifndef DBUG_OFF
+  DBUG_ASSERT(pos == 0 || pos > binlog_element->max_pos);
+  el= (pos_hash_element *) my_hash_search(pos_hash, (const uchar *)&pos, sizeof(pos));
+  DBUG_ASSERT(!el);
+#endif
+
+  if (!(el= (pos_hash_element *) my_malloc(PSI_INSTRUMENT_ME, sizeof(*el), MYF(MY_WME))))
+  {
+    my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
+    return true;
+  }
+  el->pos= pos;
+  el->gtids_idx= last_idx;
+
+  /* NOTE: data changes are done under LOCK_log taken in trx_group_commit_leader() */
+  if (my_hash_insert(pos_hash, (uchar *) el))
+  {
+    my_free(el);
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+
+  binlog_element->max_pos= pos;
+  return false;
+}
+
+
+int rpl_binlog_state::check_pos_hash(const char *filename, my_off_t pos,
+                                     rpl_gtid **gtid_array, uint32 *array_size)
+{
+  if (!binlog_element || !opt_binlog_gtid_pos_cache)
+    return 0;
+  binlog_hash_element *bel= (binlog_hash_element *)
+    my_hash_search(&binlog_hash, (const uchar *) filename, strlen(filename));
+  if (!bel)
+  {
+    DBUG_PRINT("binlog", ("Miss file: %s (%llu)", filename, pos));
+    return 0;
+  }
+  pos_hash_element *el= (pos_hash_element *)
+    my_hash_search(&bel->pos_hash, (const uchar *)&pos, sizeof(pos));
+  if (!el)
+  {
+    DBUG_PRINT("binlog", ("Miss pos: %llu (%s)", pos, filename));
+    return 2;
+  }
+  DBUG_ASSERT(el->pos == pos);
+  DBUG_PRINT("binlog", ("Hit pos: %llu -> [%llu] (%s)", pos, el->gtids_idx, filename));
+
+  if (el->gtids_idx != SIZE_T_MAX)
+  {
+    DBUG_ASSERT(el->gtids_idx < bel->gtids.elements);
+    *gtid_array= (rpl_gtid *) bel->gtids.buffer;
+    *array_size= (uint32) el->gtids_idx + 1;
+  }
+  return 1;
+}
+
 
 slave_connection_state::slave_connection_state()
 {
