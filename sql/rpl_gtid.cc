@@ -1512,6 +1512,8 @@ void rpl_binlog_state::init()
   my_hash_init(PSI_INSTRUMENT_ME, &hash, &my_charset_bin, 32,
                offsetof(element, domain_id), sizeof(element::domain_id),
                NULL, my_free, HASH_UNIQUE);
+  my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
+               offsetof(pos_gtid, pos), sizeof(my_off_t), 0, my_free, HASH_UNIQUE);
   my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtid_sort_array, sizeof(rpl_gtid), 8, 8, MYF(0));
   mysql_mutex_init(key_LOCK_binlog_state, &LOCK_binlog_state,
                    MY_MUTEX_INIT_SLOW);

@@ -896,7 +896,10 @@ int Log_event_writer::write_header(uchar *pos, size_t len)
     pos[FLAGS_OFFSET]= save;
   }
 
-//   DBUG_PRINT("binlog", ("write_header: %llu", my_b_safe_tell(file)));
+  if (!cache_data)
+  {
+    DBUG_PRINT("binlog", ("write_header: %llu", my_b_tell(file)));
+  }
 
   if (ctx)
   {

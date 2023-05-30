@@ -307,8 +307,14 @@ struct rpl_binlog_state
 
     int update_element(const rpl_gtid *gtid);
   };
+  struct pos_gtid
+  {
+    my_off_t pos;
+    rpl_gtid gtid;
+  };
   /* Mapping from domain_id to collection of elements. */
   HASH hash;
+  HASH pos_hash;
   /* Mutex protecting access to the state. */
   mysql_mutex_t LOCK_binlog_state;
   my_bool initialized;
@@ -329,6 +335,8 @@ struct rpl_binlog_state
   int update(const struct rpl_gtid *gtid, bool strict);
   int update_with_next_gtid(uint32 domain_id, uint32 server_id,
                              rpl_gtid *gtid);
+  bool update_pos_hash(my_off_t pos, uint32 domain_id);
+  rpl_gtid * check_pos_hash(my_off_t pos);
   int alloc_element_nolock(const rpl_gtid *gtid);
   bool check_strict_sequence(uint32 domain_id, uint32 server_id, uint64 seq_no,
                              bool no_error= false);

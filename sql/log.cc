@@ -162,7 +162,7 @@ static MYSQL_BIN_LOG::xid_count_per_binlog *
 
 static bool start_binlog_background_thread();
 
-static rpl_binlog_state rpl_global_gtid_binlog_state;
+rpl_binlog_state rpl_global_gtid_binlog_state;
 
 void setup_log_handling()
 {
@@ -5600,10 +5600,75 @@ end2:
   DBUG_RETURN(error);
 }
 
+
+bool rpl_binlog_state::update_pos_hash(my_off_t pos, uint32 domain_id)
+{
+  pos_gtid *el;
+
+  // FIXME: Maybe make find_most_recent_nolock() or use find_nolock() ?
+  rpl_gtid *g= find_most_recent(domain_id);
+  if (!g)
+  {
+    // FIXME: error
+    return true;
+  }
+
+  DBUG_PRINT("binlog", ("pos: %lld  GTID %u-%u-%llu", pos,
+                        g->domain_id, g->server_id, g->seq_no));
+
+  if ((el= (pos_gtid *) my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos))))
+  {
+    el->gtid= *g;
+  }
+  else
+  {
+    if (!(el= (pos_gtid *) my_malloc(PSI_INSTRUMENT_ME, sizeof(*el), MYF(MY_WME))))
+    {
+      my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
+      return true;
+    }
+    el->pos= pos;
+    el->gtid= *g;
+
+    if (my_hash_insert(&pos_hash, (uchar *) el))
+    {
+      my_free(el);
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+rpl_gtid * rpl_binlog_state::check_pos_hash(my_off_t pos)
+{
+  pos_gtid *el= (pos_gtid *) my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos));
+  return el ? &(el->gtid) : NULL;
+}
+
+
 bool MYSQL_BIN_LOG::write_event(Log_event *ev, binlog_cache_data *cache_data,
                                 IO_CACHE *file)
 {
-  DBUG_PRINT("binlog", ("write_event: %llu", my_b_safe_tell(file)));
+//   DBUG_PRINT("binlog", ("write_event: %llu", my_b_safe_tell(file)));
+//   mysql_mutex_lock(&LOCK_log);
+//   mysql_mutex_assert_owner(&LOCK_log);
+  my_off_t pos= my_b_tell(&log_file);
+  if (ev->thd)
+  {
+    uint32 domain_id= ev->thd->variables.gtid_domain_id;
+  //   local_server_id= thd->variables.server_id;
+
+    if (rpl_global_gtid_binlog_state.update_pos_hash(pos, domain_id))
+    {
+//       mysql_mutex_unlock(&LOCK_log);
+      return true;
+    }
+  }
+//   mysql_mutex_unlock(&LOCK_log);
+
   Log_event_writer writer(file, cache_data, &crypto);
   if (crypto.scheme && file == &log_file)
   {
@@ -6497,62 +6562,6 @@ MYSQL_BIN_LOG::write_gtid_event(THD *thd, bool standalone,
     thd->variables.server_id= global_system_variables.server_id;
   }
 #endif
-
-  mysql_mutex_assert_owner(&LOCK_log);
-  my_off_t my_org_b_tell= my_b_safe_tell(&log_file);
-  HASH hash;
-
-#if 0
-my_bool my_hash_init2(PSI_memory_key psi_key, HASH *hash, size_t growth_size,
-                      CHARSET_INFO *charset, size_t default_array_elements,
-                      size_t key_offset, size_t key_length,
-                      my_hash_get_key get_key, my_hash_function hash_function,
-                      void (*free_element)(void*), uint flags);
-
-  my_hash_init(PSI_INSTRUMENT_ME, &hash, &my_charset_bin, 32,
-               offsetof(gtid_pos_element, gtid) + offsetof(rpl_gtid, domain_id),
-               sizeof(uint32), NULL, my_free, HASH_UNIQUE);
-#endif
-  struct pos_gtid
-  {
-    my_off_t pos;
-    rpl_gtid gtid;
-  } p;
-
-  if (my_hash_init(PSI_INSTRUMENT_ME, &hash, &my_charset_bin, 1024,
-                   offsetof(pos_gtid, pos), sizeof(my_off_t), 0, 0, MYF(0)))
-    DBUG_RETURN(true);
-
-  uchar *rec;
-
-  p.pos= my_org_b_tell;
-  rec= (uchar *) &p;
-
-  domain_id= thd->variables.gtid_domain_id;
-//   local_server_id= thd->variables.server_id;
-
-  // FIXME: Maybe make find_most_recent_nolock() or use find_nolock() ?
-  rpl_gtid *g= rpl_global_gtid_binlog_state.find_most_recent(domain_id);
-  if (!g)
-  {
-    // FIXME: error
-    DBUG_RETURN(true);
-  }
-  p.gtid= *g;
-
-  if ((err= my_hash_insert(&hash, rec)))
-  {
-//     my_free(entry);
-    my_error(ER_OUT_OF_RESOURCES, MYF(0));
-    DBUG_RETURN(true);
-  }
-
-  if ((rec= my_hash_search(&hash, (const uchar *)&my_org_b_tell,
-                            sizeof(my_org_b_tell))))
-  {
-    pos_gtid *p= (pos_gtid *) rec;
-    DBUG_PRINT("binlog", ("write_gtid: %lld", p->pos));
-  }
 
   if (write_event(&gtid_event))
     DBUG_RETURN(true);
