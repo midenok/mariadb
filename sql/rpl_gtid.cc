@@ -1547,6 +1547,7 @@ void rpl_binlog_state::free()
     initialized= 0;
     reset_nolock();
     my_hash_free(&hash);
+    my_hash_free(&pos_hash);
     delete_dynamic(&gtid_sort_array);
     mysql_mutex_destroy(&LOCK_binlog_state);
   }

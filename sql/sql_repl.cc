@@ -1460,12 +1460,6 @@ gtid_state_from_pos(const char *name, uint32 offset,
   Format_description_log_event *fdev= NULL;
 
   rpl_gtid *g= rpl_global_gtid_binlog_state.check_pos_hash(offset);
-#ifndef DBUG_OFF
-  if (g) {
-    DBUG_PRINT("binlog", ("Hit: %lld  GTID %u-%u-%llu", offset,
-                          g->domain_id, g->server_id, g->seq_no));
-  }
-#endif
 
   if (unlikely(gtid_state->load((const rpl_gtid *)NULL, 0)))
   {

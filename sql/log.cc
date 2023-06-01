@@ -5642,10 +5642,16 @@ bool rpl_binlog_state::update_pos_hash(my_off_t pos, uint32 domain_id)
 }
 
 
-rpl_gtid * rpl_binlog_state::check_pos_hash(my_off_t pos)
+rpl_gtid *rpl_binlog_state::check_pos_hash(my_off_t pos)
 {
   pos_gtid *el= (pos_gtid *) my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos));
-  return el ? &(el->gtid) : NULL;
+  if (el) {
+    rpl_gtid *g= &el->gtid;
+    DBUG_PRINT("binlog", ("Hit: %lld  GTID %u-%u-%llu", pos,
+                          g->domain_id, g->server_id, g->seq_no));
+    return g;
+  }
+  return NULL;
 }
 
 
@@ -5653,21 +5659,6 @@ bool MYSQL_BIN_LOG::write_event(Log_event *ev, binlog_cache_data *cache_data,
                                 IO_CACHE *file)
 {
 //   DBUG_PRINT("binlog", ("write_event: %llu", my_b_safe_tell(file)));
-//   mysql_mutex_lock(&LOCK_log);
-//   mysql_mutex_assert_owner(&LOCK_log);
-  my_off_t pos= my_b_tell(&log_file);
-  if (ev->thd)
-  {
-    uint32 domain_id= ev->thd->variables.gtid_domain_id;
-  //   local_server_id= thd->variables.server_id;
-
-    if (rpl_global_gtid_binlog_state.update_pos_hash(pos, domain_id))
-    {
-//       mysql_mutex_unlock(&LOCK_log);
-      return true;
-    }
-  }
-//   mysql_mutex_unlock(&LOCK_log);
 
   Log_event_writer writer(file, cache_data, &crypto);
   if (crypto.scheme && file == &log_file)
@@ -7525,7 +7516,7 @@ public:
   {
     DBUG_ENTER("CacheWriter::write");
     if (first)
-      write_header(pos, len);
+      write_header(thd, pos, len);
     else
       write_data(pos, len);
 

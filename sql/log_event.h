@@ -993,7 +993,7 @@ public:
   void *ctx;         ///< Encryption context or 0 if no encryption is needed
   uint checksum_len;
   int write(Log_event *ev);
-  int write_header(uchar *pos, size_t len);
+  int write_header(THD *thd, uchar *pos, size_t len);
   int write_data(const uchar *pos, size_t len);
   int write_footer();
   my_off_t pos() { return my_b_safe_tell(file); }

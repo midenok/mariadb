@@ -879,7 +879,10 @@ err:
   return res;
 }
 
-int Log_event_writer::write_header(uchar *pos, size_t len)
+
+extern rpl_binlog_state rpl_global_gtid_binlog_state;
+
+int Log_event_writer::write_header(THD *thd, uchar *pos, size_t len)
 {
   DBUG_ENTER("Log_event_writer::write_header");
   /*
@@ -899,6 +902,18 @@ int Log_event_writer::write_header(uchar *pos, size_t len)
   if (!cache_data)
   {
     DBUG_PRINT("binlog", ("write_header: %llu", my_b_tell(file)));
+    my_off_t pos= my_b_tell(file);
+    // FIXME: if thd is empty write "no GTID" element
+    if (thd)
+    {
+      uint32 domain_id= thd->variables.gtid_domain_id;
+      // local_server_id= thd->variables.server_id;
+
+      if (rpl_global_gtid_binlog_state.update_pos_hash(pos, domain_id))
+      {
+        return true;
+      }
+    }
   }
 
   if (ctx)
@@ -1010,7 +1025,7 @@ bool Log_event::write_header(size_t event_data_length)
   int4store(header+ LOG_POS_OFFSET, log_pos);
   int2store(header + FLAGS_OFFSET, flags);
 
-  bool ret= writer->write_header(header, sizeof(header));
+  bool ret= writer->write_header(thd, header, sizeof(header));
   DBUG_RETURN(ret);
 }
 
