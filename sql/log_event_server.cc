@@ -906,10 +906,7 @@ int Log_event_writer::write_header(THD *thd, uchar *pos, size_t len)
     // FIXME: if thd is empty write "no GTID" element
     if (thd)
     {
-      uint32 domain_id= thd->variables.gtid_domain_id;
-      // local_server_id= thd->variables.server_id;
-
-      if (rpl_global_gtid_binlog_state.update_pos_hash(pos, domain_id))
+      if (rpl_global_gtid_binlog_state.push_pos_hash(pos))
       {
         return true;
       }

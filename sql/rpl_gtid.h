@@ -46,6 +46,11 @@ inline bool operator==(const rpl_gtid& lhs, const rpl_gtid& rhs)
     lhs.seq_no    == rhs.seq_no;
 };
 
+inline bool operator!=(const rpl_gtid& lhs, const rpl_gtid& rhs)
+{
+  return !(lhs == rhs);
+}
+
 inline bool operator<(const rpl_gtid& lhs, const rpl_gtid& rhs)
 {
   return (lhs.domain_id == rhs.domain_id) ? lhs.seq_no < rhs.seq_no
@@ -307,20 +312,27 @@ struct rpl_binlog_state
 
     int update_element(const rpl_gtid *gtid);
   };
-  struct pos_gtid
-  {
-    my_off_t pos;
-    rpl_gtid gtid;
-  };
   /* Mapping from domain_id to collection of elements. */
   HASH hash;
-  HASH pos_hash;
   /* Mutex protecting access to the state. */
   mysql_mutex_t LOCK_binlog_state;
   my_bool initialized;
 
   /* Auxiliary buffer to sort gtid list. */
   DYNAMIC_ARRAY gtid_sort_array;
+
+  struct pos_hash_element
+  {
+    my_off_t pos;
+    size_t gtids_idx;
+  };
+
+  // FIXME: reset on binlog file change
+  // FIXME: test server_id change and GTID list event
+  /* Ordered array of gtids as they appear in binlog */
+  DYNAMIC_ARRAY gtids;
+  /* Map of file position to index in gtids array */
+  HASH pos_hash;
 
    rpl_binlog_state() :initialized(0) {}
   ~rpl_binlog_state();
@@ -335,7 +347,8 @@ struct rpl_binlog_state
   int update(const struct rpl_gtid *gtid, bool strict);
   int update_with_next_gtid(uint32 domain_id, uint32 server_id,
                              rpl_gtid *gtid);
-  bool update_pos_hash(my_off_t pos, uint32 domain_id);
+  bool push_gtids_array(const rpl_gtid *gtid);
+  bool push_pos_hash(my_off_t pos);
   rpl_gtid * check_pos_hash(my_off_t pos);
   int alloc_element_nolock(const rpl_gtid *gtid);
   bool check_strict_sequence(uint32 domain_id, uint32 server_id, uint64 seq_no,

@@ -5601,41 +5601,52 @@ end2:
 }
 
 
-bool rpl_binlog_state::update_pos_hash(my_off_t pos, uint32 domain_id)
+bool rpl_binlog_state::push_gtids_array(const rpl_gtid *gtid)
 {
-  pos_gtid *el;
-
-  // FIXME: Maybe make find_most_recent_nolock() or use find_nolock() ?
-  rpl_gtid *g= find_most_recent(domain_id);
-  if (!g)
+  DBUG_PRINT("binlog", ("Push GTID: [%llu] GTID %u-%u-%llu", gtids.elements,
+                        gtid->domain_id, gtid->server_id, gtid->seq_no));
+#ifndef DBUG_OFF
+  if (gtids.elements)
   {
-    // FIXME: error
+    rpl_gtid *last= dynamic_element(&gtids, gtids.elements - 1, rpl_gtid *);
+    DBUG_ASSERT(*last != *gtid);
+  }
+#endif
+  if (insert_dynamic(&gtids, (const void *) gtid))
+  {
+    my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*gtid));
     return true;
   }
+  return false;
+}
 
-  DBUG_PRINT("binlog", ("pos: %lld  GTID %u-%u-%llu", pos,
-                        g->domain_id, g->server_id, g->seq_no));
 
-  if ((el= (pos_gtid *) my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos))))
+bool rpl_binlog_state::push_pos_hash(my_off_t pos)
+{
+  pos_hash_element *el;
+  DBUG_ASSERT(gtids.elements);
+  size_t last_idx= gtids.elements - 1;
+  DBUG_PRINT("binlog", ("Push pos: {%llu} -> [%llu]", pos, last_idx));
+
+#ifndef DBUG_OFF
+  el= (pos_hash_element *) my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos));
+  DBUG_ASSERT(!el);
+#endif
+
+  if (!(el= (pos_hash_element *) my_malloc(PSI_INSTRUMENT_ME, sizeof(*el), MYF(MY_WME))))
   {
-    el->gtid= *g;
+    my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
+    return true;
   }
-  else
-  {
-    if (!(el= (pos_gtid *) my_malloc(PSI_INSTRUMENT_ME, sizeof(*el), MYF(MY_WME))))
-    {
-      my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
-      return true;
-    }
-    el->pos= pos;
-    el->gtid= *g;
+  el->pos= pos;
+  el->gtids_idx= last_idx;
 
-    if (my_hash_insert(&pos_hash, (uchar *) el))
-    {
-      my_free(el);
-      my_error(ER_OUT_OF_RESOURCES, MYF(0));
-      return true;
-    }
+  // FIXME: use LOCK_binlog_state?
+  if (my_hash_insert(&pos_hash, (uchar *) el))
+  {
+    my_free(el);
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
   }
 
   return false;
@@ -5644,12 +5655,12 @@ bool rpl_binlog_state::update_pos_hash(my_off_t pos, uint32 domain_id)
 
 rpl_gtid *rpl_binlog_state::check_pos_hash(my_off_t pos)
 {
-  pos_gtid *el= (pos_gtid *) my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos));
+  pos_hash_element *el= (pos_hash_element *)
+    my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos));
   if (el) {
-    rpl_gtid *g= &el->gtid;
-    DBUG_PRINT("binlog", ("Hit: %lld  GTID %u-%u-%llu", pos,
-                          g->domain_id, g->server_id, g->seq_no));
-    return g;
+    DBUG_ASSERT(el->pos == pos);
+    DBUG_PRINT("binlog", ("Hit pos: {%llu} -> [%llu]", pos, el->gtids_idx));
+    return NULL;
   }
   return NULL;
 }
@@ -6535,6 +6546,9 @@ MYSQL_BIN_LOG::write_gtid_event(THD *thd, bool standalone,
   if (err)
     DBUG_RETURN(true);
 
+  if(rpl_global_gtid_binlog_state.push_gtids_array(&gtid))
+    DBUG_RETURN(true);
+
   thd->set_last_commit_gtid(gtid);
   if (thd->get_binlog_flags_for_alter() & Gtid_log_event::FL_START_ALTER_E1)
     thd->set_binlog_start_alter_seq_no(gtid.seq_no);
@@ -6557,7 +6571,6 @@ MYSQL_BIN_LOG::write_gtid_event(THD *thd, bool standalone,
   if (write_event(&gtid_event))
     DBUG_RETURN(true);
 
-//   DBUG_ASSERT(log_file.write_buffer == log_file.write_pos);
   status_var_add(thd->status_var.binlog_bytes_written, gtid_event.data_written);
 
   DBUG_RETURN(false);
