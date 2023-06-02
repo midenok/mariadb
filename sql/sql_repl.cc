@@ -1459,7 +1459,16 @@ gtid_state_from_pos(const char *name, uint32 offset,
   String packet;
   Format_description_log_event *fdev= NULL;
 
-  rpl_gtid *g= rpl_global_gtid_binlog_state.check_pos_hash(offset);
+  rpl_gtid *gtid_list;
+  uint32 list_size;
+  // FIXME: turn off cache with config var?
+  err= rpl_global_gtid_binlog_state.check_pos_hash(name, offset, &gtid_list, &list_size);
+
+  if (!err)
+  {
+    gtid_state->load(gtid_list, list_size);
+    return NULL;
+  }
 
   if (unlikely(gtid_state->load((const rpl_gtid *)NULL, 0)))
   {

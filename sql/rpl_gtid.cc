@@ -1515,18 +1515,19 @@ void rpl_binlog_state::init()
   my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtid_sort_array, sizeof(rpl_gtid), 8, 8, MYF(0));
   mysql_mutex_init(key_LOCK_binlog_state, &LOCK_binlog_state,
                    MY_MUTEX_INIT_SLOW);
-  my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtids, sizeof(rpl_gtid), 8, 8, MYF(0));
-  my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
-               offsetof(pos_hash_element, pos), sizeof(my_off_t), 0,
-               my_free, HASH_UNIQUE);
+  my_hash_init(PSI_INSTRUMENT_ME, &binlog_hash, files_charset_info, 10, 0, 0,
+               (my_hash_get_key) binlog_hash_element::get_key, binlog_hash_element::free, HASH_UNIQUE);
+
   initialized= 1;
 }
+
 
 void
 rpl_binlog_state::reset_nolock()
 {
   uint32 i;
 
+  // FIXME: reset here?
   for (i= 0; i < hash.records; ++i)
     my_hash_free(&((element *)my_hash_element(&hash, i))->hash);
   my_hash_reset(&hash);
@@ -1551,8 +1552,7 @@ void rpl_binlog_state::free()
     my_hash_free(&hash);
     delete_dynamic(&gtid_sort_array);
     mysql_mutex_destroy(&LOCK_binlog_state);
-    delete_dynamic(&gtids);
-    my_hash_free(&pos_hash);
+    my_hash_free(&binlog_hash);
   }
 }
 

@@ -327,12 +327,47 @@ struct rpl_binlog_state
     size_t gtids_idx;
   };
 
-  // FIXME: reset on binlog file change
   // FIXME: test server_id change and GTID list event
-  /* Ordered array of gtids as they appear in binlog */
-  DYNAMIC_ARRAY gtids;
-  /* Map of file position to index in gtids array */
-  HASH pos_hash;
+  struct binlog_hash_element
+  {
+    char filename_buf[FN_REFLEN];
+    LEX_CSTRING filename;
+    /* Ordered array of gtids as they appear in binlog */
+    DYNAMIC_ARRAY gtids;
+    /* Map of file position to index in gtids array */
+    HASH pos_hash;
+
+    binlog_hash_element()
+    {
+      my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtids, sizeof(rpl_gtid), 8, 8, MYF(0));
+      my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
+                   offsetof(pos_hash_element, pos), sizeof(my_off_t), 0,
+                   my_free, HASH_UNIQUE);
+    }
+
+    ~binlog_hash_element()
+    {
+      delete_dynamic(&gtids);
+      my_hash_free(&pos_hash);
+    }
+
+    static void free(void *ptr)
+    {
+      delete static_cast<binlog_hash_element *>(ptr);
+    }
+
+    static
+    uchar* get_key(binlog_hash_element *el, size_t *length,
+                   my_bool not_used __attribute__((unused)))
+    {
+      *length= el->filename.length;
+      return (uchar*) el->filename.str;
+    }
+  };
+
+  HASH binlog_hash;
+  /* Current binlog element */
+  binlog_hash_element *binlog_element;
 
    rpl_binlog_state() :initialized(0) {}
   ~rpl_binlog_state();
@@ -347,9 +382,11 @@ struct rpl_binlog_state
   int update(const struct rpl_gtid *gtid, bool strict);
   int update_with_next_gtid(uint32 domain_id, uint32 server_id,
                              rpl_gtid *gtid);
+  bool rotate_binlog(const char *filename);
   bool push_gtids_array(const rpl_gtid *gtid);
-  bool push_pos_hash(my_off_t pos);
-  rpl_gtid * check_pos_hash(my_off_t pos);
+  bool push_pos_hash(my_off_t pos, uchar event_type);
+  int check_pos_hash(const char *filename, my_off_t pos,
+                     rpl_gtid **gtid_array, uint32 *array_size);
   int alloc_element_nolock(const rpl_gtid *gtid);
   bool check_strict_sequence(uint32 domain_id, uint32 server_id, uint64 seq_no,
                              bool no_error= false);

@@ -3916,6 +3916,8 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
       if (!is_relay_log)
       {
         char buf[FN_REFLEN];
+        if (rpl_global_gtid_binlog_state.rotate_binlog(log_file_name))
+          goto err;
 
         /*
           Output a Gtid_list_log_event at the start of the binlog file.
@@ -5601,18 +5603,48 @@ end2:
 }
 
 
+// FIXME: move rpl_binlog_state methods to rpl_gtid.cc
+bool rpl_binlog_state::rotate_binlog(const char *filename)
+{
+  // FIXME: reset on binlog file change
+  binlog_hash_element *el= new (std::nothrow) binlog_hash_element();
+  if (!el)
+  {
+    my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
+    return true;
+  }
+  size_t len= strlen(filename);
+  memcpy(el->filename_buf, filename, len + 1);
+  el->filename.str= el->filename_buf;
+  el->filename.length= len;
+
+  // FIXME: use LOCK_binlog_state?
+  if (my_hash_insert(&binlog_hash, (uchar *) el))
+  {
+    delete el;
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+  binlog_element= el;
+
+  // FIXME: rotate max number of elements
+  return false;
+}
+
+
 bool rpl_binlog_state::push_gtids_array(const rpl_gtid *gtid)
 {
-  DBUG_PRINT("binlog", ("Push GTID: [%llu] GTID %u-%u-%llu", gtids.elements,
+  DYNAMIC_ARRAY *gtids= &binlog_element->gtids;
+  DBUG_PRINT("binlog", ("Push GTID: [%llu] GTID %u-%u-%llu", gtids->elements,
                         gtid->domain_id, gtid->server_id, gtid->seq_no));
 #ifndef DBUG_OFF
-  if (gtids.elements)
+  if (gtids->elements)
   {
-    rpl_gtid *last= dynamic_element(&gtids, gtids.elements - 1, rpl_gtid *);
+    rpl_gtid *last= dynamic_element(gtids, gtids->elements - 1, rpl_gtid *);
     DBUG_ASSERT(*last != *gtid);
   }
 #endif
-  if (insert_dynamic(&gtids, (const void *) gtid))
+  if (insert_dynamic(gtids, (const void *) gtid))
   {
     my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*gtid));
     return true;
@@ -5621,15 +5653,23 @@ bool rpl_binlog_state::push_gtids_array(const rpl_gtid *gtid)
 }
 
 
-bool rpl_binlog_state::push_pos_hash(my_off_t pos)
+bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
 {
   pos_hash_element *el;
-  DBUG_ASSERT(gtids.elements);
-  size_t last_idx= gtids.elements - 1;
+  DYNAMIC_ARRAY *gtids= &binlog_element->gtids;
+  HASH *pos_hash= &binlog_element->pos_hash;
+  /* For gtids->elements == 0 we store SIZE_T_MAX to indicate no GTIDs */
+  size_t last_idx= gtids->elements - 1;
+  if (event_type == GTID_EVENT)
+  {
+    DBUG_ASSERT(gtids->elements);
+    /* New GTID event does not include this new GTID, only next event includes it */
+    last_idx--;
+  }
   DBUG_PRINT("binlog", ("Push pos: {%llu} -> [%llu]", pos, last_idx));
 
 #ifndef DBUG_OFF
-  el= (pos_hash_element *) my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos));
+  el= (pos_hash_element *) my_hash_search(pos_hash, (const uchar *)&pos, sizeof(pos));
   DBUG_ASSERT(!el);
 #endif
 
@@ -5642,7 +5682,7 @@ bool rpl_binlog_state::push_pos_hash(my_off_t pos)
   el->gtids_idx= last_idx;
 
   // FIXME: use LOCK_binlog_state?
-  if (my_hash_insert(&pos_hash, (uchar *) el))
+  if (my_hash_insert(pos_hash, (uchar *) el))
   {
     my_free(el);
     my_error(ER_OUT_OF_RESOURCES, MYF(0));
@@ -5653,16 +5693,40 @@ bool rpl_binlog_state::push_pos_hash(my_off_t pos)
 }
 
 
-rpl_gtid *rpl_binlog_state::check_pos_hash(my_off_t pos)
+int rpl_binlog_state::check_pos_hash(const char *filename, my_off_t pos,
+                                     rpl_gtid **gtid_array, uint32 *array_size)
 {
-  pos_hash_element *el= (pos_hash_element *)
-    my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos));
-  if (el) {
-    DBUG_ASSERT(el->pos == pos);
-    DBUG_PRINT("binlog", ("Hit pos: {%llu} -> [%llu]", pos, el->gtids_idx));
-    return NULL;
+  binlog_hash_element *bel= (binlog_hash_element *)
+    my_hash_search(&binlog_hash, (const uchar *) filename, strlen(filename));
+  if (!bel)
+  {
+    DBUG_PRINT("binlog", ("Miss file: %s (%llu)", filename, pos));
+    return 1;
   }
-  return NULL;
+  pos_hash_element *el= (pos_hash_element *)
+    my_hash_search(&bel->pos_hash, (const uchar *)&pos, sizeof(pos));
+  if (!el)
+  {
+    DBUG_PRINT("binlog", ("Miss pos: %llu (%s)", pos, filename));
+    *gtid_array= NULL;
+    *array_size= 0;
+    return 0;
+  }
+  DBUG_ASSERT(el->pos == pos);
+  DBUG_PRINT("binlog", ("Hit pos: %llu -> [%llu] (%s)", pos, el->gtids_idx, filename));
+
+  if (el->gtids_idx == SIZE_T_MAX)
+  {
+    // FIXME: return "empty" gtid?
+    *gtid_array= NULL;
+    *array_size= 0;
+  }
+  else
+  {
+    *gtid_array= (rpl_gtid *) bel->gtids.buffer;
+    *array_size= (uint32) el->gtids_idx + 1;
+  }
+  return 0;
 }
 
 
@@ -7529,7 +7593,7 @@ public:
   {
     DBUG_ENTER("CacheWriter::write");
     if (first)
-      write_header(thd, pos, len);
+      write_header(pos, len);
     else
       write_data(pos, len);
 
