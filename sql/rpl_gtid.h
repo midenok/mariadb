@@ -384,11 +384,6 @@ struct rpl_binlog_state
   int update(const struct rpl_gtid *gtid, bool strict);
   int update_with_next_gtid(uint32 domain_id, uint32 server_id,
                              rpl_gtid *gtid);
-  bool rotate_binlog(const char *filename);
-  bool push_gtids_array(const rpl_gtid *gtid, uint32 count);
-  bool push_pos_hash(my_off_t pos, uchar event_type);
-  int check_pos_hash(const char *filename, my_off_t pos,
-                     rpl_gtid **gtid_array, uint32 *array_size);
   int alloc_element_nolock(const rpl_gtid *gtid);
   bool check_strict_sequence(uint32 domain_id, uint32 server_id, uint64 seq_no,
                              bool no_error= false);
@@ -404,6 +399,12 @@ struct rpl_binlog_state
   rpl_gtid *find(uint32 domain_id, uint32 server_id);
   rpl_gtid *find_most_recent(uint32 domain_id);
   const char* drop_domain(DYNAMIC_ARRAY *ids, Gtid_list_log_event *glev, char*);
+  /* binlog_gtid_pos() caching methods */
+  bool rotate_binlog(const char *filename);
+  bool push_gtids_array(const rpl_gtid *gtid, uint32 count);
+  bool push_pos_hash(my_off_t pos, uchar event_type);
+  int check_pos_hash(const char *filename, my_off_t pos,
+                     rpl_gtid **gtid_array, uint32 *array_size);
 };
 
 

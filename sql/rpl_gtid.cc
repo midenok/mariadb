@@ -2291,6 +2291,143 @@ end:
   DBUG_RETURN(errmsg);
 }
 
+
+bool rpl_binlog_state::rotate_binlog(const char *filename)
+{
+  // FIXME: reset on binlog file change
+  binlog_hash_element *el= new (std::nothrow) binlog_hash_element();
+  if (!el)
+  {
+    my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
+    return true;
+  }
+  size_t len= strlen(filename);
+  memcpy(el->filename_buf, filename, len + 1);
+  el->filename.str= el->filename_buf;
+  el->filename.length= len;
+
+  // FIXME: use LOCK_binlog_state?
+  if (my_hash_insert(&binlog_hash, (uchar *) el))
+  {
+    delete el;
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+  binlog_element= el;
+
+  // FIXME: rotate max number of elements
+  return false;
+}
+
+
+bool rpl_binlog_state::push_gtids_array(const rpl_gtid *gtid, uint32 count)
+{
+  if (!binlog_element)
+    return false;
+  DBUG_ASSERT(count > 0);
+  DYNAMIC_ARRAY *gtids= &binlog_element->gtids;
+  DBUG_PRINT("binlog", ("Push GTID: [%llu] GTID %u-%u-%llu", gtids->elements,
+                        gtid->domain_id, gtid->server_id, gtid->seq_no));
+#ifndef DBUG_OFF
+  if (gtids->elements)
+  {
+    rpl_gtid *last= dynamic_element(gtids, gtids->elements - 1, rpl_gtid *);
+    DBUG_ASSERT(*last != *gtid);
+  }
+#endif
+  for (uint32 i= 0; i < count; ++i)
+    if (insert_dynamic(gtids, (const void *) (gtid + i)))
+    {
+      my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*gtid));
+      return true;
+    }
+  return false;
+}
+
+
+bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
+{
+  if (!binlog_element)
+    return false;
+  pos_hash_element *el;
+  DYNAMIC_ARRAY *gtids= &binlog_element->gtids;
+  HASH *pos_hash= &binlog_element->pos_hash;
+  /* For gtids->elements == 0 we store SIZE_T_MAX to indicate no GTIDs */
+  size_t last_idx= gtids->elements - 1;
+  if (event_type == GTID_EVENT)
+  {
+    DBUG_ASSERT(gtids->elements);
+    /* New GTID event does not include this new GTID, only next event includes it */
+    last_idx--;
+  }
+  else if (gtids->elements && event_type == GTID_LIST_EVENT)
+  {
+    /* Update all preceding events with GTID list */
+    for (size_t idx= 0; idx < pos_hash->records; idx++)
+    {
+      el= (pos_hash_element *) my_hash_element(pos_hash, idx);
+      el->gtids_idx= last_idx;
+    }
+  }
+  DBUG_PRINT("binlog", ("Push pos: {%llu} -> [%llu]", pos, last_idx));
+
+#ifndef DBUG_OFF
+  DBUG_ASSERT(pos == 0 || pos > binlog_element->max_pos);
+  el= (pos_hash_element *) my_hash_search(pos_hash, (const uchar *)&pos, sizeof(pos));
+  DBUG_ASSERT(!el);
+#endif
+
+  if (!(el= (pos_hash_element *) my_malloc(PSI_INSTRUMENT_ME, sizeof(*el), MYF(MY_WME))))
+  {
+    my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
+    return true;
+  }
+  el->pos= pos;
+  el->gtids_idx= last_idx;
+
+  // FIXME: use LOCK_binlog_state?
+  if (my_hash_insert(pos_hash, (uchar *) el))
+  {
+    my_free(el);
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+
+  binlog_element->max_pos= pos;
+  return false;
+}
+
+
+int rpl_binlog_state::check_pos_hash(const char *filename, my_off_t pos,
+                                     rpl_gtid **gtid_array, uint32 *array_size)
+{
+  binlog_hash_element *bel= (binlog_hash_element *)
+    my_hash_search(&binlog_hash, (const uchar *) filename, strlen(filename));
+  if (!bel)
+  {
+    DBUG_PRINT("binlog", ("Miss file: %s (%llu)", filename, pos));
+    return 0;
+  }
+  pos_hash_element *el= (pos_hash_element *)
+    my_hash_search(&bel->pos_hash, (const uchar *)&pos, sizeof(pos));
+  if (!el)
+  {
+    DBUG_PRINT("binlog", ("Miss pos: %llu (%s)", pos, filename));
+    return 2;
+  }
+  DBUG_ASSERT(el->pos == pos);
+  DBUG_PRINT("binlog", ("Hit pos: %llu -> [%llu] (%s)", pos, el->gtids_idx, filename));
+
+  if (el->gtids_idx != SIZE_T_MAX)
+  {
+    DBUG_ASSERT(el->gtids_idx < bel->gtids.elements);
+    *gtid_array= (rpl_gtid *) bel->gtids.buffer;
+    *array_size= (uint32) el->gtids_idx + 1;
+  }
+  return 1;
+}
+
+
 slave_connection_state::slave_connection_state()
 {
   my_hash_init(PSI_INSTRUMENT_ME, &hash, &my_charset_bin, 32,
