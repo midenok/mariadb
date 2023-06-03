@@ -18,6 +18,7 @@
 
 #include "hash.h"
 #include "queues.h"
+#include "sql_list.h"
 #include <atomic>
 
 /* Definitions for MariaDB global transaction ID (GTID). */
@@ -368,6 +369,9 @@ struct rpl_binlog_state
   };
 
   HASH binlog_hash;
+  /* Used for binlog_hash rotation */
+  List<binlog_hash_element> binlog_list;
+  MEM_ROOT mem_root;
   /* Current binlog element, NULL means no caching is done */
   binlog_hash_element *binlog_element;
 

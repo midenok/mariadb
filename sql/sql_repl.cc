@@ -1465,7 +1465,6 @@ gtid_state_from_pos(const char *name, uint32 offset,
 
   rpl_gtid *gtid_list= NULL;
   uint32 list_size= 0;
-  // FIXME: turn off cache with config var?
   err= rpl_global_gtid_binlog_state.check_pos_hash(name, offset, &gtid_list, &list_size);
 
   if (unlikely(gtid_state->load(gtid_list, list_size)))

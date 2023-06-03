@@ -1515,20 +1515,20 @@ void rpl_binlog_state::init()
   my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtid_sort_array, sizeof(rpl_gtid), 8, 8, MYF(0));
   mysql_mutex_init(key_LOCK_binlog_state, &LOCK_binlog_state,
                    MY_MUTEX_INIT_SLOW);
-  // FIXME: don't init/destroy if caching is off
   my_hash_init(PSI_INSTRUMENT_ME, &binlog_hash, files_charset_info, 10, 0, 0,
-               (my_hash_get_key) binlog_hash_element::get_key, binlog_hash_element::free, HASH_UNIQUE);
+               (my_hash_get_key) binlog_hash_element::get_key,
+               binlog_hash_element::free, HASH_UNIQUE);
+  binlog_list.empty();
+  init_alloc_root(PSI_INSTRUMENT_ME, &mem_root, 1024, 0, MYF(0));
   binlog_element= NULL;
   initialized= 1;
 }
-
 
 void
 rpl_binlog_state::reset_nolock()
 {
   uint32 i;
 
-  // FIXME: reset here?
   for (i= 0; i < hash.records; ++i)
     my_hash_free(&((element *)my_hash_element(&hash, i))->hash);
   my_hash_reset(&hash);
@@ -1554,6 +1554,7 @@ void rpl_binlog_state::free()
     delete_dynamic(&gtid_sort_array);
     mysql_mutex_destroy(&LOCK_binlog_state);
     my_hash_free(&binlog_hash);
+    free_root(&mem_root, MYF(0));
   }
 }
 
@@ -2294,8 +2295,48 @@ end:
 
 bool rpl_binlog_state::rotate_binlog(const char *filename)
 {
-  // FIXME: reset on binlog file change
-  binlog_hash_element *el= new (std::nothrow) binlog_hash_element();
+  binlog_hash_element *el;
+  DBUG_ASSERT(binlog_hash.records == binlog_list.elements);
+
+  /* If turned off clear and return */
+  if (!opt_binlog_gtid_pos_cache)
+  {
+    if (binlog_hash.records)
+    {
+      DBUG_PRINT("binlog", ("Cleared all %lu records", binlog_hash.records));
+      binlog_list.empty();
+      my_hash_reset(&binlog_hash);
+      free_root(&mem_root, MYF(0));
+      binlog_element= NULL;
+    }
+    return false;
+  }
+
+  /* Rotate binlog_hash if needed */
+  if (binlog_hash.records >= opt_binlog_gtid_pos_cache)
+  {
+    const ulong drop_size= binlog_hash.records - opt_binlog_gtid_pos_cache + 1;
+    if (drop_size == binlog_hash.records)
+    {
+      binlog_list.empty();
+      my_hash_reset(&binlog_hash);
+      free_root(&mem_root, MYF(0));
+    }
+    else
+    {
+      for (ulong n= 0; n < drop_size; n++)
+      {
+        el= binlog_list.pop();
+        DBUG_PRINT("binlog", ("Rotated: %s", el->filename));
+        if (my_hash_delete(&binlog_hash, (uchar *) el))
+          DBUG_ASSERT(0);
+      }
+    }
+    DBUG_PRINT("binlog", ("Cleared %lu records", drop_size));
+  }
+
+  /* Push new element */
+  el= new (std::nothrow) binlog_hash_element();
   if (!el)
   {
     my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
@@ -2313,9 +2354,17 @@ bool rpl_binlog_state::rotate_binlog(const char *filename)
     my_error(ER_OUT_OF_RESOURCES, MYF(0));
     return true;
   }
-  binlog_element= el;
 
-  // FIXME: rotate max number of elements
+  /* Note: I_List cannot pop() */
+  if (binlog_list.push_back(el, &mem_root))
+  {
+    if (my_hash_delete(&binlog_hash, (uchar *) el))
+      DBUG_ASSERT(0);
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+
+  binlog_element= el;
   return false;
 }
 
@@ -2401,6 +2450,8 @@ bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
 int rpl_binlog_state::check_pos_hash(const char *filename, my_off_t pos,
                                      rpl_gtid **gtid_array, uint32 *array_size)
 {
+  if (!binlog_element)
+    return 0;
   binlog_hash_element *bel= (binlog_hash_element *)
     my_hash_search(&binlog_hash, (const uchar *) filename, strlen(filename));
   if (!bel)
