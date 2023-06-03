@@ -1451,6 +1451,10 @@ gtid_state_from_pos(const char *name, uint32 offset,
   IO_CACHE cache;
   File file;
   const char *errormsg= NULL;
+  static const char *invalid_pos_msg=
+      "Slave requested incorrect position in master binlog. "
+      "Requested position %u in file '%s', but this position does not "
+      "correspond to the location of any binlog event.";
   bool found_gtid_list_event= false;
   bool found_format_description_event= false;
   bool valid_pos= false;
@@ -1459,23 +1463,20 @@ gtid_state_from_pos(const char *name, uint32 offset,
   String packet;
   Format_description_log_event *fdev= NULL;
 
-  rpl_gtid *gtid_list;
-  uint32 list_size;
+  rpl_gtid *gtid_list= NULL;
+  uint32 list_size= 0;
   // FIXME: turn off cache with config var?
   err= rpl_global_gtid_binlog_state.check_pos_hash(name, offset, &gtid_list, &list_size);
 
-  if (!err)
-  {
-    gtid_state->load(gtid_list, list_size);
-    return NULL;
-  }
-
-  if (unlikely(gtid_state->load((const rpl_gtid *)NULL, 0)))
+  if (unlikely(gtid_state->load(gtid_list, list_size)))
   {
     errormsg= "Internal error (out of memory?) initializing slave state "
       "while scanning binlog to find start position";
     return errormsg;
   }
+
+  if (err)
+      return err == 2 ? invalid_pos_msg : NULL;
 
   if (unlikely((file= open_binlog(&cache, name, &errormsg)) == (File)-1))
     return errormsg;
@@ -1629,11 +1630,7 @@ gtid_state_from_pos(const char *name, uint32 offset,
   }
 
   if (unlikely(!valid_pos))
-  {
-    errormsg= "Slave requested incorrect position in master binlog. "
-      "Requested position %u in file '%s', but this position does not "
-      "correspond to the location of any binlog event.";
-  }
+    errormsg= invalid_pos_msg;
 
 end:
   delete fdev;

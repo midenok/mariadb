@@ -336,8 +336,9 @@ struct rpl_binlog_state
     DYNAMIC_ARRAY gtids;
     /* Map of file position to index in gtids array */
     HASH pos_hash;
+    my_off_t max_pos;
 
-    binlog_hash_element()
+    binlog_hash_element() : max_pos(0)
     {
       my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtids, sizeof(rpl_gtid), 8, 8, MYF(0));
       my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
@@ -366,7 +367,7 @@ struct rpl_binlog_state
   };
 
   HASH binlog_hash;
-  /* Current binlog element */
+  /* Current binlog element, NULL means no caching is done */
   binlog_hash_element *binlog_element;
 
    rpl_binlog_state() :initialized(0) {}

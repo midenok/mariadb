@@ -1515,9 +1515,10 @@ void rpl_binlog_state::init()
   my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtid_sort_array, sizeof(rpl_gtid), 8, 8, MYF(0));
   mysql_mutex_init(key_LOCK_binlog_state, &LOCK_binlog_state,
                    MY_MUTEX_INIT_SLOW);
+  // FIXME: don't init/destroy if caching is off
   my_hash_init(PSI_INSTRUMENT_ME, &binlog_hash, files_charset_info, 10, 0, 0,
                (my_hash_get_key) binlog_hash_element::get_key, binlog_hash_element::free, HASH_UNIQUE);
-
+  binlog_element= NULL;
   initialized= 1;
 }
 

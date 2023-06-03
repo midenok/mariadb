@@ -903,11 +903,8 @@ int Log_event_writer::write_header(uchar *pos, size_t len)
   {
     DBUG_PRINT("binlog", ("write_header: %llu", my_b_tell(file)));
     my_off_t offset= my_b_tell(file);
-    // FIXME: if thd is empty write "no GTID" element
     if (rpl_global_gtid_binlog_state.push_pos_hash(offset, pos[EVENT_TYPE_OFFSET]))
-    {
       return true;
-    }
   }
 
   if (ctx)
