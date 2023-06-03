@@ -336,6 +336,7 @@ struct rpl_binlog_state
     DYNAMIC_ARRAY gtids;
     /* Map of file position to index in gtids array */
     HASH pos_hash;
+    /* Currently used only for DBUG_ASSERT, but can be used for read-through caching */
     my_off_t max_pos;
 
     binlog_hash_element() : max_pos(0)
@@ -384,7 +385,7 @@ struct rpl_binlog_state
   int update_with_next_gtid(uint32 domain_id, uint32 server_id,
                              rpl_gtid *gtid);
   bool rotate_binlog(const char *filename);
-  bool push_gtids_array(const rpl_gtid *gtid);
+  bool push_gtids_array(const rpl_gtid *gtid, uint32 count);
   bool push_pos_hash(my_off_t pos, uchar event_type);
   int check_pos_hash(const char *filename, my_off_t pos,
                      rpl_gtid **gtid_array, uint32 *array_size);

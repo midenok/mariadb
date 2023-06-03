@@ -5632,10 +5632,11 @@ bool rpl_binlog_state::rotate_binlog(const char *filename)
 }
 
 
-bool rpl_binlog_state::push_gtids_array(const rpl_gtid *gtid)
+bool rpl_binlog_state::push_gtids_array(const rpl_gtid *gtid, uint32 count)
 {
   if (!binlog_element)
     return false;
+  DBUG_ASSERT(count > 0);
   DYNAMIC_ARRAY *gtids= &binlog_element->gtids;
   DBUG_PRINT("binlog", ("Push GTID: [%llu] GTID %u-%u-%llu", gtids->elements,
                         gtid->domain_id, gtid->server_id, gtid->seq_no));
@@ -5646,11 +5647,12 @@ bool rpl_binlog_state::push_gtids_array(const rpl_gtid *gtid)
     DBUG_ASSERT(*last != *gtid);
   }
 #endif
-  if (insert_dynamic(gtids, (const void *) gtid))
-  {
-    my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*gtid));
-    return true;
-  }
+  for (uint32 i= 0; i < count; ++i)
+    if (insert_dynamic(gtids, (const void *) (gtid + i)))
+    {
+      my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*gtid));
+      return true;
+    }
   return false;
 }
 
@@ -5669,6 +5671,15 @@ bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
     DBUG_ASSERT(gtids->elements);
     /* New GTID event does not include this new GTID, only next event includes it */
     last_idx--;
+  }
+  else if (gtids->elements && event_type == GTID_LIST_EVENT)
+  {
+    /* Update all preceding events with GTID list */
+    for (size_t idx= 0; idx < pos_hash->records; idx++)
+    {
+      el= (pos_hash_element *) my_hash_element(pos_hash, idx);
+      el->gtids_idx= last_idx;
+    }
   }
   DBUG_PRINT("binlog", ("Push pos: {%llu} -> [%llu]", pos, last_idx));
 
@@ -5721,6 +5732,7 @@ int rpl_binlog_state::check_pos_hash(const char *filename, my_off_t pos,
 
   if (el->gtids_idx != SIZE_T_MAX)
   {
+    DBUG_ASSERT(el->gtids_idx < bel->gtids.elements);
     *gtid_array= (rpl_gtid *) bel->gtids.buffer;
     *array_size= (uint32) el->gtids_idx + 1;
   }
@@ -5731,8 +5743,6 @@ int rpl_binlog_state::check_pos_hash(const char *filename, my_off_t pos,
 bool MYSQL_BIN_LOG::write_event(Log_event *ev, binlog_cache_data *cache_data,
                                 IO_CACHE *file)
 {
-//   DBUG_PRINT("binlog", ("write_event: %llu", my_b_safe_tell(file)));
-
   Log_event_writer writer(file, cache_data, &crypto);
   if (crypto.scheme && file == &log_file)
   {
@@ -6608,7 +6618,7 @@ MYSQL_BIN_LOG::write_gtid_event(THD *thd, bool standalone,
   if (err)
     DBUG_RETURN(true);
 
-  if(rpl_global_gtid_binlog_state.push_gtids_array(&gtid))
+  if (rpl_global_gtid_binlog_state.push_gtids_array(&gtid, 1))
     DBUG_RETURN(true);
 
   thd->set_last_commit_gtid(gtid);

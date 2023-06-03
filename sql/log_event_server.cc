@@ -4056,6 +4056,11 @@ Gtid_list_log_event::write()
   packet.length(0);
   if (to_packet(&packet))
     return true;
+
+  if (count &&
+      rpl_global_gtid_binlog_state.push_gtids_array(list, count))
+    return true;
+
   return write_header(get_data_size()) ||
          write_data(packet.ptr(), packet.length()) ||
          write_footer();
