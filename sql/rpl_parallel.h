@@ -346,6 +346,9 @@ struct rpl_parallel_entry {
   /* The group_commit_orderer object for the events currently being queued. */
   group_commit_orderer *current_gco;
 
+  uint64 current_noptim_sub_id;
+  rpl_group_info *current_noptim_group_info;
+
   rpl_parallel_thread * choose_thread(rpl_group_info *rgi, bool *did_enter_cond,
                                       PSI_stage_info *old_stage, bool reuse);
   int queue_master_restart(rpl_group_info *rgi,

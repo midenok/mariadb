@@ -2040,6 +2040,8 @@ struct wait_for_commit
   wait_for_commit *subsequent_commits_list;
   /* Link field for entries in subsequent_commits_list. */
   wait_for_commit *next_subsequent_commit;
+  /* Link threads that we register_wait_for_prior_commit() on. */
+  wait_for_commit *next_prior_commit;
   /*
     Our waitee, if we did register_wait_for_prior_commit(), and were not
     yet woken up. Else NULL.
@@ -2081,7 +2083,7 @@ struct wait_for_commit
   */
   bool commit_started;
 
-  void register_wait_for_prior_commit(wait_for_commit *waitee);
+  void register_wait_for_prior_commit(wait_for_commit *waitee, bool dep= false);
   int wait_for_prior_commit(THD *thd)
   {
     /*
@@ -2116,10 +2118,9 @@ struct wait_for_commit
   }
   void unregister_wait_for_prior_commit()
   {
-    if (waitee.load(std::memory_order_relaxed))
+    while(waitee.load(std::memory_order_relaxed))
       unregister_wait_for_prior_commit2();
-    else
-      wakeup_error= 0;
+    wakeup_error= 0;
   }
   /*
     Remove a waiter from the list in the waitee. Used to unregister a wait.
