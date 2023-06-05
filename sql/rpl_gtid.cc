@@ -2450,7 +2450,7 @@ bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
 int rpl_binlog_state::check_pos_hash(const char *filename, my_off_t pos,
                                      rpl_gtid **gtid_array, uint32 *array_size)
 {
-  if (!binlog_element)
+  if (!binlog_element || !opt_binlog_gtid_pos_cache)
     return 0;
   binlog_hash_element *bel= (binlog_hash_element *)
     my_hash_search(&binlog_hash, (const uchar *) filename, strlen(filename));
