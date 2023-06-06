@@ -3884,8 +3884,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
       if (!s.is_valid())
         goto err;
       s.dont_set_created= null_created_arg;
-      if (!is_relay_log &&
-          rpl_global_gtid_binlog_state.rotate_binlog(log_file_name))
+      if (rpl_global_gtid_binlog_state.rotate_binlog(log_file_name))
         goto err;
       if (write_event(&s))
         goto err;
@@ -4575,6 +4574,8 @@ bool MYSQL_BIN_LOG::reset_logs(THD *thd, bool create_new_log,
     else
       rpl_global_gtid_binlog_state.reset();
   }
+
+  rpl_global_gtid_binlog_state.reset_binlog_hash();
 
   /* Start logging with a new file */
   close(LOG_CLOSE_INDEX | LOG_CLOSE_TO_BE_OPENED);

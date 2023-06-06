@@ -403,6 +403,7 @@ struct rpl_binlog_state
   rpl_gtid *find_most_recent(uint32 domain_id);
   const char* drop_domain(DYNAMIC_ARRAY *ids, Gtid_list_log_event *glev, char*);
   /* binlog_gtid_pos() caching methods */
+  void reset_binlog_hash();
   bool rotate_binlog(const char *filename);
   bool push_gtids_array(const rpl_gtid *gtid, uint32 count);
   bool push_pos_hash(my_off_t pos, uchar event_type);

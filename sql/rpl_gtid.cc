@@ -2293,6 +2293,14 @@ end:
 }
 
 
+void rpl_binlog_state::reset_binlog_hash()
+{
+  binlog_list.empty();
+  my_hash_reset(&binlog_hash);
+  free_root(&mem_root, MYF(0));
+  binlog_element= NULL;
+ }
+
 bool rpl_binlog_state::rotate_binlog(const char *filename)
 {
   binlog_hash_element *el;
@@ -2304,10 +2312,7 @@ bool rpl_binlog_state::rotate_binlog(const char *filename)
     if (binlog_hash.records)
     {
       DBUG_PRINT("binlog", ("Cleared all %lu records", binlog_hash.records));
-      binlog_list.empty();
-      my_hash_reset(&binlog_hash);
-      free_root(&mem_root, MYF(0));
-      binlog_element= NULL;
+      reset_binlog_hash();
     }
     return false;
   }
@@ -2423,7 +2428,7 @@ bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
 #ifndef DBUG_OFF
   DBUG_ASSERT(pos == 0 || pos > binlog_element->max_pos);
   el= (pos_hash_element *) my_hash_search(pos_hash, (const uchar *)&pos, sizeof(pos));
-  DBUG_ASSERT(!el);
+  DBUG_ASSERT(!el || pos == 0);
 #endif
 
   if (!(el= (pos_hash_element *) my_malloc(PSI_INSTRUMENT_ME, sizeof(*el), MYF(MY_WME))))
@@ -2438,8 +2443,12 @@ bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
   if (my_hash_insert(pos_hash, (uchar *) el))
   {
     my_free(el);
-    my_error(ER_OUT_OF_RESOURCES, MYF(0));
-    return true;
+    /* NOTE: encryption repeats pos 0 event on binlog open */
+    if (pos != 0)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
   }
 
   binlog_element->max_pos= pos;
