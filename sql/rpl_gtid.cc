@@ -2399,7 +2399,8 @@ bool rpl_binlog_state::push_gtids_array(const rpl_gtid *gtid, uint32 count)
 }
 
 
-bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
+bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type,
+                                     uint event_len)
 {
   if (!binlog_element)
     return false;
@@ -2452,6 +2453,7 @@ bool rpl_binlog_state::push_pos_hash(my_off_t pos, uchar event_type)
   }
 
   binlog_element->max_pos= pos;
+  binlog_element->eof_pos= pos + event_len;
   return false;
 }
 
@@ -2467,6 +2469,19 @@ int rpl_binlog_state::check_pos_hash(const char *filename, my_off_t pos,
   {
     DBUG_PRINT("binlog", ("Miss file: %s (%llu)", filename, pos));
     return 0;
+  }
+  /*
+    SHOW MASTER STATUS returns EOF position and we must accept it as a valid point.
+    We return whole gtids array in that case (rpl.rpl_gtid_basic).
+  */
+  if (pos == bel->eof_pos)
+  {
+    if (bel->gtids.elements)
+    {
+      *gtid_array= (rpl_gtid *) bel->gtids.buffer;
+      *array_size= (uint32) bel->gtids.elements;
+    }
+    return 1;
   }
   pos_hash_element *el= (pos_hash_element *)
     my_hash_search(&bel->pos_hash, (const uchar *)&pos, sizeof(pos));

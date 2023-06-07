@@ -338,8 +338,9 @@ struct rpl_binlog_state
     HASH pos_hash;
     /* Currently used only for DBUG_ASSERT, but can be used for read-through caching */
     my_off_t max_pos;
+    my_off_t eof_pos;
 
-    binlog_hash_element() : max_pos(0)
+    binlog_hash_element() : max_pos(0), eof_pos(0)
     {
       my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtids, sizeof(rpl_gtid), 8, 8, MYF(0));
       my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
@@ -406,7 +407,7 @@ struct rpl_binlog_state
   void reset_binlog_hash();
   bool rotate_binlog(const char *filename);
   bool push_gtids_array(const rpl_gtid *gtid, uint32 count);
-  bool push_pos_hash(my_off_t pos, uchar event_type);
+  bool push_pos_hash(my_off_t pos, uchar event_type, uint event_len);
   int check_pos_hash(const char *filename, my_off_t pos,
                      rpl_gtid **gtid_array, uint32 *array_size);
 };
