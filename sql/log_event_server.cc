@@ -899,7 +899,7 @@ int Log_event_writer::write_header(uchar *pos, size_t len)
     pos[FLAGS_OFFSET]= save;
   }
 
-  if (!cache_data)
+  if (!cache_data && !is_relay_log)
   {
     DBUG_PRINT("binlog", ("write_header: %llu", my_b_tell(file)));
     my_off_t offset= my_b_tell(file);
@@ -5038,7 +5038,7 @@ int Create_file_log_event::do_apply_event(rpl_group_info *rgi)
   char *ext;
   int fd = -1;
   IO_CACHE file;
-  Log_event_writer lew(&file, 0);
+  Log_event_writer lew(&file, 0, false);
   int error = 1;
   Relay_log_info const *rli= rgi->rli;
 
