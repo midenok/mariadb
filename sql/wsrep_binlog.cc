@@ -236,7 +236,7 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
 
   File file;
   IO_CACHE cache;
-  Log_event_writer writer(&cache, 0);
+  Log_event_writer writer(&cache, 0, false);
   Format_description_log_event *ev= 0;
 
   longlong thd_trx_seqno= (long long)wsrep_thd_trx_seqno(thd);

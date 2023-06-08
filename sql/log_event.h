@@ -1003,17 +1003,17 @@ public:
   { encrypt_or_write= &Log_event_writer::encrypt_and_write; }
 
   Log_event_writer(IO_CACHE *file_arg, binlog_cache_data *cache_data_arg,
-                   bool is_relay_log_arg,
+                   bool cache_states,
                    Binlog_crypt_data *cr= 0)
     :encrypt_or_write(&Log_event_writer::write_internal),
     bytes_written(0), ctx(0),
-    file(file_arg), cache_data(cache_data_arg), is_relay_log(is_relay_log_arg),
+    file(file_arg), cache_data(cache_data_arg), cache_gtid_states(cache_states),
     crypto(cr) { }
 
 private:
   IO_CACHE *file;
   binlog_cache_data *cache_data;
-  bool is_relay_log;
+  bool cache_gtid_states;
   /**
     Placeholder for event checksum while writing to binlog.
    */

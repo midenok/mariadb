@@ -5612,13 +5612,14 @@ end2:
 bool MYSQL_BIN_LOG::write_event(Log_event *ev, binlog_cache_data *cache_data,
                                 IO_CACHE *file)
 {
-  Log_event_writer writer(file, cache_data, is_relay_log, &crypto);
+  const bool cache_gtid_state= !cache_data && !is_relay_log;
+  Log_event_writer writer(file, cache_data, cache_gtid_state, &crypto);
   if (crypto.scheme && file == &log_file)
   {
     writer.ctx= alloca(crypto.ctx_size);
     writer.set_encrypted_writer();
   }
-  DBUG_ASSERT(cache_data || is_relay_log ||
+  DBUG_ASSERT(!cache_gtid_state ||
               !rpl_global_gtid_binlog_state.binlog_element ||
               !strcmp(log_file_name, rpl_global_gtid_binlog_state.binlog_element->filename.str));
   return writer.write(ev);
@@ -6034,7 +6035,7 @@ THD::binlog_start_trans_and_stmt()
       uchar *buf= 0;
       size_t len= 0;
       IO_CACHE tmp_io_cache;
-      Log_event_writer writer(&tmp_io_cache, 0);
+      Log_event_writer writer(&tmp_io_cache, 0, false);
       if(!open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
                           128, MYF(MY_WME)))
       {
@@ -6407,7 +6408,8 @@ MYSQL_BIN_LOG::flush_and_set_pending_rows_event(THD *thd,
 
   if (Rows_log_event* pending= cache_data->pending())
   {
-    Log_event_writer writer(&cache_data->cache_log, cache_data, is_relay_log);
+    const bool cache_gtid_state= !cache_data && !is_relay_log;
+    Log_event_writer writer(&cache_data->cache_log, cache_data, cache_gtid_state);
 
     /*
       Write pending event to the cache.
@@ -7459,9 +7461,9 @@ public:
   size_t remains;
 
   CacheWriter(THD *thd_arg, IO_CACHE *file_arg, bool do_checksum,
-              bool is_relay_log,
+              bool cache_gtid_state,
               Binlog_crypt_data *cr)
-    : Log_event_writer(file_arg, 0, is_relay_log, cr), remains(0), thd(thd_arg),
+    : Log_event_writer(file_arg, 0, cache_gtid_state, cr), remains(0), thd(thd_arg),
       first(true)
   { checksum_len= do_checksum ? BINLOG_CHECKSUM_LEN : 0; }
 
@@ -7514,7 +7516,8 @@ int MYSQL_BIN_LOG::write_cache(THD *thd, IO_CACHE *cache)
   size_t val;
   size_t end_log_pos_inc= 0; // each event processed adds BINLOG_CHECKSUM_LEN 2 t
   uchar header[LOG_EVENT_HEADER_LEN];
-  CacheWriter writer(thd, &log_file, binlog_checksum_options, is_relay_log, &crypto);
+  const bool cache_gtid_state= !is_relay_log;
+  CacheWriter writer(thd, &log_file, binlog_checksum_options, cache_gtid_state, &crypto);
 
   if (crypto.scheme)
   {

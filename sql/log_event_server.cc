@@ -901,11 +901,13 @@ int Log_event_writer::write_header(uchar *pos, size_t len)
 
   event_len= uint4korr(pos + EVENT_LEN_OFFSET);
 
-  if (!cache_data && !is_relay_log)
+  if (cache_gtid_states)
   {
     DBUG_PRINT("binlog", ("write_header: %llu", my_b_tell(file)));
     my_off_t offset= my_b_tell(file);
-    if (rpl_global_gtid_binlog_state.push_pos_hash(offset, pos[EVENT_TYPE_OFFSET], event_len))
+    if (rpl_global_gtid_binlog_state.push_pos_hash(offset,
+                                                   pos[EVENT_TYPE_OFFSET],
+                                                   event_len))
       DBUG_RETURN(1);
   }
 
