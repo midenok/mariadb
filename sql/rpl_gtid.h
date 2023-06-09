@@ -286,6 +286,59 @@ struct rpl_slave_state
 };
 
 
+// FIXME: remove
+extern uint opt_binlog_gtid_pos_cache;
+
+struct GTID_state_cache
+{
+  struct pos_hash_element
+  {
+    my_off_t pos;
+    size_t gtids_idx;
+  };
+  char filename_buf[FN_REFLEN];
+  LEX_CSTRING filename;
+  /* Ordered array of gtids as they appear in binlog */
+  DYNAMIC_ARRAY gtids;
+  /* Map of file position to index in gtids array */
+  HASH pos_hash;
+  /* Currently used only for DBUG_ASSERT, but can be used for read-through caching */
+  my_off_t max_pos;
+  my_off_t eof_pos;
+
+  GTID_state_cache() : max_pos(0), eof_pos(0)
+  {
+    my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtids, sizeof(rpl_gtid), 8, 8, MYF(0));
+    my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
+                  offsetof(pos_hash_element, pos), sizeof(my_off_t), 0,
+                  my_free, HASH_UNIQUE);
+  }
+
+  ~GTID_state_cache()
+  {
+    delete_dynamic(&gtids);
+    my_hash_free(&pos_hash);
+  }
+
+  static void free(void *ptr)
+  {
+    delete static_cast<GTID_state_cache *>(ptr);
+  }
+
+  static
+  uchar* get_key(GTID_state_cache *el, size_t *length,
+                  my_bool not_used __attribute__((unused)))
+  {
+    *length= el->filename.length;
+    return (uchar*) el->filename.str;
+  }
+
+  bool push_gtids_array(const rpl_gtid *gtid, uint32 count);
+  bool push_pos_hash(my_off_t pos, uchar event_type, uint event_len);
+  int check_pos_hash(my_off_t pos, rpl_gtid **gtid_array, uint32 *array_size);
+};
+
+
 /*
   Binlog state.
   This keeps the last GTID written to the binlog for every distinct
@@ -322,58 +375,12 @@ struct rpl_binlog_state
   /* Auxiliary buffer to sort gtid list. */
   DYNAMIC_ARRAY gtid_sort_array;
 
-  struct pos_hash_element
-  {
-    my_off_t pos;
-    size_t gtids_idx;
-  };
-
-  struct binlog_hash_element
-  {
-    char filename_buf[FN_REFLEN];
-    LEX_CSTRING filename;
-    /* Ordered array of gtids as they appear in binlog */
-    DYNAMIC_ARRAY gtids;
-    /* Map of file position to index in gtids array */
-    HASH pos_hash;
-    /* Currently used only for DBUG_ASSERT, but can be used for read-through caching */
-    my_off_t max_pos;
-    my_off_t eof_pos;
-
-    binlog_hash_element() : max_pos(0), eof_pos(0)
-    {
-      my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtids, sizeof(rpl_gtid), 8, 8, MYF(0));
-      my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
-                   offsetof(pos_hash_element, pos), sizeof(my_off_t), 0,
-                   my_free, HASH_UNIQUE);
-    }
-
-    ~binlog_hash_element()
-    {
-      delete_dynamic(&gtids);
-      my_hash_free(&pos_hash);
-    }
-
-    static void free(void *ptr)
-    {
-      delete static_cast<binlog_hash_element *>(ptr);
-    }
-
-    static
-    uchar* get_key(binlog_hash_element *el, size_t *length,
-                   my_bool not_used __attribute__((unused)))
-    {
-      *length= el->filename.length;
-      return (uchar*) el->filename.str;
-    }
-  };
-
   HASH binlog_hash;
   /* Used for binlog_hash rotation */
-  List<binlog_hash_element> binlog_list;
+  List<GTID_state_cache> binlog_list;
   MEM_ROOT mem_root;
   /* Current binlog element, NULL means no caching is done */
-  binlog_hash_element *binlog_element;
+  GTID_state_cache *binlog_element;
 
    rpl_binlog_state() :initialized(0) {}
   ~rpl_binlog_state();
@@ -406,10 +413,33 @@ struct rpl_binlog_state
   /* binlog_gtid_pos() caching methods */
   void reset_binlog_hash();
   bool rotate_binlog(const char *filename);
-  bool push_gtids_array(const rpl_gtid *gtid, uint32 count);
-  bool push_pos_hash(my_off_t pos, uchar event_type, uint event_len);
+  bool push_gtids_array(const rpl_gtid *gtid, uint32 count)
+  {
+    if (!binlog_element)
+      return false;
+    return binlog_element->push_gtids_array(gtid, count);
+  }
+  bool push_pos_hash(my_off_t pos, uchar event_type, uint event_len)
+  {
+    if (!binlog_element)
+      return false;
+    return binlog_element->push_pos_hash(pos, event_type, event_len);
+  }
   int check_pos_hash(const char *filename, my_off_t pos,
-                     rpl_gtid **gtid_array, uint32 *array_size);
+                     rpl_gtid **gtid_array, uint32 *array_size)
+  {
+    // FIXME: is binlog_element check needed?
+    if (!binlog_element || !opt_binlog_gtid_pos_cache)
+      return 0;
+    GTID_state_cache *bel= (GTID_state_cache *)
+      my_hash_search(&binlog_hash, (const uchar *) filename, strlen(filename));
+    if (!bel)
+    {
+      DBUG_PRINT("binlog", ("Miss file: %s (%llu)", filename, pos));
+      return 0;
+    }
+    return bel->check_pos_hash(pos, gtid_array, array_size);
+  }
 };
 
 

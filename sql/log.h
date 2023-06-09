@@ -19,6 +19,7 @@
 
 #include "handler.h"                            /* my_xid */
 #include "rpl_constants.h"
+#include "rpl_gtid.h"
 
 class Relay_log_info;
 
@@ -978,6 +979,7 @@ public:
   */
   my_off_t binlog_end_pos;
   char binlog_end_pos_file[FN_REFLEN];
+  GTID_state_cache *gtid_state_cache;
 };
 
 class Log_event_handler
