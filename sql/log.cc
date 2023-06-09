@@ -5614,7 +5614,7 @@ end2:
 bool MYSQL_BIN_LOG::write_event(Log_event *ev, binlog_cache_data *cache_data,
                                 IO_CACHE *file)
 {
-  const bool cache_gtid_state= !cache_data && !is_relay_log;
+  const bool cache_gtid_state= !cache_data;
   Log_event_writer writer(file, cache_data,
                           (cache_gtid_state ? &gtid_state_cache : NULL),
                           &crypto);
@@ -6411,7 +6411,7 @@ MYSQL_BIN_LOG::flush_and_set_pending_rows_event(THD *thd,
 
   if (Rows_log_event* pending= cache_data->pending())
   {
-    const bool cache_gtid_state= !cache_data && !is_relay_log;
+    const bool cache_gtid_state= !cache_data;
     Log_event_writer writer(&cache_data->cache_log, cache_data,
                             (cache_gtid_state ? &gtid_state_cache : NULL));
 
