@@ -296,7 +296,6 @@ struct rpl_slave_state
 };
 
 
-// FIXME: remove
 extern uint opt_binlog_gtid_pos_cache;
 
 struct GTID_state_cache

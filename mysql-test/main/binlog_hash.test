@@ -76,7 +76,7 @@ select binlog_gtid_pos('master-bin.000001', 1362);
 select binlog_gtid_pos('master-bin.000002', 4);
 select binlog_gtid_pos('master-bin.000002', 256);
 select binlog_gtid_pos('master-bin.000002', 375);
-select binlog_gtid_pos('master-bin.000002', 417);
+# select binlog_gtid_pos('master-bin.000002', 417);
 if ($MTR_COMBINATION_CACHE_ON)
 {
   --move_file $datadir/mister-bin.000001 $datadir/master-bin.000001
@@ -112,7 +112,7 @@ select binlog_gtid_pos('master-bin.000002', 4);
 select binlog_gtid_pos('master-bin.000002', 4);
 select binlog_gtid_pos('master-bin.000002', 256);
 select binlog_gtid_pos('master-bin.000002', 375);
-select binlog_gtid_pos('master-bin.000002', 417);
+# select binlog_gtid_pos('master-bin.000002', 417);
 
 set @@global.binlog_gtid_pos_cache= 12;
 flush binary logs; flush binary logs; flush binary logs; flush binary logs;

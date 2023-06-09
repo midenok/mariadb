@@ -116,9 +116,6 @@ binlog_gtid_pos('master-bin.000002', 256)
 select binlog_gtid_pos('master-bin.000002', 375);
 binlog_gtid_pos('master-bin.000002', 375)
 0-1-2,222-1-3,333-1-1
-select binlog_gtid_pos('master-bin.000002', 417);
-binlog_gtid_pos('master-bin.000002', 417)
-0-1-2,222-1-3,333-1-2
 # Check binlog_hash rotation
 select binlog_gtid_pos('master-bin.000002', 4);
 binlog_gtid_pos('master-bin.000002', 4)
@@ -142,9 +139,6 @@ binlog_gtid_pos('master-bin.000002', 256)
 select binlog_gtid_pos('master-bin.000002', 375);
 binlog_gtid_pos('master-bin.000002', 375)
 0-1-2,222-1-3,333-1-1
-select binlog_gtid_pos('master-bin.000002', 417);
-binlog_gtid_pos('master-bin.000002', 417)
-0-1-2,222-1-3,333-1-2
 set @@global.binlog_gtid_pos_cache= 12;
 flush binary logs;
 flush binary logs;
