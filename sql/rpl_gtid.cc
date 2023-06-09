@@ -1520,7 +1520,6 @@ void rpl_binlog_state::init()
                GTID_state_cache::free, HASH_UNIQUE);
   binlog_list.empty();
   init_alloc_root(PSI_INSTRUMENT_ME, &mem_root, 1024, 0, MYF(0));
-  binlog_element= NULL;
   initialized= 1;
 }
 
@@ -2296,12 +2295,13 @@ end:
 void rpl_binlog_state::reset_binlog_hash()
 {
   binlog_list.empty();
+  // FIXME: guard
   my_hash_reset(&binlog_hash);
   free_root(&mem_root, MYF(0));
-  binlog_element= NULL;
- }
+}
 
-bool rpl_binlog_state::rotate_binlog(const char *filename)
+bool rpl_binlog_state::rotate_binlog(const char *filename,
+                                     GTID_state_cache **binlog_ptr)
 {
   GTID_state_cache *el;
   DBUG_ASSERT(binlog_hash.records == binlog_list.elements);
@@ -2369,7 +2369,8 @@ bool rpl_binlog_state::rotate_binlog(const char *filename)
     return true;
   }
 
-  binlog_element= el;
+  el->binlog_ptr= binlog_ptr;
+  *binlog_ptr= el;
   return false;
 }
 

@@ -305,8 +305,10 @@ struct GTID_state_cache
   /* Currently used only for DBUG_ASSERT, but can be used for read-through caching */
   my_off_t max_pos;
   my_off_t eof_pos;
+  /* Pointer to MYSQL_BIN_LOG::gtid_state_cache which points to this object */
+  GTID_state_cache **binlog_ptr;
 
-  GTID_state_cache() : max_pos(0), eof_pos(0)
+  GTID_state_cache() : max_pos(0), eof_pos(0), binlog_ptr(NULL)
   {
     my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtids, sizeof(rpl_gtid), 8, 8, MYF(0));
     my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
@@ -318,6 +320,10 @@ struct GTID_state_cache
   {
     delete_dynamic(&gtids);
     my_hash_free(&pos_hash);
+    // FIXME: guard
+    // FIXME: check if MYSQL_BIN_LOG is destroyed first and zero this binlog_ptr
+    if (binlog_ptr)
+      *binlog_ptr= NULL;
   }
 
   static void free(void *ptr)
@@ -379,8 +385,6 @@ struct rpl_binlog_state
   /* Used for binlog_hash rotation */
   List<GTID_state_cache> binlog_list;
   MEM_ROOT mem_root;
-  /* Current binlog element, NULL means no caching is done */
-  GTID_state_cache *binlog_element;
 
    rpl_binlog_state() :initialized(0) {}
   ~rpl_binlog_state();
@@ -412,25 +416,28 @@ struct rpl_binlog_state
   const char* drop_domain(DYNAMIC_ARRAY *ids, Gtid_list_log_event *glev, char*);
   /* binlog_gtid_pos() caching methods */
   void reset_binlog_hash();
-  bool rotate_binlog(const char *filename);
-  bool push_gtids_array(const rpl_gtid *gtid, uint32 count)
+  bool rotate_binlog(const char *filename, GTID_state_cache **binlog_ptr);
+  bool push_gtids_array(GTID_state_cache **cache, const rpl_gtid *gtid, uint32 count)
   {
-    if (!binlog_element)
-      return false;
-    return binlog_element->push_gtids_array(gtid, count);
+    // FIXME: guard from rotate
+    if (*cache)
+      return (*cache)->push_gtids_array(gtid, count);
+    return false;
   }
-  bool push_pos_hash(my_off_t pos, uchar event_type, uint event_len)
+  bool push_pos_hash(GTID_state_cache **cache, my_off_t pos, uchar event_type,
+                     uint event_len)
   {
-    if (!binlog_element)
-      return false;
-    return binlog_element->push_pos_hash(pos, event_type, event_len);
+    // FIXME: guard from rotate
+    if (*cache)
+      return (*cache)->push_pos_hash(pos, event_type, event_len);
+    return false;
   }
   int check_pos_hash(const char *filename, my_off_t pos,
                      rpl_gtid **gtid_array, uint32 *array_size)
   {
-    // FIXME: is binlog_element check needed?
-    if (!binlog_element || !opt_binlog_gtid_pos_cache)
+    if (!opt_binlog_gtid_pos_cache)
       return 0;
+    // FIXME: guard from rotate
     GTID_state_cache *bel= (GTID_state_cache *)
       my_hash_search(&binlog_hash, (const uchar *) filename, strlen(filename));
     if (!bel)

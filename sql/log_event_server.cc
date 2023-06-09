@@ -901,12 +901,12 @@ int Log_event_writer::write_header(uchar *pos, size_t len)
 
   event_len= uint4korr(pos + EVENT_LEN_OFFSET);
 
-  if (cache_gtid_states)
+  if (gtid_state_cache)
   {
     DBUG_PRINT("binlog", ("write_header: %llu", my_b_tell(file)));
     my_off_t offset= my_b_tell(file);
-    if (rpl_global_gtid_binlog_state.push_pos_hash(offset,
-                                                   pos[EVENT_TYPE_OFFSET],
+    if (rpl_global_gtid_binlog_state.push_pos_hash(gtid_state_cache,
+                                                   offset, pos[EVENT_TYPE_OFFSET],
                                                    event_len))
       DBUG_RETURN(1);
   }
@@ -4061,7 +4061,8 @@ Gtid_list_log_event::write()
     return true;
 
   if (count &&
-      rpl_global_gtid_binlog_state.push_gtids_array(list, count))
+      rpl_global_gtid_binlog_state.push_gtids_array(writer->gtid_state_cache,
+                                                    list, count))
     return true;
 
   return write_header(get_data_size()) ||
@@ -5041,7 +5042,7 @@ int Create_file_log_event::do_apply_event(rpl_group_info *rgi)
   char *ext;
   int fd = -1;
   IO_CACHE file;
-  Log_event_writer lew(&file, 0, false);
+  Log_event_writer lew(&file, 0, NULL);
   int error = 1;
   Relay_log_info const *rli= rgi->rli;
 
