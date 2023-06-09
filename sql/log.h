@@ -682,6 +682,8 @@ public:
   Atomic_counter<uint64> reset_master_count;
 
   MYSQL_BIN_LOG(uint *sync_period);
+  ~MYSQL_BIN_LOG();
+
   /*
     note that there's no destructor ~MYSQL_BIN_LOG() !
     The reason is that we don't want it to be automatically called

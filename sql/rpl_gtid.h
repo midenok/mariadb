@@ -21,6 +21,16 @@
 #include "sql_list.h"
 #include <atomic>
 
+class auto_lock
+{
+public:
+  auto_lock(mysql_mutex_t* m) : m_(m) { mysql_mutex_lock(m_); }
+  ~auto_lock() { mysql_mutex_unlock(m_); }
+private:
+  mysql_mutex_t& operator =(mysql_mutex_t&);
+  mysql_mutex_t* const m_;
+};
+
 /* Definitions for MariaDB global transaction ID (GTID). */
 
 
@@ -318,10 +328,15 @@ struct GTID_state_cache
 
   ~GTID_state_cache()
   {
+    /*
+      Called when: a) rotation is done; b) rpl_global_binlog_state destroyed
+
+      Relay log local MYSQL_BIN_LOG is destroyed before rpl_global_binlog_state.
+      Global MYSQL_BIN_LOG and rpl_global_binlog_state are destryed in same thread.
+      Rotation and local MYSQL_BIN_LOG destroy is protected by LOCK_gtid_state.
+    */
     delete_dynamic(&gtids);
     my_hash_free(&pos_hash);
-    // FIXME: guard
-    // FIXME: check if MYSQL_BIN_LOG is destroyed first and zero this binlog_ptr
     if (binlog_ptr)
       *binlog_ptr= NULL;
   }
@@ -376,6 +391,7 @@ struct rpl_binlog_state
   HASH hash;
   /* Mutex protecting access to the state. */
   mysql_mutex_t LOCK_binlog_state;
+  mysql_mutex_t LOCK_gtid_state;
   my_bool initialized;
 
   /* Auxiliary buffer to sort gtid list. */
@@ -417,9 +433,14 @@ struct rpl_binlog_state
   /* binlog_gtid_pos() caching methods */
   void reset_binlog_hash();
   bool rotate_binlog(const char *filename, GTID_state_cache **binlog_ptr);
+  void release_binlog(GTID_state_cache **cache)
+  {
+    auto_lock l(&LOCK_gtid_state);
+    *cache= NULL;
+  }
   bool push_gtids_array(GTID_state_cache **cache, const rpl_gtid *gtid, uint32 count)
   {
-    // FIXME: guard from rotate
+    auto_lock l(&LOCK_gtid_state);
     if (*cache)
       return (*cache)->push_gtids_array(gtid, count);
     return false;
@@ -427,7 +448,7 @@ struct rpl_binlog_state
   bool push_pos_hash(GTID_state_cache **cache, my_off_t pos, uchar event_type,
                      uint event_len)
   {
-    // FIXME: guard from rotate
+    auto_lock l(&LOCK_gtid_state);
     if (*cache)
       return (*cache)->push_pos_hash(pos, event_type, event_len);
     return false;
@@ -437,7 +458,7 @@ struct rpl_binlog_state
   {
     if (!opt_binlog_gtid_pos_cache)
       return 0;
-    // FIXME: guard from rotate
+    auto_lock l(&LOCK_gtid_state);
     GTID_state_cache *bel= (GTID_state_cache *)
       my_hash_search(&binlog_hash, (const uchar *) filename, strlen(filename));
     if (!bel)

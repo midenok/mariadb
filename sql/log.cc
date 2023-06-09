@@ -3555,6 +3555,12 @@ MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
   bzero((char*) &purge_index_file, sizeof(purge_index_file));
 }
 
+MYSQL_BIN_LOG::~MYSQL_BIN_LOG()
+{
+  if (gtid_state_cache)
+    rpl_global_gtid_binlog_state.release_binlog(&gtid_state_cache);
+}
+
 void MYSQL_BIN_LOG::stop_background_thread()
 {
   if (binlog_background_thread_started)

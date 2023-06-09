@@ -1515,6 +1515,8 @@ void rpl_binlog_state::init()
   my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtid_sort_array, sizeof(rpl_gtid), 8, 8, MYF(0));
   mysql_mutex_init(key_LOCK_binlog_state, &LOCK_binlog_state,
                    MY_MUTEX_INIT_SLOW);
+  mysql_mutex_init(key_LOCK_binlog_state, &LOCK_gtid_state,
+                   MY_MUTEX_INIT_SLOW);
   my_hash_init(PSI_INSTRUMENT_ME, &binlog_hash, files_charset_info, 10, 0, 0,
                (my_hash_get_key) GTID_state_cache::get_key,
                GTID_state_cache::free, HASH_UNIQUE);
@@ -1552,6 +1554,7 @@ void rpl_binlog_state::free()
     my_hash_free(&hash);
     delete_dynamic(&gtid_sort_array);
     mysql_mutex_destroy(&LOCK_binlog_state);
+    mysql_mutex_destroy(&LOCK_gtid_state);
     my_hash_free(&binlog_hash);
     free_root(&mem_root, MYF(0));
   }
@@ -2294,8 +2297,8 @@ end:
 
 void rpl_binlog_state::reset_binlog_hash()
 {
+  auto_lock l(&LOCK_gtid_state);
   binlog_list.empty();
-  // FIXME: guard
   my_hash_reset(&binlog_hash);
   free_root(&mem_root, MYF(0));
 }
@@ -2318,6 +2321,8 @@ bool rpl_binlog_state::rotate_binlog(const char *filename,
   }
 
   /* Rotate binlog_hash if needed */
+  auto_lock l(&LOCK_gtid_state);
+
   if (binlog_hash.records >= opt_binlog_gtid_pos_cache)
   {
     const ulong drop_size= binlog_hash.records - opt_binlog_gtid_pos_cache + 1;
