@@ -6038,7 +6038,7 @@ THD::binlog_start_trans_and_stmt()
       uchar *buf= 0;
       size_t len= 0;
       IO_CACHE tmp_io_cache;
-      Log_event_writer writer(&tmp_io_cache, 0, false);
+      Log_event_writer writer(&tmp_io_cache, 0, NULL);
       if(!open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
                           128, MYF(MY_WME)))
       {

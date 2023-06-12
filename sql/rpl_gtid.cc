@@ -2385,13 +2385,7 @@ bool GTID_state_cache::push_gtids_array(const rpl_gtid *gtid, uint32 count)
   DBUG_ASSERT(count > 0);
   DBUG_PRINT("binlog", ("Push GTID: [%llu] GTID %u-%u-%llu", gtids.elements,
                         gtid->domain_id, gtid->server_id, gtid->seq_no));
-#ifndef DBUG_OFF
-  if (gtids.elements)
-  {
-    rpl_gtid *last= dynamic_element(&gtids, gtids.elements - 1, rpl_gtid *);
-    DBUG_ASSERT(*last != *gtid);
-  }
-#endif
+
   for (uint32 i= 0; i < count; ++i)
     if (insert_dynamic(&gtids, (const void *) (gtid + i)))
     {
