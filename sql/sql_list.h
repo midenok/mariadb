@@ -672,12 +672,15 @@ inline void bubble_sort(List<T> *list_to_sort,
   on delete (for THD element)
 */
 
+namespace psi_instrumented
+{
+template<PSI_memory_key psi_key>
 struct ilink
 {
   struct ilink **prev,*next;
   static void *operator new(size_t size) throw ()
   {
-    return (void*)my_malloc(PSI_INSTRUMENT_ME,
+    return (void*)my_malloc(psi_key,
                             (uint)size, MYF(MY_WME | MY_FAE | ME_FATAL));
   }
   static void operator delete(void* ptr_arg, size_t)
@@ -707,36 +710,15 @@ struct ilink
   virtual ~ilink() { unlink(); }		/*lint -e1740 */
 };
 
+template<PSI_memory_key psi_key>
+class base_ilist_iterator;
 
-/* Needed to be able to have an I_List of char* strings in mysqld.cc. */
-
-class i_string: public ilink
-{
-public:
-  const char* ptr;
-  i_string():ptr(0) { }
-  i_string(const char* s) : ptr(s) {}
-};
-
-/* needed for linked list of two strings for replicate-rewrite-db */
-class i_string_pair: public ilink
-{
-public:
-  const char* key;
-  const char* val;
-  i_string_pair():key(0),val(0) { }
-  i_string_pair(const char* key_arg, const char* val_arg) : 
-    key(key_arg),val(val_arg) {}
-};
-
-
-template <class T> class I_List_iterator;
-
-
+template<PSI_memory_key psi_key>
 class base_ilist
 {
-  struct ilink *first;
-  struct ilink last;
+  typedef ilink<psi_key> ilink;
+  ilink *first;
+  ilink last;
 public:
   inline void empty() { first= &last; last.prev= &first; }
   base_ilist() { empty(); }
@@ -756,15 +738,25 @@ public:
     a->prev= last.prev;
     last.prev= &a->next;
   }
-  inline struct ilink *get()
+  inline void *pop(void)
   {
-    struct ilink *first_link=first;
+    if (first == &last)
+      return 0;
+    ilink *tmp= first;
+    first= first->next;
+    if (first == &last)
+      last.prev= &first;
+    return tmp;
+  }
+  inline ilink *get()
+  {
+    ilink *first_link=first;
     if (first_link == &last)
       return 0;
     first_link->unlink();			// Unlink from list
     return first_link;
   }
-  inline struct ilink *head()
+  inline ilink *head()
   {
     return (first != &last) ? first : 0;
   }
@@ -784,7 +776,7 @@ public:
     empty();
   }
 
-  friend class base_ilist_iterator;
+  friend class base_ilist_iterator<psi_key>;
  private:
   /*
     We don't want to allow copying of this class, as that would give us
@@ -795,11 +787,13 @@ public:
   void operator=(const base_ilist&);
 };
 
-
+template<PSI_memory_key psi_key>
 class base_ilist_iterator
 {
+  typedef base_ilist<psi_key> base_ilist;
+  typedef ilink<psi_key> ilink;
   base_ilist *list;
-  struct ilink **el,*current;
+  ilink **el,*current;
 public:
   base_ilist_iterator(base_ilist &list_par) :list(&list_par),
     el(&list_par.first),current(0) {}
@@ -812,12 +806,18 @@ public:
     return current;
   }
 };
+} // namespace psi_instrumented
 
 
-template <class T>
-class I_List :private base_ilist
+template <class T, PSI_memory_key psi_key>
+class I_List_iterator;
+
+template <class T, PSI_memory_key psi_key= PSI_INSTRUMENT_ME>
+class I_List :private psi_instrumented::base_ilist<psi_key>
 {
 public:
+  typedef psi_instrumented::base_ilist<psi_key> base_ilist;
+
   I_List() :base_ilist()	{}
   inline bool is_last(T *p)     { return base_ilist::is_last(p); }
   inline void empty()		{ base_ilist::empty(); }
@@ -830,17 +830,46 @@ public:
     base_ilist::move_elements_to(new_owner);
   }
 #ifndef _lint
-  friend class I_List_iterator<T>;
+  friend class I_List_iterator<T, psi_key>;
 #endif
 };
 
-
-template <class T> class I_List_iterator :public base_ilist_iterator
+template <class T, PSI_memory_key psi_key= PSI_INSTRUMENT_ME>
+class I_List_iterator :public psi_instrumented::base_ilist_iterator<psi_key>
 {
 public:
+  typedef psi_instrumented::base_ilist_iterator<psi_key> base_ilist_iterator;
   I_List_iterator(I_List<T> &a) : base_ilist_iterator(a) {}
   inline T* operator++(int) { return (T*) base_ilist_iterator::next(); }
 };
+
+
+typedef psi_instrumented::base_ilist<PSI_INSTRUMENT_ME> base_ilist;
+typedef psi_instrumented::base_ilist_iterator<PSI_INSTRUMENT_ME> base_ilist_iterator;
+typedef psi_instrumented::ilink<PSI_INSTRUMENT_ME> ilink;
+
+/* Needed to be able to have an I_List of char* strings in mysqld.cc. */
+
+class i_string: public ilink
+{
+public:
+  const char* ptr;
+  i_string():ptr(0) { }
+  i_string(const char* s) : ptr(s) {}
+};
+
+/* needed for linked list of two strings for replicate-rewrite-db */
+class i_string_pair: public ilink
+{
+public:
+  const char* key;
+  const char* val;
+  i_string_pair():key(0),val(0) { }
+  i_string_pair(const char* key_arg, const char* val_arg) :
+    key(key_arg),val(val_arg) {}
+};
+
+
 
 /**
   Make a deep copy of each list element.
