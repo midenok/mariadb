@@ -1512,16 +1512,16 @@ void rpl_binlog_state::init()
   my_hash_init(PSI_INSTRUMENT_ME, &hash, &my_charset_bin, 32,
                offsetof(element, domain_id), sizeof(element::domain_id),
                NULL, my_free, HASH_UNIQUE);
-  my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtid_sort_array, sizeof(rpl_gtid), 8, 8, MYF(0));
+  my_init_dynamic_array(key_memory_gtid_cache, &gtid_sort_array, sizeof(rpl_gtid), 8, 8, MYF(0));
   mysql_mutex_init(key_LOCK_binlog_state, &LOCK_binlog_state,
                    MY_MUTEX_INIT_SLOW);
   mysql_mutex_init(key_LOCK_binlog_state, &LOCK_gtid_state,
                    MY_MUTEX_INIT_SLOW);
-  my_hash_init(PSI_INSTRUMENT_ME, &binlog_hash, files_charset_info, 10, 0, 0,
+  my_hash_init(key_memory_gtid_cache, &binlog_hash, files_charset_info, 10, 0, 0,
                (my_hash_get_key) GTID_state_cache::get_key,
                GTID_state_cache::free, HASH_UNIQUE);
   binlog_list.empty();
-  init_alloc_root(PSI_INSTRUMENT_ME, &mem_root, 1024, 0, MYF(0));
+  init_alloc_root(key_memory_gtid_cache, &mem_root, 1024, 0, MYF(0));
   initialized= 1;
 }
 
