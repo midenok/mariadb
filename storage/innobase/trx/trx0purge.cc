@@ -41,6 +41,7 @@ Created 3/26/1996 Heikki Tuuri
 #include "trx0roll.h"
 #include "trx0rseg.h"
 #include "trx0trx.h"
+#include "log0log.h"
 #include <mysql/service_wsrep.h>
 
 /** Maximum allowable purge history length.  <=0 means 'infinite'. */
@@ -437,6 +438,16 @@ trx_purge_truncate_rseg_history(
 	mtr_t		mtr;
 	trx_id_t	undo_trx_no;
 
+	/*
+	 *  Early return from this function is OK because in trx_undo_free_page() we would decrement rseg.curr_size
+	 *  for each page that is being freed, and trx_purge_truncate_history() is referring to that
+	 *  count in undo tablespace truncation.
+	 */
+	if (log_is_in_distress())
+	{
+		return;
+	}
+
 	mtr.start();
 	ut_ad(rseg.is_persistent());
 	mutex_enter(&rseg.mutex);
@@ -446,7 +457,7 @@ trx_purge_truncate_rseg_history(
 	hdr_addr = trx_purge_get_log_from_hist(
 		flst_get_last(rseg_hdr + TRX_RSEG_HISTORY, &mtr));
 loop:
-	if (hdr_addr.page == FIL_NULL) {
+	if (hdr_addr.page == FIL_NULL || log_is_in_distress()) {
 func_exit:
 		mutex_exit(&rseg.mutex);
 		mtr.commit();

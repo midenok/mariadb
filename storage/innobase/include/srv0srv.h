@@ -340,6 +340,8 @@ extern const ulint	SRV_UNDO_TABLESPACE_SIZE_IN_PAGES;
 extern char*	srv_log_group_home_dir;
 
 extern ulong	srv_n_log_files;
+extern ulonglong srv_log_distress_margin;
+extern uint srv_log_distress_margin_pct;
 /** The InnoDB redo log file size, or 0 when changing the redo log format
 at startup (while disallowing writes to the redo log). */
 extern ulonglong	srv_log_file_size;
@@ -964,6 +966,7 @@ struct export_var_t{
 	ulint innodb_dblwr_pages_written;	/*!< srv_dblwr_pages_written */
 	ulint innodb_dblwr_writes;		/*!< srv_dblwr_writes */
 	ibool innodb_have_atomic_builtins;	/*!< HAVE_ATOMIC_BUILTINS */
+	ibool innodb_log_is_in_distress;
 	ulint innodb_log_waits;			/*!< srv_log_waits */
 	ulint innodb_log_write_requests;	/*!< srv_log_write_requests */
 	ulint innodb_log_writes;		/*!< srv_log_writes */
