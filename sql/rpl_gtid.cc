@@ -1521,7 +1521,7 @@ void rpl_binlog_state::init()
                (my_hash_get_key) GTID_state_cache::get_key,
                GTID_state_cache::free, HASH_UNIQUE);
   binlog_list.empty();
-  init_alloc_root(key_memory_binlog_gtid_cache, &mem_root, 1024, 0, MYF(0));
+  sparse_factor= false;
   initialized= 1;
 }
 
@@ -1556,7 +1556,6 @@ void rpl_binlog_state::free()
     mysql_mutex_destroy(&LOCK_binlog_state);
     mysql_mutex_destroy(&LOCK_gtid_state);
     my_hash_free(&binlog_hash);
-    free_root(&mem_root, MYF(0));
   }
 }
 
@@ -2045,31 +2044,39 @@ end:
 int
 rpl_binlog_state::get_most_recent_gtid_list(rpl_gtid **list, uint32 *size)
 {
+  auto_lock l(&LOCK_binlog_state);
+  if (!(*list= (rpl_gtid *)my_malloc(PSI_INSTRUMENT_ME,
+                                     hash.records * sizeof(rpl_gtid), MYF(MY_WME))))
+    return 1;
+
+  get_most_recent_gtid_list(*list, size, false);
+
+  return 0;
+}
+
+void
+rpl_binlog_state::get_most_recent_gtid_list(rpl_gtid *list, uint32 *size, bool lock)
+{
   uint32 i;
-  uint32 alloc_size, out_size;
-  int res= 0;
+  uint32 out_size;
 
   out_size= 0;
-  mysql_mutex_lock(&LOCK_binlog_state);
-  alloc_size= hash.records;
-  if (!(*list= (rpl_gtid *)my_malloc(PSI_INSTRUMENT_ME,
-                                     alloc_size * sizeof(rpl_gtid), MYF(MY_WME))))
-  {
-    res= 1;
-    goto end;
-  }
+  if (lock)
+    mysql_mutex_lock(&LOCK_binlog_state);
+  const uint32 alloc_size= hash.records;
+
   for (i= 0; i < alloc_size; ++i)
   {
     element *e= (element *)my_hash_element(&hash, i);
     if (!e->last_gtid)
       continue;
-    memcpy(&((*list)[out_size++]), e->last_gtid, sizeof(rpl_gtid));
+    memcpy(&(list[out_size++]), e->last_gtid, sizeof(rpl_gtid));
   }
 
-end:
-  mysql_mutex_unlock(&LOCK_binlog_state);
-  *size= out_size;
-  return res;
+  if (lock)
+    mysql_mutex_unlock(&LOCK_binlog_state);
+  if (size)
+    *size= out_size;
 }
 
 bool
@@ -2300,7 +2307,6 @@ void rpl_binlog_state::reset_binlog_hash()
   auto_lock l(&LOCK_gtid_state);
   binlog_list.empty();
   my_hash_reset(&binlog_hash);
-  free_root(&mem_root, MYF(0));
 }
 
 bool rpl_binlog_state::rotate_binlog(const char *filename,
@@ -2322,14 +2328,28 @@ bool rpl_binlog_state::rotate_binlog(const char *filename,
   /* Rotate binlog_hash if needed */
   auto_lock l(&LOCK_gtid_state);
 
-  if (binlog_hash.records >= opt_binlog_gtid_pos_cache)
+  if (!binlog_hash.records)
+  {
+    if (opt_binlog_gtid_pos_cache_sparse_factor)
+    {
+      sparse_factor= opt_binlog_gtid_pos_cache_sparse_factor;
+      push_pos_hash_hook= &GTID_state_cache::push_sparse;
+      check_pos_hash_hook= &GTID_state_cache::check_sparse;
+    }
+    else
+    {
+      sparse_factor= 0;
+      push_pos_hash_hook= &GTID_state_cache::push_contiguous;
+      check_pos_hash_hook= &GTID_state_cache::check_contiguous;
+    }
+  }
+  else if (binlog_hash.records >= opt_binlog_gtid_pos_cache)
   {
     const ulong drop_size= binlog_hash.records - opt_binlog_gtid_pos_cache + 1;
     if (drop_size == binlog_hash.records)
     {
       binlog_list.empty();
       my_hash_reset(&binlog_hash);
-      free_root(&mem_root, MYF(0));
     }
     else
     {
@@ -2345,7 +2365,7 @@ bool rpl_binlog_state::rotate_binlog(const char *filename,
   }
 
   /* Push new element */
-  el= new (key_memory_binlog_gtid_cache) GTID_state_cache();
+  el= new (key_memory_binlog_gtid_cache) GTID_state_cache(sparse_factor, this);
   if (!el)
   {
     my_error(ER_OUTOFMEMORY, MYF(0), (int) sizeof(*el));
@@ -2373,6 +2393,7 @@ bool rpl_binlog_state::rotate_binlog(const char *filename,
 
 bool GTID_state_cache::push_gtids_array(const rpl_gtid *gtid, uint32 count)
 {
+  DBUG_ASSERT(!sparse_factor);
   DBUG_ASSERT(count > 0);
   DBUG_PRINT("binlog", ("Push GTID: [%llu] GTID %u-%u-%llu", gtids.elements,
                         gtid->domain_id, gtid->server_id, gtid->seq_no));
@@ -2387,9 +2408,10 @@ bool GTID_state_cache::push_gtids_array(const rpl_gtid *gtid, uint32 count)
 }
 
 
-bool GTID_state_cache::push_pos_hash(my_off_t pos, uchar event_type,
-                                     uint event_len)
+bool GTID_state_cache::push_contiguous(my_off_t pos, uchar event_type,
+                                       uint event_len)
 {
+  DBUG_ASSERT(!sparse_factor);
   pos_hash_element *el;
   /* For gtids->elements == 0 we store SIZE_T_MAX to indicate no GTIDs */
   size_t last_idx= gtids.elements - 1;
@@ -2442,39 +2464,78 @@ bool GTID_state_cache::push_pos_hash(my_off_t pos, uchar event_type,
 }
 
 
-int GTID_state_cache::check_pos_hash(my_off_t pos, rpl_gtid **gtid_array,
-                                     uint32 *array_size)
+bool GTID_state_cache::push_sparse(my_off_t pos, uchar event_type,
+                                   uint event_len)
 {
+  DBUG_ASSERT(sparse_factor);
+  if (sparse_counter--)
+    return false;
+  const uint32 old_gtids= gtids.elements;
+  const uint32 n_gtids= binlog_state->hash.records;
+  if (allocate_dynamic(&gtids, old_gtids + n_gtids))
+  {
+    my_error(ER_OUTOFMEMORY, MYF(0), (int) (gtids.size_of_element * (old_gtids + n_gtids)));
+    return true;
+  }
+  binlog_state->get_most_recent_gtid_list(((rpl_gtid *) gtids.buffer) + old_gtids);
+  gtids.elements+= n_gtids;
+  sparse_counter= sparse_factor;
+  pos_map_element e= {pos, old_gtids, n_gtids};
+  pos_map.insert(pos_map_t::value_type(pos, e));
+  return false;
+}
+
+
+int GTID_state_cache::check_contiguous(check_pos_hash_args args)
+{
+  DBUG_ASSERT(!sparse_factor);
   /*
     SHOW MASTER STATUS returns EOF position and we must accept it as a valid point.
     We return whole gtids array in that case (rpl.rpl_gtid_basic).
   */
-  if (pos == eof_pos)
+  if (args.pos == eof_pos)
   {
     if (gtids.elements)
     {
-      *gtid_array= (rpl_gtid *) gtids.buffer;
-      *array_size= (uint32) gtids.elements;
+      *args.gtid_array= (rpl_gtid *) gtids.buffer;
+      *args.array_size= (uint32) gtids.elements;
     }
     return 1;
   }
   pos_hash_element *el= (pos_hash_element *)
-    my_hash_search(&pos_hash, (const uchar *)&pos, sizeof(pos));
+    my_hash_search(&pos_hash, (const uchar *)&args.pos, sizeof(args.pos));
   if (!el)
   {
-    DBUG_PRINT("binlog", ("Miss pos: %llu (%s)", pos, filename));
+    DBUG_PRINT("binlog", ("Miss pos: %llu (%s)", args.pos, filename));
     return 2;
   }
-  DBUG_ASSERT(el->pos == pos);
-  DBUG_PRINT("binlog", ("Hit pos: %llu -> [%llu] (%s)", pos, el->gtids_idx, filename));
+  DBUG_ASSERT(el->pos == args.pos);
+  DBUG_PRINT("binlog", ("Hit pos: %llu -> [%llu] (%s)", args.pos, el->gtids_idx, filename));
 
   if (el->gtids_idx != SIZE_T_MAX)
   {
     DBUG_ASSERT(el->gtids_idx < gtids.elements);
-    *gtid_array= (rpl_gtid *) gtids.buffer;
-    *array_size= (uint32) el->gtids_idx + 1;
+    *args.gtid_array= (rpl_gtid *) gtids.buffer;
+    *args.array_size= (uint32) el->gtids_idx + 1;
   }
   return 1;
+}
+
+
+int GTID_state_cache::check_sparse(check_pos_hash_args args)
+{
+  DBUG_ASSERT(sparse_factor);
+  if (pos_map.empty()) /* Maybe sparse point was not reached, read the file */
+    return 0;
+  pos_map_t::iterator it= pos_map.upper_bound(args.pos);
+  if (it == pos_map.begin())
+    return 0;
+  it--;
+  pos_map_element &el= it->second;
+  *args.seek_pos= el.pos;
+  *args.gtid_array= ((rpl_gtid *) gtids.buffer) + el.gtids_idx;
+  *args.array_size= (uint32) el.n_gtids;
+  return 0;
 }
 
 

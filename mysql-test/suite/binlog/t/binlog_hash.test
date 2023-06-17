@@ -16,6 +16,12 @@ if ($MTR_COMBINATION_CACHE_OFF)
   --enable_query_log
 }
 
+if ($MTR_COMBINATION_CACHE_SPARSE)
+{
+  set @@global.binlog_gtid_pos_cache_sparse_factor= 2;
+  reset master;
+}
+
 select @@gtid_binlog_pos;
 create table t1 (a int primary key, b int) engine=innodb;
 select @@gtid_binlog_pos;
@@ -52,6 +58,11 @@ if ($MTR_COMBINATION_CACHE_OFF)
   --disable_query_log
   set @@global.binlog_gtid_pos_cache= 0;
   --enable_query_log
+  --move_file $datadir/mister-bin.000001 $datadir/master-bin.000001
+}
+if ($MTR_COMBINATION_CACHE_SPARSE)
+{
+  # FIXME: test encryption
   --move_file $datadir/mister-bin.000001 $datadir/master-bin.000001
 }
 # Note: no error when there is no file means cache hit
@@ -103,6 +114,10 @@ if ($MTR_COMBINATION_CACHE_OFF)
 {
   --move_file $datadir/master-bin.000002 $datadir/mister-bin.000002
 }
+if ($MTR_COMBINATION_CACHE_SPARSE)
+{
+  --move_file $datadir/master-bin.000002 $datadir/mister-bin.000002
+}
 set @@global.binlog_gtid_pos_cache= 0;
 --error 29
 select binlog_gtid_pos('master-bin.000002', 4);
@@ -110,10 +125,18 @@ if ($MTR_COMBINATION_CACHE_OFF)
 {
   --move_file $datadir/mister-bin.000002 $datadir/master-bin.000002
 }
+if ($MTR_COMBINATION_CACHE_SPARSE)
+{
+  --move_file $datadir/mister-bin.000002 $datadir/master-bin.000002
+}
 set @@global.binlog_gtid_pos_cache= 1;
 select binlog_gtid_pos('master-bin.000002', 4);
 flush binary logs;
 if ($MTR_COMBINATION_CACHE_OFF)
+{
+  --move_file $datadir/master-bin.000002 $datadir/mister-bin.000002
+}
+if ($MTR_COMBINATION_CACHE_SPARSE)
 {
   --move_file $datadir/master-bin.000002 $datadir/mister-bin.000002
 }
@@ -133,13 +156,19 @@ flush binary logs; flush binary logs; flush binary logs; flush binary logs;
 
 --list_files $datadir *ster-bin.*
 --move_file $datadir/master-bin.000007 $datadir/mister-bin.000007
---move_file $datadir/master-bin.000008 $datadir/mister-bin.000008
+if ($MTR_COMBINATION_CACHE_ON)
+{
+  --move_file $datadir/master-bin.000008 $datadir/mister-bin.000008
+}
 # 07 is not in cache while 08 is still in cache
 --error 29
 select binlog_gtid_pos('master-bin.000007', 4);
 select binlog_gtid_pos('master-bin.000008', 4);
 --move_file $datadir/mister-bin.000007 $datadir/master-bin.000007
---move_file $datadir/mister-bin.000008 $datadir/master-bin.000008
+if ($MTR_COMBINATION_CACHE_ON)
+{
+  --move_file $datadir/mister-bin.000008 $datadir/master-bin.000008
+}
 
 set @@global.binlog_gtid_pos_cache= 3;
 flush binary logs;
