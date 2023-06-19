@@ -1476,6 +1476,15 @@ gtid_state_from_pos(const char *name, uint32 offset,
     return errormsg;
   }
 
+#ifndef DBUG_OFF
+  if (list_size)
+  {
+    String str;
+    gtid_state->to_string(&str);
+    DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %u) loaded %s", name, offset, str.c_ptr()));
+  }
+#endif
+
   if (err)
       return err == 2 ? invalid_pos_msg : NULL;
 
@@ -1571,6 +1580,8 @@ gtid_state_from_pos(const char *name, uint32 offset,
     }
     else if (seek_pos)
     {
+      DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %u) seek from {%llu} to {%llu}",
+                            name, offset, cur_pos, seek_pos));
       my_b_seek(&cache, seek_pos);
       seek_pos= 0;
       found_gtid_list_event= true;
@@ -1609,6 +1620,13 @@ gtid_state_from_pos(const char *name, uint32 offset,
         goto end;
       }
       found_gtid_list_event= true;
+#ifndef DBUG_OFF
+      String str;
+      gtid_state->to_string(&str);
+      DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %u) {%llu}: GTID_LIST_EVENT[%u]: %s",
+                            name, offset, cur_pos, list_len, str.c_ptr()));
+#endif
+
     }
     else if (unlikely(!found_gtid_list_event))
     {
@@ -1634,6 +1652,12 @@ gtid_state_from_pos(const char *name, uint32 offset,
           "scanning binlog to find start position";
         goto end;
       }
+#ifndef DBUG_OFF
+      String str;
+      gtid_state->to_string(&str);
+      DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %u) {%llu}: GTID_EVENT: %s",
+                            name, offset, cur_pos, str.c_ptr()));
+#endif
     }
   }
 
