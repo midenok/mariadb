@@ -313,11 +313,13 @@ struct GTID_state_cache : public ilink
   /* Used by sparse algorithm */
   struct pos_map_element : public pos_hash_element
   {
-    pos_map_element(my_off_t pos, size_t gtids_idx, size_t n_gtids) :
-      pos_hash_element{pos, gtids_idx}, n_gtids{n_gtids}
+    pos_map_element(my_off_t pos, size_t gtids_idx, size_t n_gtids,  my_off_t seek_pos) :
+      pos_hash_element{pos, gtids_idx}, n_gtids{n_gtids}, seek_pos{seek_pos}
     {}
     /* Number of gtids in array starting from gitds[gtids_idx] */
     size_t n_gtids;
+    /* We don't have to scan from cached pos, so we also store next event pos */
+    my_off_t seek_pos;
   };
   char filename_buf[FN_REFLEN];
   LEX_CSTRING filename;

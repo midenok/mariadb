@@ -2470,6 +2470,12 @@ bool GTID_state_cache::push_sparse(my_off_t pos, uchar event_type,
   DBUG_ASSERT(sparse_factor);
   if (sparse_counter--)
     return false;
+  if (event_type == GTID_EVENT)
+  {
+    /* GTID_EVENT does not contain itself its GTID, so we skip it from cache */
+    sparse_counter++;
+    return false;
+  }
   const uint32 old_gtids= gtids.elements;
   const uint32 n_gtids= binlog_state->hash.records;
   if (allocate_dynamic(&gtids, old_gtids + n_gtids))
@@ -2482,7 +2488,7 @@ bool GTID_state_cache::push_sparse(my_off_t pos, uchar event_type,
   binlog_state->get_most_recent_gtid_list(((rpl_gtid *) gtids.buffer) + old_gtids);
   gtids.elements+= n_gtids;
   sparse_counter= sparse_factor;
-  pos_map_element e= {pos, old_gtids, n_gtids};
+  pos_map_element e= {pos, old_gtids, n_gtids, pos + event_len};
   pos_map.insert(pos_map_t::value_type(pos, e));
   return false;
 }
@@ -2550,7 +2556,8 @@ int GTID_state_cache::check_sparse(check_pos_hash_args args)
   *args.array_size= (uint32) el.n_gtids;
   DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %llu): hit {%llu} [%llu: %llu]",
                         filename.str, args.pos, el.pos, el.gtids_idx, el.n_gtids));
-  return 0;
+  /* Skip file reading if the queried position is cached */
+  return el.pos == args.pos ? 1 : 0;
 }
 
 
