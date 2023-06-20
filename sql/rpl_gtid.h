@@ -307,19 +307,19 @@ struct GTID_state_cache : public ilink
   /* Used by contiguous algorithm */
   struct pos_hash_element
   {
-    my_off_t pos;
-    size_t gtids_idx;
+    uint32 pos;
+    uint32 gtids_idx;
   };
   /* Used by sparse algorithm */
   struct pos_map_element : public pos_hash_element
   {
-    pos_map_element(my_off_t pos, size_t gtids_idx, size_t n_gtids,  my_off_t seek_pos) :
+    pos_map_element(uint32 pos, uint32 gtids_idx, uint32 n_gtids,  uint32 seek_pos) :
       pos_hash_element{pos, gtids_idx}, n_gtids{n_gtids}, seek_pos{seek_pos}
     {}
-    /* Number of gtids in array starting from gitds[gtids_idx] */
-    size_t n_gtids;
+    /* Number of gtids in array starting from gtids[gtids_idx] */
+    uint32 n_gtids;
     /* We don't have to scan from cached pos, so we also store next event pos */
-    my_off_t seek_pos;
+    uint32 seek_pos;
   };
   char filename_buf[FN_REFLEN];
   LEX_CSTRING filename;
@@ -328,7 +328,7 @@ struct GTID_state_cache : public ilink
   /* Map of file position to index in gtids array (contigous algorithm) */
   HASH pos_hash;
   /* RB-tree search of file position to subarray in gtids array (contigous algorithm) */
-  typedef std::map<size_t, pos_map_element> pos_map_t;
+  typedef std::map<uint32, pos_map_element> pos_map_t;
   pos_map_t pos_map;
   uint sparse_factor;
   uint sparse_counter;
@@ -348,7 +348,7 @@ struct GTID_state_cache : public ilink
     /* Note: tweak alloc_increment to minimize allocations */
     my_init_dynamic_array(PSI_INSTRUMENT_ME, &gtids, sizeof(rpl_gtid), 8, 4096, MYF(0));
     my_hash_init(PSI_INSTRUMENT_ME, &pos_hash, &my_charset_bin, 1024,
-                  offsetof(pos_hash_element, pos), sizeof(my_off_t), 0,
+                  offsetof(pos_hash_element, pos), sizeof(pos_hash_element::pos), 0,
                   my_free, HASH_UNIQUE);
   }
 
@@ -381,13 +381,18 @@ struct GTID_state_cache : public ilink
   }
 
   bool push_gtids_array(const rpl_gtid *gtid, uint32 count);
-  typedef bool (GTID_state_cache::*push_pos_hash_fn)
-    (my_off_t pos, uchar event_type, uint event_len);
-  bool push_contiguous(my_off_t pos, uchar event_type, uint event_len);
-  bool push_sparse(my_off_t pos, uchar event_type, uint event_len);
+  struct push_pos_hash_args
+  {
+    uint32 pos;
+    uchar event_type;
+    uint event_len;
+  };
+  typedef bool (GTID_state_cache::*push_pos_hash_fn) (push_pos_hash_args args);
+  bool push_contiguous(push_pos_hash_args args);
+  bool push_sparse(push_pos_hash_args args);
   struct check_pos_hash_args
   {
-    my_off_t pos;
+    uint32 pos;
     rpl_gtid **gtid_array;
     uint32 *array_size;
     my_off_t *seek_pos;
@@ -497,7 +502,7 @@ struct rpl_binlog_state
   {
     auto_lock l(&LOCK_gtid_state);
     if (*cache)
-      return ((*cache)->*push_pos_hash_hook)(pos, event_type, event_len);
+      return ((*cache)->*push_pos_hash_hook)({(uint32) pos, event_type, event_len});
     return false;
   }
   int check_pos_hash(const char *filename, my_off_t pos,
@@ -513,7 +518,7 @@ struct rpl_binlog_state
       DBUG_PRINT("binlog", ("Miss file: %s (%llu)", filename, pos));
       return 0;
     }
-    return (cache->*check_pos_hash_hook)({pos, gtid_array, array_size, seek_pos});
+    return (cache->*check_pos_hash_hook)({(uint32) pos, gtid_array, array_size, seek_pos});
   }
 };
 

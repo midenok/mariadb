@@ -2408,13 +2408,15 @@ bool GTID_state_cache::push_gtids_array(const rpl_gtid *gtid, uint32 count)
 }
 
 
-bool GTID_state_cache::push_contiguous(my_off_t pos, uchar event_type,
-                                       uint event_len)
+bool GTID_state_cache::push_contiguous(push_pos_hash_args args)
 {
   DBUG_ASSERT(!sparse_factor);
+  const uint32 pos= args.pos;
+  const uchar event_type= args.event_type;
+  const uint event_len= args.event_len;
   pos_hash_element *el;
-  /* For gtids->elements == 0 we store SIZE_T_MAX to indicate no GTIDs */
-  size_t last_idx= gtids.elements - 1;
+  /* For gtids->elements == 0 we store UINT32_MAX to indicate no GTIDs */
+  uint32 last_idx= (uint32) gtids.elements - 1;
   if (event_type == GTID_EVENT)
   {
     DBUG_ASSERT(gtids.elements);
@@ -2430,7 +2432,7 @@ bool GTID_state_cache::push_contiguous(my_off_t pos, uchar event_type,
       el->gtids_idx= last_idx;
     }
   }
-  DBUG_PRINT("binlog", ("Push pos: {%llu} -> [%llu] (%s)", pos, last_idx, filename.str));
+  DBUG_PRINT("binlog", ("Push pos: {%u} -> [%llu] (%s)", pos, last_idx, filename.str));
 
 #ifndef DBUG_OFF
   DBUG_ASSERT(pos == 0 || pos > max_pos);
@@ -2464,12 +2466,16 @@ bool GTID_state_cache::push_contiguous(my_off_t pos, uchar event_type,
 }
 
 
-bool GTID_state_cache::push_sparse(my_off_t pos, uchar event_type,
-                                   uint event_len)
+bool GTID_state_cache::push_sparse(push_pos_hash_args args)
 {
   DBUG_ASSERT(sparse_factor);
   if (sparse_counter--)
     return false;
+
+  const uint32 pos= args.pos;
+  const uchar event_type= args.event_type;
+  const uint event_len= args.event_len;
+
   if (event_type == GTID_EVENT)
   {
     /* GTID_EVENT does not contain itself its GTID, so we skip it from cache */
@@ -2483,12 +2489,12 @@ bool GTID_state_cache::push_sparse(my_off_t pos, uchar event_type,
     my_error(ER_OUTOFMEMORY, MYF(0), (int) (gtids.size_of_element * (old_gtids + n_gtids)));
     return true;
   }
-  DBUG_PRINT("binlog", ("Push pos: {%llu} -> [%llu: %llu] (%s)",
+  DBUG_PRINT("binlog", ("Push pos: {%u} -> [%u: %u] (%s)",
                         pos, old_gtids, n_gtids, filename.str));
   binlog_state->get_most_recent_gtid_list(((rpl_gtid *) gtids.buffer) + old_gtids);
   gtids.elements+= n_gtids;
   sparse_counter= sparse_factor;
-  pos_map_element e= {pos, old_gtids, n_gtids, pos + event_len};
+  pos_map_element e= { pos, old_gtids, n_gtids, pos + event_len};
   pos_map.insert(pos_map_t::value_type(pos, e));
   return false;
 }
@@ -2514,15 +2520,15 @@ int GTID_state_cache::check_contiguous(check_pos_hash_args args)
     my_hash_search(&pos_hash, (const uchar *)&args.pos, sizeof(args.pos));
   if (!el)
   {
-    DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %llu): miss",
+    DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %u): miss",
                           filename.str, args.pos));
     return 2;
   }
   DBUG_ASSERT(el->pos == args.pos);
-  DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %llu): hit [%llu]",
+  DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %u): hit [%u]",
                         filename.str, args.pos, el->gtids_idx));
 
-  if (el->gtids_idx != SIZE_T_MAX)
+  if (el->gtids_idx != UINT32_MAX)
   {
     DBUG_ASSERT(el->gtids_idx < gtids.elements);
     *args.gtid_array= (rpl_gtid *) gtids.buffer;
@@ -2538,23 +2544,23 @@ int GTID_state_cache::check_sparse(check_pos_hash_args args)
   if (pos_map.empty()) /* Maybe sparse point was not reached, read the file */
   {
 
-    DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %llu): empty pos_map",
+    DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %u): empty pos_map",
                           filename.str, args.pos));
     return 0;
   }
   pos_map_t::iterator it= pos_map.upper_bound(args.pos);
   if (it == pos_map.begin())
   {
-    DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %llu): before pos_map.begin()",
+    DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %u): before pos_map.begin()",
                           filename.str, args.pos));
     return 0;
   }
   it--;
   pos_map_element &el= it->second;
-  *args.seek_pos= el.pos;
+  *args.seek_pos= el.seek_pos;
   *args.gtid_array= ((rpl_gtid *) gtids.buffer) + el.gtids_idx;
   *args.array_size= (uint32) el.n_gtids;
-  DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %llu): hit {%llu} [%llu: %llu]",
+  DBUG_PRINT("binlog", ("gtid_state_from_pos(%s, %u): hit {%u} [%u: %u]",
                         filename.str, args.pos, el.pos, el.gtids_idx, el.n_gtids));
   /* Skip file reading if the queried position is cached */
   return el.pos == args.pos ? 1 : 0;
