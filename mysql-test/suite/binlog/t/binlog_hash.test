@@ -5,6 +5,7 @@
 
 let $datadir= `select @@datadir`;
 set @old_binlog_gtid_pos_cache= @@global.binlog_gtid_pos_cache;
+set @old_binlog_gtid_pos_cache_sparse= @@global.binlog_gtid_pos_cache_sparse;
 set @@global.binlog_gtid_pos_cache= 0;
 reset master;
 set @@global.binlog_gtid_pos_cache= 2;
@@ -20,7 +21,7 @@ if ($MTR_COMBINATION_CACHE_OFF)
 if ($MTR_COMBINATION_CACHE_SPARSE)
 {
   --disable_query_log
-  set @@global.binlog_gtid_pos_cache_sparse_factor= 2;
+  set @@global.binlog_gtid_pos_cache_sparse= 2;
   reset master;
   --enable_query_log
 }
@@ -242,3 +243,4 @@ if ($MTR_COMBINATION_CACHE_ON)
 
 drop table t1,t2;
 set @@global.binlog_gtid_pos_cache= @old_binlog_gtid_pos_cache;
+set @@global.binlog_gtid_pos_cache_sparse= @old_binlog_gtid_pos_cache_sparse;

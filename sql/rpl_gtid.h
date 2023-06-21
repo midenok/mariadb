@@ -298,7 +298,7 @@ struct rpl_slave_state
 
 
 extern uint opt_binlog_gtid_pos_cache;
-extern uint opt_binlog_gtid_pos_cache_sparse_factor;
+extern uint opt_binlog_gtid_pos_cache_sparse;
 
 struct rpl_binlog_state;
 
@@ -444,7 +444,7 @@ struct rpl_binlog_state
   /* Used for binlog_hash rotation */
   I_List<GTID_state_cache> binlog_list;
   /*
-    Depending on opt_binlog_gtid_pos_cache_sparse_factor calls
+    Depending on opt_binlog_gtid_pos_cache_sparse calls
     GTID_state_cache::push_contiguous() or GTID_state_cache::push_sparse()
   */
   GTID_state_cache::push_pos_hash_fn push_pos_hash_hook;

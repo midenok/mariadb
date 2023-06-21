@@ -2330,9 +2330,9 @@ bool rpl_binlog_state::rotate_binlog(const char *filename,
 
   if (!binlog_hash.records)
   {
-    if (opt_binlog_gtid_pos_cache_sparse_factor)
+    if (opt_binlog_gtid_pos_cache_sparse)
     {
-      sparse_factor= opt_binlog_gtid_pos_cache_sparse_factor;
+      sparse_factor= opt_binlog_gtid_pos_cache_sparse;
       push_pos_hash_hook= &GTID_state_cache::push_sparse;
       check_pos_hash_hook= &GTID_state_cache::check_sparse;
     }
