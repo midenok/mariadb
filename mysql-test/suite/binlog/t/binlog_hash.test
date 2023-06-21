@@ -13,13 +13,16 @@ if ($MTR_COMBINATION_CACHE_OFF)
 {
   --disable_query_log
   set @@global.binlog_gtid_pos_cache= 0;
+  reset master;
   --enable_query_log
 }
 
 if ($MTR_COMBINATION_CACHE_SPARSE)
 {
+  --disable_query_log
   set @@global.binlog_gtid_pos_cache_sparse_factor= 2;
   reset master;
+  --enable_query_log
 }
 
 select @@gtid_binlog_pos;

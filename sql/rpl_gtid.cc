@@ -2491,7 +2491,9 @@ bool GTID_state_cache::push_sparse(push_pos_hash_args args)
   }
   DBUG_PRINT("binlog", ("Push pos: {%u} -> [%u: %u] (%s)",
                         pos, old_gtids, n_gtids, filename.str));
-  binlog_state->get_most_recent_gtid_list(((rpl_gtid *) gtids.buffer) + old_gtids);
+  rpl_gtid *buffer= ((rpl_gtid *) gtids.buffer) + old_gtids;
+  binlog_state->get_most_recent_gtid_list(buffer);
+//   my_qsort(buffer, n_gtids, gtids.size_of_element, rpl_gtid_cmp_cb);
   gtids.elements+= n_gtids;
   sparse_counter= sparse_factor;
   pos_map_element e= { pos, old_gtids, n_gtids, pos + event_len};
@@ -2778,13 +2780,36 @@ slave_connection_state::append_to_string(String *out_str)
   uint32 i;
   bool first;
 
+  if (!hash.records)
+    return 0;
+
+  rpl_gtid *gtid_list= (rpl_gtid *) my_malloc(PSI_INSTRUMENT_ME,
+                                              sizeof(rpl_gtid) * hash.records,
+                                              MYF(MY_WME));
+  if (!gtid_list)
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    return 1;
+  }
+
+  if (get_gtid_list(gtid_list, hash.records))
+  {
+    my_free(gtid_list);
+    return 1;
+  }
+
+  my_qsort(gtid_list, hash.records, sizeof(rpl_gtid), rpl_gtid_cmp_cb);
+
   first= true;
   for (i= 0; i < hash.records; ++i)
   {
-    const entry *e= (const entry *)my_hash_element(&hash, i);
-    if (rpl_slave_state_tostring_helper(out_str, &e->gtid, &first))
+    if (rpl_slave_state_tostring_helper(out_str, gtid_list + i, &first))
+    {
+      my_free(gtid_list);
       return 1;
+    }
   }
+  my_free(gtid_list);
   return 0;
 }
 

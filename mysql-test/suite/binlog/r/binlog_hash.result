@@ -115,16 +115,16 @@ binlog_gtid_pos('master-bin.000001', 1358)
 0-1-2,222-1-3
 select binlog_gtid_pos('master-bin.000001', 1400);
 binlog_gtid_pos('master-bin.000001', 1400)
-0-1-2,333-1-1,222-1-3
+0-1-2,222-1-3,333-1-1
 select binlog_gtid_pos('master-bin.000001', 1451);
 binlog_gtid_pos('master-bin.000001', 1451)
-0-1-2,333-1-1,222-1-3
+0-1-2,222-1-3,333-1-1
 select binlog_gtid_pos('master-bin.000001', 1497);
 binlog_gtid_pos('master-bin.000001', 1497)
-0-1-2,333-1-1,222-1-3
+0-1-2,222-1-3,333-1-1
 select binlog_gtid_pos('master-bin.000001', 1549);
 binlog_gtid_pos('master-bin.000001', 1549)
-0-1-2,333-1-1,222-1-3
+0-1-2,222-1-3,333-1-1
 select binlog_gtid_pos('master-bin.000002', 4);
 binlog_gtid_pos('master-bin.000002', 4)
 0-1-2,222-1-3,333-1-1
@@ -242,63 +242,63 @@ binlog_gtid_pos('master-bin.000020', 616)
 0-1-2,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 658);
 binlog_gtid_pos('master-bin.000020', 658)
-0-1-2,12-2-1,333-1-3,222-1-3
+0-1-2,12-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 699);
 binlog_gtid_pos('master-bin.000020', 699)
-0-1-2,12-2-1,333-1-3,222-1-3
+0-1-2,12-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 744);
 binlog_gtid_pos('master-bin.000020', 744)
-0-1-2,12-2-1,333-1-3,222-1-3
+0-1-2,12-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 788);
 binlog_gtid_pos('master-bin.000020', 788)
-0-1-2,12-2-1,333-1-3,222-1-3
+0-1-2,12-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 861);
 binlog_gtid_pos('master-bin.000020', 861)
-0-1-2,12-2-1,333-1-3,222-1-3
+0-1-2,12-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 903);
 binlog_gtid_pos('master-bin.000020', 903)
-0-1-2,12-2-1,333-1-3,22-2-1,222-1-3
+0-1-2,12-2-1,22-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 946);
 binlog_gtid_pos('master-bin.000020', 946)
-0-1-2,12-2-1,333-1-3,22-2-1,222-1-3
+0-1-2,12-2-1,22-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 991);
 binlog_gtid_pos('master-bin.000020', 991)
-0-1-2,12-2-1,333-1-3,22-2-1,222-1-3
+0-1-2,12-2-1,22-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1029);
 binlog_gtid_pos('master-bin.000020', 1029)
-0-1-2,12-2-1,333-1-3,22-2-1,222-1-3
+0-1-2,12-2-1,22-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1102);
 binlog_gtid_pos('master-bin.000020', 1102)
-0-1-2,12-2-1,333-1-3,22-2-1,222-1-3
+0-1-2,12-2-1,22-2-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1144);
 binlog_gtid_pos('master-bin.000020', 1144)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1185);
 binlog_gtid_pos('master-bin.000020', 1185)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1230);
 binlog_gtid_pos('master-bin.000020', 1230)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1294);
 binlog_gtid_pos('master-bin.000020', 1294)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1367);
 binlog_gtid_pos('master-bin.000020', 1367)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1409);
 binlog_gtid_pos('master-bin.000020', 1409)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,44-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,44-3-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1446);
 binlog_gtid_pos('master-bin.000020', 1446)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,44-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,44-3-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1491);
 binlog_gtid_pos('master-bin.000020', 1491)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,44-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,44-3-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1539);
 binlog_gtid_pos('master-bin.000020', 1539)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,44-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,44-3-1,222-1-3,333-1-3
 select binlog_gtid_pos('master-bin.000020', 1612);
 binlog_gtid_pos('master-bin.000020', 1612)
-222-1-3,0-1-2,333-1-3,22-2-1,33-3-1,44-3-1,12-2-1
+0-1-2,12-2-1,22-2-1,33-3-1,44-3-1,222-1-3,333-1-3
 drop table t1,t2;
 set @@global.binlog_gtid_pos_cache= @old_binlog_gtid_pos_cache;
