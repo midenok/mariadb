@@ -4,7 +4,6 @@ set @old_parallel_threads=    @@global.slave_parallel_threads;
 set @old_slave_parallel_mode= @@global.slave_parallel_mode;
 set @old_dbug=                @@global.debug_dbug;
 set @old_slave_ordered_thread=    @@global.slave_ordered_thread;
-set @old_slave_ordered_dont_wait= @@global.slave_ordered_dont_wait;
 create procedure processlist()
 select Command, State, Info
 from information_schema.processlist
@@ -14,7 +13,6 @@ include/stop_slave.inc
 set global slave_parallel_threads=  5;
 set global slave_parallel_mode=     'optimistic';
 set global slave_ordered_thread=    1;
-set global slave_ordered_dont_wait= 1;
 include/start_slave.inc
 connection server_1;
 set @_parallel_do_db=             @@global.parallel_do_db;
@@ -64,11 +62,40 @@ Slave_ordered	debug sync point: now	insert into db_serial.t2 values (2)
 Slave_worker	debug sync point: now	insert into db_serial.t3 values (3)
 set debug_sync= 'now signal ha_write_row_continue_t1';
 set debug_sync= 'now wait_for ha_write_row_continued_t1';
+connection m1;
+# This transaction must not commit before any previous hanging transactions
+insert into db_parallel.t1 values (111);
+connection server_2;
+set debug_sync= 'now wait_for ha_write_row_entering_t1';
+call processlist;
+Command	State	Info
+Slave_worker	debug sync point: now	insert into db_parallel.t1 values (111)
+Slave_ordered	debug sync point: now	insert into db_serial.t2 values (2)
+Slave_worker	debug sync point: now	insert into db_serial.t3 values (3)
+select id into @id from information_schema.processlist where Info like 'insert %111%';
+set debug_sync= 'now signal ha_write_row_continue_t1';
+set debug_sync= 'now wait_for ha_write_row_continued_t1';
+# Now 111 transaction is at waiting for commit state
+select state from information_schema.processlist where id = @id;
+state
+Waiting for prior transaction to commit
+# 2 and 3 transactions still hanging
+call processlist;
+Command	State	Info
+Slave_ordered	debug sync point: now	insert into db_serial.t2 values (2)
+Slave_worker	debug sync point: now	insert into db_serial.t3 values (3)
+# There is no 111 committed still
+select * from db_parallel.t1 where a = 111;
+a
 set debug_sync= 'now signal ha_write_row_continue_t2';
 set debug_sync= 'now wait_for ha_write_row_continued_t2';
 set debug_sync= 'now signal ha_write_row_continue_t3';
 set debug_sync= 'now wait_for ha_write_row_continued_t3';
 set debug_sync= 'now wait_for ha_write_row_entering_t4';
+# 111 is still waiting because of t4
+select state from information_schema.processlist where id = @id;
+state
+Waiting for prior transaction to commit
 connection m1;
 insert into db_parallel.t1 values (5);
 connection server_2;
@@ -88,6 +115,10 @@ set debug_sync= 'now signal ha_write_row_continue_t3';
 set debug_sync= 'now wait_for ha_write_row_continued_t3';
 set debug_sync= 'now signal ha_write_row_continue_t4';
 set debug_sync= 'now wait_for ha_write_row_continued_t4';
+# Now 111 is committed
+select * from db_parallel.t1 where a = 111;
+a
+111
 connection m1;
 connection m2;
 connection m3;
@@ -166,7 +197,6 @@ include/stop_slave.inc
 set global slave_parallel_threads=  @old_parallel_threads;
 set global slave_parallel_mode=     @old_slave_parallel_mode;
 set global slave_ordered_thread=    @old_slave_ordered_thread;
-set global slave_ordered_dont_wait= @old_slave_ordered_dont_wait;
 include/start_slave.inc
 set @@global.debug_dbug= @old_dbug;
 set debug_sync= reset;

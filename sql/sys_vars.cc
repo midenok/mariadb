@@ -5220,12 +5220,6 @@ static Sys_var_mybool Sys_slave_ordered_thread(
        GLOBAL_VAR(opt_slave_ordered_thread),
        CMD_LINE(OPT_ARG), DEFAULT(TRUE));
 
-static Sys_var_mybool Sys_slave_ordered_dont_wait(
-       "slave_ordered_dont_wait",
-       "Slave ordered events don't wait previous groups unless they have explicit WAIT flag",
-       GLOBAL_VAR(opt_slave_ordered_dont_wait),
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
-
 static Sys_var_charptr Sys_slave_load_tmpdir(
        "slave_load_tmpdir", "The location where the slave should put "
        "its temporary files when replicating a LOAD DATA INFILE command",
