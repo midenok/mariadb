@@ -310,34 +310,32 @@ unlock_or_exit_cond(THD *thd, mysql_mutex_t *lock, bool *did_enter_cond,
   @return 0  registration is done completely, otherwise
           1  registration for SPECULATE_DEPEND only is done
 */
-static int
+static void
 register_wait_for_prior_event_group_commit(rpl_group_info *rgi,
                                            rpl_parallel_entry *entry)
 {
+  wait_for_commit *waitee;
   mysql_mutex_assert_owner(&entry->LOCK_parallel_entry);
   if (rgi->wait_commit_sub_id > entry->last_committed_sub_id)
   {
-    if ((rgi->speculation == rpl_group_info::SPECULATE_DEPEND) &&
-        !(rgi->gtid_ev_flags2 & Gtid_log_event::FL_ALLOW_PARALLEL))
+    if (rgi->speculation == rpl_group_info::SPECULATE_DEPEND)
     {
-      if (entry->last_committed_sub_id < rgi->wait_noptim_sub_id)
+      DBUG_ASSERT(!(rgi->gtid_ev_flags2 & Gtid_log_event::FL_ALLOW_PARALLEL));
+      /* Wait previous SPECULATE_DEPEND in group */
+      if (rgi->wait_noptim_sub_id > entry->last_committed_sub_id)
       {
-        wait_for_commit *waitee=
-          &rgi->wait_noptim_group_info->commit_orderer;
+        waitee= &rgi->wait_noptim_group_info->commit_orderer;
         rgi->commit_orderer.register_wait_for_prior_commit(waitee, true);
       }
-      return 1;
     }
     /*
       Register that the commit of this event group must wait for the
       commit of the previous event group to complete before it may
       complete itself, so that we preserve commit order.
     */
-    wait_for_commit *waitee=
-      &rgi->wait_commit_group_info->commit_orderer;
+    waitee= &rgi->wait_commit_group_info->commit_orderer;
     rgi->commit_orderer.register_wait_for_prior_commit(waitee);
   }
-  return 0;
 }
 
 
@@ -822,7 +820,7 @@ do_retry:
 #endif
         rgi->gtid_sub_id < entry->stop_on_error_sub_id)
     {
-      (void) register_wait_for_prior_event_group_commit(rgi, entry);
+      register_wait_for_prior_event_group_commit(rgi, entry);
     }
     else
     {
@@ -1263,7 +1261,7 @@ handle_rpl_parallel_thread(void *arg)
           such registration _and_ that previous commit has not already
           occurred.
         */
-        int register_wait= register_wait_for_prior_event_group_commit(rgi, entry);
+        register_wait_for_prior_event_group_commit(rgi, entry);
 
         unlock_or_exit_cond(thd, &entry->LOCK_parallel_entry,
                             &did_enter_cond, &old_stage);
@@ -1298,24 +1296,12 @@ handle_rpl_parallel_thread(void *arg)
           before, then wait now for the prior transaction to complete its
           commit.
         */
-        if (rgi->speculation >= rpl_group_info::SPECULATE_WAIT)
+        if (rgi->speculation == rpl_group_info::SPECULATE_WAIT)
         {
           if ((err= thd->wait_for_prior_commit()))
           {
             slave_output_error_info(rgi, thd);
             signal_error_to_sql_driver_thread(thd, rgi, 1);
-          }
-          else if (register_wait == 1)
-          {
-            DBUG_ASSERT(rgi->speculation >= rpl_group_info::SPECULATE_DEPEND);
-            mysql_mutex_lock(&entry->LOCK_parallel_entry);
-            if (rgi->wait_commit_sub_id > entry->last_committed_sub_id)
-            {
-              wait_for_commit *waitee=
-                &rgi->wait_commit_group_info->commit_orderer;
-              rgi->commit_orderer.register_wait_for_prior_commit(waitee, false);
-            }
-            mysql_mutex_unlock(&entry->LOCK_parallel_entry);
           }
         }
       }
