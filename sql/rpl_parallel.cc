@@ -1163,6 +1163,9 @@ handle_rpl_parallel_thread(void *arg)
       bool end_of_group;
       int group_ending;
 
+      thd->set_command(rgi->speculation == rpl_group_info::SPECULATE_DEPEND ?
+                       COM_SLAVE_ORDERED : COM_SLAVE_WORKER);
+
       next_qev= qev->next;
       if (qev->typ == rpl_parallel_thread::queued_event::QUEUED_POS_UPDATE)
       {
