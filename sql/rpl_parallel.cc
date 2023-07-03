@@ -1293,10 +1293,13 @@ handle_rpl_parallel_thread(void *arg)
           }
         }
         /*
-          If we are optimistically running transactions in parallel, but this
-          particular event group should not run in parallel with what came
-          before, then wait now for the prior transaction to complete its
+          If we are optimistically running transactions in parallel but this
+          particular event group must not be started in parallel with what came
+          before, then wait now for the prior transactions to complete its
           commit.
+
+          Wait for transaction commit is done in MYSQL_BIN_LOG::queue_for_group_commit()
+          and in InnoDB in case logging is off.
         */
         if (rgi->speculation >= rpl_group_info::SPECULATE_WAIT)
         {
@@ -1307,6 +1310,11 @@ handle_rpl_parallel_thread(void *arg)
           }
           else if (register_wait == 1)
           {
+            /*
+              Now we waited for the commit we depend on, but the wait that
+              guarantees the commit order must still has to be done (and will
+              be done in MYSQL_BIN_LOG::queue_for_group_commit())
+            */
             DBUG_ASSERT(rgi->speculation >= rpl_group_info::SPECULATE_DEPEND);
             mysql_mutex_lock(&entry->LOCK_parallel_entry);
             if (rgi->wait_commit_sub_id > entry->last_committed_sub_id)
