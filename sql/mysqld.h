@@ -838,7 +838,6 @@ extern ulong opt_binlog_dbug_fsync_sleep;
 extern uint volatile global_disable_checkpoint;
 extern my_bool opt_help;
 extern my_bool opt_slave_ordered_thread;
-extern my_bool opt_slave_ordered_dont_wait;
 
 extern char *server_version_commit_hash_ptr;
 extern char *server_samurai_version_string_ptr;
