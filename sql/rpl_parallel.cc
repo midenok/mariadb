@@ -320,10 +320,10 @@ register_wait_for_prior_event_group_commit(rpl_group_info *rgi,
     if ((rgi->speculation == rpl_group_info::SPECULATE_DEPEND) &&
         !(rgi->gtid_ev_flags2 & Gtid_log_event::FL_ALLOW_PARALLEL))
     {
-      if (entry->last_committed_sub_id < rgi->wait_noptim_sub_id)
+      if (rgi->wait_depend_sub_id > entry->last_committed_sub_id)
       {
         wait_for_commit *waitee=
-          &rgi->wait_noptim_group_info->commit_orderer;
+          &rgi->wait_depend_group_info->commit_orderer;
         rgi->commit_orderer.register_wait_for_prior_commit(waitee, true);
       }
       return 1;
@@ -2892,8 +2892,8 @@ rpl_parallel::do_event(rpl_group_info *serial_rgi, Log_event *ev,
           if (!(gtid_flags & Gtid_log_event::FL_ALLOW_PARALLEL))
           {
             speculation= rpl_group_info::SPECULATE_DEPEND;
-            rgi->wait_noptim_group_info= e->current_noptim_group_info;
-            rgi->wait_noptim_sub_id= e->current_noptim_sub_id;
+            rgi->wait_depend_group_info= e->current_noptim_group_info;
+            rgi->wait_depend_sub_id= e->current_noptim_sub_id;
             e->current_noptim_group_info= rgi;
             e->current_noptim_sub_id= rgi->gtid_sub_id;
           }
