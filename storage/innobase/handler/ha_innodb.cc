@@ -8920,34 +8920,48 @@ ha_innobase::update_row(
 		MySQL that the row is not really updated and it
 		should not increase the count of updated rows.
 		This is fix for http://bugs.mysql.com/29157 */
+		if (m_prebuilt->versioned_write
+		    && thd_sql_command(m_user_thd) != SQLCOM_ALTER_TABLE
+		    /* Multiple UPDATE of same rows in single transaction create
+		       historical rows only once. */
+		    && trx->id != table->vers_start_id()) {
+			error = row_insert_for_mysql((byte*) old_row,
+						     m_prebuilt,
+						     ROW_INS_HISTORICAL);
+			if (error != DB_SUCCESS) {
+				goto func_exit;
+			}
+			innobase_srv_conc_exit_innodb(m_prebuilt);
+			innobase_active_small();
+		}
 		DBUG_RETURN(HA_ERR_RECORD_IS_THE_SAME);
 	} else {
+		const bool vers_set_fields = m_prebuilt->versioned_write
+			&& m_prebuilt->upd_node->update->affects_versioned();
+		const bool vers_ins_row = vers_set_fields
+			&& thd_sql_command(m_user_thd) != SQLCOM_ALTER_TABLE;
+
+                TABLE_LIST *tl= table->pos_in_table_list;
+                uint8 op_map= tl->trg_event_map | tl->slave_fk_event_map;
+		/* This is not a delete */
+		m_prebuilt->upd_node->is_delete =
+			(vers_set_fields && !vers_ins_row) ||
+			(op_map & trg2bit(TRG_EVENT_DELETE) &&
+				table->versioned(VERS_TIMESTAMP))
+			? VERSIONED_DELETE
+			: NO_DELETE;
+
 		innobase_srv_conc_enter_innodb(m_prebuilt);
-
-
-	const TABLE_LIST *tl= table->pos_in_table_list;
-	const uint8 op_map= tl->trg_event_map | tl->slave_fk_event_map;
-	/* Used to avoid reading history in FK check on DELETE (see MDEV-16210). */
-	m_prebuilt->upd_node->is_delete =
-		(op_map & trg2bit(TRG_EVENT_DELETE)
-		 && table->versioned(VERS_TIMESTAMP))
-		? VERSIONED_DELETE : NO_DELETE;
 
 		if (m_prebuilt->upd_node->is_delete) {
 			trx->fts_next_doc_id = 0;
 		}
-		/* See vers_make_update() inside for versioned_write for how
-		row_start/row_end updated */
 		error = row_update_for_mysql(m_prebuilt);
 
-		if (error == DB_SUCCESS && m_prebuilt->versioned_write
-		    && uvect->affects_versioned()
+		if (error == DB_SUCCESS && vers_ins_row
 		    /* Multiple UPDATE of same rows in single transaction create
 		       historical rows only once. */
 		    && trx->id != table->vers_start_id()) {
-			/* UPDATE is not used by ALTER TABLE. Just precaution
-			as we don't need history generation for ALTER TABLE. */
-			ut_ad(thd_sql_command(m_user_thd) != SQLCOM_ALTER_TABLE);
 			error = row_insert_for_mysql((byte*) old_row,
 						     m_prebuilt,
 						     ROW_INS_HISTORICAL);
