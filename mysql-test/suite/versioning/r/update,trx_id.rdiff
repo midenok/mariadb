@@ -1,5 +1,5 @@
 --- update.result
-+++ update,trx_id.reject
++++ update.reject
 @@ -84,12 +84,10 @@
  commit;
  select x, y, sys_trx_end = MAXVAL as current from t1 for system_time all order by sys_trx_end, x, y;

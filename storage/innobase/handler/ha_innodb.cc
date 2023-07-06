@@ -8410,6 +8410,9 @@ calc_row_difference(
 	trx_t* const	trx = prebuilt->trx;
 	doc_id_t	doc_id = FTS_NULL_DOC_ID;
 	ulint		num_v = 0;
+#ifndef DBUG_OFF
+	uint		vers_fields = 0;
+#endif
 	prebuilt->versioned_write = table->versioned_write(VERS_TRX_ID);
 	const bool skip_virtual = ha_innobase::omits_virtual_cols(*table->s);
 
@@ -8423,6 +8426,14 @@ calc_row_difference(
 
 	for (uint i = 0; i < table->s->fields; i++) {
 		field = table->field[i];
+
+#ifndef DBUG_OFF
+		if (!field->vers_sys_field()
+		    && !field->vers_update_unversioned()) {
+			++vers_fields;
+		}
+#endif
+
 		const bool is_virtual = !field->stored_in_db();
 		if (is_virtual && skip_virtual) {
 			num_v++;
@@ -8562,15 +8573,9 @@ calc_row_difference(
 			}
 		}
 
-		const bool add_anyway= prebuilt->versioned_write
-					&& !field->vers_update_unversioned();
 		if (o_len != n_len || (o_len != 0 && o_len != UNIV_SQL_NULL
-				       && (add_anyway ||
-				           0 != memcmp(o_ptr, n_ptr, o_len)))) {
-			/* The field has changed or it is trx-versioned write
-			which must write history for affects_versioned() rows
-			for UPDATE with versioned fields even when the value
-			was not changed (MDEV-23446) */
+				       && 0 != memcmp(o_ptr, n_ptr, o_len))) {
+			/* The field has changed */
 
 			ufield = uvect->fields + n_changed;
 			MEM_UNDEFINED(ufield, sizeof *ufield);
@@ -8774,7 +8779,10 @@ calc_row_difference(
 		 && table->versioned(VERS_TIMESTAMP))
 		? VERSIONED_DELETE : NO_DELETE;
 
-	if (prebuilt->versioned_write && uvect->affects_versioned()) {
+	if (prebuilt->versioned_write) {
+		/* Guaranteed by CREATE TABLE, but anyway we make sure we
+		generate history only when there are versioned fields. */
+		DBUG_ASSERT(vers_fields);
 		prebuilt->upd_node->vers_make_update(trx);
 	}
 
@@ -8944,7 +8952,6 @@ ha_innobase::update_row(
 		error = row_update_for_mysql(m_prebuilt);
 
 		if (error == DB_SUCCESS && m_prebuilt->versioned_write
-		    && uvect->affects_versioned()
 		    /* Multiple UPDATE of same rows in single transaction create
 		       historical rows only once. */
 		    && trx->id != table->vers_start_id()) {
