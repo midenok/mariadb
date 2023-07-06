@@ -393,6 +393,7 @@ update t1 set nstate= nstate where nid = 1;
 select nid, nstate, check_row(row_start, row_end) from t1 for system_time all order by row_start, row_end;
 --echo # Bug: ERROR 1761 (23000): Foreign key constraint for table 'xxx', record '1-18446744073709551615' would lead to a duplicate entry in table 'xxx', key 'PRIMARY'
 update t1 set nstate= 3 where nid= 1;
+--exit
 # Under one transaction trx_id generates only one history row, that differs from timestamp
 select nid, nstate, check_row(row_start, row_end) from t1 for system_time all order by row_start, row_end;
 commit;

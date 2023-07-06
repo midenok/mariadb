@@ -8564,6 +8564,7 @@ calc_row_difference(
 
 		const bool add_anyway= prebuilt->versioned_write
 					&& !field->vers_update_unversioned();
+		const bool add_anyway2= false;
 		if (o_len != n_len || (o_len != 0 && o_len != UNIV_SQL_NULL
 				       && (add_anyway ||
 				           0 != memcmp(o_ptr, n_ptr, o_len)))) {
