@@ -8766,18 +8766,6 @@ calc_row_difference(
 
 	ut_a(buf <= (byte*) original_upd_buff + buff_len);
 
-	const TABLE_LIST *tl= table->pos_in_table_list;
-	const uint8 op_map= tl->trg_event_map | tl->slave_fk_event_map;
-	/* Used to avoid reading history in FK check on DELETE (see MDEV-16210). */
-	prebuilt->upd_node->is_delete =
-		(op_map & trg2bit(TRG_EVENT_DELETE)
-		 && table->versioned(VERS_TIMESTAMP))
-		? VERSIONED_DELETE : NO_DELETE;
-
-	if (prebuilt->versioned_write && uvect->affects_versioned()) {
-		prebuilt->upd_node->vers_make_update(trx);
-	}
-
 	ut_ad(uvect->validate());
 	return(DB_SUCCESS);
 }
@@ -8935,6 +8923,15 @@ ha_innobase::update_row(
 		DBUG_RETURN(HA_ERR_RECORD_IS_THE_SAME);
 	} else {
 		innobase_srv_conc_enter_innodb(m_prebuilt);
+
+
+	const TABLE_LIST *tl= table->pos_in_table_list;
+	const uint8 op_map= tl->trg_event_map | tl->slave_fk_event_map;
+	/* Used to avoid reading history in FK check on DELETE (see MDEV-16210). */
+	m_prebuilt->upd_node->is_delete =
+		(op_map & trg2bit(TRG_EVENT_DELETE)
+		 && table->versioned(VERS_TIMESTAMP))
+		? VERSIONED_DELETE : NO_DELETE;
 
 		if (m_prebuilt->upd_node->is_delete) {
 			trx->fts_next_doc_id = 0;
