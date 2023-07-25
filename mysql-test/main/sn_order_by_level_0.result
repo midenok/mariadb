@@ -1,0 +1,55 @@
+CREATE TABLE `task` (
+`sys_id` char(32) NOT NULL DEFAULT '',
+`sys_class_name` varchar(80) DEFAULT NULL,
+`sys_domain_path` varchar(255) DEFAULT NULL,
+`sys_created_on` datetime DEFAULT NULL,
+`active` tinyint(1) DEFAULT NULL,
+`assignment_group` varchar(32) DEFAULT NULL,
+`number` varchar(130) DEFAULT NULL,
+PRIMARY KEY (`sys_id`),
+KEY `task_ref2` (`assignment_group`,`active`),
+KEY `task_task_class_created` (`sys_class_name`,`sys_created_on`),
+KEY `sys_class_name_2` (`sys_class_name`,`number`,`sys_domain_path`),
+KEY `active` (`active`,`sys_class_name`,`number`),
+KEY `all_k` (`active`,`sys_class_name`,`assignment_group`,`number`)
+);
+show variables like '%sn%';
+Variable_name	Value
+sn_order_by_limit_optimize_level	2
+sn_order_by_limit_row_threshold	300000
+select count(*) from task;
+count(*)
+10617
+# Should select task_ref2 -- cos we are ignoring order by index
+SET sn_order_by_limit_optimize_level = 0;
+explain format=json SELECT task0.sys_id FROM task task0 WHERE task0.sys_class_name = 'sn_customerservice_case' AND task0.active = 1 AND task0.assignment_group = '58280f58584120006863f2dea01f7f04' ORDER BY task0.number LIMIT 0, 20;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "task0.`number`",
+        "table": {
+          "table_name": "task0",
+          "access_type": "ref",
+          "possible_keys": [
+            "task_ref2",
+            "task_task_class_created",
+            "sys_class_name_2",
+            "active",
+            "all_k"
+          ],
+          "key": "task_ref2",
+          "key_length": "37",
+          "used_key_parts": ["assignment_group", "active"],
+          "ref": ["const", "const"],
+          "rows": 1,
+          "filtered": 100,
+          "index_condition": "task0.assignment_group = '58280f58584120006863f2dea01f7f04'",
+          "attached_condition": "task0.assignment_group <=> '58280f58584120006863f2dea01f7f04' and task0.active <=> 1 and task0.sys_class_name = 'sn_customerservice_case'"
+        }
+      }
+    }
+  }
+}

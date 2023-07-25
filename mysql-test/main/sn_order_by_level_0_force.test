@@ -1,0 +1,43 @@
+# Defect DEF0370542
+--source include/have_innodb.inc
+--source include/have_stat_tables.inc
+--source include/sn_task.inc
+
+--disable_query_log
+--disable_result_log
+
+set @save_use_stat_tables=@@use_stat_tables;
+set @save_tmp_cond_selectivity= @@optimizer_use_condition_selectivity;
+set @save_sn_order_by_limit_optimize_level= @@sn_order_by_limit_optimize_level;
+
+set @save_optimizer_switch_for_selectivity_test=@@optimizer_switch;
+
+SET optimizer_use_condition_selectivity = 1;
+set optimizer_switch='rowid_filter=off';
+set use_stat_tables='never';
+
+use glide;
+
+--enable_result_log
+--enable_query_log
+select count(*) from task;
+
+echo # Should select task_ref2 -- cos we are ignoring order by index;
+SET sn_order_by_limit_optimize_level = 0;
+explain format=json SELECT task0.sys_id FROM task task0 force index(all_k) WHERE task0.sys_class_name = 'sn_customerservice_case' AND task0.active = 1 AND task0.assignment_group = '58280f58584120006863f2dea01f7f04' ORDER BY task0.number LIMIT 0, 20;
+
+--disable_query_log
+--disable_result_log
+
+# cleanup ...
+SET optimizer_use_condition_selectivity = @save_tmp_cond_selectivity;
+SET optimizer_switch = @save_optimizer_switch_for_selectivity_test;
+SET optimizer_trace='enabled=off';
+SET sn_order_by_limit_optimize_level = @save_sn_order_by_limit_optimize_level;
+SET use_stat_tables=@save_use_stat_tables;
+
+drop table task;
+drop database glide;
+
+--enable_result_log
+--enable_query_log

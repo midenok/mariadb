@@ -1,0 +1,24 @@
+CREATE TABLE `ts_word` (
+`word` varchar(40) DEFAULT NULL,
+`number` int(11) NOT NULL,
+PRIMARY KEY (`number`),
+UNIQUE KEY `ts_word_u` (`word`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+# Should select all_k -- only using cost
+SET sn_order_by_limit_optimize_level = 5;
+explain format=json SELECT * FROM ts_word ORDER BY number LIMIT 1;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "ts_word",
+      "access_type": "index",
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["number"],
+      "rows": 1,
+      "filtered": 100
+    }
+  }
+}
