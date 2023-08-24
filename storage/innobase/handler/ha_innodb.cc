@@ -4039,6 +4039,14 @@ static void innobase_update_optimizer_costs(OPTIMIZER_COSTS *costs)
 }
 
 
+extern BufferStream lock_latest_err_buf;
+
+static void innobase_deadlock_info(char **buf, size_t *buf_size, bool *free)
+{
+  lock_latest_err_buf.get(buf, buf_size, free);
+}
+
+
 /** Initialize the InnoDB storage engine plugin.
 @param[in,out]	p	InnoDB handlerton
 @return error code
@@ -4107,6 +4115,7 @@ static int innodb_init(void* p)
 		= innodb_prepare_commit_versioned;
 
         innobase_hton->update_optimizer_costs= innobase_update_optimizer_costs;
+	innobase_hton->deadlock_info= innobase_deadlock_info;
 
 	innodb_remember_check_sysvar_funcs();
 

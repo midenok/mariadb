@@ -1682,6 +1682,8 @@ struct handlerton
   int (*create_partitioning_metadata)(const char *path,
                                       const char *old_path,
                                       chf_create_flags action_flag);
+
+  void (*deadlock_info)(char **buf, size_t *buf_size, bool *free);
 };
 
 

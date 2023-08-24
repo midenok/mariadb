@@ -49,6 +49,7 @@ Created 5/7/1996 Heikki Tuuri
 #include <debug_sync.h>
 
 #include <set>
+#include <stdio.h>
 
 #ifdef WITH_WSREP
 #include <mysql/service_wsrep.h>
@@ -332,6 +333,7 @@ lock_sys_t lock_sys;
 
 /** Only created if !srv_read_only_mode. Protected by lock_sys.latch. */
 static FILE *lock_latest_err_file;
+BufferStream lock_latest_err_buf(lock_latest_err_file);
 
 /*********************************************************************//**
 Reports that a transaction id is insensible, i.e., in the future. */
@@ -412,8 +414,7 @@ void lock_sys_t::create(ulint n_cells)
 
   if (!srv_read_only_mode)
   {
-    lock_latest_err_file= os_file_create_tmpfile();
-    ut_a(lock_latest_err_file);
+    lock_latest_err_buf.init();
   }
 }
 
@@ -4527,7 +4528,7 @@ lock_print_info_summary(
 		      "------------------------\n", file);
 
 		if (!srv_read_only_mode) {
-			ut_copy_file(file, lock_latest_err_file);
+			lock_latest_err_buf.copy_to(file);
 		}
 	}
 
