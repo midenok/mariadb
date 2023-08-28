@@ -848,10 +848,22 @@ retry_event_group(rpl_group_info *rgi, rpl_parallel_thread *rpt,
   rpl_parallel_entry *entry= rgi->parallel_entry;
   ulong retries= 0;
   Format_description_log_event *description_event= NULL;
+  char *deadlock_info;
+  size_t di_size;
+  bool di_free;
 
 do_retry:
   if (slave_retries_file &&
       (!opt_slave_retries_max_log || retries < opt_slave_retries_max_log || errmsg))
+  {
+    handlerton *hton= rgi->tables_to_lock->table->file->ht;
+    if (hton->deadlock_info)
+      (hton->deadlock_info)(&deadlock_info, &di_size, &di_free);
+    else {
+      deadlock_info= NULL;
+      di_size= 0;
+      di_free= false;
+    }
     slave_retries_print("[R%lu] event: %lu of %lu  log_pos: %lu  GTID: %u-%u-%llu  query_id: %ld  reason: %u%s%s%s",
                         retries + 1, event_count, events_to_execute,
                         log_pos,
@@ -861,7 +873,10 @@ do_retry:
                         (thd->is_error() ? thd->get_stmt_da()->sql_errno() : 0),
                         (errmsg ? "  binlog error: " : ""),
                         (errmsg ? errmsg : ""),
-                        rgi->deadlock_info);
+                        (deadlock_info ? deadlock_info : ""));
+    if (di_free)
+      free(deadlock_info);
+  }
 
   DBUG_EXECUTE_IF("rpl_parallel_retries_at_max", {
     if (retries == slave_trans_retries - 1)
