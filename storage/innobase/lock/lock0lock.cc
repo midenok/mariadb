@@ -64,7 +64,6 @@ ulong innodb_deadlock_report;
 extern "C" void thd_rpl_deadlock_check(MYSQL_THD thd, MYSQL_THD other_thd);
 extern "C" int thd_need_wait_reports(const MYSQL_THD thd);
 extern "C" int thd_need_ordering_with(const MYSQL_THD thd, const MYSQL_THD other_thd);
-extern "C" size_t thd_deadlock_buf(MYSQL_THD thd, char **buf);
 #endif
 
 /** Functor for accessing the embedded node within a table lock. */
