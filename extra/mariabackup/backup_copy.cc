@@ -469,14 +469,13 @@ struct datafile_cur_t {
 	char		abs_path[FN_REFLEN];
 	MY_STAT		statinfo;
 	uint		thread_n;
-	byte*		orig_buf;
 	byte*		buf;
 	size_t		buf_size;
 	size_t		buf_read;
 	size_t		buf_offset;
 
 	explicit datafile_cur_t(const char* filename = NULL) :
-		file(), thread_n(0), orig_buf(NULL), buf(NULL), buf_size(0),
+		file(), thread_n(0), buf(NULL), buf_size(0),
 		buf_read(0), buf_offset(0)
 	{
 		memset(rel_path, 0, sizeof rel_path);
@@ -1036,16 +1035,16 @@ static int fix_win_file_permissions(const char *file)
 	ea.grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;
 	ea.Trustee.TrusteeType = TRUSTEE_IS_UNKNOWN;
 	ACL* pNewDACL = 0;
-	SetEntriesInAcl(1, &ea, pOldDACL, &pNewDACL);
-	if (pNewDACL)
+	DWORD err = SetEntriesInAcl(1, &ea, pOldDACL, &pNewDACL);
+	if (!err)
 	{
+		DBUG_ASSERT(pNewDACL);
 		SetSecurityInfo(hFile, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL,
 			pNewDACL, NULL);
+		LocalFree((HLOCAL)pNewDACL);
 	}
 	if (pSD != NULL)
 		LocalFree((HLOCAL)pSD);
-	if (pNewDACL != NULL)
-		LocalFree((HLOCAL)pNewDACL);
 	CloseHandle(hFile);
 	return 0;
 }

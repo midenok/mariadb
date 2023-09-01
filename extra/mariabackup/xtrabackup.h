@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1335  USA
 #include "changed_page_bitmap.h"
 #include <set>
 
+#define XB_TOOL_NAME "mariadb-backup"
+
 struct xb_delta_info_t
 {
 	xb_delta_info_t(ulint page_size, ulint zip_size, ulint space_id)
@@ -42,8 +44,8 @@ class CorruptedPages
 public:
   CorruptedPages();
   ~CorruptedPages();
-  void add_page(const char *file_name, ulint space_id, ulint page_no);
-  bool contains(ulint space_id, ulint page_no) const;
+  void add_page(const char *file_name, ulint space_id, unsigned page_no);
+  bool contains(ulint space_id, unsigned page_no) const;
   void drop_space(ulint space_id);
   void rename_space(ulint space_id, const std::string &new_name);
   bool print_to_file(ds_ctxt *ds_data, const char *file_name) const;
@@ -54,11 +56,11 @@ public:
   void backup_fix_ddl(ds_ctxt *ds_data, ds_ctxt *ds_meta);
 
 private:
-  void add_page_no_lock(const char *space_name, ulint space_id, ulint page_no,
-                        bool convert_space_name);
+  void add_page_no_lock(const char *space_name, ulint space_id,
+                        unsigned page_no, bool convert_space_name);
   struct space_info_t {
     std::string space_name;
-    std::set<ulint> pages;
+    std::set<unsigned> pages;
   };
   typedef std::map<ulint, space_info_t> container_t;
   mutable pthread_mutex_t m_mutex;
@@ -146,7 +148,7 @@ extern char		*opt_incremental_history_name;
 extern char		*opt_incremental_history_uuid;
 
 extern char		*opt_user;
-extern char		*opt_password;
+extern const char	*opt_password;
 extern char		*opt_host;
 extern char		*opt_defaults_group;
 extern char		*opt_socket;

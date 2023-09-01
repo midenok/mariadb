@@ -27,7 +27,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1335  USA
 #include "common.h"
 #include "write_filt.h"
 #include "fil_cur.h"
-#include <os0proc.h>
+#include "xtrabackup.h"
 
 /************************************************************************
 Write-through page write filter. */
@@ -117,7 +117,7 @@ Run the next batch of pages through incremental page write filter.
 static my_bool
 wf_incremental_process(xb_write_filt_ctxt_t *ctxt, ds_file_t *dstfile)
 {
-	ulint				i;
+	unsigned				i;
 	xb_fil_cur_t			*cursor = ctxt->cursor;
 	byte				*page;
 	const ulint			page_size = cursor->page_size;
