@@ -5687,6 +5687,8 @@ uint32_t get_space_id(const char *file) {
 
 	ulong bytes_read;
 	if ((bytes_read = read(fd, page, srv_page_size)) == srv_page_size) {
+		 if (buf_page_is_corrupted(false, page, srv_sys_space.flags()))
+			 die("Error: page is corrupted: %s", file);
 		// read the space id ...
 		uint32_t space_id = mach_read_from_4(
 				page + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
