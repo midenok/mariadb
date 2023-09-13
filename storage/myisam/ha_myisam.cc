@@ -717,12 +717,21 @@ static int compute_vcols(MI_INFO *info, uchar *record, int keynum)
   table->move_fields(table->field, record, table->field[0]->record_ptr());
   if (keynum == -1) // update all vcols
   {
+    /*
+      To evaluate vcols we must have current_thd set.
+      This will set current_thd in all threads to the same THD, but it's
+      safe, because vcols are always evaluated under info->s->intern_lock.
+    */
+    if (!current_thd)
+      set_current_thd(table->in_use);
     int error= table->update_virtual_fields(table->file, VCOL_UPDATE_FOR_READ);
     if (table->update_virtual_fields(table->file, VCOL_UPDATE_INDEXED))
       error= 1;
     mysql_mutex_unlock(&info->s->intern_lock);
     return error;
   }
+  if (!current_thd)
+    set_current_thd(table->in_use);
   // update only one key
   KEY *key= table->key_info + keynum;
   KEY_PART_INFO *kp= key->key_part, *end= kp + key->ext_key_parts;
