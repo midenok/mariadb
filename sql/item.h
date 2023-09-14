@@ -2079,6 +2079,7 @@ public:
     return mark_unsupported_function(full_name(), arg, VCOL_IMPOSSIBLE);
   }
   virtual bool check_field_expression_processor(void *arg) { return 0; }
+  virtual bool check_circular_ref_processor(void *arg) { return 0; }
   virtual bool check_func_default_processor(void *arg) { return 0; }
   /*
     Check if an expression value has allowed arguments, like DATE/DATETIME
@@ -3528,6 +3529,7 @@ public:
   bool post_fix_fields_part_expr_processor(void *bool_arg);
   bool check_valid_arguments_processor(void *bool_arg);
   bool check_field_expression_processor(void *arg);
+  bool check_circular_ref_processor(void *arg);
   bool enumerate_field_refs_processor(void *arg);
   bool update_table_bitmaps_processor(void *arg);
   bool switch_to_nullable_fields_processor(void *arg);

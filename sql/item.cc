@@ -933,6 +933,23 @@ bool Item_field::check_field_expression_processor(void *arg)
   return 0;
 }
 
+
+bool Item_field::check_circular_ref_processor(void *arg)
+{
+  Field *org_field= (Field*) arg;
+
+  if (field == org_field)
+  {
+    my_error(ER_EXPRESSION_CIRCULAR_REFERENCE, MYF(0), field->field_name.str);
+    return 1;
+  }
+  if (field->vcol_info &&
+      field->vcol_info->expr->walk(&Item::check_circular_ref_processor, 0, org_field))
+    return 1;
+  return 0;
+}
+
+
 bool Item_field::update_vcol_processor(void *arg)
 {
   MY_BITMAP *map= (MY_BITMAP *) arg;

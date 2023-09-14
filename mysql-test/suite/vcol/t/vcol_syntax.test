@@ -185,3 +185,24 @@ insert into t values (1, 1, 1);
 
 drop trigger tr;
 drop table t;
+
+--echo #
+--echo # MDEV-31112 vcol circular references lead to stack overflow
+--echo #
+create table t (a int, e int, b int as (a), c int as (rand(rand(rand(1 + b + e)))), d int as (pow(c, e)));
+alter table t alter column b drop default, alter column c drop default, alter column d drop default;
+--echo # non-circular ref
+alter table t modify column a int as (e) stored;
+--echo # circular ref prohibited
+--error ER_EXPRESSION_CIRCULAR_REFERENCE
+alter table t modify column a int as (d) stored;
+--echo # circular default to vcol is ok
+alter table t modify column a int default (b);
+insert t (a, e) values (default, 1);
+select * from t;
+--echo # circular default to default prohibited
+alter table t modify column a int default (e);
+--error ER_EXPRESSION_REFERS_TO_UNINIT_FIELD
+alter table t modify column e int default (a);
+# Cleanup
+drop table t;

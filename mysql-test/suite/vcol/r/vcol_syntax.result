@@ -234,3 +234,24 @@ Warning	1292	Incorrect datetime value: '1' for column `test`.`t`.`c2` at row 1
 Warning	1292	Incorrect datetime value: '0' for column `test`.`t`.`c2` at row 1
 drop trigger tr;
 drop table t;
+#
+# MDEV-31112 vcol circular references lead to stack overflow
+#
+create table t (a int, e int, b int as (a), c int as (rand(rand(rand(1 + b + e)))), d int as (pow(c, e)));
+alter table t alter column b drop default, alter column c drop default, alter column d drop default;
+# non-circular ref
+alter table t modify column a int as (e) stored;
+# circular ref prohibited
+alter table t modify column a int as (d) stored;
+ERROR HY000: Expression for field `a` has circular reference
+# circular default to vcol is ok
+alter table t modify column a int default (b);
+insert t (a, e) values (default, 1);
+select * from t;
+a	e	b	c	d
+NULL	1	NULL	0	0
+# circular default to default prohibited
+alter table t modify column a int default (e);
+alter table t modify column e int default (a);
+ERROR 01000: Expression for field `a` is referring to uninitialized field `e`
+drop table t;

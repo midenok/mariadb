@@ -1074,6 +1074,11 @@ bool parse_vcol_defs(THD *thd, MEM_ROOT *mem_root, TABLE *table,
       return vcol &&
              vcol->expr->walk(&Item::check_field_expression_processor, 0, field);
     }
+    static bool check_circular(Field *field, Virtual_column_info *vcol)
+    {
+      return vcol &&
+             vcol->expr->walk(&Item::check_circular_ref_processor, 0, field);
+    }
     static bool check_constraint(Field *field, Virtual_column_info *vcol)
     {
       uint32 flags= field->flags;
@@ -1087,7 +1092,8 @@ bool parse_vcol_defs(THD *thd, MEM_ROOT *mem_root, TABLE *table,
     {
       if (check(field, field->vcol_info) ||
           check_constraint(field, field->check_constraint) ||
-          check(field, field->default_value))
+          check(field, field->default_value) ||
+          check_circular(field, field->vcol_info))
         return true;
       return false;
     }
