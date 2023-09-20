@@ -230,6 +230,9 @@ int maria_close(register MARIA_HA *info)
         my_free(share->state_history);
       /* Marker for concurrent checkpoint */
       share->state_history= 0;
+      info->state->changed= 0;
+      if (info->used_tables)
+        info->used_tables->state_current.changed= 0;
     }
   }
   if (!internal_table)
