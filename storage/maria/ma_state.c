@@ -113,7 +113,6 @@ end:
   info->state_start= &tables->state_start;
   info->state= &tables->state_current;
   info->used_tables= tables;
-  // FIXME: where else it is incremented? It cannot be > 1
   tables->use_count++;
 
   /*

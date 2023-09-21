@@ -838,8 +838,7 @@ public:
   /* Add tables used by routine to the table list. */
   bool add_used_tables_to_table_list(THD *thd,
                                      TABLE_LIST ***query_tables_last_ptr,
-                                     TABLE_LIST *belong_to_view,
-                                     TABLE_LIST *table_list= NULL);
+                                     TABLE_LIST *belong_to_view);
 
   /**
     Check if this stored routine contains statements disallowed
