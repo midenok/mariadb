@@ -5136,7 +5136,8 @@ sp_head::merge_table_list(THD *thd, TABLE_LIST *table, LEX *lex_for_tmp_check)
 bool
 sp_head::add_used_tables_to_table_list(THD *thd,
                                        TABLE_LIST ***query_tables_last_ptr,
-                                       TABLE_LIST *belong_to_view)
+                                       TABLE_LIST *belong_to_view,
+                                       TABLE_LIST *table_list)
 {
   uint i;
   Query_arena *arena, backup;
@@ -5157,9 +5158,32 @@ sp_head::add_used_tables_to_table_list(THD *thd,
   {
     char *tab_buff, *key_buff;
     SP_TABLE *stab= (SP_TABLE*) my_hash_element(&m_sptabs, i);
-    LEX_CSTRING db_name;
+    LEX_CSTRING db_name= { stab->qname.str, stab->db_length };
     if (stab->temp)
       continue;
+
+    if (table_list)
+    {
+      uint covered= 0;
+      for (uint j= 0; j < stab->lock_count; j++)
+      {
+        LEX_CSTRING table_name= { db_name.str + db_name.length + 1,
+                                  stab->table_name_length };
+        for (TABLE_LIST *tl= table_list; tl; tl= tl->next_global)
+        {
+          if ((lex_string_cmp(system_charset_info, &db_name, &tl->db) == 0) &&
+              (lex_string_cmp(system_charset_info, &table_name, &tl->table_name) == 0) &&
+              stab->lock_type == tl->lock_type)
+          {
+            covered++;
+            break;
+          }
+        }
+      }
+
+      if (stab->lock_count == covered)
+        continue;
+    }
 
     if (!(tab_buff= (char *)thd->alloc(ALIGN_SIZE(sizeof(TABLE_LIST)) *
                                         stab->lock_count)) ||
@@ -5168,8 +5192,6 @@ sp_head::add_used_tables_to_table_list(THD *thd,
       DBUG_RETURN(FALSE);
 
     db_name.str=    key_buff;
-    db_name.length= stab->db_length;
-
 
     for (uint j= 0; j < stab->lock_count; j++)
     {

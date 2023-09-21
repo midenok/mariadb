@@ -2543,7 +2543,7 @@ add_tables_and_routines_for_triggers(THD *thd,
           {
             trigger->add_used_tables_to_table_list(thd,
                        &prelocking_ctx->query_tables_last,
-                       table_list->belong_to_view);
+                       table_list);
             sp_update_stmt_used_routines(thd, prelocking_ctx,
                                          &trigger->m_sroutines,
                                          table_list->belong_to_view);
