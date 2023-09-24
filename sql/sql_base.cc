@@ -1780,9 +1780,9 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
     Open_table_context::enum_open_table_action action;
     TABLE_LIST *table_arg;
     mysql_mutex_lock(&table->s->LOCK_share);
-    if (!table->s->vers_skip_auto_create)
+    if (!table->s->vers_auto_create_signal)
     {
-      table->s->vers_skip_auto_create= true;
+      table->s->vers_auto_create_signal= new Cond;
       action= Open_table_context::OT_ADD_HISTORY_PARTITION;
       table_arg= table_list;
     }
@@ -1798,6 +1798,7 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
       */
       table_list->vers_skip_create= 0;
       ot_ctx->vers_create_count= 0;
+      ot_ctx->vers_create_signal= table->s->vers_auto_create_signal->going_wait();
       action= Open_table_context::OT_REOPEN_TABLES;
       table_arg= NULL;
       DEBUG_SYNC(thd, "reopen_history_partition");
@@ -3259,7 +3260,8 @@ Open_table_context::Open_table_context(THD *thd, uint flags)
    m_action(OT_NO_ACTION),
    m_has_locks(thd->mdl_context.has_locks()),
    m_has_protection_against_grl(0),
-   vers_create_count(0)
+   vers_create_count(0),
+   vers_create_signal(NULL)
 {}
 
 
@@ -3395,6 +3397,8 @@ Open_table_context::recover_from_failed_open()
 {
   bool result= FALSE;
   MDL_deadlock_discovery_repair_handler handler;
+  Cond *cond= 0;
+
   /*
     Install error handler to mark transaction to rollback on DEADLOCK error.
   */
@@ -3429,16 +3433,15 @@ Open_table_context::recover_from_failed_open()
         {
           TABLE_SHARE *share= tdc_acquire_share(m_thd, m_failed_table,
                                                 GTS_TABLE, NULL);
-          if (share)
-          {
-            share->vers_skip_auto_create= false;
-            tdc_release_share(share);
-          }
+          cond= share->vers_auto_create_signal;
+          tdc_release_share(share);
           if (m_thd->get_stmt_da()->sql_errno() == ER_LOCK_WAIT_TIMEOUT)
           {
             // MDEV-23642 Locking timeout caused by auto-creation affects original DML
             m_thd->clear_error();
             vers_create_count= 0;
+            if (!cond->signal())
+              delete cond;
             result= false;
           }
         }
@@ -3494,6 +3497,8 @@ Open_table_context::recover_from_failed_open()
           DBUG_ASSERT(vers_create_count);
           result= vers_create_partitions(m_thd, m_failed_table, vers_create_count);
           vers_create_count= 0;
+          if (!cond->signal())
+            delete cond;
           if (!m_thd->transaction->stmt.is_empty())
             trans_commit_stmt(m_thd);
           DBUG_ASSERT(!result ||
@@ -4643,6 +4648,14 @@ restart:
           /* Re-open temporary tables after close_tables_for_reopen(). */
           if (thd->open_temporary_tables(*start))
             goto error;
+
+          if (ot_ctx.vers_create_signal)
+          {
+            uint waiters_left= ot_ctx.vers_create_signal->wait();
+            if (!waiters_left)
+              delete ot_ctx.vers_create_signal;
+            ot_ctx.vers_create_signal= 0;
+          }
 
           error= FALSE;
           goto restart;

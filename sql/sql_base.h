@@ -615,6 +615,7 @@ private:
 
 public:
   uint vers_create_count;
+  Cond *vers_create_signal;
 };
 
 
@@ -669,6 +670,60 @@ public:
 private:
   int m_handled_errors;
   int m_unhandled_errors;
+};
+
+
+/**
+  mysql_cond_t with waiters count
+*/
+
+class Cond
+{
+  uint waiters;
+  bool signalled;
+  mysql_mutex_t mutex;
+  mysql_cond_t cond;
+
+public:
+  Cond() : waiters(0), signalled(false)
+  {
+    mysql_mutex_init(PSI_NOT_INSTRUMENTED, &mutex, 0);
+    mysql_cond_init(0, &cond, 0);
+  }
+
+  ~Cond()
+  {
+    DBUG_ASSERT(!waiters);
+    mysql_cond_destroy(&cond);
+    mysql_mutex_destroy(&mutex);
+  }
+
+  uint signal()
+  {
+    mysql_mutex_lock(&mutex);
+    signalled= true;
+    mysql_cond_signal(&cond);
+    mysql_mutex_unlock(&mutex);
+    return waiters;
+  }
+
+  Cond *going_wait()
+  {
+    mysql_mutex_lock(&mutex);
+    ++waiters;
+    mysql_mutex_unlock(&mutex);
+    return this;
+  }
+
+  uint wait()
+  {
+    mysql_mutex_lock(&mutex);
+    while (!signalled)
+      mysql_cond_wait(&cond, &mutex);
+    --waiters;
+    mysql_mutex_unlock(&mutex);
+    return waiters;
+  }
 };
 
 
