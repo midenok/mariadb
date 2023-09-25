@@ -688,7 +688,7 @@ public:
   Cond() : waiters(0), signalled(false)
   {
     mysql_mutex_init(PSI_NOT_INSTRUMENTED, &mutex, 0);
-    mysql_cond_init(0, &cond, 0);
+    mysql_cond_init(PSI_NOT_INSTRUMENTED, &cond, 0);
   }
 
   ~Cond()
@@ -700,6 +700,7 @@ public:
 
   uint signal()
   {
+    DBUG_PRINT("cond", ("Signalling for %u waiters", waiters));
     mysql_mutex_lock(&mutex);
     signalled= true;
     mysql_cond_signal(&cond);
@@ -712,6 +713,7 @@ public:
     mysql_mutex_lock(&mutex);
     ++waiters;
     mysql_mutex_unlock(&mutex);
+    DBUG_PRINT("cond", ("Going wait, now %u waiters", waiters));
     return this;
   }
 
@@ -719,8 +721,12 @@ public:
   {
     mysql_mutex_lock(&mutex);
     while (!signalled)
+    {
+      DBUG_PRINT("cond", ("Waiting, now %u waiters", waiters));
       mysql_cond_wait(&cond, &mutex);
+    }
     --waiters;
+    DBUG_PRINT("cond", ("Waited, now %u waiters", waiters));
     mysql_mutex_unlock(&mutex);
     return waiters;
   }
