@@ -1806,8 +1806,8 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
       */
       table_list->vers_skip_create= 0;
       ot_ctx->vers_create_count= 0;
-      action= Open_table_context::OT_REOPEN_TABLES;
-      table_arg= NULL;
+      action= Open_table_context::OT_ADD_HISTORY_PARTITION;
+      table_arg= table_list;
       DEBUG_SYNC(thd, "reopen_history_partition");
     }
     mysql_mutex_unlock(&table->s->LOCK_share);
@@ -3426,6 +3426,10 @@ Open_table_context::recover_from_failed_open()
         DBUG_ASSERT(!result);
         DBUG_ASSERT(m_action == OT_ADD_HISTORY_PARTITION);
       }
+
+      if (m_action == OT_ADD_HISTORY_PARTITION && vers_create_count == 0)
+        break;
+
       /*
          We are now under MDL_EXCLUSIVE mode. Other threads have no table share
          acquired: they are blocked either at open_table_get_mdl_lock() in
