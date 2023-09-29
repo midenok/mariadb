@@ -3289,11 +3289,14 @@ bool Virtual_column_info::fix_expr(THD *thd)
   DBUG_ENTER("fix_vcol_expr");
 
   const enum enum_column_usage saved_column_usage= thd->column_usage;
+  const bool column_usage_force= thd->column_usage_force;
   thd->column_usage= COLUMNS_WRITE;
+  thd->column_usage_force= true;
 
   int error= expr->fix_fields(thd, &expr);
 
   thd->column_usage= saved_column_usage;
+  thd->column_usage_force= column_usage_force;
 
   if (unlikely(error))
   {
@@ -3564,6 +3567,7 @@ unpack_vcol_info_from_frm(THD *thd, TABLE *table,
   LEX *old_lex= thd->lex;
   LEX lex;
   bool error;
+  TABLE_LIST *sequence;
   DBUG_ENTER("unpack_vcol_info_from_frm");
 
   DBUG_ASSERT(vcol->expr == NULL);
@@ -3581,10 +3585,33 @@ unpack_vcol_info_from_frm(THD *thd, TABLE *table,
   if (unlikely(error))
     goto end;
 
-  if (lex.current_select->table_list.first[0].next_global)
+  /*
+    Assign opened TABLE objects to lex.query_tables to make fix_and_check_expr()
+    happy. Probably can be useful for implementing SELECT inside vcol expressions.
+  */
+  for (TABLE_LIST *vcol_tab= lex.query_tables; vcol_tab; vcol_tab= vcol_tab->next_global)
+  {
+    if (!vcol_tab->cmp_name(table))
+    {
+      /*
+        This one is important for CREATE OR REPLACE as the original table was
+        already deleted, so cannot get TABLE from old_lex.
+      */
+      vcol_tab->table= table;
+      continue;
+    }
+    for (TABLE_LIST *tab= old_lex->query_tables; tab; tab= tab->next_global)
+    {
+      if (!tab->table || vcol_tab->cmp_name(tab))
+        continue;
+      vcol_tab->table= tab->table;
+    }
+  }
+
+  sequence= lex.current_select->table_list.first[0].next_global;
+  if (sequence && sequence->sequence)
   {
     /* We are using NEXT VALUE FOR sequence. Remember table name for open */
-    TABLE_LIST *sequence= lex.current_select->table_list.first[0].next_global;
     sequence->next_global= table->internal_tables;
     table->internal_tables= sequence;
   }
@@ -3597,6 +3624,14 @@ unpack_vcol_info_from_frm(THD *thd, TABLE *table,
   {
     *vcol_ptr= vcol_info= vcol_storage.vcol_info;   // Expression ok
     DBUG_ASSERT(vcol_info->expr);
+    /*
+      Revert back TABLE objects assignment.
+      open_and_process_table() will be unhappy at:
+
+        DBUG_ASSERT(tables->table->pos_in_table_list == tables);
+    */
+    for (TABLE_LIST *vcol_tab= lex.query_tables; vcol_tab; vcol_tab= vcol_tab->next_global)
+      vcol_tab->table= NULL;
     goto end;
   }
   *error_reported= TRUE;
