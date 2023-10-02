@@ -3985,40 +3985,6 @@ enum open_frm_error open_table_from_share(THD *thd, TABLE_SHARE *share,
     }
   }
 
-  /* Allocate bitmaps */
-
-  bitmap_size= share->column_bitmap_size;
-  bitmap_count= 7;
-  if (share->virtual_fields)
-    bitmap_count++;
-
-  if (!(bitmaps= (uchar*) alloc_root(&outparam->mem_root,
-                                     bitmap_size * bitmap_count)))
-    goto err;
-
-  my_bitmap_init(&outparam->def_read_set,
-                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
-  bitmaps+= bitmap_size;
-  my_bitmap_init(&outparam->def_write_set,
-                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
-  bitmaps+= bitmap_size;
-
-  my_bitmap_init(&outparam->has_value_set,
-                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
-  bitmaps+= bitmap_size;
-  my_bitmap_init(&outparam->tmp_set,
-                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
-  bitmaps+= bitmap_size;
-  my_bitmap_init(&outparam->eq_join_set,
-                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
-  bitmaps+= bitmap_size;
-  my_bitmap_init(&outparam->cond_set,
-                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
-  bitmaps+= bitmap_size;
-  my_bitmap_init(&outparam->def_rpl_write_set,
-                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
-  outparam->default_column_bitmaps();
-
   /*
     Process virtual and default columns, if any.
   */
@@ -4168,6 +4134,40 @@ partititon_err:
     error_reported= TRUE;
     goto err;
   }
+
+  /* Allocate bitmaps */
+
+  bitmap_size= share->column_bitmap_size;
+  bitmap_count= 7;
+  if (share->virtual_fields)
+    bitmap_count++;
+
+  if (!(bitmaps= (uchar*) alloc_root(&outparam->mem_root,
+                                     bitmap_size * bitmap_count)))
+    goto err;
+
+  my_bitmap_init(&outparam->def_read_set,
+                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
+  bitmaps+= bitmap_size;
+  my_bitmap_init(&outparam->def_write_set,
+                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
+  bitmaps+= bitmap_size;
+
+  my_bitmap_init(&outparam->has_value_set,
+                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
+  bitmaps+= bitmap_size;
+  my_bitmap_init(&outparam->tmp_set,
+                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
+  bitmaps+= bitmap_size;
+  my_bitmap_init(&outparam->eq_join_set,
+                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
+  bitmaps+= bitmap_size;
+  my_bitmap_init(&outparam->cond_set,
+                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
+  bitmaps+= bitmap_size;
+  my_bitmap_init(&outparam->def_rpl_write_set,
+                 (my_bitmap_map*) bitmaps, share->fields, FALSE);
+  outparam->default_column_bitmaps();
 
   outparam->cond_selectivity= 1.0;
 
