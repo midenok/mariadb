@@ -1327,7 +1327,8 @@ JOIN::prepare(TABLE_LIST *tables_init,
   enum_parsing_place save_place=
                      thd->lex->current_select->context_analysis_place;
   thd->lex->current_select->context_analysis_place= SELECT_LIST;
-  if (setup_fields(thd, ref_ptrs, fields_list, MARK_COLUMNS_READ,
+  if (setup_fields(thd, ref_ptrs, fields_list,
+                   (thd->column_usage_force ? thd->column_usage : MARK_COLUMNS_READ),
                    &all_fields, &select_lex->pre_fix, 1))
     DBUG_RETURN(-1);
   thd->lex->current_select->context_analysis_place= save_place;

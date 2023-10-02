@@ -1207,6 +1207,7 @@ public:
    ulong id;
 
   enum enum_column_usage column_usage;
+  bool column_usage_force;
 
   LEX_CSTRING name; /* name for named prepared statements */
   LEX *lex;                                     // parse tree descriptor
