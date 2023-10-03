@@ -688,6 +688,30 @@ class Cond
   mysql_cond_t cond;
   mysql_cond_t feedback;
 
+  bool timedwait(THD *thd, mysql_cond_t *c)
+  {
+    time_t timeout= thd->variables.lock_wait_timeout - (my_time(0) - thd->start_time);
+    if (timeout <= 0)
+    {
+      my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
+      return true;
+    }
+    timespec abstime= { timeout, 0};
+    int err= mysql_cond_timedwait(c, &mutex, &abstime);
+    if (err)
+    {
+      if (err == ETIMEDOUT)
+        my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
+      else
+      {
+        my_error(ER_GET_ERRNO, MYF(0), err, "Cond::wait()");
+        DBUG_ASSERT(0);
+      }
+      return true;
+    }
+    return false;
+  }
+
 public:
   Cond() : waiters(0), signalled(false)
   {
@@ -704,8 +728,9 @@ public:
     mysql_mutex_destroy(&mutex);
   }
 
-  void signal()
+  bool signal(THD *thd)
   {
+    bool err= false;
     DBUG_PRINT("cond", ("0x%lx: Signalling for %u waiters", this, waiters.load()));
     mysql_mutex_lock(&mutex);
     signalled= true;
@@ -713,9 +738,11 @@ public:
     while (waiters)
     {
       DBUG_PRINT("cond", ("0x%lx: Waiting for %u waiters", this, waiters.load()));
-      mysql_cond_wait(&feedback, &mutex);
+      if ((err= timedwait(thd, &feedback)))
+        break;
     }
     mysql_mutex_unlock(&mutex);
+    return err;
   }
 
   Cond *going_wait()
@@ -725,18 +752,21 @@ public:
     return this;
   }
 
-  void wait()
+  bool wait(THD *thd)
   {
+    bool err= false;
     mysql_mutex_lock(&mutex);
     while (!signalled)
     {
       DBUG_PRINT("cond", ("0x%lx: Waiting, now %u waiters", this, waiters.load()));
-      mysql_cond_wait(&cond, &mutex);
+      if ((err= timedwait(thd, &cond)))
+        break;
     }
     --waiters;
     DBUG_PRINT("cond", ("0x%lx: Waited, now %u waiters", this, waiters.load()));
     mysql_cond_signal(&feedback);
     mysql_mutex_unlock(&mutex);
+    return err;
   }
 };
 

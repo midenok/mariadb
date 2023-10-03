@@ -4669,8 +4669,10 @@ restart:
 
           if (ot_ctx.vers_create_signal)
           {
-            ot_ctx.vers_create_signal->wait();
+            bool err= ot_ctx.vers_create_signal->wait(thd);
             ot_ctx.vers_create_signal= 0;
+            if (err)
+              goto error;
           }
 
           error= FALSE;
