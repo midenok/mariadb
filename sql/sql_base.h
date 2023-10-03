@@ -674,7 +674,10 @@ private:
 
 
 /**
-  mysql_cond_t with waiters count
+  mysql_cond_t with waiters count and feedback
+
+  One-to-many signal router. Signalling thread is blocked until all
+  the waiting threads receive signal.
 */
 
 class Cond
@@ -683,17 +686,20 @@ class Cond
   std::atomic<bool> signalled;
   mysql_mutex_t mutex;
   mysql_cond_t cond;
+  mysql_cond_t feedback;
 
 public:
   Cond() : waiters(0), signalled(false)
   {
     mysql_mutex_init(PSI_NOT_INSTRUMENTED, &mutex, 0);
     mysql_cond_init(PSI_NOT_INSTRUMENTED, &cond, 0);
+    mysql_cond_init(PSI_NOT_INSTRUMENTED, &feedback, 0);
   }
 
   ~Cond()
   {
     DBUG_ASSERT(!waiters);
+    mysql_cond_destroy(&feedback);
     mysql_cond_destroy(&cond);
     mysql_mutex_destroy(&mutex);
   }
@@ -704,9 +710,11 @@ public:
     mysql_mutex_lock(&mutex);
     signalled= true;
     mysql_cond_broadcast(&cond);
-    mysql_mutex_unlock(&mutex);
-    while (waiters);
-    mysql_mutex_lock(&mutex);
+    while (waiters)
+    {
+      DBUG_PRINT("cond", ("0x%lx: Waiting for %u waiters", this, waiters.load()));
+      mysql_cond_wait(&feedback, &mutex);
+    }
     mysql_mutex_unlock(&mutex);
   }
 
@@ -727,6 +735,7 @@ public:
     }
     --waiters;
     DBUG_PRINT("cond", ("0x%lx: Waited, now %u waiters", this, waiters.load()));
+    mysql_cond_signal(&feedback);
     mysql_mutex_unlock(&mutex);
   }
 };

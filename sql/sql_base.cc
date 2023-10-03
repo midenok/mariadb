@@ -1792,6 +1792,7 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
       DBUG_PRINT("auto-create", ("Initiating for %u partitions; query_id: %ld",
                                  ot_ctx->vers_create_count, thd->query_id));
       table->s->vers_auto_create_signal= new Cond;
+      /* Thread signals to vers_create_signal after it creates partitions.  */
       ot_ctx->vers_create_signal= table->s->vers_auto_create_signal;
       action= Open_table_context::OT_ADD_HISTORY_PARTITION;
       table_arg= table_list;
@@ -1800,18 +1801,9 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
     {
       DBUG_PRINT("auto-create", ("Skipping for %u partitions; query_id: %ld",
                                  ot_ctx->vers_create_count, thd->query_id));
-      /*
-          NOTE: this may repeat multiple times until creating thread acquires
-          MDL_EXCLUSIVE. Since auto-creation is rare operation this is acceptable.
-          We could suspend this thread on cond-var but we must first exit
-          MDL_SHARED_WRITE and we cannot store cond-var into TABLE_SHARE
-          because it is already released and there is no guarantee that it will
-          be same instance if we acquire it again.
-
-          FIXME: update comment
-      */
       table_list->vers_skip_create= 0;
       ot_ctx->vers_create_count= 0;
+      /* Thread waits on vers_create_signal after it releases share. */
       ot_ctx->vers_create_signal= table->s->vers_auto_create_signal->going_wait();
       action= Open_table_context::OT_REOPEN_TABLES;
       table_arg= NULL;
