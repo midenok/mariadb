@@ -679,8 +679,8 @@ private:
 
 class Cond
 {
-  uint waiters;
-  bool signalled;
+  std::atomic<uint> waiters;
+  std::atomic<bool> signalled;
   mysql_mutex_t mutex;
   mysql_cond_t cond;
 
@@ -698,37 +698,36 @@ public:
     mysql_mutex_destroy(&mutex);
   }
 
-  uint signal()
+  void signal()
   {
-    DBUG_PRINT("cond", ("Signalling for %u waiters", waiters));
+    DBUG_PRINT("cond", ("0x%lx: Signalling for %u waiters", this, waiters.load()));
     mysql_mutex_lock(&mutex);
     signalled= true;
-    mysql_cond_signal(&cond);
+    mysql_cond_broadcast(&cond);
     mysql_mutex_unlock(&mutex);
-    return waiters;
+    while (waiters);
+    mysql_mutex_lock(&mutex);
+    mysql_mutex_unlock(&mutex);
   }
 
   Cond *going_wait()
   {
-    mysql_mutex_lock(&mutex);
     ++waiters;
-    mysql_mutex_unlock(&mutex);
-    DBUG_PRINT("cond", ("Going wait, now %u waiters", waiters));
+    DBUG_PRINT("cond", ("0x%lx: Going wait, now %u waiters", this, waiters.load()));
     return this;
   }
 
-  uint wait()
+  void wait()
   {
     mysql_mutex_lock(&mutex);
     while (!signalled)
     {
-      DBUG_PRINT("cond", ("Waiting, now %u waiters", waiters));
+      DBUG_PRINT("cond", ("0x%lx: Waiting, now %u waiters", this, waiters.load()));
       mysql_cond_wait(&cond, &mutex);
     }
     --waiters;
-    DBUG_PRINT("cond", ("Waited, now %u waiters", waiters));
+    DBUG_PRINT("cond", ("0x%lx: Waited, now %u waiters", this, waiters.load()));
     mysql_mutex_unlock(&mutex);
-    return waiters;
   }
 };
 

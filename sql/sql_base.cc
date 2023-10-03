@@ -1769,6 +1769,9 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
   /*
       NOTE: The semantics of vers_set_hist_part() is twofold: even when we
       don't need auto-create, we need to update part_info->hist_part.
+
+      FIXME: either comment why we skipping create_count calculation or remove
+      this repeated loop.
   */
   uint *create_count= (table_list->vers_skip_create == thd->query_id) ?
     NULL : &ot_ctx->vers_create_count;
@@ -1789,6 +1792,7 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
       DBUG_PRINT("auto-create", ("Initiating for %u partitions; query_id: %ld",
                                  ot_ctx->vers_create_count, thd->query_id));
       table->s->vers_auto_create_signal= new Cond;
+      ot_ctx->vers_create_signal= table->s->vers_auto_create_signal;
       action= Open_table_context::OT_ADD_HISTORY_PARTITION;
       table_arg= table_list;
     }
@@ -1803,6 +1807,8 @@ bool TABLE::vers_switch_partition(THD *thd, TABLE_LIST *table_list,
           MDL_SHARED_WRITE and we cannot store cond-var into TABLE_SHARE
           because it is already released and there is no guarantee that it will
           be same instance if we acquire it again.
+
+          FIXME: update comment
       */
       table_list->vers_skip_create= 0;
       ot_ctx->vers_create_count= 0;
@@ -3405,7 +3411,6 @@ Open_table_context::recover_from_failed_open()
 {
   bool result= FALSE;
   MDL_deadlock_discovery_repair_handler handler;
-  Cond *cond= 0;
 
   /*
     Install error handler to mark transaction to rollback on DEADLOCK error.
@@ -3443,7 +3448,6 @@ Open_table_context::recover_from_failed_open()
                                                 GTS_TABLE, NULL);
           if (share)
           {
-	    cond= share->vers_auto_create_signal;
             share->vers_auto_create_signal= NULL;
             tdc_release_share(share);
           }
@@ -3451,12 +3455,10 @@ Open_table_context::recover_from_failed_open()
                                      m_thd->get_stmt_da()->sql_errno()));
           if (m_thd->get_stmt_da()->sql_errno() == ER_LOCK_WAIT_TIMEOUT)
           {
-            // MDEV-23642 Locking timeout caused by auto-creation affects original DML
-            m_thd->clear_error();
             vers_create_count= 0;
-            if (cond && !cond->signal())
-              delete cond;
-            result= false;
+            vers_create_signal->signal();
+            delete vers_create_signal;
+            vers_create_signal= 0;
           }
         }
         break;
@@ -3520,8 +3522,9 @@ Open_table_context::recover_from_failed_open()
                                        vers_create_count));
 #endif
           vers_create_count= 0;
-          if (!cond->signal())
-            delete cond;
+          vers_create_signal->signal();
+          delete vers_create_signal;
+          vers_create_signal= 0;
           if (!m_thd->transaction->stmt.is_empty())
             trans_commit_stmt(m_thd);
           DBUG_ASSERT(!result ||
@@ -4674,9 +4677,7 @@ restart:
 
           if (ot_ctx.vers_create_signal)
           {
-            uint waiters_left= ot_ctx.vers_create_signal->wait();
-            if (!waiters_left)
-              delete ot_ctx.vers_create_signal;
+            ot_ctx.vers_create_signal->wait();
             ot_ctx.vers_create_signal= 0;
           }
 
