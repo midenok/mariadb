@@ -728,9 +728,8 @@ public:
     mysql_mutex_destroy(&mutex);
   }
 
-  bool signal(THD *thd)
+  void signal()
   {
-    bool err= false;
     DBUG_PRINT("cond", ("0x%lx: Signalling for %u waiters", this, waiters.load()));
     mysql_mutex_lock(&mutex);
     signalled= true;
@@ -738,11 +737,9 @@ public:
     while (waiters)
     {
       DBUG_PRINT("cond", ("0x%lx: Waiting for %u waiters", this, waiters.load()));
-      if ((err= timedwait(thd, &feedback)))
-        break;
+      mysql_cond_wait(&feedback, &mutex);
     }
     mysql_mutex_unlock(&mutex);
-    return err;
   }
 
   Cond *going_wait()
