@@ -696,7 +696,8 @@ class Cond
       my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
       return true;
     }
-    timespec abstime= { timeout, 0};
+    timespec abstime;
+    set_timespec(abstime, timeout);
     int err= mysql_cond_timedwait(c, &mutex, &abstime);
     if (err)
     {

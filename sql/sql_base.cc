@@ -3436,18 +3436,27 @@ Open_table_context::recover_from_failed_open()
       {
         if (m_action == OT_ADD_HISTORY_PARTITION)
         {
-          TABLE_SHARE *share= tdc_acquire_share(m_thd, m_failed_table,
-                                                GTS_TABLE, NULL);
-          if (share)
-          {
-            share->vers_auto_create_signal= NULL;
-            tdc_release_share(share);
-          }
           DBUG_PRINT("auto-create", ("Lock error: %u",
                                      m_thd->get_stmt_da()->sql_errno()));
           if (m_thd->get_stmt_da()->sql_errno() == ER_LOCK_WAIT_TIMEOUT)
           {
             vers_create_count= 0;
+            /*
+              Before we delete vers_create_signal we must protect other threads
+              from accessing it.
+            */
+            TABLE_SHARE *share= tdc_acquire_share(m_thd, m_failed_table,
+                                                  GTS_TABLE, NULL);
+            if (share)
+            {
+              if (share->vers_auto_create_signal == vers_create_signal)
+              {
+                mysql_mutex_lock(&share->LOCK_share);
+                share->vers_auto_create_signal= NULL;
+                mysql_mutex_unlock(&share->LOCK_share);
+              }
+              tdc_release_share(share);
+            }
             vers_create_signal->signal();
             delete vers_create_signal;
             vers_create_signal= 0;
