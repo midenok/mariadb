@@ -71,9 +71,7 @@ MariaDB thread id x, OS thread handle x, query id x, GTID x-x-x Updating
 *** WAITING FOR THIS LOCK TO BE GRANTED:
 MariaDB thread id x, OS thread handle x, query id x, GTID x-x-x Updating
 *** WAITING FOR THIS LOCK TO BE GRANTED:
-x-x-x x:x:x [Tx] [Rx] event: x of x  log_pos: x  GTID: x-x-x  query_id: x  reason: x
 x-x-x x:x:x [Tx] [Rx] [SUCCESS] event: x of x  log_pos: x  GTID: x-x-x  query_id: x  result: x
-x-x-x x:x:x [Tx] [Rx] event: x of x  log_pos: x  GTID: x-x-x  query_id: x  reason: x
 x-x-x x:x:x [Tx] [Rx] [SUCCESS] event: x of x  log_pos: x  GTID: x-x-x  query_id: x  result: x
 include/stop_slave.inc
 set global slave_parallel_threads= @old_parallel_threads;

@@ -96,7 +96,7 @@ set global debug_dbug= @old_dbug;
 
 let $retries_log= `SELECT @@GLOBAL.log_slave_retries_file`;
 let grep_file= $retries_log;
-let grep_regex= WAITING|GTID|event;
+let grep_regex= WAITING|\[SUCCESS\]|Updating;
 --replace_regex /\d+/x/
 --source include/grep.inc
 
