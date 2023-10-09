@@ -93,6 +93,7 @@ update t2 set x= 6;
 --sync_with_master
 reap;
 set global debug_dbug= @old_dbug;
+flush error logs;
 
 let $retries_log= `SELECT @@GLOBAL.log_slave_retries_file`;
 let grep_file= $retries_log;

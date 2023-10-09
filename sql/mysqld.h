@@ -198,6 +198,7 @@ public:
   void close();
   bool acquire();
   void release();
+  void flush();
 };
 extern Slave_retries_file slave_retries_file;
 

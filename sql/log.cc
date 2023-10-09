@@ -9703,6 +9703,7 @@ bool flush_error_log()
       result= 1;
     mysql_mutex_unlock(&LOCK_error_log);
   }
+  slave_retries_file.flush();
   return result;
 }
 

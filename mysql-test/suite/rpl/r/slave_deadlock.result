@@ -67,6 +67,7 @@ connection server_2;
 master_pos_wait('master-bin.000001', 1912, 300, '')
 1
 set global debug_dbug= @old_dbug;
+flush error logs;
 MariaDB thread id x, OS thread handle x, query id x, GTID x-x-x Updating
 *** WAITING FOR THIS LOCK TO BE GRANTED:
 MariaDB thread id x, OS thread handle x, query id x, GTID x-x-x Updating

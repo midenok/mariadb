@@ -841,6 +841,15 @@ void Slave_retries_file::release()
 #endif
 }
 
+void Slave_retries_file::flush()
+{
+  if (acquire())
+  {
+    fflush(file);
+    release();
+  }
+}
+
 /* Static variables */
 
 my_bool opt_stack_trace;
