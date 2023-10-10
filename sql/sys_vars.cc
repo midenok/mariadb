@@ -5896,11 +5896,20 @@ static bool check_slave_retries_file(sys_var *self, THD *thd, set_var *var)
   return false;
 }
 
+static bool update_slave_retries_file(sys_var *self, THD* thd, enum_var_type type)
+{
+  if (!opt_slave_retries_path)
+    opt_slave_retries_path=  my_strdup(key_memory_Sys_var_charptr_value,
+                                       default_slave_retries_path, MYF(0));
+  return false;
+}
+
 static Sys_var_charptr Sys_slave_retries_log_path(
        "log_slave_retries_file", "Log file path for transaction retries",
        GLOBAL_VAR(opt_slave_retries_path),
-       CMD_LINE(REQUIRED_ARG, OPT_SLAVE_RETRIES_LOG), DEFAULT(""),
-       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_slave_retries_file));
+       CMD_LINE(REQUIRED_ARG, OPT_SLAVE_RETRIES_LOG), DEFAULT(NULL),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_slave_retries_file),
+       ON_UPDATE(update_slave_retries_file));
 
 
 static Sys_var_uint Sys_slave_retries_log_max(

@@ -50,9 +50,12 @@ set global log_slave_retries_file= "abcdef";
 select @@log_slave_retries retries, @@log_slave_retries_max max, @@log_slave_retries_file file;
 set global log_slave_retries_file= default;
 call mtr.add_suppression("Open of log_slave_retries");
---error ER_CANT_OPEN_FILE
 set global log_slave_retries= ON;
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 select @@log_slave_retries retries, @@log_slave_retries_max max, @@log_slave_retries_file file;
+set global log_slave_retries= off;
+let $logfile= `select @@log_slave_retries_file`;
+--remove_file $logfile
 set global log_slave_retries_file= @old_log_slave_retries_file;
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
 select @@log_slave_retries retries, @@log_slave_retries_max max, @@log_slave_retries_file file;
@@ -131,7 +134,7 @@ flush error logs;
 let $retries_log= `SELECT @@GLOBAL.log_slave_retries_file`;
 let grep_file= $retries_log;
 let grep_regex= WAITING|\[SUCCESS\]|Updating;
---replace_regex /\d+/x/
+--replace_regex /\d+/x/ /  / /
 --source include/grep.inc
 
 # Cleanup

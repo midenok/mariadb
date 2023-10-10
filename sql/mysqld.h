@@ -179,6 +179,7 @@ extern const char *log_output_str;
 extern const char *log_backup_output_str;
 
 #ifdef HAVE_REPLICATION
+extern char default_slave_retries_path[FN_REFLEN];
 extern bool opt_slave_retries;
 extern char *opt_slave_retries_path;
 extern uint opt_slave_retries_max_log;

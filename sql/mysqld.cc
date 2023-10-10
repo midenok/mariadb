@@ -766,7 +766,7 @@ char *opt_logname, *opt_slow_logname, *opt_bin_logname;
 char *opt_binlog_index_name=0;
 
 #ifdef HAVE_REPLICATION
-char default_slave_retries_log[FN_REFLEN];
+char default_slave_retries_path[FN_REFLEN];
 bool opt_slave_retries= false;
 char *opt_slave_retries_path= NULL;
 uint opt_slave_retries_max_log= 0;
@@ -5147,17 +5147,17 @@ static int init_server_components()
   }
 
   slave_retries_file.init();
+  if (!log_error_file_ptr[0])
+    fn_format(default_slave_retries_path, pidfile_name, mysql_data_home,
+              "-retries.err", MY_REPLACE_EXT);
+  else
+    fn_format(default_slave_retries_path, log_error_file_ptr, mysql_data_home,
+              "-retries.err", MY_REPLACE_EXT);
   if (opt_slave_retries_path && !opt_abort)
   {
     if (!opt_slave_retries_path[0])
     {
-      if (!log_error_file_ptr[0])
-        fn_format(default_slave_retries_log, pidfile_name, mysql_data_home,
-                  "-retries.err", MY_REPLACE_EXT);
-      else
-        fn_format(default_slave_retries_log, log_error_file_ptr, mysql_data_home,
-                  "-retries.err", MY_REPLACE_EXT);
-      if (!default_slave_retries_log[0])
+      if (!default_slave_retries_path[0])
       {
         /* fn_format failed */
         opt_slave_retries_path= NULL;
@@ -5165,7 +5165,8 @@ static int init_server_components()
       }
       else
       {
-        opt_slave_retries_path= default_slave_retries_log;
+        opt_slave_retries_path= my_strdup(key_memory_Sys_var_charptr_value,
+                                          default_slave_retries_path, MYF(0));
       }
     }
 
