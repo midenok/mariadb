@@ -206,7 +206,7 @@ create or replace table t3 (id2 int, constraint C foreign key (id2) references t
 create or replace table t3 (id2 int);
 --error ER_DUP_CONSTRAINT_NAME
 alter table t2 add constraint c foreign key (id2) references t1 (id);
-alter table t2 add constraint fk_t3 foreign key (id2) references t1 (id);
+alter table t2 add constraint t3_ibfk_1 foreign key (id2) references t1 (id);
 --error ER_DUP_CONSTRAINT_NAME
 alter table t3 add foreign key (id2) references t1 (id);
 drop tables t3, t2, t1;
