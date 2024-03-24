@@ -13685,6 +13685,9 @@ bool TABLE_SHARE::fk_handle_create(THD *thd, FK_create_vector &shares)
       // Check for duplicated id
       for (const FK_info &rk: ref_share->referenced_keys)
       {
+        /* Constraint ids may be same in different databases */
+        if (cmp_table(fk.foreign_db, rk.foreign_db))
+          continue;
         DBUG_ASSERT(rk.foreign_id.str);
         if (0 == rk.foreign_id.cmp(fk.foreign_id))
         {
