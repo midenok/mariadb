@@ -11112,7 +11112,9 @@ ha_innobase::commit_inplace_alter_table(
 
 		dict_sys.freeze(SRW_LOCK_CALL);
 		for (auto f : ctx->old_table->referenced_set) {
-			if (dict_table_t* child = f->foreign_table) {
+			dict_table_t* child = f->foreign_table;
+			if (child && (child->get_ref_count() ||
+				!child->can_be_evicted)) {
 				error = lock_table_for_trx(child, trx, LOCK_X);
 				if (error != DB_SUCCESS) {
 					break;

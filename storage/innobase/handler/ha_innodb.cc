@@ -13507,9 +13507,12 @@ int ha_innobase::delete_table(const char *name)
     {
       dict_sys.freeze(SRW_LOCK_CALL);
       for (const dict_foreign_t* f : table->referenced_set)
-        if (dict_table_t* child= f->foreign_table)
+      {
+        dict_table_t* child= f->foreign_table;
+        if (child && (child->get_ref_count() || !child->can_be_evicted))
           if ((err= lock_table_for_trx(child, trx, LOCK_X)) != DB_SUCCESS)
             break;
+      }
       dict_sys.unfreeze();
     }
   }
@@ -13913,9 +13916,12 @@ int ha_innobase::truncate()
 
   dict_sys.freeze(SRW_LOCK_CALL);
   for (const dict_foreign_t *f : ib_table->referenced_set)
-    if (dict_table_t *child= f->foreign_table)
+  {
+    dict_table_t* child= f->foreign_table;
+    if (child && (child->get_ref_count() || !child->can_be_evicted))
       if ((error= lock_table_for_trx(child, trx, LOCK_X)) != DB_SUCCESS)
         break;
+  }
   dict_sys.unfreeze();
 
   if (error == DB_SUCCESS)
@@ -14105,7 +14111,9 @@ ha_innobase::rename_table(
 		    norm_from, false, DICT_ERR_IGNORE_FK_NOKEY)) {
 		dict_sys.freeze(SRW_LOCK_CALL);
 		for (const dict_foreign_t* f : table->referenced_set) {
-			if (dict_table_t* child = f->foreign_table) {
+			dict_table_t* child = f->foreign_table;
+			if (child && (child->get_ref_count() ||
+					!child->can_be_evicted)) {
 				error = lock_table_for_trx(child, trx, LOCK_X);
 				if (error != DB_SUCCESS) {
 					break;
