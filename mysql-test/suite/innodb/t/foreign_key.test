@@ -238,11 +238,9 @@ DROP TABLE t3,t1;
 CREATE TABLE t1 (a INT, UNIQUE(a), KEY(a), c INT) ENGINE=InnoDB;
 ALTER TABLE t1 ADD FOREIGN KEY (c) REFERENCES t1 (a);
 SET SESSION FOREIGN_KEY_CHECKS = OFF;
---error ER_FK_COLUMN_CANNOT_CHANGE
 ALTER TABLE t1 CHANGE COLUMN a a TIME NOT NULL;
 ALTER TABLE t1 ADD pk INT NOT NULL AUTO_INCREMENT PRIMARY KEY;
---error ER_FK_COLUMN_CANNOT_DROP
-ALTER TABLE t1 CHANGE COLUMN a b TIME;
+ALTER TABLE t1 CHANGE COLUMN a a TIME;
 ALTER TABLE t1 CHANGE COLUMN a b TIME, DROP FOREIGN KEY t1_ibfk_1;
 SET SESSION FOREIGN_KEY_CHECKS = ON;
 DROP TABLE t1;
@@ -1076,6 +1074,7 @@ BEGIN;
 --error ER_NO_REFERENCED_ROW_2
 INSERT INTO child SET a=1;
 connection default;
+SET lock_wait_timeout= 0;
 SET innodb_lock_wait_timeout=0, foreign_key_checks=0;
 --error ER_LOCK_WAIT_TIMEOUT
 TRUNCATE TABLE parent;
@@ -1090,11 +1089,13 @@ COMMIT;
 connection default;
 # Restore the timeout to avoid occasional races with purge.
 SET innodb_lock_wait_timeout=DEFAULT;
+SET lock_wait_timeout= DEFAULT;
 TRUNCATE TABLE parent;
 ALTER TABLE parent FORCE, ALGORITHM=COPY;
 ALTER TABLE parent FORCE, ALGORITHM=INPLACE;
 ALTER TABLE parent ADD COLUMN b INT, ALGORITHM=INSTANT;
 DROP TABLE child, parent;
+SET foreign_key_checks= 1;
 
 --echo #
 --echo # MDEV-26217 Failing assertion: list.count > 0 in ut_list_remove

@@ -1593,7 +1593,10 @@ bool TABLE_SHARE::fk_resolve_referenced_keys(THD *thd, TABLE_SHARE *from)
   {
     DBUG_ASSERT(rk.foreign_id.length);
     if (!ids.insert(rk.foreign_id, &inserted))
+    {
+      my_error(ER_DUP_CONSTRAINT_NAME, MYF(0), "FOREIGN KEY", rk.foreign_id.str);
       return true;
+    }
 
     DBUG_ASSERT(inserted);
   }
@@ -1624,9 +1627,10 @@ bool TABLE_SHARE::fk_resolve_referenced_keys(THD *thd, TABLE_SHARE *from)
       }
       if (i == fields)
       {
-        push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, ER_CANNOT_ADD_FOREIGN,
+        push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, ER_NO_REFERENCED_ROW_2,
                             "Missing field `%s` hint table `%s.%s` refers to",
                             fld.str, from->db.str, from->table_name.str);
+        my_error(ER_NO_REFERENCED_ROW_2, MYF(0), from->table_name.str);
         return true;
       }
     }

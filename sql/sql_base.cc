@@ -2299,7 +2299,11 @@ retry_share:
         if (!ref_found)
         {
           if (table->s->fk_resolve_referenced_keys(thd, tbl->table->s))
-            goto err_lock;
+          {
+            MYSQL_UNBIND_TABLE(table->file);
+            tc_release_table(table);
+            DBUG_RETURN(true);
+          }
           share_updated= true;
           break;
         }
