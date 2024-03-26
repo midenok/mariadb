@@ -1608,7 +1608,10 @@ bool TABLE_SHARE::fk_resolve_referenced_keys(THD *thd, TABLE_SHARE *from)
 
     DBUG_ASSERT(fk.foreign_id.length);
     if (!ids.insert(fk.foreign_id, &inserted))
+    {
+      my_error(ER_DUP_CONSTRAINT_NAME, MYF(0), "FOREIGN KEY", fk.foreign_id.str);
       return true;
+    }
 
     if (!inserted)
     {
@@ -1628,10 +1631,10 @@ bool TABLE_SHARE::fk_resolve_referenced_keys(THD *thd, TABLE_SHARE *from)
       if (i == fields)
       {
         push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, ER_NO_REFERENCED_ROW_2,
-                            "Missing field `%s` hint table `%s.%s` refers to",
-                            fld.str, from->db.str, from->table_name.str);
-        my_error(ER_NO_REFERENCED_ROW_2, MYF(0), from->table_name.str);
-        return true;
+                            "`%s.%s` is missing field `%s` referenced by foreign key `%s` in `%s.%s`",
+                            db.str, table_name.str, fld.str, fk.foreign_id.str,
+                            from->db.str, from->table_name.str);
+        continue;
       }
     }
     FK_info *dst= fk.clone(&mem_root);

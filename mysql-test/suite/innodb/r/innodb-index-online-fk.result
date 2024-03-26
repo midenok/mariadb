@@ -81,6 +81,8 @@ test/child	a1
 test/child	a2
 SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
 NAME
+SYS_FOREIGN
+SYS_FOREIGN_COLS
 SYS_VIRTUAL
 mysql/innodb_index_stats
 mysql/innodb_table_stats
@@ -187,6 +189,8 @@ test/child	a1
 test/child	a2
 SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
 NAME
+SYS_FOREIGN
+SYS_FOREIGN_COLS
 SYS_VIRTUAL
 mysql/innodb_index_stats
 mysql/innodb_table_stats
@@ -205,6 +209,8 @@ test/child	a2
 test/child	a3
 SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
 NAME
+SYS_FOREIGN
+SYS_FOREIGN_COLS
 SYS_VIRTUAL
 mysql/innodb_index_stats
 mysql/innodb_table_stats
@@ -234,6 +240,8 @@ test/child	a1
 test/child	a2
 SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
 NAME
+SYS_FOREIGN
+SYS_FOREIGN_COLS
 SYS_VIRTUAL
 mysql/innodb_index_stats
 mysql/innodb_table_stats
@@ -261,6 +269,8 @@ test/child	a2
 test/child	a3
 SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
 NAME
+SYS_FOREIGN
+SYS_FOREIGN_COLS
 SYS_VIRTUAL
 mysql/innodb_index_stats
 mysql/innodb_table_stats
@@ -447,28 +457,4 @@ drop table t1;
 #
 CREATE TABLE t1(f1 INT, KEY(f1),
 FOREIGN KEY(f1) references t1(f1))ENGINE=InnoDB;
-SHOW CREATE TABLE t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `f1` int(11) DEFAULT NULL,
-  KEY `f1` (`f1`),
-  CONSTRAINT `t1_ibfk_1` FOREIGN KEY (`f1`) REFERENCES `t1` (`f1`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
-DROP TABLE t1;
-CREATE TABLE t1(f1 INT, KEY(f1),
-FOREIGN KEY(f1) REFERENCES t1(f1))ENGINE=InnoDB;
-SHOW CREATE TABLE t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `f1` int(11) DEFAULT NULL,
-  KEY `f1` (`f1`),
-  CONSTRAINT `t1_ibfk_1` FOREIGN KEY (`f1`) REFERENCES `t1` (`f1`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
-ALTER TABLE t1 DROP KEY f1;
-SHOW CREATE TABLE t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `f1` int(11) DEFAULT NULL,
-  CONSTRAINT `t1_ibfk_1` FOREIGN KEY (`f1`) REFERENCES `t1` (`f1`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
-DROP TABLE t1;
+ERROR 42000: Incorrect foreign key definition for 'f1': foreign key references itself

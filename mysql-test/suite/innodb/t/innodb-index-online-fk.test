@@ -438,14 +438,6 @@ drop table t1;
 --echo #  MDEV-29092  FOREIGN_KEY_CHECKS does not prevent non-copy
 --echo #               alter from creating invalid FK structures
 --echo #
+--error ER_WRONG_FK_DEF
 CREATE TABLE t1(f1 INT, KEY(f1),
                 FOREIGN KEY(f1) references t1(f1))ENGINE=InnoDB;
-SHOW CREATE TABLE t1;
-DROP TABLE t1;
-
-CREATE TABLE t1(f1 INT, KEY(f1),
-                FOREIGN KEY(f1) REFERENCES t1(f1))ENGINE=InnoDB;
-SHOW CREATE TABLE t1;
-ALTER TABLE t1 DROP KEY f1;
-SHOW CREATE TABLE t1;
-DROP TABLE t1;

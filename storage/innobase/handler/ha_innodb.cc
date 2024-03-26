@@ -14006,8 +14006,11 @@ int ha_innobase::truncate()
     ib_table->release();
     m_prebuilt->table= nullptr;
 
+    bool save_check_foreigns= trx->check_foreigns;
+    trx->check_foreigns= false;
     err= create(name, table, &info, dict_table_is_file_per_table(ib_table),
                 trx);
+    trx->check_foreigns= save_check_foreigns;
     if (!err)
     {
       m_prebuilt->table->acquire();
