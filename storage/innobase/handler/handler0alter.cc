@@ -7536,7 +7536,7 @@ innobase_drop_column_check_legacy_fk(trx_t* trx, const char* table_name,
 	pars_info_add_str_literal(info, "ref_name", table_name);
 	pars_info_add_str_literal(info, "ref_col_name", col_name);
 
-	dberr_t err = que_eval_sql(info, sql_check, false, trx);
+	dberr_t err = que_eval_sql(info, sql_check, trx);
 	if (err != DB_SUCCESS) {
 		return err;
 	}
@@ -9482,7 +9482,7 @@ rename_foreign:
 		pars_info_add_str_literal(info, "old", from);
 		pars_info_add_str_literal(info, "new", to);
 
-		error = que_eval_sql(info, sql_rename_ref, false, trx);
+		error = que_eval_sql(info, sql_rename_ref, trx);
 
 		if (error != DB_SUCCESS) {
 			goto err_exit;

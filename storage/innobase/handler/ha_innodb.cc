@@ -12806,11 +12806,11 @@ check_legacy_fk(trx_t *trx, const TABLE *table, bool lock_dict_mutex)
 	row_drop_table_check_legacy_data data;
 
 	if (lock_dict_mutex) {
-		dict_sys.mutex_lock();
+		dict_sys.lock(SRW_LOCK_CALL);
 	}
 	err = row_drop_table_check_legacy_fk(trx, table_name, data);
 	if (lock_dict_mutex) {
-		dict_sys.mutex_unlock();
+		dict_sys.unlock();
 	}
 	if (err != DB_SUCCESS) {
 		return convert_error_code_to_mysql(err, 0, NULL);
@@ -19611,13 +19611,15 @@ retry:
 
 	pars_info_t* info      = pars_info_create();
 	info->fatal_syntax_err = false;
-	err	   	       = que_eval_sql(info, str, true, trx);
+	dict_sys.lock(SRW_LOCK_CALL);
+	err	   	       = que_eval_sql(info, str, trx);
+	dict_sys.unlock();
 	if (err != DB_SUCCESS) {
 		trx->op_info = "Rollback of internal trx on innodb_eval_sql";
 		trx->dict_operation_lock_mode = RW_X_LATCH;
-		dict_sys.mutex_lock();
+		dict_sys.lock(SRW_LOCK_CALL);
 		trx->rollback();
-		dict_sys.mutex_unlock();
+		dict_sys.unlock();
 		trx->dict_operation_lock_mode = 0;
 		if (err == DB_DEADLOCK && --retries) {
 			goto retry;
@@ -21173,13 +21175,14 @@ buf_pool_size_align(
 struct fk_legacy_data {
 	trx_t*	      trx;
 	dict_table_t* table;
+	THD*	      thd;
 	TABLE_SHARE*  s;
 	char	      ref_name[MAX_FULL_NAME_LEN + 1];
 	FK_info*      fk;
 	dberr_t	      err;
 	FK_list	      foreign_keys;
-	fk_legacy_data(trx_t* _t, dict_table_t* _tab, TABLE_SHARE* _s)
-	    : trx(_t), table(_tab), s(_s), fk(NULL), err(DB_SUCCESS){};
+	fk_legacy_data(trx_t* _t, dict_table_t* _tab, THD *_thd, TABLE_SHARE* _s)
+	    : trx(_t), table(_tab), thd(_thd), s(_s), fk(NULL), err(DB_SUCCESS){};
 };
 
 static ibool
@@ -21395,12 +21398,12 @@ fk_upgrade_push_fk(
 		Lex_cstring* rcol     = it++;
 		ref_column_names[i++] = rcol->str;
 	}
-	dict_sys.mutex_lock();
+	dict_sys.lock(SRW_LOCK_CALL);
 	index = dict_foreign_find_index(d.table, NULL, column_names,
 					fk.foreign_fields.elements, NULL, true,
 					false);
 	if (!index) {
-		dict_sys.mutex_unlock();
+		dict_sys.unlock();
 		ib_foreign_warn(
 			d.trx, DB_CANNOT_ADD_CONSTRAINT, d.s->table_name.str,
 			"Upgrade table %s with foreign key %s constraint"
@@ -21411,9 +21414,9 @@ fk_upgrade_push_fk(
 	}
 	normalize_table_name(norm_name, d.ref_name);
 	dict_table_t* ref_table = dict_table_open_on_name(
-		norm_name, true, false, DICT_ERR_IGNORE_FK_NOKEY);
+		norm_name, true, DICT_ERR_IGNORE_FK_NOKEY);
 	if (!ref_table) {
-		dict_sys.mutex_unlock();
+		dict_sys.unlock();
 		ib_foreign_warn(
 			d.trx, DB_CANNOT_ADD_CONSTRAINT, d.s->table_name.str,
 			"Upgrade table %s with foreign key %s constraint"
@@ -21425,8 +21428,8 @@ fk_upgrade_push_fk(
 	index = dict_foreign_find_index(ref_table, NULL, ref_column_names,
 					fk.foreign_fields.elements, NULL, true,
 					false);
-	dict_table_close(ref_table, true, false);
-	dict_sys.mutex_unlock();
+	dict_table_close(ref_table, true, d.thd, NULL);
+	dict_sys.unlock();
 	if (!index) {
 		ib_foreign_warn(
 			d.trx, DB_CANNOT_ADD_CONSTRAINT, d.s->table_name.str,
@@ -21462,12 +21465,12 @@ fk_cleanup_legacy_storage(bool lock_dict_mutex, trx_t* trx)
 	bool sys_forcols_empty;
 	dberr_t err = DB_SUCCESS;
 	if (lock_dict_mutex) {
-		dict_sys.mutex_lock();
+		dict_sys.lock(SRW_LOCK_CALL);
 	}
-	dict_table_t* sys_foreign = dict_table_get_low("SYS_FOREIGN");
-	dict_table_t* sys_forcols = dict_table_get_low("SYS_FOREIGN_COLS");
+	dict_table_t* sys_foreign = dict_sys.load_table({C_STRING_WITH_LEN("SYS_FOREIGN")});
+	dict_table_t* sys_forcols = dict_sys.load_table({C_STRING_WITH_LEN("SYS_FOREIGN_COLS")});
 	if (lock_dict_mutex) {
-		dict_sys.mutex_unlock();
+		dict_sys.unlock();
 	}
 	sys_foreign_empty = innobase_table_is_empty(sys_foreign);
 	sys_forcols_empty = innobase_table_is_empty(sys_forcols);
@@ -21505,7 +21508,7 @@ fk_upgrade_legacy_storage(dict_table_t* table, trx_t* trx, THD* thd,
 			  TABLE_SHARE* share)
 {
 	pars_info_t*   info;
-	fk_legacy_data d(trx, table, share);
+	fk_legacy_data d(trx, table, thd, share);
 
 	ut_ad(DB_SUCCESS == fk_legacy_storage_exists(true));
 
@@ -21561,7 +21564,9 @@ fk_upgrade_legacy_storage(dict_table_t* table, trx_t* trx, THD* thd,
 		  "CLOSE c;\n"
 		  "END;\n";
 
-	dberr_t err = que_eval_sql(info, sql_fetch, true, trx);
+	dict_sys.lock(SRW_LOCK_CALL);
+	dberr_t err = que_eval_sql(info, sql_fetch, trx);
+	dict_sys.unlock();
 	if (err != DB_SUCCESS) {
 		return err;
 	}
@@ -21594,7 +21599,7 @@ fk_upgrade_legacy_storage(dict_table_t* table, trx_t* trx, THD* thd,
 	}
 
 	// Update foreign FRM
-	if (d.s->fk_write_shadow_frm()) {
+	if (d.s->fk_write_shadow_frm(thd)) {
 		err = DB_ERROR;
 		goto rollback;
 	}
@@ -21644,7 +21649,9 @@ fk_upgrade_legacy_storage(dict_table_t* table, trx_t* trx, THD* thd,
 	}
 	pars_info_add_str_literal(info, "for_name", table->name.m_name);
 
-	err = que_eval_sql(info, sql_drop, true, trx);
+	dict_sys.lock(SRW_LOCK_CALL);
+	err = que_eval_sql(info, sql_drop, trx);
+	dict_sys.unlock();
 	if (err != DB_SUCCESS) {
 		return err;
 	}
@@ -21703,7 +21710,9 @@ fk_check_legacy_storage(const char* table_name, trx_t* trx)
 				  "CLOSE c;\n"
 				  "END;\n";
 
-	err = que_eval_sql(info, sql, true, trx);
+	dict_sys.lock(SRW_LOCK_CALL);
+	err = que_eval_sql(info, sql, trx);
+	dict_sys.unlock();
 	if (err == DB_SUCCESS && do_upgrade) {
 		err = DB_LEGACY_FK;
 	}

@@ -1358,16 +1358,16 @@ bool dict_sys_t::load_sys_tables()
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
 dberr_t
 fk_check_if_system_table_exists(
-	const char*	tablename,	/*!< in: name of table */
+	const span<const char> &tablename, /*!< in: name of table */
 	ulint		num_fields,	/*!< in: number of fields */
 	ulint		num_indexes)	/*!< in: number of indexes */
 {
 	dict_table_t*	sys_table;
 	dberr_t		error = DB_SUCCESS;
 
-	dict_sys.assert_locked();
+	ut_ad(dict_sys.locked());
 
-	sys_table = dict_table_get_low(tablename);
+	sys_table = dict_sys.load_table(tablename);
 
 	if (sys_table == NULL) {
 		error = DB_TABLE_NOT_FOUND;
@@ -1387,14 +1387,14 @@ fk_legacy_storage_exists(bool lock_dict_mutex)
 	dberr_t		sys_foreign_err;
 	dberr_t		sys_foreign_cols_err;
 	if (lock_dict_mutex) {
-		dict_sys.mutex_lock();
+		dict_sys.lock(SRW_LOCK_CALL);
 	}
 	sys_foreign_err = fk_check_if_system_table_exists(
-		"SYS_FOREIGN", DICT_NUM_FIELDS__SYS_FOREIGN + 1, 3);
+		{C_STRING_WITH_LEN("SYS_FOREIGN")}, DICT_NUM_FIELDS__SYS_FOREIGN + 1, 3);
 	sys_foreign_cols_err = fk_check_if_system_table_exists(
-		"SYS_FOREIGN_COLS", DICT_NUM_FIELDS__SYS_FOREIGN_COLS + 1, 1);
+		{C_STRING_WITH_LEN("SYS_FOREIGN_COLS")}, DICT_NUM_FIELDS__SYS_FOREIGN_COLS + 1, 1);
 	if (lock_dict_mutex) {
-		dict_sys.mutex_unlock();
+		dict_sys.unlock();
 	}
 
 	if (sys_foreign_err == DB_SUCCESS
@@ -1429,12 +1429,12 @@ dict_create_or_check_foreign_constraint_tables(void)
 	dberr_t		sys_foreign_err;
 	dberr_t		sys_foreign_cols_err;
 
-	dict_sys.mutex_lock();
+	dict_sys.lock(SRW_LOCK_CALL);
 	sys_foreign_err = fk_check_if_system_table_exists(
 		"SYS_FOREIGN", DICT_NUM_FIELDS__SYS_FOREIGN + 1, 3);
 	sys_foreign_cols_err = fk_check_if_system_table_exists(
 		"SYS_FOREIGN_COLS", DICT_NUM_FIELDS__SYS_FOREIGN_COLS + 1, 1);
-	dict_sys.mutex_unlock();
+	dict_sys.unlock();
 
 	if (sys_foreign_err == DB_SUCCESS
 	    && sys_foreign_cols_err == DB_SUCCESS) {
@@ -1447,9 +1447,6 @@ dict_create_or_check_foreign_constraint_tables(void)
 	}
 
 	trx = trx_create();
-
-	trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
-
 	trx->op_info = "creating foreign key sys tables";
 
 	row_mysql_lock_data_dictionary(trx);
@@ -1493,7 +1490,7 @@ dict_create_or_check_foreign_constraint_tables(void)
 		" ON SYS_FOREIGN_COLS (ID, POS);\n"
 		"COMMIT WORK;\n"
 		"END;\n",
-		FALSE, trx);
+		trx);
 
 	if (UNIV_UNLIKELY(err != DB_SUCCESS)) {
 		ib::error() << "Creation of SYS_FOREIGN and SYS_FOREIGN_COLS"
@@ -1505,10 +1502,6 @@ dict_create_or_check_foreign_constraint_tables(void)
 
 		row_drop_table_after_create_fail("SYS_FOREIGN", trx);
 		row_drop_table_after_create_fail("SYS_FOREIGN_COLS", trx);
-
-		if (err == DB_OUT_OF_FILE_SPACE) {
-			err = DB_MUST_GET_MORE_FILE_SPACE;
-		}
 	}
 
 	trx_commit_for_mysql(trx);
@@ -1519,7 +1512,7 @@ dict_create_or_check_foreign_constraint_tables(void)
 
 	srv_file_per_table = srv_file_per_table_backup;
 
-	dict_sys.mutex_lock();
+	dict_sys.lock(SRW_LOCK_CALL);
 	sys_foreign_err = fk_check_if_system_table_exists(
 		"SYS_FOREIGN", DICT_NUM_FIELDS__SYS_FOREIGN + 1, 3);
 	ut_a(sys_foreign_err == DB_SUCCESS);
@@ -1527,7 +1520,7 @@ dict_create_or_check_foreign_constraint_tables(void)
 	sys_foreign_cols_err = fk_check_if_system_table_exists(
 		"SYS_FOREIGN_COLS", DICT_NUM_FIELDS__SYS_FOREIGN_COLS + 1, 1);
 	ut_a(sys_foreign_cols_err == DB_SUCCESS);
-	dict_sys.mutex_unlock();
+	dict_sys.unlock();
 
 	return(err);
 }
@@ -1789,7 +1782,6 @@ dict_create_add_foreign_field_to_dictionary(
 /********************************************************************//**
 Construct foreign key constraint defintion from data dictionary information.
 */
-static
 char*
 dict_foreign_def_get(
 /*=================*/

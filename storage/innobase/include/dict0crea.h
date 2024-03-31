@@ -166,7 +166,6 @@ dict_foreigns_has_s_base_col(
 /********************************************************************//**
 Construct foreign key constraint defintion from data dictionary information.
 */
-UNIV_INTERN
 char*
 dict_foreign_def_get(
 /*=================*/

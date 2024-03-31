@@ -5831,12 +5831,12 @@ i_s_sys_foreign_fill_table(
 	DBUG_ENTER("i_s_sys_foreign_fill_table");
 	RETURN_IF_INNODB_NOT_STARTED(tables->schema_table_name.str);
 
-	dict_sys.mutex_lock();
-	dberr_t err = fk_check_if_system_table_exists(
+	dict_sys.lock(SRW_LOCK_CALL);
+	dberr_t err2 = fk_check_if_system_table_exists(
 		"SYS_FOREIGN", DICT_NUM_FIELDS__SYS_FOREIGN + 1, 3);
-	dict_sys.mutex_unlock();
+	dict_sys.unlock();
 
-	if (err != DB_SUCCESS) {
+	if (err2 != DB_SUCCESS) {
 		my_error(ER_BAD_TABLE_ERROR, MYF(0), tables->schema_table_name.str);
 		DBUG_RETURN(1);
 	}

@@ -2502,7 +2502,7 @@ row_delete_constraint_low(
 			    "DELETE FROM SYS_FOREIGN_COLS WHERE ID = :id;\n"
 			    "DELETE FROM SYS_FOREIGN WHERE ID = :id;\n"
 			    "END;\n"
-			    , FALSE, trx));
+			    , trx));
 }
 
 /****************************************************************//**
@@ -2813,7 +2813,7 @@ row_rename_table_for_mysql(
 			"  AND TO_BINARY(REF_NAME)\n"
 			"    = TO_BINARY(:old_table_name);\n"
 			"END;\n"
-			, FALSE, trx);
+			, trx);
 
 	} else if (n_constraints_to_drop > 0) {
 		/* Drop some constraints of tmp tables. */
