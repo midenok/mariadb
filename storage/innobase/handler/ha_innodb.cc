@@ -1371,78 +1371,126 @@ static void innodb_drop_database(handlerton*, char *path)
     err= lock_sys_tables(trx);
   row_mysql_lock_data_dictionary(trx);
 
-  static const char drop_database[] =
-    "PROCEDURE DROP_DATABASE_PROC () IS\n"
-    "fk CHAR;\n"
-    "name CHAR;\n"
-    "tid CHAR;\n"
-    "iid CHAR;\n"
-
-    "DECLARE FUNCTION fk_report;\n"
-
-    "DECLARE CURSOR fkf IS\n"
-    "SELECT ID FROM SYS_FOREIGN WHERE ID >= :db FOR UPDATE;\n"
-
-    "DECLARE CURSOR fkr IS\n"
-    "SELECT REF_NAME,ID FROM SYS_FOREIGN WHERE REF_NAME >= :db FOR UPDATE\n"
-    "ORDER BY REF_NAME;\n"
-
-    "DECLARE CURSOR tab IS\n"
-    "SELECT ID,NAME FROM SYS_TABLES WHERE NAME >= :db FOR UPDATE;\n"
-
-    "DECLARE CURSOR idx IS\n"
-    "SELECT ID FROM SYS_INDEXES WHERE TABLE_ID = tid FOR UPDATE;\n"
-
-    "BEGIN\n"
-
-    "OPEN fkf;\n"
-    "WHILE 1 = 1 LOOP\n"
-    "  FETCH fkf INTO fk;\n"
-    "  IF (SQL % NOTFOUND) THEN EXIT; END IF;\n"
-    "  IF TO_BINARY(SUBSTR(fk, 0, LENGTH(:db)))<>TO_BINARY(:db)"
-    " THEN EXIT; END IF;\n"
-    "  DELETE FROM SYS_FOREIGN_COLS WHERE TO_BINARY(ID)=TO_BINARY(fk);\n"
-    "  DELETE FROM SYS_FOREIGN WHERE CURRENT OF fkf;\n"
-    "END LOOP;\n"
-    "CLOSE fkf;\n"
-
-    "OPEN fkr;\n"
-    "FETCH fkr INTO fk_report();\n"
-    "CLOSE fkr;\n"
-
-    "OPEN tab;\n"
-    "WHILE 1 = 1 LOOP\n"
-    "  FETCH tab INTO tid,name;\n"
-    "  IF (SQL % NOTFOUND) THEN EXIT; END IF;\n"
-    "  IF TO_BINARY(SUBSTR(name, 0, LENGTH(:db))) <> TO_BINARY(:db)"
-    " THEN EXIT; END IF;\n"
-    "  DELETE FROM SYS_COLUMNS WHERE TABLE_ID=tid;\n"
-    "  DELETE FROM SYS_TABLES WHERE ID=tid;\n"
-    "  OPEN idx;\n"
-    "  WHILE 1 = 1 LOOP\n"
-    "    FETCH idx INTO iid;\n"
-    "    IF (SQL % NOTFOUND) THEN EXIT; END IF;\n"
-    "    DELETE FROM SYS_FIELDS WHERE INDEX_ID=iid;\n"
-    "    DELETE FROM SYS_INDEXES WHERE CURRENT OF idx;\n"
-    "  END LOOP;\n"
-    "  CLOSE idx;\n"
-    "END LOOP;\n"
-    "CLOSE tab;\n"
-
-    "END;\n";
-
-  innodb_drop_database_fk_report report{{namebuf, len + 1}, false};
-
-  if (err == DB_SUCCESS)
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
+  if (dict_sys.sys_foreign)
   {
-    pars_info_t* pinfo = pars_info_create();
-    pars_info_bind_function(pinfo, "fk_report", trx->check_foreigns
-                            ? innodb_drop_database_fk
-                            : innodb_drop_database_ignore_fk, &report);
-    pars_info_add_str_literal(pinfo, "db", namebuf);
-    err= que_eval_sql(pinfo, drop_database, trx);
-    if (err == DB_SUCCESS && report.violated)
-      err= DB_CANNOT_DROP_CONSTRAINT;
+    static const char drop_database[] =
+      "PROCEDURE DROP_DATABASE_PROC () IS\n"
+      "fk CHAR;\n"
+      "name CHAR;\n"
+      "tid CHAR;\n"
+      "iid CHAR;\n"
+
+      "DECLARE FUNCTION fk_report;\n"
+
+      "DECLARE CURSOR fkf IS\n"
+      "SELECT ID FROM SYS_FOREIGN WHERE ID >= :db FOR UPDATE;\n"
+
+      "DECLARE CURSOR fkr IS\n"
+      "SELECT REF_NAME,ID FROM SYS_FOREIGN WHERE REF_NAME >= :db FOR UPDATE\n"
+      "ORDER BY REF_NAME;\n"
+
+      "DECLARE CURSOR tab IS\n"
+      "SELECT ID,NAME FROM SYS_TABLES WHERE NAME >= :db FOR UPDATE;\n"
+
+      "DECLARE CURSOR idx IS\n"
+      "SELECT ID FROM SYS_INDEXES WHERE TABLE_ID = tid FOR UPDATE;\n"
+
+      "BEGIN\n"
+
+      "OPEN fkf;\n"
+      "WHILE 1 = 1 LOOP\n"
+      "  FETCH fkf INTO fk;\n"
+      "  IF (SQL % NOTFOUND) THEN EXIT; END IF;\n"
+      "  IF TO_BINARY(SUBSTR(fk, 0, LENGTH(:db)))<>TO_BINARY(:db)"
+      " THEN EXIT; END IF;\n"
+      "  DELETE FROM SYS_FOREIGN_COLS WHERE TO_BINARY(ID)=TO_BINARY(fk);\n"
+      "  DELETE FROM SYS_FOREIGN WHERE CURRENT OF fkf;\n"
+      "END LOOP;\n"
+      "CLOSE fkf;\n"
+
+      "OPEN fkr;\n"
+      "FETCH fkr INTO fk_report();\n"
+      "CLOSE fkr;\n"
+
+      "OPEN tab;\n"
+      "WHILE 1 = 1 LOOP\n"
+      "  FETCH tab INTO tid,name;\n"
+      "  IF (SQL % NOTFOUND) THEN EXIT; END IF;\n"
+      "  IF TO_BINARY(SUBSTR(name, 0, LENGTH(:db))) <> TO_BINARY(:db)"
+      " THEN EXIT; END IF;\n"
+      "  DELETE FROM SYS_COLUMNS WHERE TABLE_ID=tid;\n"
+      "  DELETE FROM SYS_TABLES WHERE ID=tid;\n"
+      "  OPEN idx;\n"
+      "  WHILE 1 = 1 LOOP\n"
+      "    FETCH idx INTO iid;\n"
+      "    IF (SQL % NOTFOUND) THEN EXIT; END IF;\n"
+      "    DELETE FROM SYS_FIELDS WHERE INDEX_ID=iid;\n"
+      "    DELETE FROM SYS_INDEXES WHERE CURRENT OF idx;\n"
+      "  END LOOP;\n"
+      "  CLOSE idx;\n"
+      "END LOOP;\n"
+      "CLOSE tab;\n"
+
+      "END;\n";
+
+    innodb_drop_database_fk_report report{{namebuf, len + 1}, false};
+
+    if (err == DB_SUCCESS)
+    {
+      pars_info_t* pinfo = pars_info_create();
+      pars_info_bind_function(pinfo, "fk_report", trx->check_foreigns
+                              ? innodb_drop_database_fk
+                              : innodb_drop_database_ignore_fk, &report);
+      pars_info_add_str_literal(pinfo, "db", namebuf);
+      err= que_eval_sql(pinfo, drop_database, trx);
+      if (err == DB_SUCCESS && report.violated)
+        err= DB_CANNOT_DROP_CONSTRAINT;
+    }
+  } else
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
+  {
+    static const char drop_database[] =
+      "PROCEDURE DROP_DATABASE_PROC () IS\n"
+      "name CHAR;\n"
+      "tid CHAR;\n"
+      "iid CHAR;\n"
+
+      "DECLARE CURSOR tab IS\n"
+      "SELECT ID,NAME FROM SYS_TABLES WHERE NAME >= :db FOR UPDATE;\n"
+
+      "DECLARE CURSOR idx IS\n"
+      "SELECT ID FROM SYS_INDEXES WHERE TABLE_ID = tid FOR UPDATE;\n"
+
+      "BEGIN\n"
+
+      "OPEN tab;\n"
+      "WHILE 1 = 1 LOOP\n"
+      "  FETCH tab INTO tid,name;\n"
+      "  IF (SQL % NOTFOUND) THEN EXIT; END IF;\n"
+      "  IF TO_BINARY(SUBSTR(name, 0, LENGTH(:db))) <> TO_BINARY(:db)"
+      " THEN EXIT; END IF;\n"
+      "  DELETE FROM SYS_COLUMNS WHERE TABLE_ID=tid;\n"
+      "  DELETE FROM SYS_TABLES WHERE ID=tid;\n"
+      "  OPEN idx;\n"
+      "  WHILE 1 = 1 LOOP\n"
+      "    FETCH idx INTO iid;\n"
+      "    IF (SQL % NOTFOUND) THEN EXIT; END IF;\n"
+      "    DELETE FROM SYS_FIELDS WHERE INDEX_ID=iid;\n"
+      "    DELETE FROM SYS_INDEXES WHERE CURRENT OF idx;\n"
+      "  END LOOP;\n"
+      "  CLOSE idx;\n"
+      "END LOOP;\n"
+      "CLOSE tab;\n"
+
+      "END;\n";
+
+    if (err == DB_SUCCESS)
+    {
+      pars_info_t* pinfo = pars_info_create();
+      pars_info_add_str_literal(pinfo, "db", namebuf);
+      err= que_eval_sql(pinfo, drop_database, trx);
+    }
   }
 
   const trx_id_t trx_id= trx->id;
@@ -13820,7 +13868,7 @@ err_exit:
   }
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-  if (!table->no_rollback())
+  if (!table->no_rollback() && dict_sys.sys_foreign)
     err= trx->drop_table_foreign(table->name);
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
@@ -14292,7 +14340,7 @@ ha_innobase::rename_table(
 	if (error == DB_SUCCESS) {
 		error = lock_table_for_trx(dict_sys.sys_tables, trx, LOCK_X);
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-		if (error == DB_SUCCESS) {
+		if (error == DB_SUCCESS && dict_sys.sys_foreign) {
 			error = lock_table_for_trx(dict_sys.sys_foreign, trx,
 						   LOCK_X);
 			if (error == DB_SUCCESS) {

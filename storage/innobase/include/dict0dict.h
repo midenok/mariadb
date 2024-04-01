@@ -1359,14 +1359,16 @@ public:
   dict_table_t *sys_virtual;
 
   /** @return whether all non-hard-coded system tables exist */
-  bool sys_tables_exist() const
-  {
-    return UNIV_LIKELY((bool) sys_virtual
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-      && sys_foreign && sys_foreign_cols
-#endif /* WITH_INNODB_FOREIGN_UPGRADE */
-    );
+  bool sys_tables_exist(bool create_foreign= false) const
+  {
+    return UNIV_LIKELY((bool) sys_virtual &&
+      (!create_foreign || (sys_foreign && sys_foreign_cols)));
   }
+#else
+  bool sys_tables_exist() const
+  { return UNIV_LIKELY((bool) sys_virtual); }
+#endif /* !WITH_INNODB_FOREIGN_UPGRADE */
 
   /** list of persistent tables that can be evicted */
   UT_LIST_BASE_NODE_T(dict_table_t) table_LRU;

@@ -1418,9 +1418,10 @@ fk_legacy_storage_exists(bool lock_dict_mutex)
 dberr_t dict_sys_t::create_or_check_sys_tables(bool create_foreign)
 #else
 dberr_t dict_sys_t::create_or_check_sys_tables()
+#define create_foreign
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 {
-  if (sys_tables_exist())
+  if (sys_tables_exist(create_foreign))
     return DB_SUCCESS;
 
   if (srv_read_only_mode || srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO)
@@ -1433,7 +1434,7 @@ dberr_t dict_sys_t::create_or_check_sys_tables()
     return DB_CORRUPTION;
   }
 
-  if (sys_tables_exist())
+  if (sys_tables_exist(create_foreign))
     return DB_SUCCESS;
 
   trx_t *trx= trx_create();
@@ -1559,6 +1560,8 @@ err_exit:
     tablename= SYS_TABLE[SYS_VIRTUAL];
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
 load_fail:
+#else
+#undef create_foreign
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
     unlock();
     sql_print_error("InnoDB: Failed to CREATE TABLE %.*s",
