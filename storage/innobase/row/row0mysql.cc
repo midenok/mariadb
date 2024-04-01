@@ -2594,39 +2594,6 @@ row_delete_constraint(
 	err = fk_cleanup_legacy_storage(false, trx);
 	return(err);
 }
-
-/** Drop a table for MySQL.
-If the data dictionary was not already locked by the transaction,
-the transaction will be committed.  Otherwise, the data dictionary
-will remain locked.
-@param[in]	name		Table name
-@param[in,out]	trx		Transaction handle
-@param[in]	sqlcom		type of SQL operation
-@param[in]	create_failed	true=create table failed
-				because e.g. foreign key column
-@param[in]	nonatomic	Whether it is permitted to release
-				and reacquire dict_sys.latch
-@return error code or DB_SUCCESS */
-dberr_t
-row_drop_table_for_mysql(
-	const char*		name,
-	trx_t*			trx,
-	enum_sql_command	sqlcom,
-	bool			create_failed,
-	bool			nonatomic,
-	bool			is_temp_name)
-{
-	// FIXME: implement like in ha_innobase::truncate():
-#if 0
-  if (error == DB_SUCCESS)
-  {
-    error= innobase_rename_table(trx, ib_table->name.m_name, temp_name, false);
-    if (error == DB_SUCCESS)
-      error= trx->drop_table(*ib_table);
-  }
-#endif
-	return DB_SUCCESS;
-}
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 /*********************************************************************//**
