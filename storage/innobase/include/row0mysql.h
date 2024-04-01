@@ -848,6 +848,10 @@ struct row_drop_table_check_legacy_data {
 dberr_t
 row_drop_table_check_legacy_fk(trx_t* trx, const char* table_name,
 			       row_drop_table_check_legacy_data& d);
+
+/** Drop SYS_FOREIGN[_COLS] tables if they are empty */
+dberr_t
+fk_cleanup_legacy_storage(bool lock_dict_mutex, trx_t* trx);
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 #endif /* row0mysql.h */

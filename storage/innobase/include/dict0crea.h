@@ -120,19 +120,10 @@ dict_create_index_tree_in_mem(
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
 dberr_t
 fk_check_if_system_table_exists(
-	const char*	tablename,	/*!< in: name of table */
+	const span<const char> &tablename, /*!< in: name of table */
 	ulint		num_fields,	/*!< in: number of fields */
 	ulint		num_indexes);	/*!< in: number of indexes */
 dberr_t fk_legacy_storage_exists(bool lock_dict_mutex);
-#ifndef DBUG_OFF
-/****************************************************************//**
-Creates the foreign key constraints system tables inside InnoDB
-at server bootstrap or server start if they are not found or are
-not of the right form.
-@return DB_SUCCESS or error code */
-dberr_t
-dict_create_or_check_foreign_constraint_tables(void);
-#endif /* DBUG_OFF */
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 /********************************************************************//**

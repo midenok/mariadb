@@ -502,6 +502,14 @@ fk_check_legacy_storage(const char* table_name, trx_t* trx);
 static dberr_t
 fk_upgrade_legacy_storage(dict_table_t* table, trx_t* trx, THD* thd,
 			  TABLE_SHARE* share);
+dberr_t
+row_drop_table_for_mysql(
+	const char*		name,
+	trx_t*			trx,
+	enum_sql_command	sqlcom,
+	bool			create_failed,
+	bool			nonatomic,
+	bool			is_temp_name);
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 #ifdef HAVE_PSI_INTERFACE
@@ -19563,8 +19571,9 @@ static int innodb_eval_sql_validate(THD *thd, st_mysql_sys_var*,
 	   like lock->trx->dict_operation */
 	dberr_t err = DB_SUCCESS;
 	uint retries = 10;
+	// FIXME: test
 	DBUG_EXECUTE_IF("fk_create_legacy_storage",
-			err = dict_create_or_check_foreign_constraint_tables(););
+			err = dict_sys.create_or_check_sys_tables(););
 	if (err != DB_SUCCESS) {
 		return 1;
 	}

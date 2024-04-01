@@ -2482,6 +2482,59 @@ rollback:
 }
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
+static ibool
+row_drop_table_check_legacy_step(
+	void* row,	/*!< in: sel_node_t* */
+	void* user_arg) /*!< in/out: row_drop_table_check_legacy_data */
+{
+	row_drop_table_check_legacy_data& d
+		= *(row_drop_table_check_legacy_data*)user_arg;
+	sel_node_t* node = static_cast<sel_node_t*>(row);
+	que_node_t* exp	 = node->select_list;
+	dfield_t*   fld	 = que_node_get_val(exp);
+	ut_a(fld->len < sizeof(d.foreign_name));
+	memcpy(d.foreign_name, fld->data, fld->len);
+	d.foreign_name[fld->len] = 0;
+	d.found			 = true;
+	ut_a(!que_node_get_next(exp));
+	return 0;
+}
+
+dberr_t
+row_drop_table_check_legacy_fk(trx_t* trx, const char* table_name,
+			       row_drop_table_check_legacy_data& d)
+{
+	ut_ad(DB_SUCCESS == fk_legacy_storage_exists(false));
+	static const char sql_check[]
+		= "PROCEDURE FK_PROC () IS\n"
+		  "DECLARE FUNCTION row_drop_table_check_legacy_step;\n"
+
+		  "DECLARE CURSOR c IS"
+		  " SELECT FOR_NAME FROM SYS_FOREIGN"
+		  " WHERE REF_NAME = :ref_name;\n"
+
+		  "BEGIN\n"
+		  "OPEN c;\n"
+		  "FETCH c INTO row_drop_table_check_legacy_step();\n"
+		  "CLOSE c;\n"
+		  "END;\n";
+
+	pars_info_t* info = pars_info_create();
+	if (!info) {
+		return DB_OUT_OF_MEMORY;
+	}
+	pars_info_bind_function(info, "row_drop_table_check_legacy_step",
+				row_drop_table_check_legacy_step, &d);
+	pars_info_add_str_literal(info, "ref_name", table_name);
+
+	dberr_t err = que_eval_sql(info, sql_check, trx);
+	if (err != DB_SUCCESS) {
+		return err;
+	}
+
+	return DB_SUCCESS;
+}
+
 /****************************************************************//**
 Delete a single constraint.
 @return error code or DB_SUCCESS */
@@ -2540,6 +2593,39 @@ row_delete_constraint(
 
 	err = fk_cleanup_legacy_storage(false, trx);
 	return(err);
+}
+
+/** Drop a table for MySQL.
+If the data dictionary was not already locked by the transaction,
+the transaction will be committed.  Otherwise, the data dictionary
+will remain locked.
+@param[in]	name		Table name
+@param[in,out]	trx		Transaction handle
+@param[in]	sqlcom		type of SQL operation
+@param[in]	create_failed	true=create table failed
+				because e.g. foreign key column
+@param[in]	nonatomic	Whether it is permitted to release
+				and reacquire dict_sys.latch
+@return error code or DB_SUCCESS */
+dberr_t
+row_drop_table_for_mysql(
+	const char*		name,
+	trx_t*			trx,
+	enum_sql_command	sqlcom,
+	bool			create_failed,
+	bool			nonatomic,
+	bool			is_temp_name)
+{
+	// FIXME: implement like in ha_innobase::truncate():
+#if 0
+  if (error == DB_SUCCESS)
+  {
+    error= innobase_rename_table(trx, ib_table->name.m_name, temp_name, false);
+    if (error == DB_SUCCESS)
+      error= trx->drop_table(*ib_table);
+  }
+#endif
+	return DB_SUCCESS;
 }
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 

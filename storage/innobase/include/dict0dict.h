@@ -1595,7 +1595,11 @@ public:
   @return whether any discrepancy with the expected definition was found */
   bool load_sys_tables();
   /** Create or check system tables on startup */
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
+  dberr_t create_or_check_sys_tables(bool create_foreign= false);
+#else
   dberr_t create_or_check_sys_tables();
+#endif
 };
 
 /** the data dictionary cache */
