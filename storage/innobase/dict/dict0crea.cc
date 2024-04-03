@@ -1535,23 +1535,26 @@ err_exit:
 
   lock(SRW_LOCK_CALL);
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-  if (sys_foreign);
-  else if (!(sys_foreign= load_table(SYS_TABLE[SYS_FOREIGN])))
+  if (create_foreign)
   {
-    tablename= SYS_TABLE[SYS_FOREIGN];
-    goto load_fail;
-  }
-  else
-    prevent_eviction(sys_foreign);
+    if (sys_foreign);
+    else if (!(sys_foreign= load_table(SYS_TABLE[SYS_FOREIGN])))
+    {
+      tablename= SYS_TABLE[SYS_FOREIGN];
+      goto load_fail;
+    }
+    else
+      prevent_eviction(sys_foreign);
 
-  if (sys_foreign_cols);
-  else if (!(sys_foreign_cols= load_table(SYS_TABLE[SYS_FOREIGN_COLS])))
-  {
-    tablename= SYS_TABLE[SYS_FOREIGN_COLS];
-    goto load_fail;
+    if (sys_foreign_cols);
+    else if (!(sys_foreign_cols= load_table(SYS_TABLE[SYS_FOREIGN_COLS])))
+    {
+      tablename= SYS_TABLE[SYS_FOREIGN_COLS];
+      goto load_fail;
+    }
+    else
+      prevent_eviction(sys_foreign_cols);
   }
-  else
-    prevent_eviction(sys_foreign_cols);
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
   if (sys_virtual);
