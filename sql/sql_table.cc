@@ -12133,6 +12133,7 @@ do_continue:;
       thd->get_stmt_da()->sql_errno() == ER_ROW_IS_REFERENCED_2 &&
       alter_info->algorithm(thd) == Alter_info::ALTER_TABLE_ALGORITHM_COPY)
   {
+    DBUG_ASSERT(0);
     /*
       TODO: row_drop_table_check_legacy_fk() failed and we must revert the
       ALTER back (depends on Atomic ALTER).
