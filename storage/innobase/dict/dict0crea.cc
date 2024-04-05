@@ -1418,7 +1418,7 @@ fk_legacy_storage_exists(bool lock_dict_mutex)
 dberr_t dict_sys_t::create_or_check_sys_tables(bool create_foreign)
 #else
 dberr_t dict_sys_t::create_or_check_sys_tables()
-#define create_foreign
+#define create_foreign false
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 {
   if (sys_tables_exist(create_foreign))
@@ -1427,7 +1427,7 @@ dberr_t dict_sys_t::create_or_check_sys_tables()
   if (srv_read_only_mode || srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO)
     return DB_READ_ONLY;
 
-  if (load_sys_tables())
+  if (!create_foreign && load_sys_tables())
   {
     sql_print_information("InnoDB: Set innodb_read_only=1 "
                           "or innodb_force_recovery=3 to start up");

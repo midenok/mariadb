@@ -19611,7 +19611,7 @@ static int innodb_eval_sql_validate(THD *thd, st_mysql_sys_var*,
 	uint retries = 10;
 	// FIXME: test
 	DBUG_EXECUTE_IF("fk_create_legacy_storage",
-			err = dict_sys.create_or_check_sys_tables(););
+			err = dict_sys.create_or_check_sys_tables(true););
 	if (err != DB_SUCCESS) {
 		return 1;
 	}
@@ -21492,13 +21492,11 @@ static ibool fk_upgrade_push_fk(void *row,      /*!< in: sel_node_t* */
     Lex_cstring *rcol= it++;
     ref_column_names[i++]= rcol->str;
   }
-  dict_sys.lock(SRW_LOCK_CALL);
   index=
       dict_foreign_find_index(d.table, NULL, column_names,
                               fk.foreign_fields.elements, NULL, true, false);
   if (!index)
   {
-    dict_sys.unlock();
     ib_foreign_warn(d.trx, DB_CANNOT_ADD_CONSTRAINT, d.s->table_name.str,
                     "Upgrade table %s with foreign key %s constraint"
                     " failed. Foreign key index not found!",
@@ -21511,7 +21509,6 @@ static ibool fk_upgrade_push_fk(void *row,      /*!< in: sel_node_t* */
       dict_table_open_on_name(norm_name, true, DICT_ERR_IGNORE_FK_NOKEY);
   if (!ref_table)
   {
-    dict_sys.unlock();
     ib_foreign_warn(d.trx, DB_CANNOT_ADD_CONSTRAINT, d.s->table_name.str,
                     "Upgrade table %s with foreign key %s constraint"
                     " failed. Could not open referenced table!",
@@ -21523,7 +21520,6 @@ static ibool fk_upgrade_push_fk(void *row,      /*!< in: sel_node_t* */
       dict_foreign_find_index(ref_table, NULL, ref_column_names,
                               fk.foreign_fields.elements, NULL, true, false);
   dict_table_close(ref_table, true, d.thd, NULL);
-  dict_sys.unlock();
   if (!index)
   {
     ib_foreign_warn(d.trx, DB_CANNOT_ADD_CONSTRAINT, d.s->table_name.str,
