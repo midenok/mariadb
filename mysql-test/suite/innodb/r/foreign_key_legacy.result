@@ -31,7 +31,6 @@ t2	CREATE TABLE `t2` (
   KEY `fk_t2` (`y`),
   CONSTRAINT `test_t2_ibfk_1` FOREIGN KEY (`y`) REFERENCES `t1` (`x`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -53,7 +52,6 @@ set session debug_dbug= @saved_debug_dbug;
 drop table t1;
 ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails
 drop tables t2, t1;
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -89,7 +87,6 @@ Table	Op	Msg_type	Msg_text
 D1.t1	check	status	OK
 D2.t2	check	Error	Table 'D2.t2' doesn't exist
 D2.t2	check	status	Operation failed
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -129,7 +126,6 @@ set session debug_dbug= "+d,fk_skip_store";
 create or replace table t1(x int);
 create or replace table t2(y int references t1(x));
 set session debug_dbug= @saved_debug_dbug;
-set global innodb_background_drop_list_empty= 1;
 set session debug_dbug= "+d,fk_create_legacy_storage";
 set global innodb_eval_sql="BEGIN
 INSERT INTO SYS_FOREIGN VALUES ('test/t2_ibfk_1', 'test/t2', 'test/t1', 1);
@@ -148,7 +144,6 @@ set session debug_dbug= "+d,fk_skip_store";
 create or replace table t1(x int primary key);
 create or replace table t2(z int references t1(x));
 set session debug_dbug= @saved_debug_dbug;
-set global innodb_background_drop_list_empty= 1;
 set session debug_dbug= "+d,fk_create_legacy_storage";
 set global innodb_eval_sql="BEGIN
 INSERT INTO SYS_FOREIGN VALUES ('test/t2_ibfk_1', 'test/t2', 'test/t1', 1);
@@ -167,7 +162,6 @@ set session debug_dbug= "+d,fk_skip_store";
 create or replace table t1(z int primary key);
 create or replace table t2(y int references t1(z));
 set session debug_dbug= @saved_debug_dbug;
-set global innodb_background_drop_list_empty= 1;
 set session debug_dbug= "+d,fk_create_legacy_storage";
 set global innodb_eval_sql="BEGIN
 INSERT INTO SYS_FOREIGN VALUES ('test/t2_ibfk_1', 'test/t2', 'test/t1', 1);
@@ -193,7 +187,6 @@ set session debug_dbug= "+d,fk_skip_store";
 create or replace table t1(x int primary key);
 create or replace table t2(y int references t1(x));
 set session debug_dbug= @saved_debug_dbug;
-set global innodb_background_drop_list_empty= 1;
 set session debug_dbug= "+d,fk_create_legacy_storage";
 set global innodb_eval_sql="BEGIN
 INSERT INTO SYS_FOREIGN VALUES ('test/t2_ibfk_1', 'test/t2', 'test/t1', 1);
@@ -213,7 +206,6 @@ t2	CREATE TABLE `t2` (
   KEY `fk_t2` (`y`),
   CONSTRAINT `test_t2_ibfk_1` FOREIGN KEY (`y`) REFERENCES `t0` (`x`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -244,7 +236,6 @@ t3	CREATE TABLE `t3` (
   KEY `fk_t2` (`y`),
   CONSTRAINT `test_t3_ibfk_1` FOREIGN KEY (`y`) REFERENCES `t1` (`x`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -278,7 +269,6 @@ t2	CREATE TABLE `t2` (
   KEY `fk_t2` (`y`),
   CONSTRAINT `test_t2_ibfk_1` FOREIGN KEY (`y`) REFERENCES `t0` (`x`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -296,7 +286,6 @@ set session debug_dbug= @saved_debug_dbug;
 alter table t2 rename t3;
 Warnings:
 Note	1459	Upgrade required. Please do "REPAIR TABLE `t2`" or dump/reload to fix it!
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -337,7 +326,6 @@ t2	CREATE TABLE `t2` (
   KEY `fk_t2` (`y`),
   CONSTRAINT `test_t2_ibfk_1` FOREIGN KEY (`y`) REFERENCES `t1` (`z`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -355,7 +343,6 @@ set session debug_dbug= @saved_debug_dbug;
 alter table t2 change y z int, algorithm=copy;
 ERROR HY000: Cannot drop column 'z': needed in a foreign key constraint 'test_t2_ibfk_1'
 alter table t2 change y z int, algorithm=inplace;
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -396,7 +383,6 @@ t2	CREATE TABLE `t2` (
   KEY `fk_t2` (`y`),
   CONSTRAINT `test_t2_ibfk_1` FOREIGN KEY (`y`) REFERENCES `t1` (`z`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -416,7 +402,6 @@ set session debug_dbug= @saved_debug_dbug;
 alter table t2 rename column y to z, algorithm=copy;
 ERROR HY000: Cannot drop column 'z': needed in a foreign key constraint 'test_t2_ibfk_1'
 alter table t2 rename column y to z, algorithm=inplace;
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -475,7 +460,6 @@ t1	CREATE TABLE `t1` (
   `s` int(11) GENERATED ALWAYS AS (`x`) STORED,
   PRIMARY KEY (`x`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -496,7 +480,6 @@ alter table t2 add column z int;
 Warnings:
 Note	1459	Upgrade required. Please do "REPAIR TABLE `t2`" or dump/reload to fix it!
 alter table t2 add column s int as (y) stored, algorithm=copy;
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -531,7 +514,6 @@ alter table t1 drop column x, algorithm=inplace;
 ERROR HY000: Cannot drop index 'x': needed in a foreign key constraint
 alter table t2 drop column y;
 ERROR 42000: Incorrect foreign key definition for 'y': foreign field not found
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -591,7 +573,6 @@ connection default;
 Table	Op	Msg_type	Msg_text
 test.t5	check	Note	Found 1 foreign keys
 test.t5	check	status	OK
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -682,7 +663,6 @@ test.t3                                            OK
 Phase 7/7: Running 'FLUSH PRIVILEGES'
 OK
 set global alter_algorithm=@saved_alter_algorithm;
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -774,7 +754,6 @@ INSERT INTO SYS_FOREIGN_COLS VALUES ('test/t2_ibfk_1', 0, 'x', 'x');";
 set session debug_dbug= @saved_debug_dbug;
 insert t2 values (1);
 ERROR 23000: Cannot add or update a child row: a foreign key constraint fails (`test`.`t2`, CONSTRAINT `test_t2_ibfk_1` FOREIGN KEY (`x`) REFERENCES `t1` (`x`))
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -797,7 +776,6 @@ t2	CREATE TABLE `t2` (
   KEY `fk_t2` (`y`),
   CONSTRAINT `test_t2_ibfk_1` FOREIGN KEY (`y`) REFERENCES `t1` (`y`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -830,7 +808,6 @@ connection master;
 alter table t1 rename column x to y, algorithm=inplace;
 alter table t2 rename column x to y, algorithm=inplace;
 connection slave;
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -869,7 +846,6 @@ alter table t1 rename column x to y, algorithm=inplace;
 alter table t2 rename column x to y, algorithm=inplace;
 Warnings:
 Note	1459	Upgrade required. Please do "REPAIR TABLE `t2`" or dump/reload to fix it!
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
@@ -882,7 +858,6 @@ t2	CREATE TABLE `t2` (
   CONSTRAINT `test_t2_ibfk_1` FOREIGN KEY (`y`) REFERENCES `t1` (`y`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
 connection slave;
-set global innodb_background_drop_list_empty= 1;
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;

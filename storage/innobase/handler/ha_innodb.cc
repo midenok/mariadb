@@ -626,7 +626,7 @@ mysql_var_check_func check_sysvar_int;
 
 // should page compression be used by default for new tables
 static MYSQL_THDVAR_BOOL(compression_default, PLUGIN_VAR_OPCMDARG,
-  "Is compression the default for new tables", 
+  "Is compression the default for new tables",
   NULL, NULL, FALSE);
 
 /** Update callback for SET [SESSION] innodb_default_encryption_key_id */
@@ -19710,26 +19710,277 @@ will remain locked.
 @param[in]	nonatomic	Whether it is permitted to release
                                 and reacquire dict_sys.latch
 @return error code or DB_SUCCESS */
-static
-dberr_t row_drop_table_for_mysql(dict_table_t *table, trx_t *trx,
-                                 enum_sql_command sqlcom, bool create_failed,
-                                 bool nonatomic, bool is_temp_name)
+dberr_t row_drop_table_for_mysql(dict_table_t *table, trx_t *trx)
 {
-  // FIXME: implement like in ha_innobase::truncate()
-  dberr_t error= DB_SUCCESS;
-  mem_heap_t *heap= mem_heap_create(1024); // FIXME: pass heap?
-  const char *temp_name=
-    dict_mem_create_temporary_tablename(heap, table->name.m_name, table->id);
+  dberr_t err;
+  char *tablename= NULL;
+  bool locked_dictionary= false;
+  mem_heap_t *heap= NULL;
+  ut_ad(!table->fts);
 
-  if (error == DB_SUCCESS)
+  DBUG_ENTER("row_drop_table_for_mysql");
+  DBUG_PRINT("row_drop_table_for_mysql", ("table: '%s'", table->name.m_name));
+
+  ut_ad(table);
+  ut_ad(!strchr(table->name.m_name, '/'));
+
+  /* Serialize data dictionary operations with dictionary mutex:
+  no deadlocks can occur then in these operations */
+
+  trx->op_info= "dropping table";
+
+  if (!trx->dict_operation_lock_mode)
   {
-    error= innobase_rename_table(trx, table->name.m_name, temp_name, false);
-    if (error == DB_SUCCESS)
-      error= trx->drop_table(*table);
+    /* Prevent foreign key checks etc. while we are
+    dropping the table */
+
+    row_mysql_lock_data_dictionary(trx);
+
+    locked_dictionary= true;
   }
-  mem_heap_free(heap);
-  return DB_SUCCESS;
+
+  ut_ad(dict_sys.locked());
+
+  std::vector<pfs_os_file_t> detached_handles;
+  ut_ad(!table->is_temporary());
+
+  /* This function is called recursively via fts_drop_tables(). */
+  if (!trx_is_started(trx))
+  {
+    trx_start_for_ddl(trx);
+  }
+
+  if (!table->no_rollback())
+  {
+    if (table->space != fil_system.sys_space)
+    {
+      /* Delete the link file if used. */
+      ut_ad(!DICT_TF_HAS_DATA_DIR(table->flags));
+    }
+
+    // FIXME: is it needed? SYS_FOREIGN should not be in stats
+    dict_stats_recalc_pool_del(table->id, false);
+  }
+
+  // FIXME: remove
+//   dict_table_close(table, TRUE, FALSE);
+
+  /* Check if the table is referenced by foreign key constraints from
+  some other table (not the table itself) */
+
+  ut_ad(table->referenced_set.empty());
+
+  if (!srv_read_only_mode) // FIXME: is it needed the below?
+  {
+    row_drop_table_check_legacy_data data;
+
+    err= fk_legacy_storage_exists(false);
+    if (err == DB_CORRUPTION)
+    {
+      goto funct_exit;
+    }
+    if (err == DB_TABLE_NOT_FOUND)
+    {
+      err= DB_SUCCESS;
+    }
+    else
+    {
+      ut_ad(err == DB_SUCCESS);
+      err= row_drop_table_check_legacy_fk(trx, table->name.m_name, data);
+      if (err != DB_SUCCESS)
+      {
+        goto funct_exit;
+      }
+      if (data.found)
+      {
+        FILE *ef= dict_foreign_err_file;
+
+        err= DB_CANNOT_DROP_CONSTRAINT;
+
+        mysql_mutex_lock(&dict_foreign_err_mutex);
+        rewind(ef);
+        ut_print_timestamp(ef);
+
+        fputs("  Cannot drop table ", ef);
+        ut_print_name(ef, trx, table->name.m_name);
+        fputs("\n"
+              "because it is referenced by ",
+              ef);
+        ut_print_name(ef, trx, data.foreign_name);
+        putc('\n', ef);
+        mysql_mutex_unlock(&dict_foreign_err_mutex);
+
+        goto funct_exit;
+      }
+    }
+  }
+
+  if (table->get_ref_count() > 0 || lock_table_has_locks(table))
+  {
+    err= DB_LOCK_WAIT;
+    goto funct_exit;
+  }
+
+  /* Mark all indexes unavailable in the data dictionary cache
+  before starting to drop the table. */
+
+  unsigned *page_no;
+  unsigned *page_nos;
+  heap= mem_heap_create(200 +
+                        UT_LIST_GET_LEN(table->indexes) * sizeof *page_nos);
+  tablename= mem_heap_strdup(heap, table->name.m_name);
+
+  page_no= page_nos= static_cast<unsigned *>(
+      mem_heap_alloc(heap, UT_LIST_GET_LEN(table->indexes) * sizeof *page_no));
+
+  for (dict_index_t *index= dict_table_get_first_index(table); index != NULL;
+       index= dict_table_get_next_index(index))
+  {
+    index->lock.x_lock(SRW_LOCK_CALL);
+    /* Save the page numbers so that we can restore them
+    if the operation fails. */
+    *page_no++= index->page;
+    /* Mark the index unusable. */
+    index->page= FIL_NULL;
+    index->lock.x_unlock();
+  }
+
+  err= lock_table_for_trx(table, trx, LOCK_X);
+
+  if (err == DB_SUCCESS)
+    err= trx->drop_table(*table);
+
+  switch (err)
+  {
+    fil_space_t *space;
+    char *filepath;
+  case DB_SUCCESS:
+    space= table->space;
+    ut_ad(!space || space->id == table->space_id);
+    /* Determine the tablespace filename before we drop
+    dict_table_t. */
+    if (DICT_TF_HAS_DATA_DIR(table->flags))
+    {
+      dict_get_and_save_data_dir_path(table);
+      ut_ad(table->data_dir_path || !space);
+      filepath=
+          space ? NULL
+                : fil_make_filepath(table->data_dir_path, table->name,
+                                    IBD, table->data_dir_path != NULL);
+    }
+    else
+    {
+      filepath= space
+                    ? NULL
+                    : fil_make_filepath(NULL, table->name, IBD, false);
+    }
+
+    trx->mod_tables.erase(table);
+    dict_sys.remove(table);
+
+    /* Do not attempt to drop known-to-be-missing tablespaces,
+    nor the system tablespace. */
+    if (!space)
+    {
+      fil_delete_file(filepath);
+      ut_free(filepath);
+      break;
+    }
+
+    ut_ad(!filepath);
+
+    if (space->id != TRX_SYS_SPACE)
+    {
+      // FIXME: check and remove
+      pfs_os_file_t detached= fil_delete_tablespace(space->id);
+      if (detached != OS_FILE_CLOSED)
+        detached_handles.emplace_back(detached);
+    }
+    break;
+
+  case DB_OUT_OF_FILE_SPACE:
+    trx->error_state= err;
+    row_mysql_handle_errors(&err, trx, NULL, NULL);
+
+    /* raise error */
+    ut_error;
+    break;
+
+  case DB_TOO_MANY_CONCURRENT_TRXS:
+    /* Cannot even find a free slot for the
+    the undo log. We can directly exit here
+    and return the DB_TOO_MANY_CONCURRENT_TRXS
+    error. */
+
+  default:
+    /* This is some error we do not expect. Print
+    the error number and rollback the transaction */
+    ib::error() << "Unknown error code " << err
+                << " while"
+                   " dropping table: "
+                << ut_get_name(trx, tablename) << ".";
+
+    trx->error_state= DB_SUCCESS;
+    trx->rollback();
+    trx->error_state= DB_SUCCESS;
+
+    /* Mark all indexes available in the data dictionary
+    cache again. */
+
+    page_no= page_nos;
+
+    for (dict_index_t *index= dict_table_get_first_index(table); index != NULL;
+         index= dict_table_get_next_index(index))
+    {
+      index->lock.x_lock(SRW_LOCK_CALL);
+      ut_a(index->page == FIL_NULL);
+      index->page= *page_no++;
+      index->lock.x_unlock();
+    }
+  }
+
+  if (err != DB_SUCCESS && table != NULL)
+  {
+    /* Drop table has failed with error but as drop table is not
+    transaction safe we should mark the table as corrupted to avoid
+    unwarranted follow-up action on this table that can result
+    in more serious issues. */
+
+    table->corrupted= true;
+    for (dict_index_t *index= UT_LIST_GET_FIRST(table->indexes); index != NULL;
+         index= UT_LIST_GET_NEXT(indexes, index))
+    {
+      dict_set_corrupted(index, "DROP TABLE");
+    }
+  }
+
+funct_exit:
+  if (heap)
+  {
+    mem_heap_free(heap);
+  }
+
+  if (locked_dictionary)
+  {
+    if (trx_is_started(trx))
+    {
+      trx_commit_for_mysql(trx);
+    }
+
+    row_mysql_unlock_data_dictionary(trx);
+  }
+
+  for (const auto &handle : detached_handles)
+  {
+    ut_ad(handle != OS_FILE_CLOSED);
+    os_file_close(handle);
+  }
+
+  trx->op_info= "";
+
+  DBUG_RETURN(err);
 }
+
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 static struct st_mysql_sys_var* innobase_system_variables[]= {
@@ -21547,46 +21798,34 @@ static ibool pars_get_true(void *row
 }
 
 /** Drop SYS_FOREIGN[_COLS] tables if they are empty */
+// FIXME: remove lock_dict_mutex
 dberr_t fk_cleanup_legacy_storage(bool lock_dict_mutex, trx_t *trx)
 {
   ut_ad(DB_SUCCESS == fk_legacy_storage_exists(lock_dict_mutex));
   bool sys_foreign_empty;
   bool sys_forcols_empty;
   dberr_t err= DB_SUCCESS;
-  if (lock_dict_mutex)
-  {
-    dict_sys.lock(SRW_LOCK_CALL);
-  }
-  // FIXME: just access dict_sys.sys_foreign, dict_sys.sys_foreign_cols?
-  dict_table_t *sys_foreign=
-      dict_sys.load_table({C_STRING_WITH_LEN("SYS_FOREIGN")});
-  dict_table_t *sys_forcols=
-      dict_sys.load_table({C_STRING_WITH_LEN("SYS_FOREIGN_COLS")});
-  if (lock_dict_mutex)
-  {
-    dict_sys.unlock();
-  }
-  sys_foreign_empty= innobase_table_is_empty(sys_foreign);
-  sys_forcols_empty= innobase_table_is_empty(sys_forcols);
+  sys_foreign_empty= innobase_table_is_empty(dict_sys.sys_foreign);
+  sys_forcols_empty= innobase_table_is_empty(dict_sys.sys_foreign_cols);
 
   bool check_foreigns= trx->check_foreigns;
   if (sys_foreign_empty)
   {
     trx->check_foreigns= false;
-    err= row_drop_table_for_mysql(sys_foreign, trx, SQLCOM_DROP_DB, false,
-                                  true, true);
+    err= row_drop_table_for_mysql(dict_sys.sys_foreign, trx);
     if (err != DB_SUCCESS)
     {
       trx->check_foreigns= check_foreigns;
       return err;
     }
+    dict_sys.sys_foreign= NULL;
   }
   if (sys_forcols_empty)
   {
     trx->check_foreigns= false;
-    err= row_drop_table_for_mysql(sys_forcols, trx, SQLCOM_DROP_DB, false,
-                                  true, true);
+    err= row_drop_table_for_mysql(dict_sys.sys_foreign_cols, trx);
   }
+  dict_sys.sys_foreign_cols= NULL;
   trx->check_foreigns= check_foreigns;
   return err;
 }
@@ -22043,3 +22282,4 @@ dict_load_foreigns(THD* thd, dict_table_t* table, TABLE_SHARE* share,
 	}
 	return DB_SUCCESS;
 }
+

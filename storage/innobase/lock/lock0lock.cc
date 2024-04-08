@@ -1616,7 +1616,13 @@ lock_rec_lock(
   ut_ad(!trx->dict_operation_lock_mode ||
         (strstr(index->table->name.m_name, "/FTS_") &&
          strstr(index->table->name.m_name, "_CONFIG") + sizeof("_CONFIG") ==
-         index->table->name.m_name + strlen(index->table->name.m_name) + 1));
+         index->table->name.m_name + strlen(index->table->name.m_name) + 1) ||
+         !strcmp(index->table->name.m_name,"SYS_TABLES") ||
+         !strcmp(index->table->name.m_name,"SYS_INDEXES") ||
+         !strcmp(index->table->name.m_name,"SYS_FIELDS") ||
+         !strcmp(index->table->name.m_name,"SYS_COLUMNS") ||
+         !strcmp(index->table->name.m_name,"SYS_VIRTUAL") ||
+         !memcmp(index->table->name.m_name, C_STRING_WITH_LEN("SYS_FOREIGN")));
   MONITOR_ATOMIC_INC(MONITOR_NUM_RECLOCK_REQ);
   const page_id_t id{block->page.id()};
   LockGuard g{lock_sys.rec_hash, id};
@@ -3460,7 +3466,13 @@ lock_t *lock_table_create(dict_table_t *table, unsigned type_mode, trx_t *trx,
 	ut_ad(!trx->dict_operation_lock_mode
 	      || (strstr(table->name.m_name, "/FTS_")
 		  && strstr(table->name.m_name, "_CONFIG") + sizeof("_CONFIG")
-		  == table->name.m_name + strlen(table->name.m_name) + 1));
+		  == table->name.m_name + strlen(table->name.m_name) + 1)
+              || !strcmp(table->name.m_name,"SYS_TABLES")
+              || !strcmp(table->name.m_name,"SYS_INDEXES")
+              || !strcmp(table->name.m_name,"SYS_FIELDS")
+              || !strcmp(table->name.m_name,"SYS_COLUMNS")
+              || !strcmp(table->name.m_name,"SYS_VIRTUAL")
+              || !memcmp(table->name.m_name, C_STRING_WITH_LEN("SYS_FOREIGN")));
 
 	switch (LOCK_MODE_MASK & type_mode) {
 	case LOCK_AUTO_INC:
