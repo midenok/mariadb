@@ -19698,31 +19698,22 @@ static MYSQL_SYSVAR_STR(eval_sql,
   innodb_eval_sql_validate, NULL, NULL);
 #endif /* DBUG_OFF */
 
-/** Drop a table for MySQL.
-If the data dictionary was not already locked by the transaction,
-the transaction will be committed.  Otherwise, the data dictionary
-will remain locked.
-@param[in]	name		Table name
-@param[in,out]	trx		Transaction handle
-@param[in]	sqlcom		type of SQL operation
-@param[in]	create_failed	true=create table failed
-                                because e.g. foreign key column
-@param[in]	nonatomic	Whether it is permitted to release
-                                and reacquire dict_sys.latch
+/** Drop SYS_FOREIGN or SYS_FOREIGN_COLS table.
 @return error code or DB_SUCCESS */
-dberr_t row_drop_table_for_mysql(dict_table_t *table, trx_t *trx)
+static
+dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
 {
   dberr_t err;
   char *tablename= NULL;
   bool locked_dictionary= false;
   mem_heap_t *heap= NULL;
   ut_ad(!table->fts);
-
-  DBUG_ENTER("row_drop_table_for_mysql");
-  DBUG_PRINT("row_drop_table_for_mysql", ("table: '%s'", table->name.m_name));
+  ut_ad(!table->is_temporary());
 
   ut_ad(table);
   ut_ad(!strchr(table->name.m_name, '/'));
+  ut_ad(table->referenced_set.empty());
+
 
   /* Serialize data dictionary operations with dictionary mutex:
   no deadlocks can occur then in these operations */
@@ -19740,9 +19731,6 @@ dberr_t row_drop_table_for_mysql(dict_table_t *table, trx_t *trx)
   }
 
   ut_ad(dict_sys.locked());
-
-  std::vector<pfs_os_file_t> detached_handles;
-  ut_ad(!table->is_temporary());
 
   /* This function is called recursively via fts_drop_tables(). */
   if (!trx_is_started(trx))
@@ -19762,61 +19750,12 @@ dberr_t row_drop_table_for_mysql(dict_table_t *table, trx_t *trx)
     dict_stats_recalc_pool_del(table->id, false);
   }
 
-  // FIXME: remove
-//   dict_table_close(table, TRUE, FALSE);
-
   /* Check if the table is referenced by foreign key constraints from
   some other table (not the table itself) */
 
-  ut_ad(table->referenced_set.empty());
-
-  if (!srv_read_only_mode) // FIXME: is it needed the below?
-  {
-    row_drop_table_check_legacy_data data;
-
-    err= fk_legacy_storage_exists(false);
-    if (err == DB_CORRUPTION)
-    {
-      goto funct_exit;
-    }
-    if (err == DB_TABLE_NOT_FOUND)
-    {
-      err= DB_SUCCESS;
-    }
-    else
-    {
-      ut_ad(err == DB_SUCCESS);
-      err= row_drop_table_check_legacy_fk(trx, table->name.m_name, data);
-      if (err != DB_SUCCESS)
-      {
-        goto funct_exit;
-      }
-      if (data.found)
-      {
-        FILE *ef= dict_foreign_err_file;
-
-        err= DB_CANNOT_DROP_CONSTRAINT;
-
-        mysql_mutex_lock(&dict_foreign_err_mutex);
-        rewind(ef);
-        ut_print_timestamp(ef);
-
-        fputs("  Cannot drop table ", ef);
-        ut_print_name(ef, trx, table->name.m_name);
-        fputs("\n"
-              "because it is referenced by ",
-              ef);
-        ut_print_name(ef, trx, data.foreign_name);
-        putc('\n', ef);
-        mysql_mutex_unlock(&dict_foreign_err_mutex);
-
-        goto funct_exit;
-      }
-    }
-  }
-
   if (table->get_ref_count() > 0 || lock_table_has_locks(table))
   {
+    ut_ad(0);
     err= DB_LOCK_WAIT;
     goto funct_exit;
   }
@@ -19888,14 +19827,7 @@ dberr_t row_drop_table_for_mysql(dict_table_t *table, trx_t *trx)
     }
 
     ut_ad(!filepath);
-
-    if (space->id != TRX_SYS_SPACE)
-    {
-      // FIXME: check and remove
-      pfs_os_file_t detached= fil_delete_tablespace(space->id);
-      if (detached != OS_FILE_CLOSED)
-        detached_handles.emplace_back(detached);
-    }
+    ut_a(space->id == TRX_SYS_SPACE);
     break;
 
   case DB_OUT_OF_FILE_SPACE:
@@ -19970,15 +19902,8 @@ funct_exit:
     row_mysql_unlock_data_dictionary(trx);
   }
 
-  for (const auto &handle : detached_handles)
-  {
-    ut_ad(handle != OS_FILE_CLOSED);
-    os_file_close(handle);
-  }
-
   trx->op_info= "";
-
-  DBUG_RETURN(err);
+  return err;
 }
 
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
@@ -21812,7 +21737,7 @@ dberr_t fk_cleanup_legacy_storage(bool lock_dict_mutex, trx_t *trx)
   if (sys_foreign_empty)
   {
     trx->check_foreigns= false;
-    err= row_drop_table_for_mysql(dict_sys.sys_foreign, trx);
+    err= fk_drop_legacy_table(dict_sys.sys_foreign, trx);
     if (err != DB_SUCCESS)
     {
       trx->check_foreigns= check_foreigns;
@@ -21823,9 +21748,9 @@ dberr_t fk_cleanup_legacy_storage(bool lock_dict_mutex, trx_t *trx)
   if (sys_forcols_empty)
   {
     trx->check_foreigns= false;
-    err= row_drop_table_for_mysql(dict_sys.sys_foreign_cols, trx);
+    err= fk_drop_legacy_table(dict_sys.sys_foreign_cols, trx);
+    dict_sys.sys_foreign_cols= NULL;
   }
-  dict_sys.sys_foreign_cols= NULL;
   trx->check_foreigns= check_foreigns;
   return err;
 }

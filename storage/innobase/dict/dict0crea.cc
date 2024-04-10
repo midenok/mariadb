@@ -1356,63 +1356,14 @@ bool dict_sys_t::load_sys_tables()
 }
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-// FIXME: are fk_check_if_system_table_exists(), fk_legacy_storage_exists() needed?
-dberr_t
-fk_check_if_system_table_exists(
-	const span<const char> &tablename, /*!< in: name of table */
-	ulint		num_fields,	/*!< in: number of fields */
-	ulint		num_indexes)	/*!< in: number of indexes */
-{
-	dict_table_t*	sys_table;
-	dberr_t		error = DB_SUCCESS;
-
-	ut_ad(dict_sys.locked());
-
-	sys_table = dict_sys.load_table(tablename);
-
-	if (sys_table == NULL) {
-		error = DB_TABLE_NOT_FOUND;
-
-	} else if (UT_LIST_GET_LEN(sys_table->indexes) != num_indexes
-		   || sys_table->n_cols != num_fields) {
-		error = DB_CORRUPTION;
-
-	}
-
-	return(error);
-}
-
 dberr_t
 fk_legacy_storage_exists(bool lock_dict_mutex)
 {
-	dberr_t		sys_foreign_err;
-	dberr_t		sys_foreign_cols_err;
-	if (lock_dict_mutex) {
-		dict_sys.lock(SRW_LOCK_CALL);
-	}
-	sys_foreign_err = fk_check_if_system_table_exists(
-		{C_STRING_WITH_LEN("SYS_FOREIGN")}, DICT_NUM_FIELDS__SYS_FOREIGN + 1, 3);
-	sys_foreign_cols_err = fk_check_if_system_table_exists(
-		{C_STRING_WITH_LEN("SYS_FOREIGN_COLS")}, DICT_NUM_FIELDS__SYS_FOREIGN_COLS + 1, 1);
-	if (lock_dict_mutex) {
-		dict_sys.unlock();
-	}
-
-	if (sys_foreign_err == DB_SUCCESS
-	    && sys_foreign_cols_err == DB_SUCCESS) {
-		return(DB_SUCCESS);
-	}
-
-	// deferred drop is asynchronous
-	if ((sys_foreign_err == DB_TABLE_NOT_FOUND
-	     || sys_foreign_err == DB_SUCCESS)
-	    && (sys_foreign_cols_err == DB_TABLE_NOT_FOUND
-	     || sys_foreign_cols_err == DB_SUCCESS)) {
-		return(DB_TABLE_NOT_FOUND);
-	}
-
-	ut_ad(0);
-	return(DB_CORRUPTION);
+  if (dict_sys.sys_foreign && dict_sys.sys_foreign_cols)
+    return DB_SUCCESS;
+  if (dict_sys.sys_foreign || dict_sys.sys_foreign_cols)
+    return DB_CORRUPTION;
+  return DB_TABLE_NOT_FOUND;
 }
 
 dberr_t dict_sys_t::create_or_check_sys_tables(bool create_foreign)
