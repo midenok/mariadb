@@ -12829,42 +12829,41 @@ dict_table_t::build_name(
 }
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-static int
-check_legacy_fk(trx_t *trx, const TABLE *table, bool lock_dict_mutex)
+static int check_legacy_fk(trx_t *trx, const TABLE *table,
+                           bool lock_dict_mutex)
 {
-	char   table_name[MAX_FULL_NAME_LEN + 1];
-	char*  bufptr = table_name;
-	size_t len;
+  char table_name[MAX_FULL_NAME_LEN + 1];
+  char *bufptr= table_name;
+  size_t len;
 
-	dberr_t err = fk_legacy_storage_exists(lock_dict_mutex);
-	if (err == DB_TABLE_NOT_FOUND) {
-		return DB_SUCCESS;
-	}
-	if (err != DB_SUCCESS) {
-		return convert_error_code_to_mysql(err, 0, NULL);
-	}
+  dberr_t err= fk_legacy_storage_exists(lock_dict_mutex);
+  if (err == DB_TABLE_NOT_FOUND)
+    return DB_SUCCESS;
+  if (err != DB_SUCCESS)
+    return convert_error_code_to_mysql(err, 0, NULL);
 
-	if (dict_table_t::build_name(LEX_STRING_WITH_LEN(table->s->db),
-				     LEX_STRING_WITH_LEN(table->s->table_name),
-				     bufptr, len)) {
-		return HA_ERR_OUT_OF_MEM;
-	}
-	row_drop_table_check_legacy_data data;
+  if (dict_table_t::build_name(LEX_STRING_WITH_LEN(table->s->db),
+                               LEX_STRING_WITH_LEN(table->s->table_name),
+                               bufptr, len))
+    return HA_ERR_OUT_OF_MEM;
 
-	if (lock_dict_mutex) {
-		dict_sys.lock(SRW_LOCK_CALL);
-	}
-	err = row_drop_table_check_legacy_fk(trx, table_name, data);
-	if (lock_dict_mutex) {
-		dict_sys.unlock();
-	}
-	if (err != DB_SUCCESS) {
-		return convert_error_code_to_mysql(err, 0, NULL);
-	}
-	if (data.found) {
-		return HA_ERR_FK_UPGRADE;
-	}
-	return DB_SUCCESS;
+  const bool drop_db=
+      (enum_sql_command(thd_sql_command(trx->mysql_thd)) == SQLCOM_DROP_DB);
+  row_drop_table_check_legacy_data data(table_name, drop_db);
+
+  if (lock_dict_mutex)
+    dict_sys.lock(SRW_LOCK_CALL);
+  err= row_drop_table_check_legacy_fk(trx, data);
+  if (lock_dict_mutex)
+    dict_sys.unlock();
+
+  if (err != DB_SUCCESS)
+    return convert_error_code_to_mysql(err, 0, NULL);
+
+  if (data.found)
+    return HA_ERR_FK_UPGRADE;
+
+  return DB_SUCCESS;
 }
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
@@ -13839,37 +13838,58 @@ err_exit:
     DBUG_RETURN(convert_error_code_to_mysql(err, 0, NULL));
   }
 
-  if (!table->no_rollback() && trx->check_foreigns)
-  {
-    const bool drop_db= sqlcom == SQLCOM_DROP_DB;
-    for (auto foreign : table->referenced_set)
-    {
-      /* We should allow dropping a referenced table if creating
-      that referenced table has failed for some reason. For example
-      if referenced table is created but it column types that are
-      referenced do not match. */
-      if (foreign->foreign_table == table ||
-          (drop_db &&
-           dict_tables_have_same_db(table->name.m_name,
-                                    foreign->foreign_table_name_lookup)))
-        continue;
-      mysql_mutex_lock(&dict_foreign_err_mutex);
-      rewind(dict_foreign_err_file);
-      ut_print_timestamp(dict_foreign_err_file);
-      fputs("  Cannot drop table ", dict_foreign_err_file);
-      ut_print_name(dict_foreign_err_file, trx, table->name.m_name);
-      fputs("\nbecause it is referenced by ", dict_foreign_err_file);
-      ut_print_name(dict_foreign_err_file, trx, foreign->foreign_table_name);
-      putc('\n', dict_foreign_err_file);
-      mysql_mutex_unlock(&dict_foreign_err_mutex);
-      err= DB_CANNOT_DROP_CONSTRAINT;
-      goto err_exit;
-    }
-  }
-
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-  if (!table->no_rollback() && dict_sys.sys_foreign)
-    err= trx->drop_table_foreign(table->name);
+  if (!table->no_rollback())
+  {
+    /*
+      Check if table is referenced by foreign tables. Normally it is tested by
+      fk_handle_drop(), but if foreign/referenced keys was not yet upgraded
+      TABLE_SHARE doesn't have them and fk_handle_drop() passes the check.
+      Here we check it against legacy storage (SYS_FOREIGN).
+    */
+    err= fk_legacy_storage_exists(false);
+    if (err == DB_CORRUPTION)
+      goto err_exit;
+
+    if (err == DB_TABLE_NOT_FOUND)
+      err= DB_SUCCESS;
+    else
+    {
+      ut_ad(err == DB_SUCCESS);
+      if (trx->check_foreigns)
+      {
+        const bool drop_db= sqlcom == SQLCOM_DROP_DB;
+        row_drop_table_check_legacy_data data(table->name.m_name, drop_db);
+        err= row_drop_table_check_legacy_fk(trx, data);
+        if (err != DB_SUCCESS)
+          goto err_exit;
+
+        if (data.found)
+        {
+          mysql_mutex_lock(&dict_foreign_err_mutex);
+          rewind(dict_foreign_err_file);
+          ut_print_timestamp(dict_foreign_err_file);
+          fputs("  Cannot drop table ", dict_foreign_err_file);
+          ut_print_name(dict_foreign_err_file, trx, table->name.m_name);
+          fputs("\nbecause it is referenced by ", dict_foreign_err_file);
+          ut_print_name(dict_foreign_err_file, trx, data.foreign_name);
+          putc('\n', dict_foreign_err_file);
+          mysql_mutex_unlock(&dict_foreign_err_mutex);
+          err= DB_CANNOT_DROP_CONSTRAINT;
+          goto err_exit;
+        } /* data.found: some table references this table (with respect of drop_db logic) */
+      } /* if (trx->check_foreigns) */
+
+      /* Drop table from legacy storage */
+      err= trx->drop_table_foreign(table->name);
+      if (err != DB_SUCCESS)
+        goto err_exit;
+      /* Drop legacy storage if it is empty */
+      err = fk_cleanup_legacy_storage(false, trx);
+      if (err != DB_SUCCESS)
+        goto err_exit;
+    } /* err == DB_SUCCESS (legacy storage exists) */
+  }
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
   if (err == DB_SUCCESS && table_stats && index_stats)

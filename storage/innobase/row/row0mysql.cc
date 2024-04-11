@@ -2482,57 +2482,59 @@ rollback:
 }
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-static ibool
-row_drop_table_check_legacy_step(
-	void* row,	/*!< in: sel_node_t* */
-	void* user_arg) /*!< in/out: row_drop_table_check_legacy_data */
+static ibool row_drop_table_check_legacy_step(
+    void *row,      /*!< in: sel_node_t* */
+    void *user_arg) /*!< in/out: row_drop_table_check_legacy_data */
 {
-	row_drop_table_check_legacy_data& d
-		= *(row_drop_table_check_legacy_data*)user_arg;
-	sel_node_t* node = static_cast<sel_node_t*>(row);
-	que_node_t* exp	 = node->select_list;
-	dfield_t*   fld	 = que_node_get_val(exp);
-	ut_a(fld->len < sizeof(d.foreign_name));
-	memcpy(d.foreign_name, fld->data, fld->len);
-	d.foreign_name[fld->len] = 0;
-	d.found			 = true;
-	ut_a(!que_node_get_next(exp));
-	return 0;
+  row_drop_table_check_legacy_data &d=
+      *(row_drop_table_check_legacy_data *) user_arg;
+  sel_node_t *node= static_cast<sel_node_t *>(row);
+  que_node_t *exp= node->select_list;
+  dfield_t *fld= que_node_get_val(exp);
+  ut_a(fld->len < sizeof(d.foreign_name));
+  memcpy(d.foreign_name, fld->data, fld->len);
+  d.foreign_name[fld->len]= 0;
+  ut_a(!que_node_get_next(exp));
+  if (d.drop_db &&
+      dict_tables_have_same_db(d.foreign_name, d.table_name))
+  {
+    ut_ad(0); /* FIXME: remove */
+    return 1; /* continue FETCH */
+  }
+  d.found= true;
+  return 0; /* stop FETCH */
 }
 
 dberr_t
-row_drop_table_check_legacy_fk(trx_t* trx, const char* table_name,
-			       row_drop_table_check_legacy_data& d)
+row_drop_table_check_legacy_fk(trx_t* trx, row_drop_table_check_legacy_data& d)
 {
-	ut_ad(DB_SUCCESS == fk_legacy_storage_exists(false));
-	static const char sql_check[]
-		= "PROCEDURE FK_PROC () IS\n"
-		  "DECLARE FUNCTION row_drop_table_check_legacy_step;\n"
+  ut_ad(DB_SUCCESS == fk_legacy_storage_exists(false));
+  static const char sql_check[]=
+      "PROCEDURE FK_PROC () IS\n"
+      "DECLARE FUNCTION row_drop_table_check_legacy_step;\n"
 
-		  "DECLARE CURSOR c IS"
-		  " SELECT FOR_NAME FROM SYS_FOREIGN"
-		  " WHERE REF_NAME = :ref_name;\n"
+      "DECLARE CURSOR c IS"
+      " SELECT FOR_NAME FROM SYS_FOREIGN"
+      " WHERE REF_NAME = :ref_name;\n"
 
-		  "BEGIN\n"
-		  "OPEN c;\n"
-		  "FETCH c INTO row_drop_table_check_legacy_step();\n"
-		  "CLOSE c;\n"
-		  "END;\n";
+      "BEGIN\n"
+      "OPEN c;\n"
+      "FETCH c INTO row_drop_table_check_legacy_step();\n"
+      "CLOSE c;\n"
+      "END;\n";
 
-	pars_info_t* info = pars_info_create();
-	if (!info) {
-		return DB_OUT_OF_MEMORY;
-	}
-	pars_info_bind_function(info, "row_drop_table_check_legacy_step",
-				row_drop_table_check_legacy_step, &d);
-	pars_info_add_str_literal(info, "ref_name", table_name);
+  pars_info_t *info= pars_info_create();
+  if (!info)
+    return DB_OUT_OF_MEMORY;
+  pars_info_bind_function(info, "row_drop_table_check_legacy_step",
+                          row_drop_table_check_legacy_step, &d);
+  pars_info_add_str_literal(info, "ref_name", d.table_name);
 
-	dberr_t err = que_eval_sql(info, sql_check, trx);
-	if (err != DB_SUCCESS) {
-		return err;
-	}
+  dberr_t err= que_eval_sql(info, sql_check, trx);
+  if (err != DB_SUCCESS)
+    return err;
 
-	return DB_SUCCESS;
+  return DB_SUCCESS;
 }
 
 /****************************************************************//**
