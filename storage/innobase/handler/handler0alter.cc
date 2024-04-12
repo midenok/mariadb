@@ -8396,8 +8396,7 @@ check_if_can_drop_indexes:
 					row_mysql_unlock_data_dictionary(
 						m_prebuilt->trx);
 					m_prebuilt->trx->error_info = index;
-					// FIXME: ER_DROP_INDEX_FK is deprecated in favor of ER_FK_NO_INDEX_CHILD/ER_FK_NO_INDEX_PARENT
-					ut_ad(0);
+                                        // TODO: ER_DROP_INDEX_FK is deprecated in favor of ER_FK_NO_INDEX_PARENT
 					print_error(HA_ERR_DROP_INDEX_FK,
 						MYF(0));
 					goto err_exit;
@@ -8412,8 +8411,7 @@ check_if_can_drop_indexes:
 					indexed_table, col_names,
 					m_prebuilt->trx, drop_fk, n_drop_fk)) {
 				row_mysql_unlock_data_dictionary(m_prebuilt->trx);
-				// FIXME: ER_DROP_INDEX_FK is deprecated in favor of ER_FK_NO_INDEX_CHILD/ER_FK_NO_INDEX_PARENT
-				ut_ad(0);
+				// TODO: ER_DROP_INDEX_FK is deprecated in favor of ER_FK_NO_INDEX_PARENT
 				print_error(HA_ERR_DROP_INDEX_FK, MYF(0));
 				goto err_exit;
 			}

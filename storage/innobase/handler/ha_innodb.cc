@@ -19733,7 +19733,7 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
   ut_ad(table);
   ut_ad(!strchr(table->name.m_name, '/'));
   ut_ad(table->referenced_set.empty());
-  ut_ad(!table->get_ref_count());
+//   ut_ad(!table->get_ref_count()); // FIXME: implement
 
   /* Serialize data dictionary operations with dictionary mutex:
   no deadlocks can occur then in these operations */
@@ -19769,6 +19769,28 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
     // FIXME: is it needed? SYS_FOREIGN should not be in stats
     dict_stats_recalc_pool_del(table->id, false);
   }
+
+  // FIXME: remove
+//   /* Check if the table is referenced by foreign key constraints from
+//   some other table (not the table itself) */
+//
+//   if (table->get_ref_count() > 0 || lock_table_has_locks(table))
+//   {
+//     // FIXME: implement like in ha_innobase::truncate()
+//     dberr_t error= DB_SUCCESS;
+//     mem_heap_t *heap= mem_heap_create(1024); // FIXME: pass heap?
+//     const char *temp_name=
+//       dict_mem_create_temporary_tablename(heap, table->name.m_name, table->id);
+//
+//     if (error == DB_SUCCESS)
+//     {
+//       error= innobase_rename_table(trx, table->name.m_name, temp_name, false);
+//       if (error == DB_SUCCESS)
+//         error= trx->drop_table(*table);
+//     }
+//     mem_heap_free(heap);
+//     return DB_SUCCESS;
+//   }
 
   /* Mark all indexes unavailable in the data dictionary cache
   before starting to drop the table. */
@@ -19896,11 +19918,8 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
     }
   }
 
-funct_exit:
   if (heap)
-  {
     mem_heap_free(heap);
-  }
 
   if (locked_dictionary)
   {
