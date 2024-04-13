@@ -1859,7 +1859,7 @@ const char *thd_innodb_tmpdir(THD *thd)
 /** Obtain the InnoDB transaction of a MySQL thread.
 @param[in,out]	thd	thread handle
 @return reference to transaction pointer */
-static trx_t* thd_to_trx(THD* thd)
+trx_t* thd_to_trx(THD* thd)
 {
 	return reinterpret_cast<trx_t*>(thd_get_ha_data(thd, innodb_hton_ptr));
 }
@@ -2860,7 +2860,6 @@ Gets the InnoDB transaction handle for a MySQL handler object, creates
 an InnoDB transaction struct if the corresponding MySQL thread struct still
 lacks one.
 @return InnoDB transaction handle */
-static inline
 trx_t*
 check_trx_exists(
 /*=============*/

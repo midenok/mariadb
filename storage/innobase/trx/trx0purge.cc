@@ -1122,6 +1122,9 @@ void purge_sys_t::wait_FTS(bool also_sys)
   while (paused);
 }
 
+trx_t* thd_to_trx(THD* thd);
+trx_t* check_trx_exists(THD *);
+
 __attribute__((nonnull))
 /** Aqcuire a metadata lock on a table.
 @param table        table handle
@@ -1132,7 +1135,8 @@ __attribute__((nonnull))
 @retval -1      if the purge of history must be suspended due to DDL */
 static dict_table_t *trx_purge_table_acquire(dict_table_t *table,
                                              MDL_context *mdl_context,
-                                             MDL_ticket **mdl)
+                                             MDL_ticket **mdl,
+                                             THD *thd)
 {
   ut_ad(dict_sys.frozen_not_locked());
   *mdl= nullptr;
@@ -1145,7 +1149,20 @@ static dict_table_t *trx_purge_table_acquire(dict_table_t *table,
 
   size_t db_len= dict_get_db_name_len(table->name.m_name);
   if (db_len == 0)
+  {
+    if (table == dict_sys.sys_foreign || table == dict_sys.sys_foreign_cols)
+    {
+      /*
+        Lock legacy table for the case upgrade logic wants to drop it.
+        Otherwise drop will fail as long as table is acquired here.
+      */
+      trx_t *trx= check_trx_exists(thd);
+      trx_start_if_not_started(trx, false);
+      if (DB_SUCCESS != lock_table_for_trx(table, trx, LOCK_S))
+        goto must_wait;
+    }
     return table; /* InnoDB system tables are not covered by MDL */
+  }
 
   if (purge_sys.must_wait_FTS())
   {
@@ -1185,7 +1202,8 @@ static dict_table_t *trx_purge_table_acquire(dict_table_t *table,
 @retval -1      if the purge of history must be suspended due to DDL */
 static dict_table_t *trx_purge_table_open(table_id_t table_id,
                                           MDL_context *mdl_context,
-                                          MDL_ticket **mdl)
+                                          MDL_ticket **mdl,
+                                          THD *thd)
 {
   dict_sys.freeze(SRW_LOCK_CALL);
 
@@ -1206,7 +1224,7 @@ static dict_table_t *trx_purge_table_open(table_id_t table_id,
     dict_sys.freeze(SRW_LOCK_CALL);
   }
 
-  table= trx_purge_table_acquire(table, mdl_context, mdl);
+  table= trx_purge_table_acquire(table, mdl_context, mdl, thd);
   dict_sys.unfreeze();
   return table;
 }
@@ -1231,7 +1249,7 @@ dict_table_t *purge_sys_t::close_and_reopen(table_id_t id, THD *thd,
   wait_FTS(false);
   m_active= true;
 
-  dict_table_t *table= trx_purge_table_open(id, mdl_context, mdl);
+  dict_table_t *table= trx_purge_table_open(id, mdl_context, mdl, thd);
   if (table == reinterpret_cast<dict_table_t*>(-1))
     goto retry;
 
@@ -1244,7 +1262,7 @@ dict_table_t *purge_sys_t::close_and_reopen(table_id_t id, THD *thd,
       if (t.second.first)
       {
         t.second.first= trx_purge_table_open(t.first, mdl_context,
-                                             &t.second.second);
+                                             &t.second.second, thd);
         if (t.second.first == reinterpret_cast<dict_table_t*>(-1))
         {
           if (table)
@@ -1341,7 +1359,7 @@ trx_purge_attach_undo_recs(ulint n_purge_threads, THD *thd)
 		if (!table_node) {
 			std::pair<dict_table_t*,MDL_ticket*> p;
 			p.first = trx_purge_table_open(table_id, mdl_context,
-						       &p.second);
+						       &p.second, thd);
 			if (p.first == reinterpret_cast<dict_table_t*>(-1)) {
 				p.first = purge_sys.close_and_reopen(
 					table_id, thd, &p.second);
@@ -1491,6 +1509,10 @@ TRANSACTIONAL_TARGET ulint trx_purge(ulint n_tasks, ulint history_size)
 		trx_purge_close_tables(node, thd);
 		node->tables.clear();
 	}
+
+	trx_t *trx= thd_to_trx(thd);
+        if (trx && trx->state == TRX_STATE_ACTIVE)
+          trx->commit(); /* For trx->release_locks() */
 
 	purge_sys.batch_cleanup(head);
 
