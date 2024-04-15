@@ -1245,6 +1245,10 @@ dict_table_t *purge_sys_t::close_and_reopen(table_id_t id, THD *thd,
     trx_purge_close_tables(node, thd);
   }
 
+  trx_t *trx= thd_to_trx(thd);
+  if (trx && trx->state == TRX_STATE_ACTIVE)
+    trx->commit(); /* For trx->release_locks() */
+
   m_active= false;
   wait_FTS(false);
   m_active= true;
