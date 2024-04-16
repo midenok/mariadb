@@ -6028,8 +6028,10 @@ ha_innobase::open(const char* name, int, uint open_flags)
 	}
 	err = fk_check_legacy_storage(ib_table->name.m_name, trx);
 	if (err == DB_LEGACY_FK && (open_flags & HA_OPEN_FOR_REPAIR)) {
+                dict_sys.lock(SRW_LOCK_CALL);
 		err = fk_upgrade_legacy_storage(ib_table, trx, thd, table->s);
-		if (err == DB_LEGACY_FK) {
+                dict_sys.unlock(); // trx has locks on SYS_FOREIGN[_COLS] until committed
+		if (err == DB_SUCCESS) {
 			err = fk_check_legacy_storage(ib_table->name.m_name,
 						      trx);
 			if (err == DB_LEGACY_FK) {
@@ -12835,7 +12837,7 @@ static int check_legacy_fk(trx_t *trx, const TABLE *table,
   char *bufptr= table_name;
   size_t len;
 
-  dberr_t err= fk_legacy_storage_exists(lock_dict_mutex);
+  dberr_t err= fk_legacy_storage_exists();
   if (err == DB_TABLE_NOT_FOUND)
     return DB_SUCCESS;
   if (err != DB_SUCCESS)
@@ -13846,7 +13848,7 @@ err_exit:
       TABLE_SHARE doesn't have them and fk_handle_drop() passes the check.
       Here we check it against legacy storage (SYS_FOREIGN).
     */
-    err= fk_legacy_storage_exists(false);
+    err= fk_legacy_storage_exists();
     if (err == DB_CORRUPTION)
       goto err_exit;
 
@@ -13884,7 +13886,7 @@ err_exit:
       if (err != DB_SUCCESS)
         goto err_exit;
       /* Drop legacy storage if it is empty */
-      err = fk_cleanup_legacy_storage(false, trx);
+      err = fk_cleanup_legacy_storage(trx, false);
       if (err != DB_SUCCESS)
         goto err_exit;
     } /* err == DB_SUCCESS (legacy storage exists) */
@@ -19722,6 +19724,8 @@ static MYSQL_SYSVAR_STR(eval_sql,
 static
 dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
 {
+  ut_ad(trx->dict_operation_lock_mode);
+  ut_ad(dict_sys.locked());
   dberr_t err;
   char *tablename= NULL;
   bool locked_dictionary= false;
@@ -19732,30 +19736,16 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
   ut_ad(table);
   ut_ad(!strchr(table->name.m_name, '/'));
   ut_ad(table->referenced_set.empty());
-//   ut_ad(!table->get_ref_count()); // FIXME: implement
+  ut_ad(!table->get_ref_count());
 
   /* Serialize data dictionary operations with dictionary mutex:
   no deadlocks can occur then in these operations */
 
   trx->op_info= "dropping table";
 
-  if (!trx->dict_operation_lock_mode)
-  {
-    /* Prevent foreign key checks etc. while we are
-    dropping the table */
-
-    row_mysql_lock_data_dictionary(trx);
-
-    locked_dictionary= true;
-  }
-
-  ut_ad(dict_sys.locked());
-
   /* This function is called recursively via fts_drop_tables(). */
   if (!trx_is_started(trx))
-  {
     trx_start_for_ddl(trx);
-  }
 
   if (!table->no_rollback())
   {
@@ -21751,10 +21741,15 @@ static ibool pars_get_true(void *row
 }
 
 /** Drop SYS_FOREIGN[_COLS] tables if they are empty */
-// FIXME: remove lock_dict_mutex
-dberr_t fk_cleanup_legacy_storage(bool lock_dict_mutex, trx_t *trx)
+dberr_t fk_cleanup_legacy_storage(trx_t *trx, bool lock_dict_sys)
 {
-  ut_ad(DB_SUCCESS == fk_legacy_storage_exists(lock_dict_mutex));
+  if (lock_dict_sys)
+  {
+    ut_ad(!dict_sys.locked());
+    row_mysql_lock_data_dictionary(trx);
+  }
+
+  ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
   bool sys_foreign_empty;
   bool sys_forcols_empty;
   dberr_t err= DB_SUCCESS;
@@ -21762,24 +21757,30 @@ dberr_t fk_cleanup_legacy_storage(bool lock_dict_mutex, trx_t *trx)
   sys_forcols_empty= innobase_table_is_empty(dict_sys.sys_foreign_cols);
 
   bool check_foreigns= trx->check_foreigns;
+  bool dict_operation_lock_mode= trx->dict_operation_lock_mode;
   if (sys_foreign_empty)
   {
     trx->check_foreigns= false;
+    trx->dict_operation_lock_mode= true;
     err= fk_drop_legacy_table(dict_sys.sys_foreign, trx);
     if (err != DB_SUCCESS)
-    {
-      trx->check_foreigns= check_foreigns;
-      return err;
-    }
+      goto error;
     dict_sys.sys_foreign= NULL;
   }
   if (sys_forcols_empty)
   {
     trx->check_foreigns= false;
+    trx->dict_operation_lock_mode= true;
     err= fk_drop_legacy_table(dict_sys.sys_foreign_cols, trx);
     dict_sys.sys_foreign_cols= NULL;
   }
+
+error:
   trx->check_foreigns= check_foreigns;
+  trx->dict_operation_lock_mode= dict_operation_lock_mode;
+
+  if (lock_dict_sys)
+    row_mysql_unlock_data_dictionary(trx);
   return err;
 }
 
@@ -21789,20 +21790,42 @@ dberr_t fk_cleanup_legacy_storage(bool lock_dict_mutex, trx_t *trx)
 @param[in]	trx		trx_t used to eval sql code
 @param[in]	thd		THD used to handle FRM update
 @param[out]	share		foreign_keys, referenced_keys receive the data
-@return				DB_LEGACY_FK or error code */
+@return				DB_SUCCESS or error code */
 static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
                                          THD *thd, TABLE_SHARE *share)
 {
   pars_info_t *info;
   fk_legacy_data d(trx, table, thd, share);
 
-  ut_ad(DB_SUCCESS == fk_legacy_storage_exists(true));
+  ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
+
+  /*
+    Purge system:
+
+    1. Freezes dict_sys;
+    2. Acquires table;
+    3a. Locks legacy SYS_FOREIGN table or
+    3b. MDL-locks user table + delay;
+    4. Unfreezes dict_sys;
+    5. Releases table;
+    6. Unlocks logacy SYS_FOREIGN table.
+
+    To avoid dropping acquired SYS_FOREIGN table we keep lock 3. until the table is
+    released in 5. If MDL-lock fails it goes the same way through 4.-6. and
+    repeats again from 1. But MDL may attempt to lock the same table this thread
+    locked, so it will cause timeout delay at 3b. The delay means dict_sys
+    is frozen for the same period of time and that may cause
+    fk_upgrade_legacy_storage() to fail. To avoid that we lock dict_sys for the
+    whole period of fk_upgrade_legacy_storage(): when we enter
+    fk_upgrade_legacy_storage() we are at 5. in purge system so we will soon
+    release SYS_FOREIGN table. At 6. we are ready to drop SYS_FOREIGN table.
+  */
+  ut_ad(dict_sys.locked());
 
   info= pars_info_create();
   if (!info)
-  {
     return DB_OUT_OF_MEMORY;
-  }
+
   pars_info_bind_function(info, "fk_upgrade_create_fk", fk_upgrade_create_fk,
                           &d);
   pars_info_bind_function(info, "fk_upgrade_add_col", fk_upgrade_add_col, &d);
@@ -21849,18 +21872,12 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
       "CLOSE c;\n"
       "END;\n";
 
-  dict_sys.lock(SRW_LOCK_CALL);
   dberr_t err= que_eval_sql(info, sql_fetch, trx);
-  dict_sys.unlock();
   if (err != DB_SUCCESS)
-  {
     return err;
-  }
 
   if (d.err != DB_LEGACY_FK)
-  {
     return d.err;
-  }
 
   ut_ad(d.foreign_keys.elements);
 
@@ -21939,33 +21956,28 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
                                 "END;\n";
 
   info= pars_info_create();
+  // TODO: rollback the below fails in crash-safety task
   if (!info)
-  {
     return DB_OUT_OF_MEMORY;
-  }
+
   pars_info_add_str_literal(info, "for_name", table->name.m_name);
 
-  dict_sys.lock(SRW_LOCK_CALL);
   err= que_eval_sql(info, sql_drop, trx);
-  dict_sys.unlock();
   if (err != DB_SUCCESS)
-  {
     return err;
-  }
 
-  err= fk_cleanup_legacy_storage(true, trx);
+  err= fk_cleanup_legacy_storage(trx, false);
   if (err != DB_SUCCESS)
-  {
     return err;
-  }
 
-  return DB_LEGACY_FK;
+  return DB_SUCCESS;
 
 rollback:
   for (FK_ddl_backup &bak : ref_shares)
   {
     bak.rollback();
   }
+  ut_ad(err != DB_SUCCESS);
   return err;
 }
 
@@ -21980,21 +21992,16 @@ static dberr_t fk_check_legacy_storage(const char *table_name, trx_t *trx)
   pars_info_t *info;
   bool do_upgrade= false;
 
-  dberr_t err= fk_legacy_storage_exists(true);
+  dberr_t err= fk_legacy_storage_exists();
   if (err == DB_TABLE_NOT_FOUND)
-  {
     return DB_SUCCESS;
-  }
   if (err != DB_SUCCESS)
-  {
     return err;
-  }
 
   info= pars_info_create();
   if (!info)
-  {
     return DB_OUT_OF_MEMORY;
-  }
+
   pars_info_bind_function(info, "get_upgrade", pars_get_true, &do_upgrade);
   pars_info_add_str_literal(info, "for_name", table_name);
   static const char sql[]= "PROCEDURE FK_PROC () IS\n"
@@ -22014,9 +22021,7 @@ static dberr_t fk_check_legacy_storage(const char *table_name, trx_t *trx)
   err= que_eval_sql(info, sql, trx);
   dict_sys.unlock();
   if (err == DB_SUCCESS && do_upgrade)
-  {
     err= DB_LEGACY_FK;
-  }
 
   return err;
 }

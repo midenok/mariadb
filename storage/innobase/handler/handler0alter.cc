@@ -7498,7 +7498,7 @@ static dberr_t
 innobase_drop_column_check_legacy_fk(trx_t* trx, const char* table_name,
 				     const char* col_name, bool& found)
 {
-	ut_ad(DB_SUCCESS == fk_legacy_storage_exists(false));
+	ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
 
 	static const char sql_check[]
 		= "PROCEDURE FK_PROC () IS\n"
@@ -7599,7 +7599,7 @@ innobase_check_foreign_key_index(
 	}
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-	if (DB_SUCCESS == fk_legacy_storage_exists(false)) {
+	if (DB_SUCCESS == fk_legacy_storage_exists()) {
 		bool found = false;
 		// NB: foreign keys always reference index by first field
 		if (DB_SUCCESS != innobase_drop_column_check_legacy_fk(
@@ -9444,7 +9444,7 @@ err_exit:
 
 rename_foreign:
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-	error = fk_legacy_storage_exists(false);
+	error = fk_legacy_storage_exists();
 	if (error == DB_CORRUPTION) {
 		goto err_exit;
 	}

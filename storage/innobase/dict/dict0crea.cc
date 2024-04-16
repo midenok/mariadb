@@ -1357,7 +1357,7 @@ bool dict_sys_t::load_sys_tables()
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
 dberr_t
-fk_legacy_storage_exists(bool lock_dict_mutex)
+fk_legacy_storage_exists()
 {
   if (dict_sys.sys_foreign && dict_sys.sys_foreign_cols)
     return DB_SUCCESS;

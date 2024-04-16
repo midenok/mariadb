@@ -118,7 +118,7 @@ dict_create_index_tree_in_mem(
 	const trx_t*	trx);		/*!< in: InnoDB transaction handle */
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-dberr_t fk_legacy_storage_exists(bool lock_dict_mutex);
+dberr_t fk_legacy_storage_exists();
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 /********************************************************************//**

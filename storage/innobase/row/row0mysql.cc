@@ -2508,7 +2508,7 @@ static ibool row_drop_table_check_legacy_step(
 dberr_t
 row_drop_table_check_legacy_fk(trx_t* trx, row_drop_table_check_legacy_data& d)
 {
-  ut_ad(DB_SUCCESS == fk_legacy_storage_exists(false));
+  ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
   static const char sql_check[]=
       "PROCEDURE FK_PROC () IS\n"
       "DECLARE FUNCTION row_drop_table_check_legacy_step;\n"
@@ -2546,7 +2546,7 @@ row_delete_constraint_low(
 	const char*	id,		/*!< in: constraint id */
 	trx_t*		trx)		/*!< in: transaction handle */
 {
-	ut_ad(DB_SUCCESS == fk_legacy_storage_exists(false));
+	ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
 	pars_info_t*	info = pars_info_create();
 
 	pars_info_add_str_literal(info, "id", id);
@@ -2593,7 +2593,7 @@ row_delete_constraint(
 		return err;
 	}
 
-	err = fk_cleanup_legacy_storage(false, trx);
+	err = fk_cleanup_legacy_storage(trx, true);
 	return(err);
 }
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
@@ -2747,7 +2747,7 @@ row_rename_table_for_mysql(
 	}
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-	err = fk_legacy_storage_exists(false);
+	err = fk_legacy_storage_exists();
 	if (err == DB_CORRUPTION) {
 		goto rollback_and_exit;
 	}
