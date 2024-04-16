@@ -497,9 +497,8 @@ const struct _ft_vft_ext ft_vft_ext_result = {innobase_fts_get_version,
 					      innobase_fts_count_matches};
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-static dberr_t fk_check_legacy_storage(const char *table_name, trx_t *trx);
-static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
-                                         THD *thd, TABLE_SHARE *share);
+static dberr_t fk_check_and_upgrade(THD *thd, uint open_flags,
+                                    dict_table_t *ib_table, TABLE *table);
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 #ifdef HAVE_PSI_INTERFACE
@@ -6022,34 +6021,7 @@ ha_innobase::open(const char* name, int, uint open_flags)
 	}
 
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
-	trx_t* trx = innobase_trx_allocate(thd);
-	if (!trx) {
-		DBUG_RETURN(HA_ERR_OUT_OF_MEM);
-	}
-	err = fk_check_legacy_storage(ib_table->name.m_name, trx);
-	if (err == DB_LEGACY_FK && (open_flags & HA_OPEN_FOR_REPAIR)) {
-                dict_sys.lock(SRW_LOCK_CALL);
-		err = fk_upgrade_legacy_storage(ib_table, trx, thd, table->s);
-                dict_sys.unlock(); // trx has locks on SYS_FOREIGN[_COLS] until committed
-		if (err == DB_SUCCESS) {
-			err = fk_check_legacy_storage(ib_table->name.m_name,
-						      trx);
-			if (err == DB_LEGACY_FK) {
-				push_warning_printf(
-					thd, Sql_condition::WARN_LEVEL_WARN,
-					HA_ERR_FK_UPGRADE,
-					"Table %s failed to upgrade foreign "
-					"keys (index is not corrupt)!",
-					table_share->table_name.str);
-			}
-		}
-	}
-	if (trx->state != TRX_STATE_NOT_STARTED
-	    && trx->state != TRX_STATE_COMMITTED_IN_MEMORY) {
-		trx_commit_for_mysql(trx);
-	}
-	trx->error_state = DB_SUCCESS;
-	trx->free();
+        err= fk_check_and_upgrade(thd, open_flags, ib_table, table);
 	if (err != DB_SUCCESS) {
 		dict_table_close(ib_table, FALSE, FALSE);
 		DBUG_RETURN(convert_error_code_to_mysql(err, ib_table->flags,
@@ -21807,17 +21779,19 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
     3a. Locks legacy SYS_FOREIGN table or
     3b. MDL-locks user table + delay;
     4. Unfreezes dict_sys;
-    5. Releases table;
-    6. Unlocks logacy SYS_FOREIGN table.
+    5. Locks dict_sys (for close table);
+    6. Releases table (closes table);
+    7. Unlocks dict_sys;
+    8. Unlocks logacy SYS_FOREIGN table.
 
     To avoid dropping acquired SYS_FOREIGN table we keep lock 3. until the table is
-    released in 5. If MDL-lock fails it goes the same way through 4.-6. and
+    released in 6. If MDL-lock fails it goes the same way through 4.-8. and
     repeats again from 1. But MDL may attempt to lock the same table this thread
     locked, so it will cause timeout delay at 3b. The delay means dict_sys
     is frozen for the same period of time and that may cause
     fk_upgrade_legacy_storage() to fail. To avoid that we lock dict_sys for the
     whole period of fk_upgrade_legacy_storage(): when we enter
-    fk_upgrade_legacy_storage() we are at 5. in purge system so we will soon
+    fk_upgrade_legacy_storage() we are at 6. in purge system so we will soon
     release SYS_FOREIGN table. At 6. we are ready to drop SYS_FOREIGN table.
   */
   ut_ad(dict_sys.locked());
@@ -21991,6 +21965,7 @@ static dberr_t fk_check_legacy_storage(const char *table_name, trx_t *trx)
 {
   pars_info_t *info;
   bool do_upgrade= false;
+  const bool do_lock= !dict_sys.locked();
 
   dberr_t err= fk_legacy_storage_exists();
   if (err == DB_TABLE_NOT_FOUND)
@@ -22017,12 +21992,65 @@ static dberr_t fk_check_legacy_storage(const char *table_name, trx_t *trx)
                            "CLOSE c;\n"
                            "END;\n";
 
-  dict_sys.lock(SRW_LOCK_CALL);
+  if (do_lock)
+    dict_sys.lock(SRW_LOCK_CALL);
   err= que_eval_sql(info, sql, trx);
-  dict_sys.unlock();
+  if (do_lock)
+    dict_sys.unlock();
   if (err == DB_SUCCESS && do_upgrade)
     err= DB_LEGACY_FK;
 
+  return err;
+}
+
+static dberr_t fk_check_and_upgrade(THD *thd, uint open_flags,
+                                    dict_table_t *ib_table, TABLE *table)
+{
+  dberr_t err;
+  trx_t *trx= innobase_trx_allocate(thd);
+  if (!trx)
+    return DB_OUT_OF_MEMORY;
+  err= fk_check_legacy_storage(ib_table->name.m_name, trx);
+  if (!(err == DB_LEGACY_FK && (open_flags & HA_OPEN_FOR_REPAIR)))
+    goto end;
+
+  err= lock_table_for_trx(dict_sys.sys_foreign, trx, LOCK_X);
+  if (err != DB_SUCCESS)
+    goto end;
+  err= lock_table_for_trx(dict_sys.sys_foreign_cols, trx, LOCK_X);
+  if (err != DB_SUCCESS)
+    goto end;
+
+  dict_sys.lock(SRW_LOCK_CALL);
+  /* Protect from parallel fk_upgrade_legacy_storage() */
+  err= fk_legacy_storage_exists();
+  if (err == DB_TABLE_NOT_FOUND)
+    err= DB_SUCCESS;
+  else if (err == DB_SUCCESS)
+    err= fk_upgrade_legacy_storage(ib_table, trx, thd, table->s);
+  if (err != DB_SUCCESS)
+  {
+    dict_sys.unlock();
+    goto end;
+  }
+  err= fk_check_legacy_storage(ib_table->name.m_name, trx);
+  dict_sys.unlock();
+
+  if (err == DB_LEGACY_FK)
+  {
+    push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                        HA_ERR_FK_UPGRADE,
+                        "Table %s failed to upgrade foreign "
+                        "keys (index is not corrupt)!",
+                        table->s->table_name.str);
+  }
+
+end:
+  if (trx->state != TRX_STATE_NOT_STARTED &&
+      trx->state != TRX_STATE_COMMITTED_IN_MEMORY)
+    trx_commit_for_mysql(trx);
+  trx->error_state= DB_SUCCESS;
+  trx->free();
   return err;
 }
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */

@@ -1158,6 +1158,12 @@ static dict_table_t *trx_purge_table_acquire(dict_table_t *table,
       */
       trx_t *trx= check_trx_exists(thd);
       trx_start_if_not_started(trx, false);
+      if (table == dict_sys.sys_foreign_cols)
+      {
+        /* Always lock in same order: sys_foreign first (required by fk_check_and_upgrade) */
+        if (DB_SUCCESS != lock_table_for_trx(dict_sys.sys_foreign, trx, LOCK_S))
+          goto must_wait;
+      }
       if (DB_SUCCESS != lock_table_for_trx(table, trx, LOCK_S))
         goto must_wait;
     }
