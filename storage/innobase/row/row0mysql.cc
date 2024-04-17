@@ -2593,7 +2593,6 @@ row_delete_constraint(
 		return err;
 	}
 
-	err = fk_cleanup_legacy_storage(trx, true);
 	return(err);
 }
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */

@@ -951,6 +951,8 @@ void dict_sys_t::create()
 
   mysql_mutex_init(dict_foreign_err_mutex_key, &dict_foreign_err_mutex,
                    nullptr);
+
+  fk_upgrade_lock.init();
 }
 
 
@@ -4498,6 +4500,7 @@ void dict_sys_t::close()
     dict_foreign_err_file = NULL;
   }
 
+  fk_upgrade_lock.destroy();
   m_initialised= false;
 }
 

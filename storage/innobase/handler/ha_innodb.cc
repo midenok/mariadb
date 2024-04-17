@@ -13857,10 +13857,6 @@ err_exit:
       err= trx->drop_table_foreign(table->name);
       if (err != DB_SUCCESS)
         goto err_exit;
-      /* Drop legacy storage if it is empty */
-      err = fk_cleanup_legacy_storage(trx, false);
-      if (err != DB_SUCCESS)
-        goto err_exit;
     } /* err == DB_SUCCESS (legacy storage exists) */
   }
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
@@ -21940,10 +21936,6 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
   if (err != DB_SUCCESS)
     return err;
 
-  err= fk_cleanup_legacy_storage(trx, false);
-  if (err != DB_SUCCESS)
-    return err;
-
   return DB_SUCCESS;
 
 rollback:
@@ -22003,13 +21995,16 @@ static dberr_t fk_check_legacy_storage(const char *table_name, trx_t *trx)
   return err;
 }
 
-static dberr_t fk_check_and_upgrade(THD *thd, uint open_flags,
-                                    dict_table_t *ib_table, TABLE *table)
+static dberr_t
+fk_check_and_upgrade(THD *thd, uint open_flags,
+                     dict_table_t *ib_table, TABLE *table)
 {
   dberr_t err;
   trx_t *trx= innobase_trx_allocate(thd);
   if (!trx)
     return DB_OUT_OF_MEMORY;
+
+  dict_sys.fk_lock();
   err= fk_check_legacy_storage(ib_table->name.m_name, trx);
   if (!(err == DB_LEGACY_FK && (open_flags & HA_OPEN_FOR_REPAIR)))
     goto end;
@@ -22021,20 +22016,10 @@ static dberr_t fk_check_and_upgrade(THD *thd, uint open_flags,
   if (err != DB_SUCCESS)
     goto end;
 
-  dict_sys.lock(SRW_LOCK_CALL);
-  /* Protect from parallel fk_upgrade_legacy_storage() */
-  err= fk_legacy_storage_exists();
-  if (err == DB_TABLE_NOT_FOUND)
-    err= DB_SUCCESS;
-  else if (err == DB_SUCCESS)
-    err= fk_upgrade_legacy_storage(ib_table, trx, thd, table->s);
+  err= fk_upgrade_legacy_storage(ib_table, trx, thd, table->s);
   if (err != DB_SUCCESS)
-  {
-    dict_sys.unlock();
     goto end;
-  }
   err= fk_check_legacy_storage(ib_table->name.m_name, trx);
-  dict_sys.unlock();
 
   if (err == DB_LEGACY_FK)
   {
@@ -22046,6 +22031,8 @@ static dberr_t fk_check_and_upgrade(THD *thd, uint open_flags,
   }
 
 end:
+  dict_sys.fk_unlock();
+
   if (trx->state != TRX_STATE_NOT_STARTED &&
       trx->state != TRX_STATE_COMMITTED_IN_MEMORY)
     trx_commit_for_mysql(trx);

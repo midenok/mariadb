@@ -1320,6 +1320,8 @@ class dict_sys_t
   /** number of S-latch holders */
   Atomic_counter<uint32_t> latch_readers;
 #endif
+  srw_mutex fk_upgrade_lock;
+
 public:
   /** Indexes of SYS_TABLE[] */
   enum
@@ -1545,6 +1547,15 @@ public:
     latch.rd_unlock();
   }
 #endif
+
+  void fk_lock()
+  {
+    fk_upgrade_lock.wr_lock();
+  }
+  void fk_unlock()
+  {
+    fk_upgrade_lock.wr_unlock();
+  }
 
   /** Estimate the used memory occupied by the data dictionary
   table and index objects.
