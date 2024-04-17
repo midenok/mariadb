@@ -1523,7 +1523,11 @@ TRANSACTIONAL_TARGET ulint trx_purge(ulint n_tasks, ulint history_size)
 	trx_t *trx= thd_to_trx(thd);
         if (trx && trx->state == TRX_STATE_ACTIVE)
         {
-          dberr_t err= fk_cleanup_legacy_storage(trx, false);
+          dict_sys.fk_lock();
+          trx->dict_operation= true;
+          dberr_t err= fk_cleanup_legacy_storage(trx);
+          trx->dict_operation= false;
+          dict_sys.fk_unlock();
           if (err != DB_SUCCESS)
             return err;
           trx->commit(); /* Releases locks on SYS_FOREIGN[_COLS] */

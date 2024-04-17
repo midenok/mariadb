@@ -21709,13 +21709,10 @@ static ibool pars_get_true(void *row
 }
 
 /** Drop SYS_FOREIGN[_COLS] tables if they are empty */
-dberr_t fk_cleanup_legacy_storage(trx_t *trx, bool lock_dict_sys)
+dberr_t fk_cleanup_legacy_storage(trx_t *trx)
 {
-  if (lock_dict_sys)
-  {
-    ut_ad(!dict_sys.locked());
-    row_mysql_lock_data_dictionary(trx);
-  }
+  ut_ad(!dict_sys.locked());
+  row_mysql_lock_data_dictionary(trx);
 
   ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
   bool sys_foreign_empty;
@@ -21747,8 +21744,7 @@ error:
   trx->check_foreigns= check_foreigns;
   trx->dict_operation_lock_mode= dict_operation_lock_mode;
 
-  if (lock_dict_sys)
-    row_mysql_unlock_data_dictionary(trx);
+  row_mysql_unlock_data_dictionary(trx);
   return err;
 }
 
@@ -21767,7 +21763,7 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
 
   ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
 
-  /*
+  /* FIXME: rewrite
     Purge system:
 
     1. Freezes dict_sys;
@@ -21790,7 +21786,6 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
     fk_upgrade_legacy_storage() we are at 6. in purge system so we will soon
     release SYS_FOREIGN table. At 6. we are ready to drop SYS_FOREIGN table.
   */
-  ut_ad(dict_sys.locked());
 
   info= pars_info_create();
   if (!info)
@@ -21842,7 +21837,9 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
       "CLOSE c;\n"
       "END;\n";
 
+  dict_sys.lock(SRW_LOCK_CALL);
   dberr_t err= que_eval_sql(info, sql_fetch, trx);
+  dict_sys.unlock();
   if (err != DB_SUCCESS)
     return err;
 
@@ -21932,7 +21929,9 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
 
   pars_info_add_str_literal(info, "for_name", table->name.m_name);
 
+  dict_sys.lock(SRW_LOCK_CALL);
   err= que_eval_sql(info, sql_drop, trx);
+  dict_sys.unlock();
   if (err != DB_SUCCESS)
     return err;
 

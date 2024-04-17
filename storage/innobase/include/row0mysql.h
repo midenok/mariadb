@@ -853,7 +853,7 @@ dberr_t row_drop_table_check_legacy_fk(trx_t *trx,
                                        row_drop_table_check_legacy_data &d);
 
 /** Drop SYS_FOREIGN[_COLS] tables if they are empty */
-dberr_t fk_cleanup_legacy_storage(trx_t *trx, bool lock_dict_sys);
+dberr_t fk_cleanup_legacy_storage(trx_t *trx);
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 
 #endif /* row0mysql.h */

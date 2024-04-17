@@ -31,6 +31,7 @@ flush tables;
 show create table t2;
 --enable_warnings
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
