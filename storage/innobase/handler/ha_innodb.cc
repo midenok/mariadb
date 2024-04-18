@@ -21743,8 +21743,8 @@ dberr_t fk_cleanup_legacy_storage(trx_t *trx)
 error:
   trx->check_foreigns= check_foreigns;
   trx->dict_operation_lock_mode= dict_operation_lock_mode;
-
-  row_mysql_unlock_data_dictionary(trx);
+  trx->was_dict_operation= true;
+  dict_sys.unlock();
   return err;
 }
 
