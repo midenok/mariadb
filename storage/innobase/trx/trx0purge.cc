@@ -1518,7 +1518,8 @@ TRANSACTIONAL_TARGET ulint trx_purge(ulint n_tasks, ulint history_size)
           dict_sys.fk_unlock();
           if (err != DB_SUCCESS)
             return err;
-          trx->commit(); /* Releases locks on SYS_FOREIGN[_COLS] */
+          if (trx_is_started(trx))
+            trx->commit();
         }
 
 	purge_sys.batch_cleanup(head);

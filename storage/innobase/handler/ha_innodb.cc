@@ -19692,11 +19692,8 @@ static MYSQL_SYSVAR_STR(eval_sql,
 static
 dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
 {
-  ut_ad(trx->dict_operation_lock_mode);
-  ut_ad(dict_sys.locked());
   dberr_t err;
   char *tablename= NULL;
-  bool locked_dictionary= false;
   mem_heap_t *heap= NULL;
   ut_ad(!table->fts);
   ut_ad(!table->is_temporary());
@@ -19710,6 +19707,10 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
   no deadlocks can occur then in these operations */
 
   trx->op_info= "dropping table";
+
+  ut_ad (!trx->dict_operation_lock_mode);
+  row_mysql_lock_data_dictionary(trx);
+  ut_ad(dict_sys.locked());
 
   /* This function is called recursively via fts_drop_tables(). */
   if (!trx_is_started(trx))
@@ -19726,28 +19727,6 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
     // FIXME: is it needed? SYS_FOREIGN should not be in stats
     dict_stats_recalc_pool_del(table->id, false);
   }
-
-  // FIXME: remove
-//   /* Check if the table is referenced by foreign key constraints from
-//   some other table (not the table itself) */
-//
-//   if (table->get_ref_count() > 0 || lock_table_has_locks(table))
-//   {
-//     // FIXME: implement like in ha_innobase::truncate()
-//     dberr_t error= DB_SUCCESS;
-//     mem_heap_t *heap= mem_heap_create(1024); // FIXME: pass heap?
-//     const char *temp_name=
-//       dict_mem_create_temporary_tablename(heap, table->name.m_name, table->id);
-//
-//     if (error == DB_SUCCESS)
-//     {
-//       error= innobase_rename_table(trx, table->name.m_name, temp_name, false);
-//       if (error == DB_SUCCESS)
-//         error= trx->drop_table(*table);
-//     }
-//     mem_heap_free(heap);
-//     return DB_SUCCESS;
-//   }
 
   /* Mark all indexes unavailable in the data dictionary cache
   before starting to drop the table. */
@@ -19878,16 +19857,9 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
   if (heap)
     mem_heap_free(heap);
 
-  if (locked_dictionary)
-  {
-    if (trx_is_started(trx))
-    {
-      trx_commit_for_mysql(trx);
-    }
-
-    row_mysql_unlock_data_dictionary(trx);
-  }
-
+  if (trx_is_started(trx))
+    trx_commit_for_mysql(trx);
+  row_mysql_unlock_data_dictionary(trx);
   trx->op_info= "";
   return err;
 }
@@ -21712,8 +21684,6 @@ static ibool pars_get_true(void *row
 dberr_t fk_cleanup_legacy_storage(trx_t *trx)
 {
   ut_ad(!dict_sys.locked());
-  row_mysql_lock_data_dictionary(trx);
-
   ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
   bool sys_foreign_empty;
   bool sys_forcols_empty;
@@ -21722,11 +21692,9 @@ dberr_t fk_cleanup_legacy_storage(trx_t *trx)
   sys_forcols_empty= innobase_table_is_empty(dict_sys.sys_foreign_cols);
 
   bool check_foreigns= trx->check_foreigns;
-  bool dict_operation_lock_mode= trx->dict_operation_lock_mode;
   if (sys_foreign_empty)
   {
     trx->check_foreigns= false;
-    trx->dict_operation_lock_mode= true;
     err= fk_drop_legacy_table(dict_sys.sys_foreign, trx);
     if (err != DB_SUCCESS)
       goto error;
@@ -21735,16 +21703,12 @@ dberr_t fk_cleanup_legacy_storage(trx_t *trx)
   if (sys_forcols_empty)
   {
     trx->check_foreigns= false;
-    trx->dict_operation_lock_mode= true;
     err= fk_drop_legacy_table(dict_sys.sys_foreign_cols, trx);
     dict_sys.sys_foreign_cols= NULL;
   }
 
 error:
   trx->check_foreigns= check_foreigns;
-  trx->dict_operation_lock_mode= dict_operation_lock_mode;
-  trx->was_dict_operation= true;
-  dict_sys.unlock();
   return err;
 }
 

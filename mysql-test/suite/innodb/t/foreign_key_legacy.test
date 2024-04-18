@@ -58,6 +58,7 @@ set session debug_dbug= @saved_debug_dbug;
 drop table t1;
 drop tables t2, t1;
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -86,6 +87,7 @@ check table D1.t1, D2.t2;
 drop database D2;
 --replace_result d1 D1 d2 D2
 check table D1.t1, D2.t2;
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -171,6 +173,7 @@ select * from information_schema.innodb_sys_foreign_cols;
 show create table t2;
 --enable_warnings
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -199,6 +202,7 @@ select * from information_schema.innodb_sys_foreign_cols;
 show create table t3;
 --enable_warnings
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -231,6 +235,7 @@ select * from information_schema.innodb_sys_foreign_cols;
 show create table t2;
 --enable_warnings
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -250,6 +255,7 @@ set session debug_dbug= @saved_debug_dbug;
 
 alter table t2 rename t3;
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -282,6 +288,7 @@ select * from information_schema.innodb_sys_foreign_cols;
 --disable_warnings
 show create table t2;
 --enable_warnings
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -303,6 +310,7 @@ set session debug_dbug= @saved_debug_dbug;
 alter table t2 change y z int, algorithm=copy;
 alter table t2 change y z int, algorithm=inplace;
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -338,6 +346,7 @@ select * from information_schema.innodb_sys_foreign_cols;
 show create table t2;
 --enable_warnings
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -361,6 +370,7 @@ set session debug_dbug= @saved_debug_dbug;
 alter table t2 rename column y to z, algorithm=copy;
 alter table t2 rename column y to z, algorithm=inplace;
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -403,6 +413,7 @@ alter table t1 add column s int as (x) stored, algorithm=copy;
 show create table t2;
 show create table t1;
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -425,6 +436,7 @@ set session debug_dbug= @saved_debug_dbug;
 alter table t2 add column z int;
 alter table t2 add column s int as (y) stored, algorithm=copy;
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -459,6 +471,7 @@ alter table t1 drop column x, algorithm=inplace;
 --error ER_FK_NO_INDEX_CHILD
 alter table t2 drop column y;
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -510,6 +523,7 @@ reap;
 --disconnect con2
 --disconnect con3
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -552,6 +566,7 @@ set global alter_algorithm=@saved_alter_algorithm;
 --file_exists $MYSQLD_DATADIR/mariadb_upgrade_info
 --remove_file $MYSQLD_DATADIR/mariadb_upgrade_info
 
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -587,6 +602,7 @@ INSERT INTO SYS_FOREIGN_COLS VALUES ('test/t2_ibfk_1', 0, 'x', 'x');";
 set session debug_dbug= @saved_debug_dbug;
 --error ER_NO_REFERENCED_ROW_2
 insert t2 values (1);
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -601,6 +617,7 @@ set session debug_dbug= @saved_debug_dbug;
 alter table t1 rename column x to y, algorithm=inplace;
 alter table t2 rename column x to y, algorithm=inplace;
 show create table t2;
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -628,6 +645,7 @@ set session debug_dbug= @saved_debug_dbug;
 alter table t1 rename column x to y, algorithm=inplace;
 alter table t2 rename column x to y, algorithm=inplace;
 --sync_slave_with_master
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
@@ -659,12 +677,14 @@ set session debug_dbug= @saved_debug_dbug;
 --connection master
 alter table t1 rename column x to y, algorithm=inplace;
 alter table t2 rename column x to y, algorithm=inplace;
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign_cols;
 show create table t2;
 --sync_slave_with_master
+--source include/wait_all_purged.inc
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
