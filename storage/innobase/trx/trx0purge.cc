@@ -1529,14 +1529,13 @@ TRANSACTIONAL_TARGET ulint trx_purge(ulint n_tasks, ulint history_size)
         if (trx && trx->state == TRX_STATE_ACTIVE)
         {
           dict_sys.fk_lock();
-          trx->dict_operation= true;
           dberr_t err= fk_cleanup_legacy_storage(trx);
-          trx->dict_operation= false;
           dict_sys.fk_unlock();
           if (err != DB_SUCCESS)
             return err;
+
           if (trx_is_started(trx))
-            trx->commit();
+            trx_commit_for_mysql(trx);
         }
 
 	purge_sys.batch_cleanup(head);

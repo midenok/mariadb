@@ -19713,8 +19713,7 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
   ut_ad(dict_sys.locked());
 
   /* This function is called recursively via fts_drop_tables(). */
-  if (!trx_is_started(trx))
-    trx_start_for_ddl(trx);
+  ut_ad(trx_is_started(trx));
 
   if (!table->no_rollback())
   {
@@ -19855,9 +19854,8 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
   if (heap)
     mem_heap_free(heap);
 
-  if (trx_is_started(trx))
-    trx_commit_for_mysql(trx);
-  row_mysql_unlock_data_dictionary(trx);
+  trx->dict_operation_lock_mode = false;
+  dict_sys.unlock();
   trx->op_info= "";
   return err;
 }
@@ -21693,6 +21691,7 @@ dberr_t fk_cleanup_legacy_storage(trx_t *trx)
   if (sys_foreign_empty)
   {
     trx->check_foreigns= false;
+    trx->dict_operation= true;
     err= fk_drop_legacy_table(dict_sys.sys_foreign, trx);
     if (err != DB_SUCCESS)
       goto error;
@@ -21701,6 +21700,7 @@ dberr_t fk_cleanup_legacy_storage(trx_t *trx)
   if (sys_forcols_empty)
   {
     trx->check_foreigns= false;
+    trx->dict_operation= true;
     err= fk_drop_legacy_table(dict_sys.sys_foreign_cols, trx);
     dict_sys.sys_foreign_cols= NULL;
   }
