@@ -1152,8 +1152,25 @@ static dict_table_t *trx_purge_table_acquire(dict_table_t *table,
   {
     if (table == dict_sys.sys_foreign || table == dict_sys.sys_foreign_cols)
     {
+      /*
+        Lock legacy table for the case upgrade logic wants to drop it.
+        Otherwise drop will fail as long as table is acquired here.
+      */
       trx_t *trx= check_trx_exists(thd);
       trx_start_if_not_started(trx, false);
+      /* Always lock in same order to avoid deadlocks: sys_foreign first
+         (required by lock_sys_tables()) */
+      const bool sys_foreign_locked= trx_has_lock_x(*trx, *dict_sys.sys_foreign);
+      if (table == dict_sys.sys_foreign_cols && !sys_foreign_locked)
+      {
+        if (DB_SUCCESS != lock_table_for_trx(dict_sys.sys_foreign, trx, LOCK_X))
+          goto must_wait;
+      }
+      if (table == dict_sys.sys_foreign_cols || !sys_foreign_locked)
+      {
+        if (DB_SUCCESS != lock_table_for_trx(table, trx, LOCK_X))
+          goto must_wait;
+      }
     }
     return table; /* InnoDB system tables are not covered by MDL */
   }

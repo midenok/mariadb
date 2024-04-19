@@ -19752,10 +19752,8 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
     index->lock.x_unlock();
   }
 
-  err= lock_table_for_trx(table, trx, LOCK_X);
-
-  if (err == DB_SUCCESS)
-    err= trx->drop_table(*table);
+  ut_ad(trx_has_lock_x(*trx, *table));
+  err= trx->drop_table(*table);
 
   switch (err)
   {
