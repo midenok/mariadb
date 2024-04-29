@@ -1161,14 +1161,14 @@ static dict_table_t *trx_purge_table_acquire(dict_table_t *table,
       /* Always lock in same order to avoid deadlocks: sys_foreign first
          (required by lock_sys_tables()) */
       const bool sys_foreign_locked= trx_has_lock_x(*trx, *dict_sys.sys_foreign);
-      if (table == dict_sys.sys_foreign_cols && !sys_foreign_locked)
+      if (!sys_foreign_locked)
       {
-        if (DB_SUCCESS != lock_table_for_trx(dict_sys.sys_foreign, trx, LOCK_X))
+        dict_sys.fk_lock();
+        if (dict_sys.sys_foreign &&
+            (DB_SUCCESS != lock_table_for_trx(dict_sys.sys_foreign, trx, LOCK_X)))
           goto must_wait;
-      }
-      if (table == dict_sys.sys_foreign_cols || !sys_foreign_locked)
-      {
-        if (DB_SUCCESS != lock_table_for_trx(table, trx, LOCK_X))
+        if (dict_sys.sys_foreign_cols &&
+            (DB_SUCCESS != lock_table_for_trx(dict_sys.sys_foreign_cols, trx, LOCK_X)))
           goto must_wait;
       }
     }
@@ -1258,7 +1258,10 @@ dict_table_t *purge_sys_t::close_and_reopen(table_id_t id, THD *thd,
 
   trx_t *trx= thd_to_trx(thd);
   if (trx && trx->state == TRX_STATE_ACTIVE)
+  {
     trx->commit(); /* For trx->release_locks() */
+    dict_sys.fk_unlock();
+  }
 
   m_active= false;
   wait_FTS(false);
@@ -1528,14 +1531,17 @@ TRANSACTIONAL_TARGET ulint trx_purge(ulint n_tasks, ulint history_size)
 	trx_t *trx= thd_to_trx(thd);
         if (trx && trx->state == TRX_STATE_ACTIVE)
         {
-          dict_sys.fk_lock();
+          row_mysql_lock_data_dictionary(trx);
+//           if (trx_is_started(trx))
+//             trx_commit_for_mysql(trx);
           dberr_t err= fk_cleanup_legacy_storage(trx);
+          if (trx_is_started(trx))
+            trx_commit_for_mysql(trx);
+          trx->dict_operation_lock_mode = false;
+          dict_sys.unlock();
           dict_sys.fk_unlock();
           if (err != DB_SUCCESS)
             return err;
-
-          if (trx_is_started(trx))
-            trx_commit_for_mysql(trx);
         }
 
 	purge_sys.batch_cleanup(head);

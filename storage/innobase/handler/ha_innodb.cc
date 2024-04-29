@@ -19598,10 +19598,11 @@ static int innodb_eval_sql_validate(THD *thd, st_mysql_sys_var*,
 	   like lock->trx->dict_operation */
 	dberr_t err = DB_SUCCESS;
 	uint retries = 10;
-	// FIXME: test
 	DBUG_EXECUTE_IF("fk_create_legacy_storage",
+			dict_sys.fk_lock();
 			err = dict_sys.create_or_check_sys_tables(true););
 	if (err != DB_SUCCESS) {
+		DBUG_EXECUTE_IF("fk_create_legacy_storage", dict_sys.fk_unlock(););
 		return 1;
 	}
 
@@ -19624,6 +19625,7 @@ static int innodb_eval_sql_validate(THD *thd, st_mysql_sys_var*,
 		trx = trx_create();
 		if (!trx) {
 			my_error(ER_OUT_OF_RESOURCES, MYF(0));
+			DBUG_EXECUTE_IF("fk_create_legacy_storage", dict_sys.fk_unlock(););
 			return 1;
 		}
 		free_trx = true;
@@ -19635,6 +19637,7 @@ mem_err:
 		trx->error_state = DB_SUCCESS;
 		trx->free();
 		my_error(ER_OUT_OF_RESOURCES, MYF(0));
+		DBUG_EXECUTE_IF("fk_create_legacy_storage", dict_sys.fk_unlock(););
 		return 1;
 	}
 	str = ut_str3cat(sql_begin, sql, sql_end);
@@ -19650,6 +19653,7 @@ retry:
 	dict_sys.lock(SRW_LOCK_CALL);
 	err	   	       = que_eval_sql(info, str, trx);
 	dict_sys.unlock();
+	DBUG_EXECUTE_IF("fk_create_legacy_storage", dict_sys.fk_unlock(););
 	if (err != DB_SUCCESS) {
 		trx->op_info = "Rollback of internal trx on innodb_eval_sql";
 		trx->dict_operation_lock_mode = RW_X_LATCH;
@@ -19708,12 +19712,12 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
 
   trx->op_info= "dropping table";
 
-  ut_ad (!trx->dict_operation_lock_mode);
-  row_mysql_lock_data_dictionary(trx);
+  ut_ad (trx->dict_operation_lock_mode);
   ut_ad(dict_sys.locked());
 
-  /* This function is called recursively via fts_drop_tables(). */
   ut_ad(trx_is_started(trx));
+//   if (!trx_is_started(trx))
+//     trx_start_for_ddl(trx);
 
   if (!table->no_rollback())
   {
@@ -19752,6 +19756,12 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
   }
 
   ut_ad(trx_has_lock_x(*trx, *table));
+  for (lock_t *lock= UT_LIST_GET_FIRST(table->locks); lock;
+       lock= UT_LIST_GET_NEXT(un_member.tab_lock.locks, lock))
+  {
+    if (lock->trx != trx)
+      lock_sys_t::cancel_lock_wait_for_trx(lock->trx);
+  }
   err= trx->drop_table(*table);
 
   switch (err)
@@ -19780,6 +19790,7 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
     }
 
     trx->mod_tables.erase(table);
+    /* frees table object */
     dict_sys.remove(table);
 
     /* Do not attempt to drop known-to-be-missing tablespaces,
@@ -19854,8 +19865,6 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
   if (heap)
     mem_heap_free(heap);
 
-  trx->dict_operation_lock_mode = false;
-  dict_sys.unlock();
   trx->op_info= "";
   return err;
 }
@@ -21679,7 +21688,7 @@ static ibool pars_get_true(void *row
 /** Drop SYS_FOREIGN[_COLS] tables if they are empty */
 dberr_t fk_cleanup_legacy_storage(trx_t *trx)
 {
-  ut_ad(!dict_sys.locked());
+  ut_ad(dict_sys.locked());
   ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
   bool sys_foreign_empty;
   bool sys_forcols_empty;

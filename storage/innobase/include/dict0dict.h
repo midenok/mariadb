@@ -1550,6 +1550,8 @@ public:
 
   void fk_lock()
   {
+    /* fk_lock() must be taken before lock() to avoid order deadlocks */
+    ut_ad(!locked());
     fk_upgrade_lock.wr_lock();
   }
   void fk_unlock()

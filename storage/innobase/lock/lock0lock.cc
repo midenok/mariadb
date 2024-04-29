@@ -3994,6 +3994,14 @@ run_again:
 @retval DB_SUCCESS on success */
 dberr_t lock_sys_tables(trx_t *trx)
 {
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
+  bool fk_locked= false;
+  if (dict_sys.sys_foreign || dict_sys.sys_foreign_cols)
+  {
+    dict_sys.fk_lock();
+    fk_locked= true;
+  }
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
   dberr_t err;
   if (!(err= lock_table_for_trx(dict_sys.sys_tables, trx, LOCK_X)) &&
       !(err= lock_table_for_trx(dict_sys.sys_columns, trx, LOCK_X)) &&
@@ -4005,6 +4013,8 @@ dberr_t lock_sys_tables(trx_t *trx)
       err= lock_table_for_trx(dict_sys.sys_foreign, trx, LOCK_X);
     if (!err && dict_sys.sys_foreign_cols)
       err= lock_table_for_trx(dict_sys.sys_foreign_cols, trx, LOCK_X);
+    if (fk_locked)
+      dict_sys.fk_unlock();
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
     if (!err && dict_sys.sys_virtual)
       err= lock_table_for_trx(dict_sys.sys_virtual, trx, LOCK_X);
