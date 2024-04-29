@@ -14327,6 +14327,10 @@ ha_innobase::rename_table(
 	}
 
 	if (error == DB_SUCCESS) {
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
+		if (dict_sys.sys_foreign)
+			dict_sys.fk_lock();
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
 		error = lock_table_for_trx(dict_sys.sys_tables, trx, LOCK_X);
 #ifdef WITH_INNODB_FOREIGN_UPGRADE
 		if (error == DB_SUCCESS && dict_sys.sys_foreign) {
@@ -14338,6 +14342,8 @@ ha_innobase::rename_table(
 					trx, LOCK_X);
 			}
 		}
+		if (dict_sys.sys_foreign)
+			dict_sys.fk_unlock();
 #endif /* WITH_INNODB_FOREIGN_UPGRADE */
 	}
 
@@ -19716,8 +19722,6 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
   ut_ad(dict_sys.locked());
 
   ut_ad(trx_is_started(trx));
-//   if (!trx_is_started(trx))
-//     trx_start_for_ddl(trx);
 
   if (!table->no_rollback())
   {
@@ -19790,8 +19794,6 @@ dberr_t fk_drop_legacy_table(dict_table_t *table, trx_t *trx)
     }
 
     trx->mod_tables.erase(table);
-    /* frees table object */
-    dict_sys.remove(table);
 
     /* Do not attempt to drop known-to-be-missing tablespaces,
     nor the system tablespace. */
@@ -21695,13 +21697,14 @@ dberr_t fk_cleanup_legacy_storage(trx_t *trx)
   dberr_t err= DB_SUCCESS;
   sys_foreign_empty= innobase_table_is_empty(dict_sys.sys_foreign);
   sys_forcols_empty= innobase_table_is_empty(dict_sys.sys_foreign_cols);
-
+  dict_table_t *sys_foreign= dict_sys.sys_foreign;
+  dict_table_t *sys_forcols= dict_sys.sys_foreign_cols;
   bool check_foreigns= trx->check_foreigns;
   if (sys_foreign_empty)
   {
     trx->check_foreigns= false;
     trx->dict_operation= true;
-    err= fk_drop_legacy_table(dict_sys.sys_foreign, trx);
+    err= fk_drop_legacy_table(sys_foreign, trx);
     if (err != DB_SUCCESS)
       goto error;
     dict_sys.sys_foreign= NULL;
@@ -21710,11 +21713,18 @@ dberr_t fk_cleanup_legacy_storage(trx_t *trx)
   {
     trx->check_foreigns= false;
     trx->dict_operation= true;
-    err= fk_drop_legacy_table(dict_sys.sys_foreign_cols, trx);
+    err= fk_drop_legacy_table(sys_forcols, trx);
     dict_sys.sys_foreign_cols= NULL;
   }
+  ut_ad(trx_is_started(trx));
+  trx_commit_for_mysql(trx);
+  if (sys_foreign && !dict_sys.sys_foreign)
+    dict_sys.remove(sys_foreign); /* frees table object */
+  if (sys_forcols && !dict_sys.sys_foreign_cols)
+    dict_sys.remove(sys_forcols); /* frees table object */
 
 error:
+  trx->rollback();
   trx->check_foreigns= check_foreigns;
   return err;
 }
