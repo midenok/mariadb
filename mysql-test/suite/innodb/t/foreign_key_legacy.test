@@ -64,18 +64,26 @@ select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign_cols;
 
---echo # DROP DATABASE
+--echo # DROP DATABASE (convert first)
 create database D1;
 create database D2;
 create or replace table D1.t1(x int primary key);
 set session debug_dbug= "+d,fk_skip_store";
-create or replace table D2.t2(y int references D1.t1(x));
+create or replace table D2.t2(y int references D1.t1(x), x int primary key);
+create or replace table D2.t4(x int primary key);
+create or replace table D2.t3(y int references D2.t2(x), z int references D2.t4(x));
 set session debug_dbug= @saved_debug_dbug;
 
 set session debug_dbug= "+d,fk_create_legacy_storage";
+# FK id must be lowercase as this is the format of SYS_FOREIGN
+# Procedure DROP_DATABASE_PROC relies on that
 set global innodb_eval_sql="BEGIN
-INSERT INTO SYS_FOREIGN VALUES ('D2/t2_ibfk_1', 'D2/t2', 'D1/t1', 1);
-INSERT INTO SYS_FOREIGN_COLS VALUES ('D2/t2_ibfk_1', 0, 'y', 'x');";
+INSERT INTO SYS_FOREIGN VALUES ('d2/t2_ibfk_1', 'd2/t2', 'd1/t1', 1);
+INSERT INTO SYS_FOREIGN VALUES ('d2/t3_ibfk_1', 'd2/t3', 'd2/t2', 1);
+INSERT INTO SYS_FOREIGN VALUES ('d2/t3_ibfk_2', 'd2/t3', 'd2/t4', 1);
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t2_ibfk_1', 0, 'y', 'x');
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t3_ibfk_1', 0, 'y', 'x');
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t3_ibfk_2', 0, 'z', 'x');";
 set session debug_dbug= @saved_debug_dbug;
 
 --replace_result d1 D1 d2 D2
@@ -93,6 +101,37 @@ select * from information_schema.innodb_sys_foreign;
 --error ER_BAD_TABLE_ERROR
 select * from information_schema.innodb_sys_foreign_cols;
 drop database D1;
+
+--echo # DROP DATABASE (no conversion)
+create database D1;
+create database D2;
+create or replace table D1.t1(x int primary key);
+set session debug_dbug= "+d,fk_skip_store";
+create or replace table D2.t2(y int references D1.t1(x), x int primary key);
+create or replace table D2.t4(x int primary key);
+create or replace table D2.t3(y int references D2.t2(x), z int references D2.t4(x));
+set session debug_dbug= @saved_debug_dbug;
+
+set session debug_dbug= "+d,fk_create_legacy_storage";
+set global innodb_eval_sql="BEGIN
+INSERT INTO SYS_FOREIGN VALUES ('d2/t2_ibfk_1', 'd2/t2', 'd1/t1', 1);
+INSERT INTO SYS_FOREIGN VALUES ('d2/t3_ibfk_1', 'd2/t3', 'd2/t2', 1);
+INSERT INTO SYS_FOREIGN VALUES ('d2/t3_ibfk_2', 'd2/t3', 'd2/t4', 1);
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t2_ibfk_1', 0, 'y', 'x');
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t3_ibfk_1', 0, 'y', 'x');
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t3_ibfk_2', 0, 'z', 'x');";
+set session debug_dbug= @saved_debug_dbug;
+
+--error ER_ROW_IS_REFERENCED_2
+drop database D1;
+drop database D2;
+--source include/wait_all_purged.inc
+--error ER_BAD_TABLE_ERROR
+select * from information_schema.innodb_sys_foreign;
+--error ER_BAD_TABLE_ERROR
+select * from information_schema.innodb_sys_foreign_cols;
+drop database D1;
+
 
 --echo # Index errors
 create or replace table t1(x int primary key);

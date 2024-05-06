@@ -58,17 +58,23 @@ select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
 select * from information_schema.innodb_sys_foreign_cols;
 ERROR 42S02: Unknown table 'innodb_sys_foreign_cols'
-# DROP DATABASE
+# DROP DATABASE (convert first)
 create database D1;
 create database D2;
 create or replace table D1.t1(x int primary key);
 set session debug_dbug= "+d,fk_skip_store";
-create or replace table D2.t2(y int references D1.t1(x));
+create or replace table D2.t2(y int references D1.t1(x), x int primary key);
+create or replace table D2.t4(x int primary key);
+create or replace table D2.t3(y int references D2.t2(x), z int references D2.t4(x));
 set session debug_dbug= @saved_debug_dbug;
 set session debug_dbug= "+d,fk_create_legacy_storage";
 set global innodb_eval_sql="BEGIN
-INSERT INTO SYS_FOREIGN VALUES ('D2/t2_ibfk_1', 'D2/t2', 'D1/t1', 1);
-INSERT INTO SYS_FOREIGN_COLS VALUES ('D2/t2_ibfk_1', 0, 'y', 'x');";
+INSERT INTO SYS_FOREIGN VALUES ('d2/t2_ibfk_1', 'd2/t2', 'd1/t1', 1);
+INSERT INTO SYS_FOREIGN VALUES ('d2/t3_ibfk_1', 'd2/t3', 'd2/t2', 1);
+INSERT INTO SYS_FOREIGN VALUES ('d2/t3_ibfk_2', 'd2/t3', 'd2/t4', 1);
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t2_ibfk_1', 0, 'y', 'x');
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t3_ibfk_1', 0, 'y', 'x');
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t3_ibfk_2', 0, 'z', 'x');";
 set session debug_dbug= @saved_debug_dbug;
 check table D1.t1, D2.t2;
 Table	Op	Msg_type	Msg_text
@@ -76,7 +82,7 @@ D1.t1	check	status	OK
 D2.t2	check	Note	Found 1 foreign keys
 D2.t2	check	status	OK
 drop database D1;
-ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails (D2_t2_ibfk_1)
+ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails (d2_t2_ibfk_1)
 check table D1.t1, D2.t2;
 Table	Op	Msg_type	Msg_text
 D1.t1	check	Note	Found 1 referenced keys
@@ -89,6 +95,33 @@ Table	Op	Msg_type	Msg_text
 D1.t1	check	status	OK
 D2.t2	check	Error	Table 'D2.t2' doesn't exist
 D2.t2	check	status	Operation failed
+InnoDB		0 transactions not purged
+select * from information_schema.innodb_sys_foreign;
+ERROR 42S02: Unknown table 'innodb_sys_foreign'
+select * from information_schema.innodb_sys_foreign_cols;
+ERROR 42S02: Unknown table 'innodb_sys_foreign_cols'
+drop database D1;
+# DROP DATABASE (no conversion)
+create database D1;
+create database D2;
+create or replace table D1.t1(x int primary key);
+set session debug_dbug= "+d,fk_skip_store";
+create or replace table D2.t2(y int references D1.t1(x), x int primary key);
+create or replace table D2.t4(x int primary key);
+create or replace table D2.t3(y int references D2.t2(x), z int references D2.t4(x));
+set session debug_dbug= @saved_debug_dbug;
+set session debug_dbug= "+d,fk_create_legacy_storage";
+set global innodb_eval_sql="BEGIN
+INSERT INTO SYS_FOREIGN VALUES ('d2/t2_ibfk_1', 'd2/t2', 'd1/t1', 1);
+INSERT INTO SYS_FOREIGN VALUES ('d2/t3_ibfk_1', 'd2/t3', 'd2/t2', 1);
+INSERT INTO SYS_FOREIGN VALUES ('d2/t3_ibfk_2', 'd2/t3', 'd2/t4', 1);
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t2_ibfk_1', 0, 'y', 'x');
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t3_ibfk_1', 0, 'y', 'x');
+INSERT INTO SYS_FOREIGN_COLS VALUES ('d2/t3_ibfk_2', 0, 'z', 'x');";
+set session debug_dbug= @saved_debug_dbug;
+drop database D1;
+ERROR 23000: Cannot delete or update a parent row: a foreign key constraint fails
+drop database D2;
 InnoDB		0 transactions not purged
 select * from information_schema.innodb_sys_foreign;
 ERROR 42S02: Unknown table 'innodb_sys_foreign'
