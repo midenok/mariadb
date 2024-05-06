@@ -21744,30 +21744,6 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
 
   ut_ad(DB_SUCCESS == fk_legacy_storage_exists());
 
-  /* FIXME: rewrite
-    Purge system:
-
-    1. Freezes dict_sys;
-    2. Acquires table;
-    3a. Locks legacy SYS_FOREIGN table or
-    3b. MDL-locks user table + delay;
-    4. Unfreezes dict_sys;
-    5. Locks dict_sys (for close table);
-    6. Releases table (closes table);
-    7. Unlocks dict_sys;
-    8. Unlocks logacy SYS_FOREIGN table.
-
-    To avoid dropping acquired SYS_FOREIGN table we keep lock 3. until the table is
-    released in 6. If MDL-lock fails it goes the same way through 4.-8. and
-    repeats again from 1. But MDL may attempt to lock the same table this thread
-    locked, so it will cause timeout delay at 3b. The delay means dict_sys
-    is frozen for the same period of time and that may cause
-    fk_upgrade_legacy_storage() to fail. To avoid that we lock dict_sys for the
-    whole period of fk_upgrade_legacy_storage(): when we enter
-    fk_upgrade_legacy_storage() we are at 6. in purge system so we will soon
-    release SYS_FOREIGN table. At 6. we are ready to drop SYS_FOREIGN table.
-  */
-
   info= pars_info_create();
   if (!info)
     return DB_OUT_OF_MEMORY;
