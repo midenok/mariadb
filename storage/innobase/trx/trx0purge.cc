@@ -1163,7 +1163,9 @@ static dict_table_t *trx_purge_table_acquire(dict_table_t *table,
       const bool sys_foreign_locked= trx_has_lock_x(*trx, *dict_sys.sys_foreign);
       if (!sys_foreign_locked)
       {
+        dict_sys.unfreeze();
         dict_sys.fk_lock();
+        dict_sys.freeze(SRW_LOCK_CALL);
         if (dict_sys.sys_foreign &&
             (DB_SUCCESS != lock_table_for_trx(dict_sys.sys_foreign, trx, LOCK_X)))
           goto must_wait;

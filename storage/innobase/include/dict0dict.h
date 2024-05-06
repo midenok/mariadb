@@ -1550,8 +1550,9 @@ public:
 
   void fk_lock()
   {
-    /* fk_lock() must be taken before lock() to avoid order deadlocks */
+    /* fk_lock() must be taken before lock() or freeze() to avoid order deadlocks */
     ut_ad(!locked());
+    /* It must not be frozen by this thread as well (frozen() cannot check it) */
     fk_upgrade_lock.wr_lock();
   }
   void fk_unlock()
