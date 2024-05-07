@@ -19662,7 +19662,7 @@ retry:
 	DBUG_EXECUTE_IF("fk_create_legacy_storage", dict_sys.fk_unlock(););
 	if (err != DB_SUCCESS) {
 		trx->op_info = "Rollback of internal trx on innodb_eval_sql";
-		trx->dict_operation_lock_mode = RW_X_LATCH;
+		trx->dict_operation_lock_mode = true;
 		dict_sys.lock(SRW_LOCK_CALL);
 		trx->rollback();
 		dict_sys.unlock();
@@ -21913,7 +21913,6 @@ static dberr_t fk_check_legacy_storage(const char *table_name, trx_t *trx)
 {
   pars_info_t *info;
   bool do_upgrade= false;
-  const bool do_lock= !dict_sys.locked();
 
   dberr_t err= fk_legacy_storage_exists();
   if (err == DB_TABLE_NOT_FOUND)
@@ -21940,11 +21939,9 @@ static dberr_t fk_check_legacy_storage(const char *table_name, trx_t *trx)
                            "CLOSE c;\n"
                            "END;\n";
 
-  if (do_lock)
-    dict_sys.lock(SRW_LOCK_CALL);
+  dict_sys.lock(SRW_LOCK_CALL);
   err= que_eval_sql(info, sql, trx);
-  if (do_lock)
-    dict_sys.unlock();
+  dict_sys.unlock();
   if (err == DB_SUCCESS && do_upgrade)
     err= DB_LEGACY_FK;
 
