@@ -69,11 +69,12 @@ drop table t1;
 # create table with foreign key reference and rm frm
 CREATE TABLE parent (id INT NOT NULL, PRIMARY KEY (id)) ENGINE=INNODB;
 CREATE TABLE child (id INT, parent_id INT, INDEX par_ind (parent_id), FOREIGN KEY (parent_id) REFERENCES parent(id) ON DELETE CASCADE) ENGINE=INNODB;
---remove_file $DATADIR/test/parent.frm
+# --remove_file $DATADIR/test/parent.frm
 
 # parent can not be dropped when there are foreign key references
 --error ER_ROW_IS_REFERENCED_2
 drop table parent;
+--exit
 
 # parent can be dropped when there are no foreign key references
 drop table child;
