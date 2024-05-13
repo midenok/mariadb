@@ -701,6 +701,8 @@ bool Sql_cmd_alter_table::execute(THD *thd)
 #endif
 
   Recreate_info recreate_info;
+  TABLE_LIST save;
+  memcpy(&save, first_table, sizeof(save));
   result= mysql_alter_table(thd, &select_lex->db, &lex->name,
                             &create_info,
                             first_table,
@@ -709,6 +711,8 @@ bool Sql_cmd_alter_table::execute(THD *thd)
                             select_lex->order_list.elements,
                             select_lex->order_list.first,
                             lex->ignore, lex->if_exists());
+
+  memcpy(first_table, &save, sizeof(save));
 
   DBUG_RETURN(result);
 }

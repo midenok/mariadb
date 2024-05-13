@@ -3443,8 +3443,8 @@ bool run_set_statement_if_requested(THD *thd, LEX *lex)
     TRUE        Error
 */
 
-int
-mysql_execute_command(THD *thd, bool is_called_from_prepared_stmt)
+static int
+mysql_execute_command2(THD *thd, bool is_called_from_prepared_stmt)
 {
   int res= 0;
   LEX  *lex= thd->lex;
@@ -5996,7 +5996,25 @@ finish:
   if (lex->sql_command != SQLCOM_SET_OPTION)
     DEBUG_SYNC(thd, "end_of_statement");
   DBUG_RETURN(res || thd->is_error());
- }
+}
+
+int
+mysql_execute_command(THD *thd, bool is_called_from_prepared_stmt)
+{
+  int error;
+  while (true)
+  {
+    error= mysql_execute_command2(thd, is_called_from_prepared_stmt);
+    if (!error || !thd->is_error() || thd->killed ||
+        thd->get_stmt_da()->sql_errno() != ER_LOCK_DEADLOCK)
+    {
+      break;
+    }
+    thd->clear_error(1);
+    thd->error_printed_to_log= 0;
+  }
+  return error;
+}
 
 static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
 {

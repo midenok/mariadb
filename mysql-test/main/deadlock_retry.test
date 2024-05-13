@@ -1,0 +1,32 @@
+
+create or replace table t1 (id int primary key, x int);
+create or replace table t2 (id int primary key, y int references t1 (id));
+alter table t1 add foreign key (x) references t2 (id);
+
+delimiter ~~;
+create or replace procedure run_alters(t varchar(255), n int unsigned)
+begin
+    declare yt varchar(255) default concat('y', t);
+    declare i int unsigned;
+    prepare alter1 from concat('alter table ', t, ' rename to ', yt);
+    prepare alter2 from concat('alter table ', yt, ' rename to ', t);
+    for i in 1..n do
+        execute alter1;
+        execute alter2;
+    end for;
+    drop prepare alter1;
+    drop prepare alter2;
+end~~
+delimiter ;~~
+
+--connect (con1,localhost,root,,)
+send call run_alters('t1', 3000);
+--connection default
+call run_alters('t2', 3000);
+
+--connection con1
+reap;
+--disconnect con1
+--connection default
+drop tables t1, t2;
+drop procedure run_alters;
