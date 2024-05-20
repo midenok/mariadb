@@ -1157,6 +1157,9 @@ btr_create(
 	}
 
 	/* Set the index id of the page */
+	DBUG_EXECUTE_IF(
+		"page_create_corrupted",
+		index_id++;);
 	btr_page_set_index_id(page, page_zip, index_id, mtr);
 
 	/* Set the next node and previous node fields */

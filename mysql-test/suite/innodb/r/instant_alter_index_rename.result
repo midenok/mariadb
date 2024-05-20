@@ -113,7 +113,7 @@ SET @save_dbug = @@SESSION.debug_dbug;
 SET debug_dbug = '+d,dict_set_index_corrupted';
 check table corrupted;
 Table	Op	Msg_type	Msg_text
-test.corrupted	check	Warning	InnoDB: Index a_key is marked as corrupted
+test.corrupted	check	Warning	InnoDB: Index a_key is corrupted
 test.corrupted	check	error	Corrupt
 SET debug_dbug = @save_dbug;
 select * from corrupted;

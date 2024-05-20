@@ -2584,6 +2584,10 @@ extern KEY_CREATE_INFO default_key_create_info;
 /* Forward declaration for condition pushdown to storage engine */
 typedef class Item COND;
 
+#define TT_DRY                  8U
+#define TT_RESURRECT            16U
+#define TT_DEFAULT_CHECK_TYPE   32U
+
 typedef struct st_ha_check_opt
 {
   st_ha_check_opt() {}                        /* Remove gcc warning */
@@ -2592,6 +2596,18 @@ typedef struct st_ha_check_opt
   time_t start_time;   /* When check/repair starts */
   KEY_CACHE *key_cache; /* new key cache when changing key cache */
   void init();
+  bool is_dry() const
+  {
+    return sql_flags & TT_DRY;
+  }
+  bool is_resurrect() const
+  {
+    return sql_flags & TT_RESURRECT;
+  }
+  bool can_set_corrupted() const
+  {
+    return !is_dry() && !is_resurrect();
+  }
 } HA_CHECK_OPT;
 
 

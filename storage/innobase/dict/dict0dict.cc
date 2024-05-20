@@ -5208,7 +5208,8 @@ dict_set_corrupted(
 /*===============*/
 	dict_index_t*	index,	/*!< in/out: index */
 	trx_t*		trx,	/*!< in/out: transaction */
-	const char*	ctx)	/*!< in: context */
+	const char*	ctx,	/*!< in: context */
+	bool		corrupted) /* if false set uncorrupted instead */
 {
 	mem_heap_t*	heap;
 	mtr_t		mtr;
@@ -5232,19 +5233,26 @@ dict_set_corrupted(
 	/* Mark the table as corrupted only if the clustered index
 	is corrupted */
 	if (dict_index_is_clust(index)) {
-		index->table->corrupted = TRUE;
+		index->table->corrupted = corrupted;
 	}
 
-	if (index->type & DICT_CORRUPT) {
+	if (corrupted && (index->type & DICT_CORRUPT)) {
 		/* The index was already flagged corrupted. */
 		ut_ad(!dict_index_is_clust(index) || index->table->corrupted);
+		goto func_exit;
+	} else if (!corrupted && !(index->type & DICT_CORRUPT)) {
+		ut_ad(0);
 		goto func_exit;
 	}
 
 	/* If this is read only mode, do not update SYS_INDEXES, just
 	mark it as corrupted in memory */
 	if (high_level_read_only) {
-		index->type |= DICT_CORRUPT;
+		if (corrupted) {
+			index->type |= DICT_CORRUPT;
+		} else {
+			index->type &= ~DICT_CORRUPT;
+		}
 		goto func_exit;
 	}
 
@@ -5252,7 +5260,11 @@ dict_set_corrupted(
 			       + sizeof(que_fork_t) + sizeof(upd_node_t)
 			       + sizeof(upd_t) + 12));
 	mtr_start(&mtr);
-	index->type |= DICT_CORRUPT;
+	if (corrupted) {
+		index->type |= DICT_CORRUPT;
+	} else {
+		index->type &= ~DICT_CORRUPT;
+	}
 
 	sys_index = UT_LIST_GET_FIRST(dict_sys.sys_indexes->indexes);
 
@@ -5286,10 +5298,18 @@ dict_set_corrupted(
 			goto fail;
 		}
 		mlog_write_ulint(field, index->type, MLOG_4BYTES, &mtr);
-		status = "Flagged";
+		if (corrupted) {
+			status = "Flagged";
+		} else {
+			status = "Unflagged";
+		}
 	} else {
 fail:
-		status = "Unable to flag";
+		if (corrupted) {
+			status = "Unable to flag";
+		} else {
+			status = "Unable to unflag";
+		}
 	}
 
 	mtr_commit(&mtr);

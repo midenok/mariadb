@@ -37,7 +37,8 @@
 #define KEY_PARTITIONING_CHANGED_STR "KEY () partitioning changed"
 
 static MYSQL mysql_connection, *sock = 0;
-static my_bool opt_alldbs = 0, opt_check_only_changed = 0, opt_extended = 0,
+static my_bool opt_alldbs = 0, opt_check_only_changed = 0,
+               opt_dry = 0, opt_resurrect = 0, opt_extended = 0,
                opt_compress = 0, opt_databases = 0, opt_fast = 0,
                opt_medium_check = 0, opt_quick = 0, opt_all_in_1 = 0,
                opt_silent = 0, opt_auto_repair = 0, ignore_errors = 0,
@@ -92,6 +93,12 @@ static struct my_option my_long_options[] =
    0, 0, 0, 0},
   {"check-only-changed", 'C',
    "Check only tables that have changed since last check or haven't been closed properly.",
+   0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"check-dry", 'd',
+   "Like --check but do not mark corrupted InnoDB indexes",
+   0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"resurrect", 'R',
+   "Do quick check and unmark corrupted InnoDB indexes",
    0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
   {"check-upgrade", 'g',
    "Check tables for version-dependent changes. May be used with --auto-repair to correct tables requiring version-dependent updates.",
@@ -258,7 +265,7 @@ static void usage(void)
   DBUG_ENTER("usage");
   print_version();
   puts(ORACLE_WELCOME_COPYRIGHT_NOTICE("2000"));
-  puts("This program can be used to CHECK (-c, -m, -C), REPAIR (-r), ANALYZE (-a),");
+  puts("This program can be used to CHECK (-c, -m, -C, -d, -R), REPAIR (-r), ANALYZE (-a),");
   puts("or OPTIMIZE (-o) tables. Some of the options (like -e or -q) can be");
   puts("used at the same time. Not all options are supported by all storage engines.");
   puts("The options -c, -r, -a, and -o are exclusive to each other, which");
@@ -300,6 +307,14 @@ get_one_option(int optid, const struct my_option *opt __attribute__((unused)),
   case 'C':
     what_to_do = DO_CHECK;
     opt_check_only_changed = 1;
+    break;
+  case 'd':
+    what_to_do = DO_CHECK;
+    opt_dry = 1;
+    break;
+  case 'R':
+    what_to_do = DO_CHECK;
+    opt_resurrect = 1;
     break;
   case 'I': /* Fall through */
   case '?':
@@ -895,6 +910,8 @@ static int handle_request_for_tables(char *tables, size_t length,
       if (opt_extended)           end = strmov(end, " EXTENDED");
       if (opt_medium_check)       end = strmov(end, " MEDIUM"); /* Default */
       if (opt_check_only_changed) end = strmov(end, " CHANGED");
+      if (opt_dry)                end = strmov(end, " DRY");
+      if (opt_resurrect)          end = strmov(end, " RESURRECT");
     }
     if (opt_upgrade)            end = strmov(end, " FOR UPGRADE");
     break;

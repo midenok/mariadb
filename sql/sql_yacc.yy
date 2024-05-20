@@ -1276,6 +1276,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %token  <kwd>  DISCARD
 %token  <kwd>  DISK_SYM
 %token  <kwd>  DO_SYM
+%token  <kwd>  DRY_SYM
 %token  <kwd>  DUMPFILE
 %token  <kwd>  DUPLICATE_SYM
 %token  <kwd>  DYNAMIC_SYM                   /* SQL-2003-R */
@@ -1496,6 +1497,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %token  <kwd>  RESOURCES
 %token  <kwd>  RESTORE_SYM
 %token  <kwd>  RESUME_SYM
+%token  <kwd>  RESURRECT_SYM
 %token  <kwd>  RETURNED_SQLSTATE_SYM         /* SQL-2003-N */
 %token  <kwd>  RETURNS_SYM                   /* SQL-2003-R */
 %token  <kwd>  REUSE_SYM                     /* Oracle-R   */
@@ -8996,7 +8998,7 @@ binlog_base64_event:
           ;
 
 check_view_or_table:
-          table_or_tables table_list opt_mi_check_type
+          table_or_tables table_list opt_mi_check_type opt_dry_or_resurrect
         | VIEW_SYM
           { Lex->table_type= TABLE_TYPE_VIEW; }
           table_list opt_view_check_type
@@ -9025,7 +9027,11 @@ check:    CHECK_SYM
         ;
 
 opt_mi_check_type:
-          /* empty */ { Lex->check_opt.flags = T_MEDIUM; }
+          /* empty */
+          {
+            Lex->check_opt.flags|= T_MEDIUM;
+            Lex->check_opt.sql_flags|= TT_DEFAULT_CHECK_TYPE;
+          }
         | mi_check_types {}
         ;
 
@@ -9041,6 +9047,17 @@ mi_check_type:
         | EXTENDED_SYM        { Lex->check_opt.flags|= T_EXTEND; }
         | CHANGED             { Lex->check_opt.flags|= T_CHECK_ONLY_CHANGED; }
         | FOR_SYM UPGRADE_SYM { Lex->check_opt.sql_flags|= TT_FOR_UPGRADE; }
+        ;
+
+opt_dry_or_resurrect:
+          /* empty */ {}
+        | DRY_SYM             { Lex->check_opt.sql_flags|= TT_DRY; }
+        | RESURRECT_SYM
+          {
+            if (Lex->check_opt.sql_flags & TT_DEFAULT_CHECK_TYPE)
+              Lex->check_opt.flags= T_QUICK;
+            Lex->check_opt.sql_flags|= TT_RESURRECT;
+          }
         ;
 
 opt_view_check_type:
@@ -16273,6 +16290,7 @@ keyword_sp_var_and_label:
         | DISABLE_SYM
         | DISCARD
         | DISK_SYM
+        | DRY_SYM
         | DUMPFILE
         | DUPLICATE_SYM
         | DYNAMIC_SYM
@@ -16441,6 +16459,7 @@ keyword_sp_var_and_label:
         | RESOURCES
         | RESTART_SYM
         | RESUME_SYM
+        | RESURRECT_SYM
         | RETURNED_SQLSTATE_SYM
         | RETURNS_SYM
         | REUSE_SYM

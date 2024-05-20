@@ -9533,10 +9533,10 @@ ha_innobase::change_active_index(
 				ut_ad(m_prebuilt->index->table->corrupted);
 				push_warning_printf(
 					m_user_thd, Sql_condition::WARN_LEVEL_WARN,
-					ER_TABLE_CORRUPT,
+					HA_ERR_TABLE_CORRUPT,
 					"InnoDB: Table %s is corrupted.",
 					table_name);
-				DBUG_RETURN(ER_TABLE_CORRUPT);
+				DBUG_RETURN(HA_ERR_TABLE_CORRUPT);
 			} else {
 				push_warning_printf(
 					m_user_thd, Sql_condition::WARN_LEVEL_WARN,
@@ -14780,23 +14780,31 @@ ha_innobase::check(
 		clustered index, we will do so here */
 		index = dict_table_get_first_index(m_prebuilt->table);
 
-		if (!index->is_corrupted()) {
+		if (!index->is_corrupted() && check_opt->can_set_corrupted()) {
 			dict_set_corrupted(
 				index, m_prebuilt->trx, "CHECK TABLE");
+			push_warning_printf(m_user_thd,
+					Sql_condition::WARN_LEVEL_WARN,
+					HA_ERR_INDEX_CORRUPT,
+					"InnoDB: Index %s was marked as"
+					" corrupted",
+					index->name());
+		} else if (!check_opt->is_resurrect()) {
+			push_warning_printf(
+				m_user_thd,
+				Sql_condition::WARN_LEVEL_WARN,
+				HA_ERR_INDEX_CORRUPT,
+				"InnoDB: Table %s is corrupted",
+				table->s->table_name.str);
 		}
-
-		push_warning_printf(m_user_thd,
-				    Sql_condition::WARN_LEVEL_WARN,
-				    HA_ERR_INDEX_CORRUPT,
-				    "InnoDB: Index %s is marked as"
-				    " corrupted",
-				    index->name());
 
 		/* Now that the table is already marked as corrupted,
 		there is no need to check any index of this table */
 		m_prebuilt->trx->op_info = "";
 
-		DBUG_RETURN(HA_ADMIN_CORRUPT);
+		if (!check_opt->is_resurrect()) {
+			DBUG_RETURN(HA_ADMIN_CORRUPT);
+		}
 	}
 
 	old_isolation_level = m_prebuilt->trx->isolation_level;
@@ -14809,7 +14817,7 @@ ha_innobase::check(
 		? TRX_ISO_READ_UNCOMMITTED
 		: TRX_ISO_REPEATABLE_READ;
 
-	ut_ad(!m_prebuilt->table->corrupted);
+	ut_ad(!m_prebuilt->table->corrupted || check_opt->is_resurrect());
 
 	for (index = dict_table_get_first_index(m_prebuilt->table);
 	     index != NULL;
@@ -14846,7 +14854,44 @@ ha_innobase::check(
 						" index %s is corrupted.",
 						index->name());
 				}
+				if (check_opt->can_set_corrupted()) {
+					dict_set_corrupted(
+						index, m_prebuilt->trx, "CHECK TABLE-check index");\
+					push_warning_printf(m_user_thd,
+							Sql_condition::WARN_LEVEL_WARN,
+							HA_ERR_INDEX_CORRUPT,
+							"InnoDB: Index %s was marked as"
+							" corrupted",
+							index->name());
+				}
 
+				continue;
+			}
+		} else if (check_opt->is_resurrect()) {
+			if (index->type & DICT_CORRUPT) {
+				dict_set_corrupted(
+					index, m_prebuilt->trx,
+					"CHECK TABLE; Resurrected", false);
+
+				push_warning_printf(
+					m_user_thd,
+					Sql_condition::WARN_LEVEL_WARN,
+					HA_ERR_INDEX_CORRUPT,
+					"InnoDB: Index %s was marked as"
+					" uncorrupted", index->name());
+
+				if (dict_index_is_clust(index)) {
+					push_warning_printf(
+						m_user_thd,
+						Sql_condition::WARN_LEVEL_WARN,
+						HA_ERR_INDEX_CORRUPT,
+						"InnoDB: Table %s was marked as"
+						" uncorrupted",
+						table->s->table_name.str);
+					ut_ad(!m_prebuilt->table->corrupted);
+				}
+			}
+			if (check_opt->flags & T_QUICK) {
 				continue;
 			}
 		}
@@ -14859,24 +14904,34 @@ ha_innobase::check(
 		m_prebuilt->index_usable = row_merge_is_index_usable(
 			m_prebuilt->trx, m_prebuilt->index);
 
-		DBUG_EXECUTE_IF(
-			"dict_set_index_corrupted",
-			if (!index->is_primary()) {
-				m_prebuilt->index_usable = FALSE;
-				// row_mysql_lock_data_dictionary(m_prebuilt->trx);
-				dict_set_corrupted(index, m_prebuilt->trx, "dict_set_index_corrupted");
-				// row_mysql_unlock_data_dictionary(m_prebuilt->trx);
-			});
+		if (check_opt->can_set_corrupted()) {
+			DBUG_EXECUTE_IF(
+				"dict_set_index_corrupted",
+				if (!index->is_primary()) {
+					m_prebuilt->index_usable = FALSE;
+					// row_mysql_lock_data_dictionary(m_prebuilt->trx);
+					dict_set_corrupted(index, m_prebuilt->trx, "dict_set_index_corrupted");
+					// row_mysql_unlock_data_dictionary(m_prebuilt->trx);
+				});
+		}
 
 		if (UNIV_UNLIKELY(!m_prebuilt->index_usable)) {
-			if (index->is_corrupted()) {
+			if (index->type & DICT_CORRUPT) {
 				push_warning_printf(
 					m_user_thd,
 					Sql_condition::WARN_LEVEL_WARN,
 					HA_ERR_INDEX_CORRUPT,
-					"InnoDB: Index %s is marked as"
-					" corrupted",
+					"InnoDB: Index %s is corrupted",
 					index->name());
+				is_ok = false;
+			} else if (index->table->corrupted) {
+				push_warning_printf(
+					m_user_thd,
+					Sql_condition::WARN_LEVEL_WARN,
+					HA_ERR_INDEX_CORRUPT,
+					"InnoDB: Table %s was marked as"
+					" corrupted",
+					table->s->table_name.str);
 				is_ok = false;
 			} else {
 				push_warning_printf(
@@ -14907,11 +14962,13 @@ ha_innobase::check(
 				m_prebuilt, index, &n_rows);
 		}
 
-		DBUG_EXECUTE_IF(
-			"dict_set_index_corrupted",
-			if (!index->is_primary()) {
-				ret = DB_CORRUPTION;
-			});
+		if (check_opt->can_set_corrupted()) {
+			DBUG_EXECUTE_IF(
+				"dict_set_index_corrupted",
+				if (!index->is_primary()) {
+					ret = DB_CORRUPTION;
+				});
+		}
 
 		if (ret == DB_INTERRUPTED || thd_killed(m_user_thd)) {
 			/* Do not report error since this could happen
@@ -14920,15 +14977,17 @@ ha_innobase::check(
 		}
 		if (ret != DB_SUCCESS) {
 			/* Assume some kind of corruption. */
-			push_warning_printf(
-				thd, Sql_condition::WARN_LEVEL_WARN,
-				ER_NOT_KEYFILE,
-				"InnoDB: The B-tree of"
-				" index %s is corrupted.",
-				index->name());
 			is_ok = false;
-			dict_set_corrupted(
-				index, m_prebuilt->trx, "CHECK TABLE-check index");
+			if (check_opt->can_set_corrupted()) {
+				dict_set_corrupted(
+					index, m_prebuilt->trx, "CHECK TABLE-check index");
+				push_warning_printf(m_user_thd,
+						Sql_condition::WARN_LEVEL_WARN,
+						HA_ERR_INDEX_CORRUPT,
+						"InnoDB: Index %s was marked as"
+						" corrupted",
+						index->name());
+			}
 		}
 
 
@@ -14943,9 +15002,11 @@ ha_innobase::check(
 				" entries, should be " ULINTPF ".",
 				index->name(), n_rows, n_rows_in_table);
 			is_ok = false;
-			dict_set_corrupted(
-				index, m_prebuilt->trx,
-				"CHECK TABLE; Wrong count");
+			if (check_opt->can_set_corrupted()) {
+				dict_set_corrupted(
+					index, m_prebuilt->trx,
+					"CHECK TABLE; Wrong count");
+			}
 		}
 	}
 

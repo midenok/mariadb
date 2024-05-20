@@ -1,0 +1,125 @@
+--source include/have_innodb.inc
+--source include/not_embedded.inc
+--source include/have_debug.inc
+
+--disable_query_log
+call mtr.add_suppression("Flagged corruption of.* in table .* in .*");
+call mtr.add_suppression("InnoDB: Page index id .* != data dictionary index id .*");
+call mtr.add_suppression("Table '.*' is marked as crashed and should be repaired");
+--enable_query_log
+
+--delimiter ~~
+create procedure show_corrupted()
+begin
+  select t2.name as tbl, t1.name as idx, t1.type & 16 > 0 as corrupted
+  from information_schema.innodb_sys_indexes t1
+  join information_schema.innodb_sys_tables t2
+  on t1.table_id = t2.table_id
+  where t2.name like 'test/%' and t1.type & 16
+  order by t2.name, t1.name;
+end~~
+--delimiter ;
+
+--echo # CHECK TABLE .. DRY/RESURRECT (corruption imitation at CHECK TABLE level)
+create table t1(a int auto_increment primary key,
+  b char(100), c int, z int,
+  index idx1(b))
+engine=innodb stats_persistent=0;
+
+insert into t1 values(0,'x',1, 1);
+create unique index idx2 on t1(c, b);
+create unique index idx3 on t1(z, b);
+
+create table t2 like t1;
+insert into t2 values(10,'y',11, 11);
+
+set debug_dbug= '+d,dict_set_index_corrupted';
+
+check table t1;
+--error ER_INDEX_CORRUPT
+select c from t1;
+--error ER_INDEX_CORRUPT
+select z from t1;
+
+call show_corrupted;
+check table t1 resurrect;
+call show_corrupted;
+
+select c from t1;
+select z from t1;
+
+check table t2 dry;
+select c from t2;
+select z from t2;
+
+drop tables t1, t2;
+
+--echo # mysqlcheck and real corruption
+set debug_dbug= '+d,page_create_corrupted';
+
+create table t1(a int auto_increment primary key,
+  b char(100), c int, z int,
+  index idx1(b))
+engine=innodb stats_persistent=0;
+
+check table t1 dry;
+--exec $MYSQL_CHECK -vvv -c test --check-dry
+--exec $MYSQL_CHECK -vvv --check-dry test
+--exec $MYSQL_CHECK -vvv -d test
+call show_corrupted;
+check table t1;
+call show_corrupted;
+
+--error ER_CRASHED_ON_USAGE
+select c from t1;
+
+--exec $MYSQL_CHECK -vvv --resurrect test
+call show_corrupted;
+--exec $MYSQL_CHECK -vvv -R test
+
+drop tables t1;
+
+--echo # SQL compatibility
+create table dry(resurrect int);
+create table resurrect(dry int);
+set @dry= 1;
+set @resurrect= 'a';
+drop tables dry, resurrect;
+create procedure dry(resurrect int) set @a= resurrect;
+drop procedure dry;
+prepare dry from "set @resurrect= 1";
+drop prepare dry;
+--delimiter $
+create function dry(p1 int)
+returns int
+not deterministic
+begin
+  dry: loop
+    set p1 = p1 + 1;
+    if p1 < 10 then iterate dry; end if;
+    leave dry;
+  end loop dry;
+  return 1;
+end$
+create or replace function resurrect(p1 int)
+returns int
+deterministic
+begin
+  resurrect: loop
+    set p1 = p1 + 1;
+    if p1 < 10 then iterate resurrect; end if;
+    leave resurrect;
+  end loop resurrect;
+  return 2;
+end$
+set sql_mode= oracle$
+create procedure p1
+as rec row(a int, b int);
+begin
+end$
+set sql_mode= default$
+--delimiter ;
+drop function dry;
+drop function resurrect;
+drop procedure p1;
+drop procedure show_corrupted;

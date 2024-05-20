@@ -20,9 +20,9 @@ SET @save_dbug = @@SESSION.debug_dbug;
 SET debug_dbug = '+d,dict_set_index_corrupted';
 check table corrupt_bit_test_ā;
 Table	Op	Msg_type	Msg_text
-test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idx is marked as corrupted
-test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idxā is marked as corrupted
-test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idxē is marked as corrupted
+test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idx is corrupted
+test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idxā is corrupted
+test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idxē is corrupted
 test.corrupt_bit_test_ā	check	error	Corrupt
 SET @@SESSION.debug_dbug = @save_dbug;
 CREATE INDEX idx3 ON corrupt_bit_test_ā(b, c);
@@ -49,8 +49,8 @@ rollback;
 drop index idxā on corrupt_bit_test_ā;
 check table corrupt_bit_test_ā;
 Table	Op	Msg_type	Msg_text
-test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idx is marked as corrupted
-test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idxē is marked as corrupted
+test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idx is corrupted
+test.corrupt_bit_test_ā	check	Warning	InnoDB: Index idxē is corrupted
 test.corrupt_bit_test_ā	check	error	Corrupt
 set names utf8;
 select z from corrupt_bit_test_ā;
