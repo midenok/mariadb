@@ -12,8 +12,8 @@ call mtr.add_suppression("Table '.*' is marked as crashed and should be repaired
 create procedure show_corrupted()
 begin
   select t2.name as tbl, t1.name as idx, t1.type & 16 > 0 as corrupted
-  from information_schema.innodb_sys_indexes t1
-  join information_schema.innodb_sys_tables t2
+  from information_schema.INNODB_SYS_INDEXES t1
+  join information_schema.INNODB_SYS_TABLES t2
   on t1.table_id = t2.table_id
   where t2.name like 'test/%' and t1.type & 16
   order by t2.name, t1.name;
@@ -62,22 +62,34 @@ create table t1(a int auto_increment primary key,
   index idx1(b))
 engine=innodb stats_persistent=0;
 
+create table t2(a int auto_increment primary key,
+  b char(100), c int, z int,
+  index idx1(b))
+engine=innodb stats_persistent=0;
+
 check table t1 dry;
 --exec $MYSQL_CHECK -vvv -c test --check-dry
 --exec $MYSQL_CHECK -vvv --check-dry test
 --exec $MYSQL_CHECK -vvv -d test
-call show_corrupted;
+--exec $MYSQL_CHECK -vL test
 check table t1;
-call show_corrupted;
+--exec $MYSQL_CHECK -vL test
 
 --error ER_CRASHED_ON_USAGE
 select c from t1;
 
+--exec $MYSQL_CHECK -vvv -L test
+check table t2;
+--exec $MYSQL_CHECK -vL test
+--exec $MYSQL_CHECK -v --list-corrupted test t1
+--exec $MYSQL_CHECK -v -L test t2
+
 --exec $MYSQL_CHECK -vvv --resurrect test
-call show_corrupted;
+--exec $MYSQL_CHECK -vL test
+
 --exec $MYSQL_CHECK -vvv -R test
 
-drop tables t1;
+drop tables t1, t2;
 
 --echo # SQL compatibility
 create table dry(resurrect int);

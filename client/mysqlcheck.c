@@ -58,7 +58,7 @@ DYNAMIC_ARRAY tables4repair, tables4rebuild, alter_table_cmds;
 DYNAMIC_ARRAY views4repair;
 static uint opt_protocol=0;
 
-enum operations { DO_CHECK=1, DO_REPAIR, DO_ANALYZE, DO_OPTIMIZE, DO_FIX_NAMES };
+enum operations { DO_CHECK=1, DO_REPAIR, DO_ANALYZE, DO_OPTIMIZE, DO_FIX_NAMES, DO_LIST_CORRUPTED };
 const char *operation_name[]=
 {
   "???", "check", "repair", "analyze", "optimize", "fix names"
@@ -99,6 +99,9 @@ static struct my_option my_long_options[] =
    0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
   {"resurrect", 'R',
    "Do quick check and unmark corrupted InnoDB indexes",
+   0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"list-corrupted", 'L',
+   "List corrupted InnoDB indexes",
    0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
   {"check-upgrade", 'g',
    "Check tables for version-dependent changes. May be used with --auto-repair to correct tables requiring version-dependent updates.",
@@ -242,7 +245,7 @@ static int process_selected_tables(char *db, char **table_names, int tables);
 static int process_all_tables_in_db(char *database);
 static int process_one_db(char *database);
 static int use_db(char *database);
-static int handle_request_for_tables(char *, size_t, my_bool, my_bool);
+static int handle_request_for_tables(char *, size_t, char *, size_t, my_bool, my_bool);
 static int dbConnect(char *host, char *user,char *passwd);
 static void dbDisconnect(char *host);
 static void DBerror(MYSQL *mysql, const char *when);
@@ -315,6 +318,9 @@ get_one_option(int optid, const struct my_option *opt __attribute__((unused)),
   case 'R':
     what_to_do = DO_CHECK;
     opt_resurrect = 1;
+    break;
+  case 'L':
+    what_to_do = DO_LIST_CORRUPTED;
     break;
   case 'I': /* Fall through */
   case '?':
@@ -554,6 +560,7 @@ static int process_selected_tables(char *db, char **table_names, int tables)
   int view;
   char *table;
   size_t table_len;
+  size_t db_len= strlen(db);
   DBUG_ENTER("process_selected_tables");
 
   if (use_db(db))
@@ -578,6 +585,13 @@ static int process_selected_tables(char *db, char **table_names, int tables)
       DBUG_RETURN(1);
     }
 
+    if (what_to_do == DO_LIST_CORRUPTED)
+    {
+      fprintf(stderr, "Error: %s cannot do --list-corrupted with --all-in-1\n",
+              my_progname);
+      DBUG_RETURN(1);
+    }
+
     for (i = 0; i < tables; i++)
       tot_length+= fixed_name_length(*(table_names + i)) + 2;
 
@@ -593,6 +607,7 @@ static int process_selected_tables(char *db, char **table_names, int tables)
     }
     *--end = 0;
     handle_request_for_tables(table_names_comma_sep + 1, tot_length - 1,
+                              db, db_len,
                               opt_do_views != 0, opt_all_in_1);
     my_free(table_names_comma_sep);
   }
@@ -605,7 +620,7 @@ static int process_selected_tables(char *db, char **table_names, int tables)
       view= is_view(table);
       if (view < 0)
         continue;
-      handle_request_for_tables(table, table_len, view == 1, opt_all_in_1);
+      handle_request_for_tables(table, table_len, db, db_len, view == 1, opt_all_in_1);
     }
   }
   DBUG_RETURN(0);
@@ -651,6 +666,7 @@ static int process_all_tables_in_db(char *database)
   uint num_columns;
   my_bool system_database= 0;
   my_bool view= FALSE;
+  size_t db_len= strlen(database);
   DBUG_ENTER("process_all_tables_in_db");
 
   if (use_db(database))
@@ -725,9 +741,9 @@ static int process_all_tables_in_db(char *database)
     *--end = 0;
     *--views_end = 0;
     if (tot_length)
-      handle_request_for_tables(tables + 1, tot_length - 1, FALSE, opt_all_in_1);
+      handle_request_for_tables(tables + 1, tot_length - 1, database, db_len, FALSE, opt_all_in_1);
     if (tot_views_length)
-      handle_request_for_tables(views + 1, tot_views_length - 1, TRUE, opt_all_in_1);
+      handle_request_for_tables(views + 1, tot_views_length - 1, database, db_len, TRUE, opt_all_in_1);
     my_free(tables);
     my_free(views);
   }
@@ -753,7 +769,7 @@ static int process_all_tables_in_db(char *database)
            !strcmp(row[0], "slow_log")))
         continue;                               /* Skip logging tables */
 
-      handle_request_for_tables(row[0], fixed_name_length(row[0]), view, opt_all_in_1);
+      handle_request_for_tables(row[0], fixed_name_length(row[0]), database, db_len, view, opt_all_in_1);
     }
   }
   mysql_free_result(res);
@@ -883,18 +899,24 @@ static int disable_binlog()
 }
 
 static int handle_request_for_tables(char *tables, size_t length,
+                                     char *db, size_t db_length,
                                      my_bool view, my_bool dont_quote)
 {
-  char *query, *end, options[100], message[100];
+  char *query, *end, options[100], message[100], db_prefix[NAME_CHAR_LEN*2*2*2+2];
   char table_name_buff[NAME_CHAR_LEN*2*2+1], *table_name;
-  size_t query_length= 0, query_size= sizeof(char)*(length+110);
+  size_t query_length= 0, query_size= sizeof(char)*(length+db_length+1024);
   const char *op = 0;
   const char *tab_view;
   DBUG_ENTER("handle_request_for_tables");
 
+  db_prefix[0]= 0;
   options[0] = 0;
   tab_view= view ? " VIEW " : " TABLE ";
   end = options;
+
+  DBUG_ASSERT(sizeof(db_prefix) > db_length + 2);
+  DBUG_ASSERT(!db || strlen(db) == db_length);
+
   switch (what_to_do) {
   case DO_CHECK:
     op = "CHECK";
@@ -946,6 +968,22 @@ static int handle_request_for_tables(char *tables, size_t length,
     }
     op= (opt_write_binlog) ? "OPTIMIZE" : "OPTIMIZE NO_WRITE_TO_BINLOG";
     break;
+  case DO_LIST_CORRUPTED:
+    DBUG_ASSERT(db);
+    if (opt_auto_repair)
+    {
+      fprintf(stderr, "Error: %s cannot do --list-corrupted and --auto-repair\n",
+              my_progname);
+      DBUG_RETURN(1);
+    }
+    op= "SELECT t2.name tbl, t1.name idx, t1.type & 16 > 0 corrupted "
+    "FROM information_schema.innodb_sys_indexes t1 "
+    "JOIN information_schema.innodb_sys_tables t2 "
+    "ON t1.table_id = t2.table_id "
+    "WHERE t1.type & 16 AND t2.name = ";
+    strcpy(options, " ORDER BY t1.name");
+    query_length= sprintf(db_prefix, "'%s/%s'", db, tables);
+    break;
   case DO_FIX_NAMES:
     if (view)
     {
@@ -957,9 +995,25 @@ static int handle_request_for_tables(char *tables, size_t length,
 
   if (!(query =(char *) my_malloc(query_size, MYF(MY_WME))))
     DBUG_RETURN(1);
-  if (dont_quote)
+  if (what_to_do == DO_LIST_CORRUPTED)
   {
-    DBUG_ASSERT(strlen(op)+strlen(tables)+strlen(options)+8+1 <= query_size);
+    DBUG_ASSERT(strlen(op)+strlen(db_prefix)+strlen(options)+1 <= query_size);
+    query_length= sprintf(query, "%s%s%s", op,
+                          db_prefix,options);
+    if (dont_quote)
+      table_name= tables;
+    else
+    {
+      char *ptr= fix_table_name(table_name_buff, tables);
+      (*ptr)= 0;
+      table_name= table_name_buff;
+    }
+    if (verbose)
+      printf("Corrupted InnoDB indexes for %s.%s:\n", db, tables);
+  }
+  else if (dont_quote)
+  {
+    DBUG_ASSERT(strlen(op)+strlen(tab_view)+strlen(tables)+strlen(options)+8+1 <= query_size);
 
     /* No backticks here as we added them before */
     query_length= sprintf(query, "%s%s%s %s", op,
@@ -1018,7 +1072,6 @@ static void print_result()
   char prev[(NAME_LEN+9)*3+2];
   char prev_alter[MAX_ALTER_STR_SIZE];
   size_t length_of_db= strlen(sock->db);
-  uint i;
   my_bool found_error=0, table_rebuild=0;
   DYNAMIC_ARRAY *array4repair= &tables4repair;
   DBUG_ENTER("print_result");
@@ -1027,10 +1080,19 @@ static void print_result()
 
   prev[0] = '\0';
   prev_alter[0]= 0;
-  for (i = 0; (row = mysql_fetch_row(res)); i++)
+  while ((row = mysql_fetch_row(res)))
   {
-    int changed = strcmp(prev, row[0]);
-    my_bool status = !strcmp(row[2], "status");
+    int changed;
+    my_bool status;
+
+    if (what_to_do == DO_LIST_CORRUPTED)
+    {
+      printf("%s/%s\n", row[0], row[1]);
+      continue;
+    }
+
+    changed = strcmp(prev, row[0]);
+    status = !strcmp(row[2], "status");
 
     if (status)
     {
@@ -1090,6 +1152,7 @@ static void print_result()
   /* add the last table to be repaired to the list */
   if (found_error && opt_auto_repair && what_to_do != DO_REPAIR)
   {
+    DBUG_ASSERT(what_to_do != DO_LIST_CORRUPTED);
     if (table_rebuild)
     {
       if (prev_alter[0])
@@ -1240,7 +1303,7 @@ int main(int argc, char **argv)
     for (i = 0; i < tables4repair.elements ; i++)
     {
       char *name= (char*) dynamic_array_ptr(&tables4repair, i);
-      handle_request_for_tables(name, fixed_name_length(name), FALSE, TRUE);
+      handle_request_for_tables(name, fixed_name_length(name), NULL, 0, FALSE, TRUE);
     }
     for (i = 0; i < tables4rebuild.elements ; i++)
       rebuild_table((char*) dynamic_array_ptr(&tables4rebuild, i));
@@ -1251,7 +1314,7 @@ int main(int argc, char **argv)
     for (i = 0; i < views4repair.elements ; i++)
     {
       char *name= (char*) dynamic_array_ptr(&views4repair, i);
-      handle_request_for_tables(name, fixed_name_length(name), TRUE, TRUE);
+      handle_request_for_tables(name, fixed_name_length(name), NULL, 0, TRUE, TRUE);
     }
   }
   ret= MY_TEST(first_error);

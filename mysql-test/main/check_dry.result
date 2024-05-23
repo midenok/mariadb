@@ -1,8 +1,8 @@
 create procedure show_corrupted()
 begin
 select t2.name as tbl, t1.name as idx, t1.type & 16 > 0 as corrupted
-from information_schema.innodb_sys_indexes t1
-join information_schema.innodb_sys_tables t2
+from information_schema.INNODB_SYS_INDEXES t1
+join information_schema.INNODB_SYS_TABLES t2
 on t1.table_id = t2.table_id
 where t2.name like 'test/%' and t1.type & 16
 order by t2.name, t1.name;
@@ -63,6 +63,10 @@ create table t1(a int auto_increment primary key,
 b char(100), c int, z int,
 index idx1(b))
 engine=innodb stats_persistent=0;
+create table t2(a int auto_increment primary key,
+b char(100), c int, z int,
+index idx1(b))
+engine=innodb stats_persistent=0;
 check table t1 dry;
 Table	Op	Msg_type	Msg_text
 test.t1	check	Warning	InnoDB: The B-tree of index PRIMARY is corrupted.
@@ -75,10 +79,8 @@ test.t1
 Warning  : InnoDB: The B-tree of index PRIMARY is corrupted.
 Warning  : InnoDB: The B-tree of index idx1 is corrupted.
 error    : Corrupt
-Processing databases
-test
-CHECK TABLE `t1`  DRY
-test.t1
+CHECK TABLE `t2`  DRY
+test.t2
 Warning  : InnoDB: The B-tree of index PRIMARY is corrupted.
 Warning  : InnoDB: The B-tree of index idx1 is corrupted.
 error    : Corrupt
@@ -89,20 +91,69 @@ test.t1
 Warning  : InnoDB: The B-tree of index PRIMARY is corrupted.
 Warning  : InnoDB: The B-tree of index idx1 is corrupted.
 error    : Corrupt
-call show_corrupted;
-tbl	idx	corrupted
+CHECK TABLE `t2`  DRY
+test.t2
+Warning  : InnoDB: The B-tree of index PRIMARY is corrupted.
+Warning  : InnoDB: The B-tree of index idx1 is corrupted.
+error    : Corrupt
+Processing databases
+test
+CHECK TABLE `t1`  DRY
+test.t1
+Warning  : InnoDB: The B-tree of index PRIMARY is corrupted.
+Warning  : InnoDB: The B-tree of index idx1 is corrupted.
+error    : Corrupt
+CHECK TABLE `t2`  DRY
+test.t2
+Warning  : InnoDB: The B-tree of index PRIMARY is corrupted.
+Warning  : InnoDB: The B-tree of index idx1 is corrupted.
+error    : Corrupt
+Processing databases
+test
+Corrupted InnoDB indexes for test.t1:
+Corrupted InnoDB indexes for test.t2:
 check table t1;
 Table	Op	Msg_type	Msg_text
 test.t1	check	Warning	InnoDB: The B-tree of index PRIMARY is corrupted.
 test.t1	check	Warning	InnoDB: Index PRIMARY was marked as corrupted
 test.t1	check	Warning	InnoDB: Index idx1 is corrupted
 test.t1	check	error	Corrupt
-call show_corrupted;
-tbl	idx	corrupted
-test/t1	idx1	1
-test/t1	PRIMARY	1
+Processing databases
+test
+Corrupted InnoDB indexes for test.t1:
+test/t1/idx1
+test/t1/PRIMARY
+Corrupted InnoDB indexes for test.t2:
 select c from t1;
 ERROR HY000: Table 't1' is marked as crashed and should be repaired
+Processing databases
+test
+Corrupted InnoDB indexes for test.t1:
+SELECT t2.name tbl, t1.name idx, t1.type & 16 > 0 corrupted FROM information_schema.innodb_sys_indexes t1 JOIN information_schema.innodb_sys_tables t2 ON t1.table_id = t2.table_id WHERE t1.type & 16 AND t2.name = 'test/t1' ORDER BY t1.name
+test/t1/idx1
+test/t1/PRIMARY
+Corrupted InnoDB indexes for test.t2:
+SELECT t2.name tbl, t1.name idx, t1.type & 16 > 0 corrupted FROM information_schema.innodb_sys_indexes t1 JOIN information_schema.innodb_sys_tables t2 ON t1.table_id = t2.table_id WHERE t1.type & 16 AND t2.name = 'test/t2' ORDER BY t1.name
+check table t2;
+Table	Op	Msg_type	Msg_text
+test.t2	check	Warning	InnoDB: The B-tree of index PRIMARY is corrupted.
+test.t2	check	Warning	InnoDB: Index PRIMARY was marked as corrupted
+test.t2	check	Warning	InnoDB: Index idx1 is corrupted
+test.t2	check	error	Corrupt
+Processing databases
+test
+Corrupted InnoDB indexes for test.t1:
+test/t1/idx1
+test/t1/PRIMARY
+Corrupted InnoDB indexes for test.t2:
+test/t2/idx1
+test/t2/PRIMARY
+Corrupted InnoDB indexes for test.t1:
+test/t1/idx1
+test/t1/PRIMARY
+Corrupted InnoDB indexes for test.t2:
+test/t2/idx1
+test/t2/PRIMARY
 Processing databases
 test
 CHECK TABLE `t1`  RESURRECT
@@ -111,13 +162,23 @@ Warning  : InnoDB: Index PRIMARY was marked as uncorrupted
 Warning  : InnoDB: Table t1 was marked as uncorrupted
 Warning  : InnoDB: Index idx1 was marked as uncorrupted
 status   : OK
-call show_corrupted;
-tbl	idx	corrupted
+CHECK TABLE `t2`  RESURRECT
+test.t2
+Warning  : InnoDB: Index PRIMARY was marked as uncorrupted
+Warning  : InnoDB: Table t2 was marked as uncorrupted
+Warning  : InnoDB: Index idx1 was marked as uncorrupted
+status   : OK
+Processing databases
+test
+Corrupted InnoDB indexes for test.t1:
+Corrupted InnoDB indexes for test.t2:
 Processing databases
 test
 CHECK TABLE `t1`  RESURRECT
 test.t1                                            OK
-drop tables t1;
+CHECK TABLE `t2`  RESURRECT
+test.t2                                            OK
+drop tables t1, t2;
 # SQL compatibility
 create table dry(resurrect int);
 create table resurrect(dry int);
