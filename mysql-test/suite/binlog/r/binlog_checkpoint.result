@@ -30,7 +30,7 @@ connect con2,localhost,root,,;
 This will timeout, as RESET MASTER is blocked
 SET DEBUG_SYNC= "now WAIT_FOR reset_master_done TIMEOUT 1";
 Warnings:
-Warning	1639	debug sync point wait timed out
+Warning	1639	Debug sync WAIT_FOR 'reset_master_done' timed out
 SET DEBUG_SYNC= "now SIGNAL con1_go";
 connection con1;
 connection default;
