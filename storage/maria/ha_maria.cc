@@ -2273,7 +2273,7 @@ bool ha_maria::check_and_repair(THD *thd)
   const CSET_STRING query_backup= thd->query_string;
   DBUG_ENTER("ha_maria::check_and_repair");
 
-  check_opt.init();
+  check_opt.init(thd);
   check_opt.flags= T_MEDIUM | T_AUTO_REPAIR;
 
   error= 1;

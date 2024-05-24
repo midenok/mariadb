@@ -179,6 +179,38 @@ test.t1                                            OK
 CHECK TABLE `t2`  RESURRECT
 test.t2                                            OK
 drop tables t1, t2;
+set debug_dbug= default;
+# sn_check_table_marks_corruption
+set sn_check_table_marks_corruption= 0;
+create table t1(a int auto_increment primary key,
+b char(100), c int, z int,
+index idx1(b))
+engine=innodb stats_persistent=0;
+insert into t1 values(0,'x',1, 1);
+create unique index idx2 on t1(c, b);
+create unique index idx3 on t1(z, b);
+set debug_dbug= '+d,dict_set_index_corrupted';
+check table t1;
+Table	Op	Msg_type	Msg_text
+test.t1	check	status	OK
+select c from t1;
+c
+1
+select z from t1;
+z
+1
+set sn_check_table_marks_corruption= 1;
+check table t1;
+Table	Op	Msg_type	Msg_text
+test.t1	check	Warning	InnoDB: Index idx1 is corrupted
+test.t1	check	Warning	InnoDB: Index idx2 is corrupted
+test.t1	check	Warning	InnoDB: Index idx3 is corrupted
+test.t1	check	error	Corrupt
+select c from t1;
+ERROR HY000: Index t1 is corrupted
+select z from t1;
+ERROR HY000: Index t1 is corrupted
+drop table t1;
 # SQL compatibility
 create table dry(resurrect int);
 create table resurrect(dry int);

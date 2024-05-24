@@ -2595,7 +2595,7 @@ typedef struct st_ha_check_opt
   uint sql_flags;   /* sql layer flags - for something myisamchk cannot do */
   time_t start_time;   /* When check/repair starts */
   KEY_CACHE *key_cache; /* new key cache when changing key cache */
-  void init();
+  void init(THD *thd);
   bool is_dry() const
   {
     return sql_flags & TT_DRY;

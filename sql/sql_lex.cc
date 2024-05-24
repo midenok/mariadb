@@ -10356,7 +10356,7 @@ void LEX::stmt_install_plugin(const LEX_CSTRING &soname)
 bool LEX::stmt_uninstall_plugin_by_name(const DDL_options_st &opt,
                                         const Lex_ident_sys_st &name)
 {
-  check_opt.init();
+  check_opt.init(thd);
   if (add_create_options_with_check(opt))
     return true;
   sql_command= SQLCOM_UNINSTALL_PLUGIN;
@@ -10369,7 +10369,7 @@ bool LEX::stmt_uninstall_plugin_by_name(const DDL_options_st &opt,
 bool LEX::stmt_uninstall_plugin_by_soname(const DDL_options_st &opt,
                                           const LEX_CSTRING &soname)
 {
-  check_opt.init();
+  check_opt.init(thd);
   if (add_create_options_with_check(opt))
     return true;
   sql_command= SQLCOM_UNINSTALL_PLUGIN;

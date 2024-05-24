@@ -1247,6 +1247,9 @@ The following specify which files/extra groups are read (specified before remain
  Log slow queries to given log file. Defaults logging to
  'hostname'-slow.log. Must be enabled to activate other
  slow log options
+ --sn-check-table-marks-corruption 
+ When off CHECK TABLE does not mark InnoDB indexes as
+ corrupted (DRY option is forced).
  --sn-order-by-limit-optimize-level=# 
  Controls the level of optimization performed for select
  queries  that has a order by limit clause. Meaning: 0 -
@@ -1767,6 +1770,7 @@ slave-transaction-retry-interval 0
 slave-type-conversions 
 slow-launch-time 2
 slow-query-log FALSE
+sn-check-table-marks-corruption FALSE
 sn-order-by-limit-optimize-level 2
 sn-order-by-limit-row-threshold 300000
 sort-buffer-size 2097152

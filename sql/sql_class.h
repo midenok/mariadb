@@ -651,6 +651,7 @@ typedef struct system_variables
   ulong optimizer_use_condition_selectivity;
   ulong sn_order_by_limit_optimize_level;
   ulong sn_order_by_row_threshold;
+  my_bool sn_check_table_marks_corruption;
   ulong use_stat_tables;
   double sample_percentage;
   ulong histogram_size;

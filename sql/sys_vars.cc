@@ -2557,6 +2557,7 @@ static Sys_var_ulong Sys_optimizer_use_condition_selectivity(
        SESSION_VAR(optimizer_use_condition_selectivity), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(1, 5), DEFAULT(4), BLOCK_SIZE(1));
 
+/*** ServiceNow custom variables ***/
 static Sys_var_ulong Sys_optimizer_sn_order_by_limit_optimize_level(
         "sn_order_by_limit_optimize_level",
         "Controls the level of optimization performed for select queries "
@@ -2588,6 +2589,13 @@ static Sys_var_ulong Sys_optimizer_sn_order_by_row_threshold(
         "the second phase of order by).",
         SESSION_VAR(sn_order_by_row_threshold), CMD_LINE(REQUIRED_ARG),
         VALID_RANGE(0, ULONG_MAX), DEFAULT(300000), BLOCK_SIZE(1));
+
+static Sys_var_mybool Sys_sn_check_table_marks_corruption(
+       "sn_check_table_marks_corruption",
+       "When off CHECK TABLE does not mark InnoDB indexes as corrupted (DRY option is forced).",
+       SESSION_VAR(sn_check_table_marks_corruption),
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+/*** ServiceNow custom variables END ***/
 
 static Sys_var_ulong Sys_optimizer_search_depth(
        "optimizer_search_depth",

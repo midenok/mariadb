@@ -1894,7 +1894,7 @@ bool ha_archive::check_and_repair(THD *thd)
   HA_CHECK_OPT check_opt;
   DBUG_ENTER("ha_archive::check_and_repair");
 
-  check_opt.init();
+  check_opt.init(thd);
 
   DBUG_RETURN(repair(thd, &check_opt));
 }

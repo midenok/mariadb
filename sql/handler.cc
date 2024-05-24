@@ -5291,10 +5291,14 @@ err:
   DBUG_RETURN(error != 0);
 }
 
-void st_ha_check_opt::init()
+void st_ha_check_opt::init(THD *thd)
 {
   flags= sql_flags= 0;
   start_time= my_time(0);
+  if (!thd->variables.sn_check_table_marks_corruption)
+  {
+    sql_flags= TT_DRY;
+  }
 }
 
 

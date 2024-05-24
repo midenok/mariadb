@@ -1386,7 +1386,7 @@ bool mysql_assign_to_keycache(THD* thd, TABLE_LIST* tables,
   DBUG_ENTER("mysql_assign_to_keycache");
 
   THD_STAGE_INFO(thd, stage_finding_key_cache);
-  check_opt.init();
+  check_opt.init(thd);
   mysql_mutex_lock(&LOCK_global_system_variables);
   if (!(key_cache= get_key_cache(key_cache_name)))
   {

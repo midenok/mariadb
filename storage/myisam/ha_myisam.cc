@@ -1867,7 +1867,7 @@ bool ha_myisam::check_and_repair(THD *thd)
   HA_CHECK_OPT check_opt;
   DBUG_ENTER("ha_myisam::check_and_repair");
 
-  check_opt.init();
+  check_opt.init(thd);
   check_opt.flags= T_MEDIUM | T_AUTO_REPAIR;
   // Don't use quick if deleted rows
   if (!file->state->del && (myisam_recover_options & HA_RECOVER_QUICK))

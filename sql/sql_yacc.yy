@@ -8206,7 +8206,7 @@ alter_commands:
           {
             LEX *lex= thd->lex;
             lex->no_write_to_binlog= $3;
-            lex->check_opt.init();
+            lex->check_opt.init(thd);
             DBUG_ASSERT(!lex->m_sql_cmd);
             lex->m_sql_cmd= new (thd->mem_root)
                               Sql_cmd_alter_table_optimize_partition();
@@ -8219,7 +8219,7 @@ alter_commands:
           {
             LEX *lex= thd->lex;
             lex->no_write_to_binlog= $3;
-            lex->check_opt.init();
+            lex->check_opt.init(thd);
             DBUG_ASSERT(!lex->m_sql_cmd);
             lex->m_sql_cmd= new (thd->mem_root)
                               Sql_cmd_alter_table_analyze_partition();
@@ -8229,7 +8229,7 @@ alter_commands:
         | CHECK_SYM PARTITION_SYM all_or_alt_part_name_list
           {
             LEX *lex= thd->lex;
-            lex->check_opt.init();
+            lex->check_opt.init(thd);
             DBUG_ASSERT(!lex->m_sql_cmd);
             lex->m_sql_cmd= new (thd->mem_root)
                               Sql_cmd_alter_table_check_partition();
@@ -8242,7 +8242,7 @@ alter_commands:
           {
             LEX *lex= thd->lex;
             lex->no_write_to_binlog= $3;
-            lex->check_opt.init();
+            lex->check_opt.init(thd);
             DBUG_ASSERT(!lex->m_sql_cmd);
             lex->m_sql_cmd= new (thd->mem_root)
                               Sql_cmd_alter_table_repair_partition();
@@ -8260,7 +8260,7 @@ alter_commands:
         | TRUNCATE_SYM PARTITION_SYM all_or_alt_part_name_list
           {
             LEX *lex= thd->lex;
-            lex->check_opt.init();
+            lex->check_opt.init(thd);
             DBUG_ASSERT(!lex->m_sql_cmd);
             lex->m_sql_cmd= new (thd->mem_root)
                               Sql_cmd_alter_table_truncate_partition();
@@ -8831,7 +8831,7 @@ repair:
             LEX *lex=Lex;
             lex->sql_command = SQLCOM_REPAIR;
             lex->no_write_to_binlog= $2;
-            lex->check_opt.init();
+            lex->check_opt.init(thd);
             lex->alter_info.reset();
             /* Will be overridden during execution. */
             YYPS->m_lock_type= TL_UNLOCK;
@@ -8873,7 +8873,7 @@ analyze:
             LEX *lex=Lex;
             lex->sql_command = SQLCOM_ANALYZE;
             lex->no_write_to_binlog= $2;
-            lex->check_opt.init();
+            lex->check_opt.init(thd);
             lex->alter_info.reset();
             /* Will be overridden during execution. */
             YYPS->m_lock_type= TL_UNLOCK;
@@ -9009,7 +9009,7 @@ check:    CHECK_SYM
             LEX *lex=Lex;
 
             lex->sql_command = SQLCOM_CHECK;
-            lex->check_opt.init();
+            lex->check_opt.init(thd);
             lex->alter_info.reset();
             /* Will be overridden during execution. */
             YYPS->m_lock_type= TL_UNLOCK;
@@ -9071,7 +9071,7 @@ optimize:
             LEX *lex=Lex;
             lex->sql_command = SQLCOM_OPTIMIZE;
             lex->no_write_to_binlog= $2;
-            lex->check_opt.init();
+            lex->check_opt.init(thd);
             lex->alter_info.reset();
             /* Will be overridden during execution. */
             YYPS->m_lock_type= TL_UNLOCK;

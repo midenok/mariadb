@@ -90,6 +90,33 @@ check table t2;
 --exec $MYSQL_CHECK -vvv -R test
 
 drop tables t1, t2;
+set debug_dbug= default;
+
+--echo # sn_check_table_marks_corruption
+set sn_check_table_marks_corruption= 0;
+
+create table t1(a int auto_increment primary key,
+  b char(100), c int, z int,
+  index idx1(b))
+engine=innodb stats_persistent=0;
+
+insert into t1 values(0,'x',1, 1);
+create unique index idx2 on t1(c, b);
+create unique index idx3 on t1(z, b);
+
+set debug_dbug= '+d,dict_set_index_corrupted';
+check table t1;
+select c from t1;
+select z from t1;
+
+set sn_check_table_marks_corruption= 1;
+check table t1;
+--error ER_INDEX_CORRUPT
+select c from t1;
+--error ER_INDEX_CORRUPT
+select z from t1;
+
+drop table t1;
 
 --echo # SQL compatibility
 create table dry(resurrect int);
