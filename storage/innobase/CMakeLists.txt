@@ -128,6 +128,7 @@ SET(INNOBASE_SOURCES
 	sync/sync0rw.cc
 	sync/sync0debug.cc
 	sync/sync0sync.cc
+	sync/srw_lock.cc
 	trx/trx0i_s.cc
 	trx/trx0purge.cc
 	trx/trx0rec.cc

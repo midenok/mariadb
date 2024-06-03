@@ -46,6 +46,7 @@ Created 1/8/1996 Heikki Tuuri
 #include "gis0type.h"
 #include "fil0fil.h"
 #include "fil0crypt.h"
+#include "sux_lock.h"
 #include <sql_const.h>
 #include <set>
 #include <algorithm>
@@ -2259,6 +2260,16 @@ public:
 				/*!< Has persistent stats error beein
 				already printed for this table ? */
 	/* @} */
+
+private:
+  /** Mutex protecting locks on this table. */
+  srw_spin_mutex lock_mutex;
+#ifdef UNIV_DEBUG
+  /** The owner of lock_mutex (0 if none) */
+  Atomic_relaxed<pthread_t> lock_mutex_owner{0};
+#endif
+public:
+
 
 	/** AUTOINC related members. @{ */
 
