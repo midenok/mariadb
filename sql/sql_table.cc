@@ -14397,8 +14397,11 @@ bool fk_handle_drop(THD *thd, TABLE_LIST *table, mbd::vector<FK_ddl_backup> &sha
       if (0 != cmp_table(rk.foreign_db, table->db) ||
           (!drop_db && 0 != cmp_table(rk.foreign_table, table->table_name)))
       {
-        // NB: we get ((null)) in foreign_id for GTS_FK_SHALLOW_HINTS
-        my_error(ER_ROW_IS_REFERENCED_2, MYF(0), rk.foreign_id.str);
+        // NB: GTS_FK_SHALLOW_HINTS does not resolve foreign_id
+        if (rk.foreign_id.str)
+          my_error(ER_ROW_IS_REFERENCED_2, MYF(0), rk.foreign_id.str);
+        else
+          my_error(ER_ROW_IS_REFERENCED, MYF(0));
         return true;
       }
     }
