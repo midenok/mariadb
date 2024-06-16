@@ -21938,10 +21938,10 @@ static dberr_t fk_upgrade_legacy_storage(dict_table_t *table, trx_t *trx,
 
   ut_ad(d.foreign_keys.elements + d.referenced_keys.elements);
 
-  // Got legacy foreign keys, update referenced shares
+  // Got legacy foreign keys, update referenced shares if not yet updated
   FK_table_backup fk_table_backup;
   FK_create_vector ref_shares;
-  if (d.s->fk_handle_create(thd, ref_shares, &d.foreign_keys))
+  if (d.s->fk_handle_create(thd, ref_shares, &d.foreign_keys, true))
   {
     err= DB_ERROR;
     goto rollback;

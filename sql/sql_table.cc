@@ -13637,7 +13637,8 @@ bool HA_CREATE_INFO::
 
 
 // Used in CREATE TABLE and in FK upgrade (fk_add != NULL)
-bool TABLE_SHARE::fk_handle_create(THD *thd, FK_create_vector &shares, FK_list *fk_add)
+bool TABLE_SHARE::fk_handle_create(THD *thd, FK_create_vector &shares, FK_list *fk_add,
+                                   bool skip_existing)
 {
   FK_list &fkeys= fk_add ? *fk_add : foreign_keys;
   if (fkeys.is_empty())
@@ -13687,27 +13688,20 @@ bool TABLE_SHARE::fk_handle_create(THD *thd, FK_create_vector &shares, FK_list *
       my_error(ER_FEATURE_NOT_SUPPORTED_WITH_PARTITIONING, MYF(0), "FOREIGN KEY");
       return true;
     }
-    if (shares.push_back(std::move(ref_sa)))
-    {
-      my_error(ER_OUT_OF_RESOURCES, MYF(0));
-      return true;
-    }
-    DBUG_ASSERT(!ref_sa.share);
-    if (!shares.back().sa.share)
-      return true; // ctor failed, share was released
-  }
 
-  for (FK_ddl_backup &ref: shares)
-  {
-    TABLE_SHARE *ref_share= ref.sa.share;
+    FK_ddl_backup ref_bak(std::move(ref_sa));
+    TABLE_SHARE *ref_share= ref_bak.sa.share;
     List_iterator<FK_info> rk_it(ref_share->referenced_keys);
     FK_info *rkp;
+    uint rkeys_before= ref_share->referenced_keys.elements;
     for (const FK_info &fk: fkeys)
     {
       // Find keys referencing the acquired share and add them to referenced_keys
       if (cmp_table(fk.ref_db(), ref_share->db) ||
           cmp_table(fk.referenced_table, ref_share->table_name))
         continue;
+
+      bool continue_loop= false;
 
       // Check for duplicated id
       rk_it.rewind();
@@ -13732,11 +13726,19 @@ bool TABLE_SHARE::fk_handle_create(THD *thd, FK_create_vector &shares, FK_list *
         DBUG_ASSERT(rk.foreign_id.str);
         if (0 == rk.foreign_id.cmp(fk.foreign_id))
         {
+          if (skip_existing)
+          {
+            continue_loop= true;
+            break;
+          }
           my_error(ER_DUP_CONSTRAINT_NAME, MYF(0), "FOREIGN KEY",
                    fk.foreign_id.str);
           return true;
         }
       }
+
+      if (continue_loop)
+        continue;
 
       FK_info *dst= fk.clone(&ref_share->mem_root);
       if (!dst ||
@@ -13746,6 +13748,19 @@ bool TABLE_SHARE::fk_handle_create(THD *thd, FK_create_vector &shares, FK_list *
         return true;
       }
     } // for (const FK_info &fk: fkeys)
+
+    if (rkeys_before == ref_share->referenced_keys.elements)
+      continue;
+
+    DBUG_ASSERT(rkeys_before < ref_share->referenced_keys.elements);
+    if (shares.push_back(std::move(ref_bak)))
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      return true;
+    }
+    DBUG_ASSERT(!ref_sa.share);
+    if (!shares.back().sa.share)
+      return true; // ctor failed, share was released
 
     if (ref_share->fk_write_shadow_frm(thd))
       return true;
@@ -14406,6 +14421,15 @@ bool fk_handle_drop(THD *thd, TABLE_LIST *table, mbd::vector<FK_ddl_backup> &sha
       }
     }
   }
+#ifdef WITH_INNODB_FOREIGN_UPGRADE
+  /* If the table was not yet upgraded we have to read its foreign keys
+     from legacy storage now. */
+  if (!table->table)
+  {
+    /* Table structure may not match legacy foreign keys, don't fail and drop anyway */
+    sa.upgrade(thd, table);
+  }
+#endif /* WITH_INNODB_FOREIGN_UPGRADE */
   if (share->foreign_keys.is_empty())
     return false;
   mbd::set<Table_name> tables;
