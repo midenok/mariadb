@@ -7700,16 +7700,6 @@ bool write_execute_ddl_log_entry(uint first_entry,
                                    DDL_LOG_MEMORY_ENTRY **active_entry);
 extern mysql_mutex_t LOCK_gdl;
 
-void ddl_log_info::release()
-{
-  while (list)
-  {
-    ddl_log_release_memory_entry(list);
-    list= list->next_active_log_entry;
-  }
-}
-
-
 void ddl_log_info::write_log_finish()
 {
   Mutex_lock lock_gdl(&LOCK_gdl);

@@ -659,7 +659,7 @@ bool FK_backup::fk_install_shadow_frm(ddl_log_info &log_info)
   char frm_name[FN_REFLEN + 1];
   TABLE_SHARE *s= get_share();
   build_table_shadow_filename(shadow_path, sizeof(shadow_path) - 1,
-                              s->db.str, s->table_name.str, tmp_fk_prefix);
+                              s->db.str, s->table_name.str, false, tmp_fk_prefix);
   build_table_filename(path, sizeof(path), s->db.str,
                        s->table_name.str, "", 0);
   strxnmov(shadow_frm_name, sizeof(shadow_frm_name), shadow_path, reg_ext, NullS);
@@ -692,7 +692,7 @@ void FK_backup::fk_drop_shadow_frm(ddl_log_info &log_info)
   char shadow_frm_name[FN_REFLEN+1];
   TABLE_SHARE *s= get_share();
   build_table_shadow_filename(shadow_path, sizeof(shadow_path) - 1,
-                              s->db.str, s->table_name.str, tmp_fk_prefix);
+                              s->db.str, s->table_name.str, false, tmp_fk_prefix);
   strxnmov(shadow_frm_name, sizeof(shadow_frm_name), shadow_path, reg_ext, NullS);
   mysql_file_delete(key_file_frm, shadow_frm_name, MYF(0));
 }

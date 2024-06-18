@@ -1016,7 +1016,10 @@ struct ddl_log_info : public st_ddl_log_state
     // write_log_finish() must be called
     DBUG_ASSERT(!list);
   }
-  void release();
+  void release()
+  {
+    ddl_log_release_entries(this);
+  }
   bool write_log_replace_delete_file(const char *from_path, const char *to_path,
                                     bool replace_flag);
 
