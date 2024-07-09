@@ -15,6 +15,7 @@ KEY `all_k` (`active`,`sys_class_name`,`assignment_group`,`number`)
 );
 show variables like '%sn%';
 Variable_name	Value
+sn_check_table_marks_corruption	OFF
 sn_order_by_limit_optimize_level	2
 sn_order_by_limit_row_threshold	300000
 select count(*) from task;
