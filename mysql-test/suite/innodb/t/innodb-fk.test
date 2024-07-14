@@ -11,7 +11,7 @@ insert into t1 values (5);
 insert into t1 values (2882);
 insert into t1 values (10);
 
-let $fk_tables = 120;
+let $fk_tables = 500;
 
 --disable_query_log
 let $i = $fk_tables;
