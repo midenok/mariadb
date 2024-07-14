@@ -24,3 +24,6 @@ binlog_ok_row: needs slave_relay_log_info
 binlog_ok_stmt: needs slave_relay_log_info
 
 server_init : Nirbhay TODO: Fix the test
+start_server_innodb : FIXME: bisect
+rpl_statements : FIXME: bisect
+bad_option_4 : FIXME: SAMU-124

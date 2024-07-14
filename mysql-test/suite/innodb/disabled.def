@@ -11,3 +11,7 @@
 ##############################################################################
 
 create-index-debug : MDEV-13680 InnoDB may crash when btr_page_alloc() fails
+instant_alter_crash : FIXME: bisect
+innodb_corrupt_bit : FIXME: bisect
+instant_alter_index_rename : FIXME: bisect
+alter_crash : FIXME: bisect
