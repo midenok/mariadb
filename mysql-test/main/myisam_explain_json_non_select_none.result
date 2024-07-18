@@ -20,6 +20,20 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON UPDATE t1 SET a = 10 WHERE a < 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "update": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "attached_condition": "t1.a < 10"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1     WHERE a < 10;
@@ -30,6 +44,20 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where `test`.`t1`.`a` <
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM t1     WHERE a < 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t1.a < 10"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -63,6 +91,20 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE a < 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "attached_condition": "t1.a < 10"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE a < 10;
@@ -73,6 +115,20 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where `test`.`t1`.`a` <
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE a < 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t1.a < 10"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -106,6 +162,20 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON DELETE   FROM t1 USING t1 WHERE a = 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t1.a = 1"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1          WHERE a = 1;
@@ -116,6 +186,20 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where `test`.`t1`.`a` =
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM t1          WHERE a = 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t1.a = 1"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -153,6 +237,26 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE        t1, t2 SET t1.a = 10 WHERE t1.a = 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t1.a = 1"
+    },
+    "table": {
+      "table_name": "t2",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1, t2               WHERE t1.a = 1;
@@ -164,6 +268,31 @@ Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1` 
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1, t2               WHERE t1.a = 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t1.a = 1"
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 3,
+        "filtered": 100
+      },
+      "buffer_type": "flat",
+      "buffer_size": "65",
+      "join_type": "BNL"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -203,6 +332,37 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE        t1 t11, (SELECT * FROM t2) t12 SET t11.a = 10 WHERE t11.a = 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t11.a = 1"
+    },
+    "table": {
+      "table_name": "<derived2>",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "materialized": {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100
+          }
+        }
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 t11, (SELECT * FROM t2) t12                WHERE t11.a = 1;
@@ -214,6 +374,31 @@ Note	1003	select `test`.`t11`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1 t11, (SELECT * FROM t2) t12                WHERE t11.a = 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t11.a = 1"
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 3,
+        "filtered": 100
+      },
+      "buffer_type": "flat",
+      "buffer_size": "65",
+      "join_type": "BNL"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -252,24 +437,80 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 Variable_name	Value
 Handler_read_key	4
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON UPDATE        t1 SET a = 10 WHERE 1 IN (SELECT 1 FROM t2 WHERE t2.b < 3);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "update": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "const_condition": "1",
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100,
+            "attached_condition": "t2.b < 3"
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1            WHERE 1 IN (SELECT 1 FROM t2 WHERE t2.b < 3);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	<subquery2>	eq_ref	distinct_key	distinct_key	4	func	1	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	
+2	SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 Warnings:
-Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` semi join (`test`.`t2`) where `test`.`t2`.`b` < 3
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where 1
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON SELECT * FROM t1            WHERE 1 IN (SELECT 1 FROM t2 WHERE t2.b < 3);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "const_condition": "1",
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100,
+            "attached_condition": "t2.b < 3"
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
-Handler_read_key	5
-Handler_read_rnd_next	8
+Handler_read_key	4
+Handler_read_rnd_next	5
 # Status of testing query execution:
 Variable_name	Value
 Handler_read_key	4
@@ -303,24 +544,82 @@ Note	1276	Field or reference 'test.t1.a' of SELECT #2 was resolved in SELECT #1
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE        t1 SET a = 10 WHERE a IN (SELECT b FROM t2 WHERE t1.a < 3);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "update": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "outer_ref_condition": "t1.a < 3",
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100,
+            "attached_condition": "<cache>(t1.a) = t2.b"
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1            WHERE a IN (SELECT b FROM t2 WHERE t1.a < 3);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
-1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where; FirstMatch(t1); Using join buffer (flat, BNL join)
+2	DEPENDENT SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 Warnings:
 Note	1276	Field or reference 'test.t1.a' of SELECT #2 was resolved in SELECT #1
-Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` semi join (`test`.`t2`) where `test`.`t2`.`b` = `test`.`t1`.`a` and `test`.`t1`.`a` < 3
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where <expr_cache><`test`.`t1`.`a`>(<in_optimizer>(`test`.`t1`.`a`,<exists>(/* select#2 */ select `test`.`t2`.`b` from `test`.`t2` where `test`.`t1`.`a` < 3 and <cache>(`test`.`t1`.`a`) = `test`.`t2`.`b`)))
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1            WHERE a IN (SELECT b FROM t2 WHERE t1.a < 3);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "outer_ref_condition": "t1.a < 3",
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100,
+            "attached_condition": "<cache>(t1.a) = t2.b"
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
-Handler_read_key	4
-Handler_read_rnd_next	8
+Handler_read_key	7
+Handler_read_rnd_next	7
 # Status of testing query execution:
 Variable_name	Value
 Handler_read_key	4
@@ -341,44 +640,114 @@ Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 EXPLAIN UPDATE        t1, t2 SET a = 10 WHERE a IN (SELECT b FROM t2 WHERE t2.b < 3);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	
-1	PRIMARY	<subquery2>	eq_ref	distinct_key	distinct_key	4	func	1	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
+2	DEPENDENT SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED UPDATE        t1, t2 SET a = 10 WHERE a IN (SELECT b FROM t2 WHERE t2.b < 3);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	
-1	PRIMARY	<subquery2>	eq_ref	distinct_key	distinct_key	4	func	1	100.00	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
+2	DEPENDENT SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE        t1, t2 SET a = 10 WHERE a IN (SELECT b FROM t2 WHERE t2.b < 3);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "table": {
+      "table_name": "t2",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100,
+            "attached_condition": "t2.b < 3 and <cache>(t1.a) = t2.b"
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1, t2            WHERE a IN (SELECT b FROM t2 WHERE t2.b < 3);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	
-1	PRIMARY	<subquery2>	eq_ref	distinct_key	distinct_key	4	func	1	100.00	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
+2	DEPENDENT SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 Warnings:
-Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1` semi join (`test`.`t2`) join `test`.`t2` where `test`.`t2`.`b` < 3
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1` join `test`.`t2` where <expr_cache><`test`.`t1`.`a`>(<in_optimizer>(`test`.`t1`.`a`,<exists>(/* select#2 */ select `test`.`t2`.`b` from `test`.`t2` where `test`.`t2`.`b` < 3 and <cache>(`test`.`t1`.`a`) = `test`.`t2`.`b`)))
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1, t2            WHERE a IN (SELECT b FROM t2 WHERE t2.b < 3);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 3,
+        "filtered": 100
+      },
+      "buffer_type": "flat",
+      "buffer_size": "65",
+      "join_type": "BNL"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100,
+            "attached_condition": "t2.b < 3 and <cache>(t1.a) = t2.b"
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
 Handler_read_key	7
-Handler_read_rnd_next	12
+Handler_read_rnd_next	15
 # Status of testing query execution:
 Variable_name	Value
 Handler_read_key	7
-Handler_read_rnd_next	16
+Handler_read_rnd_next	19
 Handler_update	2
 
 DROP TABLE t1, t2;
@@ -408,6 +777,36 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE        t1 t11, (SELECT * FROM t2) t12 SET t11.a = t11.a + 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    },
+    "table": {
+      "table_name": "<derived2>",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "materialized": {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100
+          }
+        }
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 t11, (SELECT * FROM t2) t12;
@@ -419,6 +818,30 @@ Note	1003	select `test`.`t11`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1 t11, (SELECT * FROM t2) t12;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 3,
+        "filtered": 100
+      },
+      "buffer_type": "flat",
+      "buffer_size": "65",
+      "join_type": "BNL"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -461,6 +884,33 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 Variable_name	Value
 Handler_read_key	2
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON UPDATE        t1 t11, (SELECT 1 FROM DUAL) t12 SET t11.a = t11.a + 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "<derived2>",
+      "access_type": "system",
+      "rows": 1,
+      "filtered": 100,
+      "materialized": {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "message": "No tables used"
+          }
+        }
+      }
+    },
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 t11, (SELECT 1 FROM DUAL) t12;
@@ -474,6 +924,33 @@ Note	1003	/* select#1 */ select `test`.`t11`.`a` AS `a`,1 AS `1` from `test`.`t1
 Variable_name	Value
 Handler_read_key	2
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON SELECT * FROM t1 t11, (SELECT 1 FROM DUAL) t12;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "<derived2>",
+      "access_type": "system",
+      "rows": 1,
+      "filtered": 100,
+      "materialized": {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "message": "No tables used"
+          }
+        }
+      }
+    },
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -514,6 +991,37 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE        t1 t11, (SELECT * FROM t2) t12 SET t11.a = 10 WHERE t11.a > 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t11.a > 1"
+    },
+    "table": {
+      "table_name": "<derived2>",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "materialized": {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100
+          }
+        }
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 t11, (SELECT * FROM t2) t12                WHERE t11.a > 1;
@@ -525,6 +1033,31 @@ Note	1003	select `test`.`t11`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1 t11, (SELECT * FROM t2) t12                WHERE t11.a > 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t11.a > 1"
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 3,
+        "filtered": 100
+      },
+      "buffer_type": "flat",
+      "buffer_size": "65",
+      "join_type": "BNL"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -558,6 +1091,20 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE a > 1 LIMIT 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "attached_condition": "t1.a > 1"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE a > 1 LIMIT 1;
@@ -568,6 +1115,20 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where `test`.`t1`.`a` >
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE a > 1 LIMIT 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t1.a > 1"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -601,6 +1162,16 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE 0;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "message": "Impossible WHERE"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE 0;
@@ -611,6 +1182,16 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where 0
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE 0;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "message": "Impossible WHERE"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -641,6 +1222,16 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON DELETE   FROM t1 USING t1 WHERE 0;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "message": "Impossible WHERE"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1          WHERE 0;
@@ -651,6 +1242,16 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where 0
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM t1          WHERE 0;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "message": "Impossible WHERE"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -681,6 +1282,24 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	5
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE a = 3;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["a"],
+      "key": "a",
+      "key_length": "5",
+      "used_key_parts": ["a"],
+      "rows": 1,
+      "attached_condition": "t1.a = 3"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE a = 3;
@@ -691,6 +1310,24 @@ Note	1003	select 3 AS `a`,3 AS `b` from `test`.`t1` where 1
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE a = 3;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "const",
+      "possible_keys": ["a"],
+      "key": "a",
+      "key_length": "5",
+      "used_key_parts": ["a"],
+      "ref": ["const"],
+      "rows": 1,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -722,16 +1359,52 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	5
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE a < 3;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["a"],
+      "key": "a",
+      "key_length": "5",
+      "used_key_parts": ["a"],
+      "rows": 1,
+      "attached_condition": "t1.a < 3"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE a < 3;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t1	range	a	a	5	NULL	1	100.00	Using index condition
+1	SIMPLE	t1	range	a	a	5	NULL	1	100.00	Using where
 Warnings:
 Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where `test`.`t1`.`a` < 3
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	5
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE a < 3;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["a"],
+      "key": "a",
+      "key_length": "5",
+      "used_key_parts": ["a"],
+      "rows": 1,
+      "filtered": 100,
+      "attached_condition": "t1.a < 3"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -761,6 +1434,16 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE t1.a > 0 ORDER BY t1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "message": "Impossible WHERE"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE t1.a > 0 ORDER BY t1.a;
@@ -772,6 +1455,16 @@ Note	1003	select NULL AS `a` from `test`.`t1` where 0 order by NULL
 Variable_name	Value
 Handler_read_key	3
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE t1.a > 0 ORDER BY t1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "message": "Impossible WHERE noticed after reading const tables"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -800,6 +1493,24 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE t1.a > 0 ORDER BY t1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "rows": 3,
+      "attached_condition": "t1.a > 0"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE t1.a > 0 ORDER BY t1.a;
@@ -810,6 +1521,25 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where `test`.`t1`.`a` >
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE t1.a > 0 ORDER BY t1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t1.a > 0",
+      "using_index": true
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -843,6 +1573,23 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE (@a:= a) ORDER BY a LIMIT 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "index",
+      "key": "PRIMARY",
+      "key_length": "",
+      "used_key_parts": ["a"],
+      "rows": 1,
+      "attached_condition": "@a:=t1.a"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE (@a:= a) ORDER BY a LIMIT 1;
@@ -853,6 +1600,24 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where @a:=`test`.`t1`.`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE (@a:= a) ORDER BY a LIMIT 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "index",
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "rows": 1,
+      "filtered": 100,
+      "attached_condition": "@a:=t1.a",
+      "using_index": true
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -887,6 +1652,21 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	7
+EXPLAIN FORMAT=JSON DELETE   FROM t1 ORDER BY a ASC, b ASC LIMIT 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "delete": 1,
+        "table_name": "t1",
+        "access_type": "ALL",
+        "rows": 10
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 ORDER BY a ASC, b ASC LIMIT 1;
@@ -897,6 +1677,24 @@ Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	7
+EXPLAIN FORMAT=JSON SELECT * FROM t1 ORDER BY a ASC, b ASC LIMIT 1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t1.a, t1.b",
+        "table": {
+          "table_name": "t1",
+          "access_type": "ALL",
+          "rows": 10,
+          "filtered": 100
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -944,6 +1742,41 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	13
+EXPLAIN FORMAT=JSON DELETE t1,t2,t3 FROM t1,t2,t3 WHERE a1=a2 AND b2=a3 AND b1=b3;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    },
+    "table": {
+      "table_name": "t2",
+      "access_type": "ref",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a2"],
+      "ref": ["test.t1.a1"],
+      "rows": 1,
+      "filtered": 100
+    },
+    "table": {
+      "table_name": "t3",
+      "access_type": "eq_ref",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "8",
+      "used_key_parts": ["a3", "b3"],
+      "ref": ["test.t2.b2", "test.t1.b1"],
+      "rows": 1,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT *        FROM t1,t2,t3 WHERE a1=a2 AND b2=a3 AND b1=b3;
@@ -956,6 +1789,43 @@ Note	1003	select `test`.`t1`.`a1` AS `a1`,`test`.`t1`.`b1` AS `b1`,`test`.`t2`.`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	13
+EXPLAIN FORMAT=JSON SELECT *        FROM t1,t2,t3 WHERE a1=a2 AND b2=a3 AND b1=b3;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    },
+    "table": {
+      "table_name": "t2",
+      "access_type": "ref",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a2"],
+      "ref": ["test.t1.a1"],
+      "rows": 1,
+      "filtered": 100,
+      "using_index": true
+    },
+    "table": {
+      "table_name": "t3",
+      "access_type": "eq_ref",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "8",
+      "used_key_parts": ["a3", "b3"],
+      "ref": ["test.t2.b2", "test.t1.b1"],
+      "rows": 1,
+      "filtered": 100,
+      "using_index": true
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -996,24 +1866,79 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE t1 SET a = 10 WHERE a IN (SELECT a FROM t2);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "update": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100,
+            "attached_condition": "<cache>(t1.a) = t2.a"
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1     WHERE a IN (SELECT a FROM t2);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	
-1	PRIMARY	<subquery2>	eq_ref	distinct_key	distinct_key	4	func	1	100.00	
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
+2	DEPENDENT SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 Warnings:
-Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` semi join (`test`.`t2`) where 1
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where <expr_cache><`test`.`t1`.`a`>(<in_optimizer>(`test`.`t1`.`a`,<exists>(/* select#2 */ select `test`.`t2`.`a` from `test`.`t2` where <cache>(`test`.`t1`.`a`) = `test`.`t2`.`a`)))
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1     WHERE a IN (SELECT a FROM t2);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100,
+            "attached_condition": "<cache>(t1.a) = t2.a"
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
 Handler_read_key	7
-Handler_read_rnd_next	8
+Handler_read_rnd_next	10
 # Status of testing query execution:
 Variable_name	Value
 Handler_read_key	4
@@ -1046,6 +1971,34 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE a1 IN (SELECT a2 FROM t2 WHERE a2 > 2);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 5,
+      "attached_condition": "<in_optimizer>(t1.a1,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 5,
+            "filtered": 100,
+            "attached_condition": "t2.a2 > 2 and <cache>(t1.a1) = t2.a2"
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE a1 IN (SELECT a2 FROM t2 WHERE a2 > 2);
@@ -1057,6 +2010,34 @@ Note	1003	/* select#1 */ select `test`.`t1`.`a1` AS `a1` from `test`.`t1` where 
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE a1 IN (SELECT a2 FROM t2 WHERE a2 > 2);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 5,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a1,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 5,
+            "filtered": 100,
+            "attached_condition": "t2.a2 > 2 and <cache>(t1.a1) = t2.a2"
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1091,23 +2072,79 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE a1 IN (SELECT a2 FROM t2 WHERE a2 > 2);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 5,
+      "attached_condition": "<in_optimizer>(t1.a1,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 5,
+            "filtered": 100,
+            "attached_condition": "t2.a2 > 2 and <cache>(t1.a1) = t2.a2"
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE a1 IN (SELECT a2 FROM t2 WHERE a2 > 2);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	5	100.00	
-1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	100.00	Using where; FirstMatch(t1); Using join buffer (flat, BNL join)
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	5	100.00	Using where
+2	DEPENDENT SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	5	100.00	Using where
 Warnings:
-Note	1003	select `test`.`t1`.`a1` AS `a1` from `test`.`t1` semi join (`test`.`t2`) where `test`.`t2`.`a2` > 2 and `test`.`t1`.`a1` = `test`.`t2`.`a2`
+Note	1003	/* select#1 */ select `test`.`t1`.`a1` AS `a1` from `test`.`t1` where <expr_cache><`test`.`t1`.`a1`>(<in_optimizer>(`test`.`t1`.`a1`,<exists>(/* select#2 */ select `test`.`t2`.`a2` from `test`.`t2` where `test`.`t2`.`a2` > 2 and <cache>(`test`.`t1`.`a1`) = `test`.`t2`.`a2`)))
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE a1 IN (SELECT a2 FROM t2 WHERE a2 > 2);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 5,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a1,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 5,
+            "filtered": 100,
+            "attached_condition": "t2.a2 > 2 and <cache>(t1.a1) = t2.a2"
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
-Handler_read_key	4
-Handler_read_rnd_next	12
+Handler_read_key	9
+Handler_read_rnd_next	30
 # Status of testing query execution:
 Variable_name	Value
 Handler_delete	3
@@ -1135,6 +2172,19 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON UPDATE t1 SET i = 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "update": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 5
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1;
@@ -1145,6 +2195,19 @@ Note	1003	select `test`.`t1`.`i` AS `i`,`test`.`t1`.`j` AS `j` from `test`.`t1`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON SELECT * FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 5,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1178,6 +2241,16 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON DELETE FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "message": "Deleting all rows"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1;
@@ -1188,6 +2261,19 @@ Note	1003	select `test`.`t1`.`i` AS `i`,`test`.`t1`.`j` AS `j` from `test`.`t1`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON SELECT * FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 5,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1224,6 +2310,23 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t2",
+      "access_type": "index",
+      "key": "a",
+      "key_length": "",
+      "used_key_parts": ["a", "b", "c"],
+      "rows": 5,
+      "attached_condition": "t2.b = 10"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -1234,6 +2337,23 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "index",
+      "key": "a",
+      "key_length": "15",
+      "used_key_parts": ["a", "b", "c"],
+      "rows": 5,
+      "filtered": 100,
+      "attached_condition": "t2.b = 10"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1270,6 +2390,19 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON INSERT INTO t2 SELECT * FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1;
@@ -1280,6 +2413,19 @@ Note	1003	select `test`.`t1`.`i` AS `i` from `test`.`t1`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1314,6 +2460,19 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON REPLACE INTO t2 SELECT * FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1;
@@ -1324,6 +2483,19 @@ Note	1003	select `test`.`t1`.`i` AS `i` from `test`.`t1`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1354,6 +2526,16 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON INSERT INTO t1 SET i = 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1"
+    }
+  }
+}
 # Status of testing query execution:
 Variable_name	Value
 Handler_read_key	2
@@ -1377,6 +2559,16 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON REPLACE INTO t1 SET i = 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1"
+    }
+  }
+}
 # Status of testing query execution:
 Variable_name	Value
 Handler_read_key	2
@@ -1405,16 +2597,52 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["i"],
+      "rows": 5,
+      "attached_condition": "t1.i > 10 and t1.i <= 18"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	8	100.00	Using index condition
+1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	8	100.00	Using where
 Warnings:
 Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t1`.`i` AS `i` from `test`.`t1` where `test`.`t1`.`i` > 10 and `test`.`t1`.`i` <= 18 order by `test`.`t1`.`i` limit 5
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["i"],
+      "rows": 8,
+      "filtered": 100,
+      "attached_condition": "t1.i > 10 and t1.i <= 18"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1450,6 +2678,22 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "delete": 1,
+        "table_name": "t1",
+        "access_type": "ALL",
+        "rows": 26,
+        "attached_condition": "t1.i > 10 and t1.i <= 18"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;
@@ -1460,6 +2704,26 @@ Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t1`.`i` AS `i` from `test`.`t1` 
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t1.i",
+        "table": {
+          "table_name": "t1",
+          "access_type": "ALL",
+          "possible_keys": ["i"],
+          "rows": 26,
+          "filtered": 100,
+          "attached_condition": "t1.i > 10 and t1.i <= 18"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1503,6 +2767,22 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "delete": 1,
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 26,
+        "attached_condition": "t2.b = 10"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -1513,6 +2793,25 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.a, t2.c",
+        "table": {
+          "table_name": "t2",
+          "access_type": "ALL",
+          "rows": 26,
+          "filtered": 100,
+          "attached_condition": "t2.b = 10"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1557,6 +2856,23 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t2",
+      "access_type": "index",
+      "key": "a",
+      "key_length": "",
+      "used_key_parts": ["a", "b", "c"],
+      "rows": 5,
+      "attached_condition": "t2.b = 10"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -1567,6 +2883,23 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "index",
+      "key": "a",
+      "key_length": "15",
+      "used_key_parts": ["a", "b", "c"],
+      "rows": 5,
+      "filtered": 100,
+      "attached_condition": "t2.b = 10"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1606,6 +2939,22 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "delete": 1,
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 26,
+        "attached_condition": "t2.b = 10"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -1616,6 +2965,25 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.a, t2.c",
+        "table": {
+          "table_name": "t2",
+          "access_type": "ALL",
+          "rows": 26,
+          "filtered": 100,
+          "attached_condition": "t2.b = 10"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1660,6 +3028,22 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "delete": 1,
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 26,
+        "attached_condition": "t2.b = 10"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -1670,6 +3054,25 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.a, t2.c",
+        "table": {
+          "table_name": "t2",
+          "access_type": "ALL",
+          "rows": 26,
+          "filtered": 100,
+          "attached_condition": "t2.b = 10"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1715,6 +3118,35 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE key1 < 13 or key2 < 14 ORDER BY key1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "delete": 1,
+        "table_name": "t2",
+        "access_type": "index_merge",
+        "possible_keys": ["key1", "key2"],
+        "index_merge": {
+          "sort_union": {
+            "range": {
+              "key": "key1",
+              "used_key_parts": ["key1"]
+            },
+            "range": {
+              "key": "key2",
+              "used_key_parts": ["key2"]
+            }
+          }
+        },
+        "rows": 7,
+        "attached_condition": "t2.key1 < 13 or t2.key2 < 14"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE key1 < 13 or key2 < 14 ORDER BY key1;
@@ -1725,6 +3157,39 @@ Note	1003	select `test`.`t2`.`i` AS `i`,`test`.`t2`.`key1` AS `key1`,`test`.`t2`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT * FROM t2 WHERE key1 < 13 or key2 < 14 ORDER BY key1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.key1",
+        "table": {
+          "table_name": "t2",
+          "access_type": "index_merge",
+          "possible_keys": ["key1", "key2"],
+          "key_length": "5,5",
+          "index_merge": {
+            "sort_union": {
+              "range": {
+                "key": "key1",
+                "used_key_parts": ["key1"]
+              },
+              "range": {
+                "key": "key2",
+                "used_key_parts": ["key2"]
+              }
+            }
+          },
+          "rows": 7,
+          "filtered": 100,
+          "attached_condition": "t2.key1 < 13 or t2.key2 < 14"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1768,6 +3233,24 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE i > 10 AND i <= 18 ORDER BY i DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t2",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["i"],
+      "rows": 5,
+      "attached_condition": "t2.i > 10 and t2.i <= 18"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE i > 10 AND i <= 18 ORDER BY i DESC LIMIT 5;
@@ -1778,6 +3261,24 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`i` AS `i` from `test`.`t2` 
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t2 WHERE i > 10 AND i <= 18 ORDER BY i DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["i"],
+      "rows": 8,
+      "filtered": 100,
+      "attached_condition": "t2.i > 10 and t2.i <= 18"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1815,6 +3316,21 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON DELETE   FROM t2 ORDER BY a, b DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "delete": 1,
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 26
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 ORDER BY a, b DESC LIMIT 5;
@@ -1825,6 +3341,24 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT * FROM t2 ORDER BY a, b DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.a, t2.b desc",
+        "table": {
+          "table_name": "t2",
+          "access_type": "ALL",
+          "rows": 26,
+          "filtered": 100
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1869,6 +3403,22 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON DELETE   FROM t2 ORDER BY a DESC, b DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t2",
+      "access_type": "index",
+      "key": "a",
+      "key_length": "",
+      "used_key_parts": ["a", "b"],
+      "rows": 5
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 ORDER BY a DESC, b DESC LIMIT 5;
@@ -1879,6 +3429,22 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT * FROM t2 ORDER BY a DESC, b DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "index",
+      "key": "a",
+      "key_length": "6",
+      "used_key_parts": ["a", "b"],
+      "rows": 5,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1918,16 +3484,54 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE t2 SET a = 10 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "buffer": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "range",
+        "possible_keys": ["PRIMARY"],
+        "key": "PRIMARY",
+        "key_length": "4",
+        "used_key_parts": ["i"],
+        "rows": 5,
+        "attached_condition": "t2.i > 10 and t2.i <= 18"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM  t2    WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t2	range	PRIMARY	PRIMARY	4	NULL	8	100.00	Using index condition
+1	SIMPLE	t2	range	PRIMARY	PRIMARY	4	NULL	8	100.00	Using where
 Warnings:
 Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`i` AS `i` from `test`.`t2` where `test`.`t2`.`i` > 10 and `test`.`t2`.`i` <= 18 order by `test`.`t2`.`i` limit 5
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM  t2    WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["i"],
+      "rows": 8,
+      "filtered": 100,
+      "attached_condition": "t2.i > 10 and t2.i <= 18"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -1966,6 +3570,22 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE t2 SET a = 10 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 26,
+        "attached_condition": "t2.i > 10 and t2.i <= 18"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;
@@ -1976,6 +3596,26 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`i` AS `i` from `test`.`t2` 
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t2     WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.i",
+        "table": {
+          "table_name": "t2",
+          "access_type": "ALL",
+          "possible_keys": ["i"],
+          "rows": 26,
+          "filtered": 100,
+          "attached_condition": "t2.i > 10 and t2.i <= 18"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2020,6 +3660,22 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON UPDATE t2 SET d = 10 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 26,
+        "attached_condition": "t2.b = 10"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -2030,6 +3686,25 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.a, t2.c",
+        "table": {
+          "table_name": "t2",
+          "access_type": "ALL",
+          "rows": 26,
+          "filtered": 100,
+          "attached_condition": "t2.b = 10"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2075,6 +3750,25 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON UPDATE t2 SET d = 10 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "buffer": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "index",
+        "key": "a",
+        "key_length": "",
+        "used_key_parts": ["a", "b", "c"],
+        "rows": 5,
+        "attached_condition": "t2.b = 10"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -2085,6 +3779,23 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "index",
+      "key": "a",
+      "key_length": "15",
+      "used_key_parts": ["a", "b", "c"],
+      "rows": 5,
+      "filtered": 100,
+      "attached_condition": "t2.b = 10"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2125,6 +3836,22 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON UPDATE t2 SET d = 10 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 26,
+        "attached_condition": "t2.b = 10"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -2135,6 +3862,25 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.a, t2.c",
+        "table": {
+          "table_name": "t2",
+          "access_type": "ALL",
+          "rows": 26,
+          "filtered": 100,
+          "attached_condition": "t2.b = 10"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2179,6 +3925,22 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON UPDATE t2 SET d = 10 WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 26,
+        "attached_condition": "t2.b = 10"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -2189,6 +3951,25 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	8
+EXPLAIN FORMAT=JSON SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.a, t2.c",
+        "table": {
+          "table_name": "t2",
+          "access_type": "ALL",
+          "rows": 26,
+          "filtered": 100,
+          "attached_condition": "t2.b = 10"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2234,6 +4015,35 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON UPDATE t2 SET i = 123 WHERE key1 < 13 or key2 < 14 ORDER BY key1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "index_merge",
+        "possible_keys": ["key1", "key2"],
+        "index_merge": {
+          "sort_union": {
+            "range": {
+              "key": "key1",
+              "used_key_parts": ["key1"]
+            },
+            "range": {
+              "key": "key2",
+              "used_key_parts": ["key2"]
+            }
+          }
+        },
+        "rows": 7,
+        "attached_condition": "t2.key1 < 13 or t2.key2 < 14"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2      WHERE key1 < 13 or key2 < 14 ORDER BY key1;
@@ -2244,6 +4054,39 @@ Note	1003	select `test`.`t2`.`i` AS `i`,`test`.`t2`.`key1` AS `key1`,`test`.`t2`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT * FROM t2      WHERE key1 < 13 or key2 < 14 ORDER BY key1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.key1",
+        "table": {
+          "table_name": "t2",
+          "access_type": "index_merge",
+          "possible_keys": ["key1", "key2"],
+          "key_length": "5,5",
+          "index_merge": {
+            "sort_union": {
+              "range": {
+                "key": "key1",
+                "used_key_parts": ["key1"]
+              },
+              "range": {
+                "key": "key2",
+                "used_key_parts": ["key2"]
+              }
+            }
+          },
+          "rows": 7,
+          "filtered": 100,
+          "attached_condition": "t2.key1 < 13 or t2.key2 < 14"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2287,6 +4130,26 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE t2 SET a = 10 WHERE i > 10 AND i <= 18 ORDER BY i DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "buffer": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "range",
+        "possible_keys": ["PRIMARY"],
+        "key": "PRIMARY",
+        "key_length": "4",
+        "used_key_parts": ["i"],
+        "rows": 5,
+        "attached_condition": "t2.i > 10 and t2.i <= 18"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     WHERE i > 10 AND i <= 18 ORDER BY i DESC LIMIT 5;
@@ -2297,6 +4160,24 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`i` AS `i` from `test`.`t2` 
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t2     WHERE i > 10 AND i <= 18 ORDER BY i DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["i"],
+      "rows": 8,
+      "filtered": 100,
+      "attached_condition": "t2.i > 10 and t2.i <= 18"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2335,6 +4216,21 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON UPDATE t2 SET c = 10 ORDER BY a, b DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 26
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     ORDER BY a, b DESC LIMIT 5;
@@ -2345,6 +4241,24 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT * FROM t2     ORDER BY a, b DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t2.a, t2.b desc",
+        "table": {
+          "table_name": "t2",
+          "access_type": "ALL",
+          "rows": 26,
+          "filtered": 100
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2390,6 +4304,24 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON UPDATE t2 SET c = 10 ORDER BY a DESC, b DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "buffer": {
+      "table": {
+        "update": 1,
+        "table_name": "t2",
+        "access_type": "index",
+        "key": "a",
+        "key_length": "",
+        "used_key_parts": ["a", "b"],
+        "rows": 5
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     ORDER BY a DESC, b DESC LIMIT 5;
@@ -2400,6 +4332,22 @@ Note	1003	select `test`.`t2`.`a` AS `a`,`test`.`t2`.`b` AS `b`,`test`.`t2`.`c` A
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT * FROM t2     ORDER BY a DESC, b DESC LIMIT 5;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "index",
+      "key": "a",
+      "key_length": "6",
+      "used_key_parts": ["a", "b"],
+      "rows": 5,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2442,16 +4390,60 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON UPDATE t1 SET c2 = 0 WHERE c1_idx = 'y' ORDER BY pk DESC LIMIT 2;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "update": 1,
+        "table_name": "t1",
+        "access_type": "range",
+        "possible_keys": ["c1_idx"],
+        "key": "c1_idx",
+        "key_length": "2",
+        "used_key_parts": ["c1_idx"],
+        "rows": 2,
+        "attached_condition": "t1.c1_idx = 'y'"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1     WHERE c1_idx = 'y' ORDER BY pk DESC LIMIT 2;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t1	ref	c1_idx	c1_idx	2	const	2	100.00	Using index condition; Using where; Using filesort
+1	SIMPLE	t1	ref	c1_idx	c1_idx	2	const	2	100.00	Using where; Using filesort
 Warnings:
 Note	1003	select `test`.`t1`.`pk` AS `pk`,`test`.`t1`.`c1_idx` AS `c1_idx`,`test`.`t1`.`c2` AS `c2` from `test`.`t1` where `test`.`t1`.`c1_idx` = 'y' order by `test`.`t1`.`pk` desc limit 2
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT * FROM t1     WHERE c1_idx = 'y' ORDER BY pk DESC LIMIT 2;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t1.pk desc",
+        "table": {
+          "table_name": "t1",
+          "access_type": "ref",
+          "possible_keys": ["c1_idx"],
+          "key": "c1_idx",
+          "key_length": "2",
+          "used_key_parts": ["c1_idx"],
+          "ref": ["const"],
+          "rows": 2,
+          "filtered": 100,
+          "attached_condition": "t1.c1_idx <=> 'y' and t1.c1_idx = 'y'"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2488,16 +4480,60 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE c1_idx = 'y' ORDER BY pk DESC LIMIT 2;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "delete": 1,
+        "table_name": "t1",
+        "access_type": "range",
+        "possible_keys": ["c1_idx"],
+        "key": "c1_idx",
+        "key_length": "2",
+        "used_key_parts": ["c1_idx"],
+        "rows": 2,
+        "attached_condition": "t1.c1_idx = 'y'"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE c1_idx = 'y' ORDER BY pk DESC LIMIT 2;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t1	ref	c1_idx	c1_idx	2	const	2	100.00	Using index condition; Using where; Using filesort
+1	SIMPLE	t1	ref	c1_idx	c1_idx	2	const	2	100.00	Using where; Using filesort
 Warnings:
 Note	1003	select `test`.`t1`.`pk` AS `pk`,`test`.`t1`.`c1_idx` AS `c1_idx`,`test`.`t1`.`c2` AS `c2` from `test`.`t1` where `test`.`t1`.`c1_idx` = 'y' order by `test`.`t1`.`pk` desc limit 2
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT * FROM t1 WHERE c1_idx = 'y' ORDER BY pk DESC LIMIT 2;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t1.pk desc",
+        "table": {
+          "table_name": "t1",
+          "access_type": "ref",
+          "possible_keys": ["c1_idx"],
+          "key": "c1_idx",
+          "key_length": "2",
+          "used_key_parts": ["c1_idx"],
+          "ref": ["const"],
+          "rows": 2,
+          "filtered": 100,
+          "attached_condition": "t1.c1_idx <=> 'y' and t1.c1_idx = 'y'"
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2537,6 +4573,26 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON UPDATE t1 SET a=a+10 WHERE a > 34;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "buffer": {
+      "table": {
+        "update": 1,
+        "table_name": "t1",
+        "access_type": "range",
+        "possible_keys": ["PRIMARY"],
+        "key": "PRIMARY",
+        "key_length": "4",
+        "used_key_parts": ["a"],
+        "rows": 2,
+        "attached_condition": "t1.a > 34"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1     WHERE a > 34;
@@ -2547,6 +4603,25 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where `test`.`t1`.`a` >
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON SELECT * FROM t1     WHERE a > 34;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "rows": 2,
+      "filtered": 100,
+      "attached_condition": "t1.a > 34",
+      "using_index": true
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2585,6 +4660,26 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 Variable_name	Value
 Handler_read_key	7
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON UPDATE        t1 LEFT JOIN t2 ON t1.c1 = t2.c1 SET t2.c2 = 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "system",
+      "rows": 0,
+      "filtered": 0,
+      "const_row_not_found": true
+    },
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 LEFT JOIN t2 ON t1.c1 = t2.c1;
@@ -2597,6 +4692,26 @@ Note	1003	select `test`.`t1`.`c1` AS `c1`,`test`.`t1`.`c2` AS `c2`,`test`.`t1`.`
 Variable_name	Value
 Handler_read_key	7
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON SELECT * FROM t1 LEFT JOIN t2 ON t1.c1 = t2.c1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "system",
+      "rows": 0,
+      "filtered": 0,
+      "const_row_not_found": true
+    },
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2628,6 +4743,27 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 Variable_name	Value
 Handler_read_key	7
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON UPDATE        t1 LEFT JOIN t2 ON t1.c1 = t2.c1 SET t2.c2 = 10 WHERE t1.c3 = 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "system",
+      "rows": 0,
+      "filtered": 0,
+      "const_row_not_found": true
+    },
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100,
+      "attached_condition": "t1.c3 = 10"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 LEFT JOIN t2 ON t1.c1 = t2.c1                WHERE t1.c3 = 10;
@@ -2640,6 +4776,27 @@ Note	1003	select `test`.`t1`.`c1` AS `c1`,`test`.`t1`.`c2` AS `c2`,`test`.`t1`.`
 Variable_name	Value
 Handler_read_key	7
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON SELECT * FROM t1 LEFT JOIN t2 ON t1.c1 = t2.c1                WHERE t1.c3 = 10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "system",
+      "rows": 0,
+      "filtered": 0,
+      "const_row_not_found": true
+    },
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100,
+      "attached_condition": "t1.c3 = 10"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2679,6 +4836,34 @@ Note	1276	Field or reference 'test.t1.f1' of SELECT #2 was resolved in SELECT #1
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	7
+EXPLAIN FORMAT=JSON UPDATE t1 SET t1.f2=(SELECT MAX(t2.f4) FROM t2 WHERE t2.f3=t1.f1);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "update": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 2
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "possible_keys": ["IDX"],
+            "rows": 2,
+            "filtered": 100,
+            "attached_condition": "t2.f3 = t1.f1"
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT              (SELECT MAX(t2.f4) FROM t2 WHERE t2.f3=t1.f1) FROM t1;
@@ -2691,6 +4876,37 @@ Note	1003	/* select#1 */ select <expr_cache><`test`.`t1`.`f1`>((/* select#2 */ s
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	7
+EXPLAIN FORMAT=JSON SELECT              (SELECT MAX(t2.f4) FROM t2 WHERE t2.f3=t1.f1) FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100
+    },
+    "subqueries": [
+      {
+        "expression_cache": {
+          "state": "uninitialized",
+          "query_block": {
+            "select_id": 2,
+            "table": {
+              "table_name": "t2",
+              "access_type": "ALL",
+              "possible_keys": ["IDX"],
+              "rows": 2,
+              "filtered": 100,
+              "attached_condition": "t2.f3 = t1.f1"
+            }
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2750,6 +4966,26 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON UPDATE        v1 SET a = 1 WHERE a > 0;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100,
+      "attached_condition": "t11.a > 0"
+    },
+    "table": {
+      "table_name": "t12",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM v1           WHERE a > 0;
@@ -2761,6 +4997,31 @@ Note	1003	select `test`.`t11`.`a` AS `a`,`test`.`t12`.`a` AS `b` from `test`.`t1
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM v1           WHERE a > 0;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100,
+      "attached_condition": "t11.a > 0"
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t12",
+        "access_type": "ALL",
+        "rows": 2,
+        "filtered": 100
+      },
+      "buffer_type": "flat",
+      "buffer_size": "65",
+      "join_type": "BNL"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2795,6 +5056,32 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON UPDATE        t1, v1 SET v1.a = 1 WHERE t1.a = v1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100
+    },
+    "table": {
+      "table_name": "t11",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100,
+      "attached_condition": "t11.a = t1.a"
+    },
+    "table": {
+      "table_name": "t12",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1, v1              WHERE t1.a = v1.a;
@@ -2807,6 +5094,42 @@ Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t11`.`a` AS `a`,`test`.`t12`.`a`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON SELECT * FROM t1, v1              WHERE t1.a = v1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 2,
+      "filtered": 100
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t11",
+        "access_type": "ALL",
+        "rows": 2,
+        "filtered": 100
+      },
+      "buffer_type": "flat",
+      "buffer_size": "65",
+      "join_type": "BNL",
+      "attached_condition": "t11.a = t1.a"
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t12",
+        "access_type": "ALL",
+        "rows": 2,
+        "filtered": 100
+      },
+      "buffer_type": "incremental",
+      "buffer_size": "109",
+      "join_type": "BNL"
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2844,6 +5167,24 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON DELETE   FROM v1 WHERE a < 4;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "delete": 1,
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "rows": 3,
+      "attached_condition": "t1.a < 4"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM v1 WHERE a < 4;
@@ -2854,6 +5195,25 @@ Note	1003	select `test`.`t1`.`a` AS `a` from `test`.`t1` where `test`.`t1`.`a` <
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON SELECT * FROM v1 WHERE a < 4;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "range",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "t1.a < 4",
+      "using_index": true
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2895,6 +5255,31 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON DELETE v1 FROM t2, v1 WHERE t2.x = v1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "ALL",
+      "rows": 4,
+      "filtered": 100,
+      "attached_condition": "t2.x is not null"
+    },
+    "table": {
+      "table_name": "t1",
+      "access_type": "eq_ref",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "ref": ["test.t2.x"],
+      "rows": 1,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT *  FROM t2, v1 WHERE t2.x = v1.a;
@@ -2906,6 +5291,31 @@ Note	1003	select `test`.`t2`.`x` AS `x`,`test`.`t1`.`a` AS `a`,`test`.`t1`.`b` +
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT *  FROM t2, v1 WHERE t2.x = v1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "ALL",
+      "rows": 4,
+      "filtered": 100,
+      "attached_condition": "t2.x is not null"
+    },
+    "table": {
+      "table_name": "t1",
+      "access_type": "eq_ref",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "ref": ["test.t2.x"],
+      "rows": 1,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2946,6 +5356,31 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON DELETE v1 FROM t2, v1 WHERE t2.x = v1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "ALL",
+      "rows": 4,
+      "filtered": 100,
+      "attached_condition": "t2.x is not null"
+    },
+    "table": {
+      "table_name": "t1",
+      "access_type": "eq_ref",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "ref": ["test.t2.x"],
+      "rows": 1,
+      "filtered": 100
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT *  FROM t2, v1 WHERE t2.x = v1.a;
@@ -2957,6 +5392,31 @@ Note	1003	select `test`.`t2`.`x` AS `x`,`test`.`t1`.`a` AS `a`,`test`.`t1`.`b` +
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	6
+EXPLAIN FORMAT=JSON SELECT *  FROM t2, v1 WHERE t2.x = v1.a;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t2",
+      "access_type": "ALL",
+      "rows": 4,
+      "filtered": 100,
+      "attached_condition": "t2.x is not null"
+    },
+    "table": {
+      "table_name": "t1",
+      "access_type": "eq_ref",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "ref": ["test.t2.x"],
+      "rows": 1,
+      "filtered": 100
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -2990,6 +5450,16 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	2
+EXPLAIN FORMAT=JSON INSERT INTO v1 VALUES (10);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1"
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT NULL;
@@ -2999,6 +5469,16 @@ Warnings:
 Note	1003	select NULL AS `NULL`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
+EXPLAIN FORMAT=JSON SELECT NULL;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "message": "No tables used"
+    }
+  }
+}
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
 # Status of testing query execution:
@@ -3031,6 +5511,20 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 Variable_name	Value
 Handler_read_key	4
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON INSERT INTO v1 SELECT * FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "system",
+      "rows": 0,
+      "filtered": 0,
+      "const_row_not_found": true
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1;
@@ -3042,6 +5536,20 @@ Note	1003	select NULL AS `a` from `test`.`t1`
 Variable_name	Value
 Handler_read_key	2
 Handler_read_rnd_next	1
+EXPLAIN FORMAT=JSON SELECT * FROM t1;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "system",
+      "rows": 0,
+      "filtered": 0,
+      "const_row_not_found": true
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -3081,25 +5589,120 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE        t1 SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "update": 1,
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "<derived3>",
+            "access_type": "index_subquery",
+            "possible_keys": ["key0"],
+            "key": "key0",
+            "key_length": "5",
+            "used_key_parts": ["b"],
+            "ref": ["func"],
+            "rows": 2,
+            "filtered": 100,
+            "materialized": {
+              "query_block": {
+                "select_id": 3,
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "t2.b",
+                    "table": {
+                      "table_name": "t2",
+                      "access_type": "ALL",
+                      "rows": 3,
+                      "filtered": 100
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1            WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	
-1	PRIMARY	<subquery2>	eq_ref	distinct_key	distinct_key	4	func	1	100.00	
-2	MATERIALIZED	<derived3>	ALL	NULL	NULL	NULL	NULL	3	100.00	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
+2	DEPENDENT SUBQUERY	<derived3>	index_subquery	key0	key0	5	func	2	100.00	
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 Warnings:
-Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` semi join ((/* select#3 */ select `test`.`t2`.`b` AS `b` from `test`.`t2` order by `test`.`t2`.`b` limit 2,2) `x`) where 1
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where <expr_cache><`test`.`t1`.`a`>(<in_optimizer>(`test`.`t1`.`a`,<exists>(<index_lookup>(<cache>(`test`.`t1`.`a`) in (temporary) on key0))))
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1            WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "<derived3>",
+            "access_type": "index_subquery",
+            "possible_keys": ["key0"],
+            "key": "key0",
+            "key_length": "5",
+            "used_key_parts": ["b"],
+            "ref": ["func"],
+            "rows": 2,
+            "filtered": 100,
+            "materialized": {
+              "query_block": {
+                "select_id": 3,
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "t2.b",
+                    "table": {
+                      "table_name": "t2",
+                      "access_type": "ALL",
+                      "rows": 3,
+                      "filtered": 100
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
-Handler_read_key	7
-Handler_read_rnd_next	10
+Handler_read_key	10
+Handler_read_rnd_next	8
 Sort_priority_queue_sorts	1
 Sort_rows	3
 Sort_scan	1
@@ -3120,50 +5723,160 @@ Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 EXPLAIN UPDATE        t1, t2 SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	
-1	PRIMARY	<subquery2>	eq_ref	distinct_key	distinct_key	4	func	1	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	
-2	MATERIALIZED	<derived3>	ALL	NULL	NULL	NULL	NULL	3	
+2	DEPENDENT SUBQUERY	<derived3>	index_subquery	key0	key0	5	func	2	
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	Using filesort
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED UPDATE        t1, t2 SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	
-1	PRIMARY	<subquery2>	eq_ref	distinct_key	distinct_key	4	func	1	100.00	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	
-2	MATERIALIZED	<derived3>	ALL	NULL	NULL	NULL	NULL	3	100.00	
+2	DEPENDENT SUBQUERY	<derived3>	index_subquery	key0	key0	5	func	2	100.00	
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE        t1, t2 SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "table": {
+      "table_name": "t2",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "<derived3>",
+            "access_type": "index_subquery",
+            "possible_keys": ["key0"],
+            "key": "key0",
+            "key_length": "5",
+            "used_key_parts": ["b"],
+            "ref": ["func"],
+            "rows": 2,
+            "filtered": 100,
+            "materialized": {
+              "query_block": {
+                "select_id": 3,
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "t2.b",
+                    "table": {
+                      "table_name": "t2",
+                      "access_type": "ALL",
+                      "rows": 3,
+                      "filtered": 100
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1, t2            WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	
-1	PRIMARY	<subquery2>	eq_ref	distinct_key	distinct_key	4	func	1	100.00	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using join buffer (flat, BNL join)
-2	MATERIALIZED	<derived3>	ALL	NULL	NULL	NULL	NULL	3	100.00	
+2	DEPENDENT SUBQUERY	<derived3>	index_subquery	key0	key0	5	func	2	100.00	
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 Warnings:
-Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1` semi join ((/* select#3 */ select `test`.`t2`.`b` AS `b` from `test`.`t2` order by `test`.`t2`.`b` limit 2,2) `x`) join `test`.`t2` where 1
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1` join `test`.`t2` where <expr_cache><`test`.`t1`.`a`>(<in_optimizer>(`test`.`t1`.`a`,<exists>(<index_lookup>(<cache>(`test`.`t1`.`a`) in (temporary) on key0))))
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1, t2            WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#2))"
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 3,
+        "filtered": 100
+      },
+      "buffer_type": "flat",
+      "buffer_size": "65",
+      "join_type": "BNL"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "<derived3>",
+            "access_type": "index_subquery",
+            "possible_keys": ["key0"],
+            "key": "key0",
+            "key_length": "5",
+            "used_key_parts": ["b"],
+            "ref": ["func"],
+            "rows": 2,
+            "filtered": 100,
+            "materialized": {
+              "query_block": {
+                "select_id": 3,
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "t2.b",
+                    "table": {
+                      "table_name": "t2",
+                      "access_type": "ALL",
+                      "rows": 3,
+                      "filtered": 100
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
-Handler_read_key	7
-Handler_read_rnd_next	10
+Handler_read_key	10
+Handler_read_rnd_next	8
 Sort_priority_queue_sorts	1
 Sort_rows	3
 Sort_scan	1
 # Status of testing query execution:
 Variable_name	Value
-Handler_read_key	7
-Handler_read_rnd_next	10
+Handler_read_key	10
+Handler_read_rnd_next	8
 Sort_priority_queue_sorts	1
 Sort_rows	3
 Sort_scan	1
@@ -3176,52 +5889,173 @@ Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 EXPLAIN UPDATE        t1, (SELECT * FROM t2) y SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	
-1	PRIMARY	<subquery3>	eq_ref	distinct_key	distinct_key	4	func	1	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	PRIMARY	<derived2>	ALL	NULL	NULL	NULL	NULL	3	
-3	MATERIALIZED	<derived4>	ALL	NULL	NULL	NULL	NULL	3	
+3	DEPENDENT SUBQUERY	<derived4>	index_subquery	key0	key0	5	func	2	
 4	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	Using filesort
 2	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED UPDATE        t1, (SELECT * FROM t2) y SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	
-1	PRIMARY	<subquery3>	eq_ref	distinct_key	distinct_key	4	func	1	100.00	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 1	PRIMARY	<derived2>	ALL	NULL	NULL	NULL	NULL	3	100.00	
-3	MATERIALIZED	<derived4>	ALL	NULL	NULL	NULL	NULL	3	100.00	
+3	DEPENDENT SUBQUERY	<derived4>	index_subquery	key0	key0	5	func	2	100.00	
 4	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 2	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON UPDATE        t1, (SELECT * FROM t2) y SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#3))"
+    },
+    "table": {
+      "table_name": "<derived2>",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "materialized": {
+        "query_block": {
+          "select_id": 2,
+          "table": {
+            "table_name": "t2",
+            "access_type": "ALL",
+            "rows": 3,
+            "filtered": 100
+          }
+        }
+      }
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 3,
+          "table": {
+            "table_name": "<derived4>",
+            "access_type": "index_subquery",
+            "possible_keys": ["key0"],
+            "key": "key0",
+            "key_length": "5",
+            "used_key_parts": ["b"],
+            "ref": ["func"],
+            "rows": 2,
+            "filtered": 100,
+            "materialized": {
+              "query_block": {
+                "select_id": 4,
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "t2.b",
+                    "table": {
+                      "table_name": "t2",
+                      "access_type": "ALL",
+                      "rows": 3,
+                      "filtered": 100
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1, (SELECT * FROM t2) y            WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	
-1	PRIMARY	<subquery3>	eq_ref	distinct_key	distinct_key	4	func	1	100.00	
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using join buffer (flat, BNL join)
-3	MATERIALIZED	<derived4>	ALL	NULL	NULL	NULL	NULL	3	100.00	
+3	DEPENDENT SUBQUERY	<derived4>	index_subquery	key0	key0	5	func	2	100.00	
 4	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 Warnings:
-Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1` semi join ((/* select#4 */ select `test`.`t2`.`b` AS `b` from `test`.`t2` order by `test`.`t2`.`b` limit 2,2) `x`) join `test`.`t2` where 1
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t2`.`b` AS `b` from `test`.`t1` join `test`.`t2` where <expr_cache><`test`.`t1`.`a`>(<in_optimizer>(`test`.`t1`.`a`,<exists>(<index_lookup>(<cache>(`test`.`t1`.`a`) in (temporary) on key0))))
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	4
+EXPLAIN FORMAT=JSON SELECT * FROM t1, (SELECT * FROM t2) y            WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "ALL",
+      "rows": 3,
+      "filtered": 100,
+      "attached_condition": "<in_optimizer>(t1.a,<exists>(subquery#3))"
+    },
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "ALL",
+        "rows": 3,
+        "filtered": 100
+      },
+      "buffer_type": "flat",
+      "buffer_size": "65",
+      "join_type": "BNL"
+    },
+    "subqueries": [
+      {
+        "query_block": {
+          "select_id": 3,
+          "table": {
+            "table_name": "<derived4>",
+            "access_type": "index_subquery",
+            "possible_keys": ["key0"],
+            "key": "key0",
+            "key_length": "5",
+            "used_key_parts": ["b"],
+            "ref": ["func"],
+            "rows": 2,
+            "filtered": 100,
+            "materialized": {
+              "query_block": {
+                "select_id": 4,
+                "read_sorted_file": {
+                  "filesort": {
+                    "sort_key": "t2.b",
+                    "table": {
+                      "table_name": "t2",
+                      "access_type": "ALL",
+                      "rows": 3,
+                      "filtered": 100
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
-Handler_read_key	7
-Handler_read_rnd_next	10
+Handler_read_key	10
+Handler_read_rnd_next	8
 Sort_priority_queue_sorts	1
 Sort_rows	3
 Sort_scan	1
 # Status of testing query execution:
 Variable_name	Value
-Handler_read_key	7
-Handler_read_rnd_next	10
+Handler_read_key	10
+Handler_read_rnd_next	8
 Sort_priority_queue_sorts	1
 Sort_rows	3
 Sort_scan	1
@@ -3273,6 +6107,26 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON UPDATE t1 SET a=a+1 WHERE a>10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "buffer": {
+      "table": {
+        "update": 1,
+        "table_name": "t1",
+        "access_type": "range",
+        "possible_keys": ["PRIMARY"],
+        "key": "PRIMARY",
+        "key_length": "4",
+        "used_key_parts": ["a"],
+        "rows": 1,
+        "attached_condition": "t1.a > 10"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT a t1 FROM t1 WHERE a>10;
@@ -3283,6 +6137,25 @@ Note	1003	select `test`.`t1`.`a` AS `t1` from `test`.`t1` where `test`.`t1`.`a` 
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON SELECT a t1 FROM t1 WHERE a>10;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "table": {
+      "table_name": "t1",
+      "access_type": "index",
+      "possible_keys": ["PRIMARY"],
+      "key": "PRIMARY",
+      "key_length": "4",
+      "used_key_parts": ["a"],
+      "rows": 5,
+      "filtered": 20,
+      "attached_condition": "t1.a > 10",
+      "using_index": true
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
@@ -3312,6 +6185,26 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON UPDATE t1 SET a=a+1 WHERE a>10 ORDER BY a+20;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "filesort": {
+      "table": {
+        "update": 1,
+        "table_name": "t1",
+        "access_type": "range",
+        "possible_keys": ["PRIMARY"],
+        "key": "PRIMARY",
+        "key_length": "4",
+        "used_key_parts": ["a"],
+        "rows": 1,
+        "attached_condition": "t1.a > 10"
+      }
+    }
+  }
+}
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT a t1 FROM t1 WHERE a>10 ORDER BY a+20;
@@ -3322,6 +6215,30 @@ Note	1003	select `test`.`t1`.`a` AS `t1` from `test`.`t1` where `test`.`t1`.`a` 
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
 Handler_read_key	3
+EXPLAIN FORMAT=JSON SELECT a t1 FROM t1 WHERE a>10 ORDER BY a+20;;
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "read_sorted_file": {
+      "filesort": {
+        "sort_key": "t1.a + 20",
+        "table": {
+          "table_name": "t1",
+          "access_type": "index",
+          "possible_keys": ["PRIMARY"],
+          "key": "PRIMARY",
+          "key_length": "4",
+          "used_key_parts": ["a"],
+          "rows": 5,
+          "filtered": 20,
+          "attached_condition": "t1.a > 10",
+          "using_index": true
+        }
+      }
+    }
+  }
+}
 Warnings:
 Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 # Status of "equivalent" SELECT query execution:
