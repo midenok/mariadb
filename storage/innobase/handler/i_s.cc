@@ -1179,7 +1179,6 @@ trx_i_s_common_fill_table(
 	Item*		)	/*!< in: condition (not used) */
 {
 	LEX_CSTRING		table_name;
-	int			ret;
 	trx_i_s_cache_t*	cache;
 
 	DBUG_ENTER("trx_i_s_common_fill_table");
@@ -1211,32 +1210,24 @@ trx_i_s_common_fill_table(
 			" memory limit of " << TRX_I_S_MEM_LIMIT << " bytes";
 	}
 
-	ret = 0;
-
 	trx_i_s_cache_start_read(cache);
 
 	if (innobase_strcasecmp(table_name.str, "innodb_trx") == 0) {
 
 		if (fill_innodb_trx_from_cache(
 			cache, thd, tables->table) != 0) {
-
-			ret = 1;
 		}
 
 	} else if (innobase_strcasecmp(table_name.str, "innodb_locks") == 0) {
 
 		if (fill_innodb_locks_from_cache(
 			cache, thd, tables->table) != 0) {
-
-			ret = 1;
 		}
 
 	} else if (innobase_strcasecmp(table_name.str, "innodb_lock_waits") == 0) {
 
 		if (fill_innodb_lock_waits_from_cache(
 			cache, thd, tables->table) != 0) {
-
-			ret = 1;
 		}
 
 	} else {
@@ -1245,22 +1236,15 @@ trx_i_s_common_fill_table(
 			" This function only knows how to fill"
 			" innodb_trx, innodb_locks and"
 			" innodb_lock_waits tables.";
-
-		ret = 1;
 	}
 
 	trx_i_s_cache_end_read(cache);
 
-#if 0
-	DBUG_RETURN(ret);
-#else
 	/* if this function returns something else than 0 then a
 	deadlock occurs between the mysqld server and mysql client,
 	see http://bugs.mysql.com/29900 ; when that bug is resolved
 	we can enable the DBUG_RETURN(ret) above */
-	ret++;  // silence a gcc46 warning
 	DBUG_RETURN(0);
-#endif
 }
 
 /* Fields of the dynamic table information_schema.innodb_cmp. */

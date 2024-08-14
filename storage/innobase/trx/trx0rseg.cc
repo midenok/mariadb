@@ -539,6 +539,7 @@ trx_rseg_mem_restore(trx_rseg_t* rseg, trx_id_t& max_trx_id, mtr_t* mtr)
 	}
 }
 
+#if 0
 /** Read binlog metadata from the TRX_SYS page, in case we are upgrading
 from MySQL or a MariaDB version older than 10.3.5. */
 static void trx_rseg_init_binlog_info(const page_t* page)
@@ -559,6 +560,7 @@ static void trx_rseg_init_binlog_info(const page_t* page)
 	trx_rseg_init_wsrep_xid(page, trx_sys.recovered_wsrep_xid);
 #endif
 }
+#endif
 
 /** Initialize the rollback segments in memory at database startup. */
 void

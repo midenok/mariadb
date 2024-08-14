@@ -771,7 +771,6 @@ DECLARE_THREAD(fts_parallel_tokenization)(
 	row_merge_block_t**	crypt_block;
 	pfs_os_file_t		tmpfd[FTS_NUM_AUX_INDEX];
 	ulint			mycount[FTS_NUM_AUX_INDEX];
-	ib_uint64_t		total_rec = 0;
 	ulint			num_doc_processed = 0;
 	doc_id_t		last_doc_id = 0;
 	mem_heap_t*		blob_heap = NULL;
@@ -1039,7 +1038,6 @@ exit:
 			goto func_exit;
 		}
 
-		total_rec += merge_file[i]->n_rec;
 		os_file_close(tmpfd[i]);
 	}
 
