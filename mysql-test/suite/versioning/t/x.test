@@ -1,0 +1,48 @@
+--source include/have_partition.inc
+--source include/have_innodb.inc
+
+create or replace table t1 (id int primary key)
+with system versioning engine innodb;
+
+# Subpartition by SYSTEM_TIME is prohibited at parser layer
+--error ER_PARSE_ERROR
+create or replace table t2 (i int) with system versioning
+partition by system_time interval 1 day
+subpartition by system_time interval 2 hours
+(partition p1 history, partition pn current);
+
+create or replace table t2 (fk int references t1(id))
+with system versioning engine innodb
+partition by system_time
+subpartition by key (fk) subpartitions 2
+(partition p1 history, partition pn current);
+
+insert into t1 values (1), (2), (3), (4), (5), (6);
+insert into t2 values (3), (4), (5);
+select * from t2 partition (pnsp0);
+select * from t2 partition (pnsp1);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 3;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 4;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 5;
+--error ER_NO_REFERENCED_ROW_2
+insert into t2 values (7);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id > 2;
+delete from t2;
+select * from t2 for system_time all order by fk;
+delete from t1 where id > 2;
+--error ER_NO_REFERENCED_ROW_2
+insert into t2 values (3), (5);
+insert into t2 values (2);
+
+# FIXME: partitioning alter operations
+
+select * from information_schema.innodb_sys_indexes;
+select * from information_schema.innodb_sys_tables;
+select * from information_schema.innodb_sys_foreign;
+
+
+drop tables t2, t1;

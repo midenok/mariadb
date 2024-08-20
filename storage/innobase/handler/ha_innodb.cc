@@ -5298,6 +5298,7 @@ create_table_info_t::create_table_info_t(
 	  m_table(NULL),
 	  m_innodb_file_per_table(file_per_table),
 	  m_creating_stub(thd_ddl_options(thd)->import_tablespace()),
+	  partitioned(false),
 	  alter_table(NULL)
 {
   m_table_name[0]= '\0';
@@ -12248,6 +12249,7 @@ create_table_info_t::create_foreign_keys()
 	enum_sql_command sqlcom = enum_sql_command(thd_sql_command(m_thd));
 	LEX_CSTRING name= {m_table_name, strlen(m_table_name)};
 
+	ut_ad(!partitioned);
 	if (sqlcom == SQLCOM_ALTER_TABLE) {
 		mem_heap_t* heap = mem_heap_create(10000);
 		LEX_CSTRING table_name = m_form->s->table_name;
@@ -12316,13 +12318,14 @@ create_table_info_t::create_foreign_keys()
 				       n, strlen(n), m_thd) = '\0';
 		mem_heap_free(heap);
 		operation = "Alter ";
-	} else if (strstr(m_table_name, "#P#")
-		   || strstr(m_table_name, "#p#")) {
-		/* Partitioned table */
-		create_name[0] = '\0';
 	} else {
 		*innobase_convert_name(create_name, sizeof create_name,
 				       LEX_STRING_WITH_LEN(name), m_thd)= '\0';
+	}
+
+	if (is_partition(name.str)) {
+		/* Partitioned table */
+		partitioned = true;
 	}
 
 	Alter_info* alter_info = m_create_info->alter_info;
@@ -13281,10 +13284,22 @@ ha_innobase::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
   }
 
   if (!error)
+  {
+    bool create_fk= own_trx;
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+    if (create_fk && form->part_info)
+    {
+      /* MDEV-19191 allows FK for SYSTEM_TIME partitioning. We create foreign
+      keys for current partition. */
+      ut_ad(form->vers_system_time_partitioned());
+      create_fk= form->is_vers_current_partition(this);
+    }
+#endif /* WITH_PARTITION_STORAGE_ENGINE */
     /* We can't possibly have foreign key information when creating a
     stub table for importing .frm / .cfg / .ibd because it is not
     stored in any of these files. */
-    error= info.create_table(own_trx, !create_info->recreate_identical_table);
+    error= info.create_table(create_fk, !create_info->recreate_identical_table);
+  }
 
   if (own_trx || (info.flags2() & DICT_TF2_TEMPORARY))
   {

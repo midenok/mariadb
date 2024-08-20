@@ -1855,6 +1855,12 @@ public:
     return s->versioned == type;
   }
 
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+  /* These are for InnoDB, so they cannot be inline */
+  bool vers_system_time_partitioned() const;
+  bool is_vers_current_partition(handler *file) const;
+#endif /* WITH_PARTITION_STORAGE_ENGINE */
+
   bool versioned_write() const
   {
     DBUG_ASSERT(versioned() || !vers_write);
