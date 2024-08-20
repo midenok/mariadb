@@ -4292,7 +4292,8 @@ handler *mysql_create_frm_image(THD *thd, HA_CREATE_INFO *create_info,
     If storage engine handles partitioning natively (like NDB)
     foreign keys support is possible, so we let the engine decide.
   */
-  if (create_info->db_type == partition_hton)
+  if (create_info->db_type == partition_hton &&
+      part_info->part_type != VERSIONING_PARTITION)
   {
     List_iterator_fast<Key> key_iterator(alter_info->key_list);
     Key *key;
