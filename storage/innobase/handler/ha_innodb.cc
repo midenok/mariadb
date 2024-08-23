@@ -12720,9 +12720,17 @@ name_converted:
 		case FK_OPTION_RESTRICT:
 			break;
 		case FK_OPTION_CASCADE:
+			if (partitioned)
+			{
+				goto cascade_partitioned;
+			}
 			foreign->type |= DICT_FOREIGN_ON_DELETE_CASCADE;
 			break;
 		case FK_OPTION_SET_NULL:
+			if (partitioned)
+			{
+				goto cascade_partitioned;
+			}
 			foreign->type |= DICT_FOREIGN_ON_DELETE_SET_NULL;
 			break;
 		case FK_OPTION_NO_ACTION:
@@ -12741,9 +12749,27 @@ name_converted:
 		case FK_OPTION_RESTRICT:
 			break;
 		case FK_OPTION_CASCADE:
+			if (partitioned)
+			{
+				goto cascade_partitioned;
+			}
 			foreign->type |= DICT_FOREIGN_ON_UPDATE_CASCADE;
 			break;
 		case FK_OPTION_SET_NULL:
+			if (partitioned)
+			{
+cascade_partitioned:
+				key_text k(fk);
+				ib_foreign_warn(m_trx, DB_CANNOT_ADD_CONSTRAINT,
+						create_name,
+						"%s table %s with foreign key "
+						"%s constraint failed. "
+						"CASCADE or SET NULL action is not allowed "
+						"in partitioned table",
+						operation, create_name,
+						k.str());
+				return (DB_CANNOT_ADD_CONSTRAINT);
+			}
 			foreign->type |= DICT_FOREIGN_ON_UPDATE_SET_NULL;
 			break;
 		case FK_OPTION_NO_ACTION:
