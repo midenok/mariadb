@@ -13311,14 +13311,16 @@ ha_innobase::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
 
   if (!error)
   {
-    bool create_fk= own_trx;
+    bool create_fk= true;
 #ifdef WITH_PARTITION_STORAGE_ENGINE
-    if (create_fk && form->part_info)
+    if (form->part_info)
     {
-      /* MDEV-19191 allows FK for SYSTEM_TIME partitioning. We create foreign
-      keys for current partition. */
-      ut_ad(form->vers_system_time_partitioned());
-      create_fk= form->is_vers_current_partition(this);
+      if (form->vers_system_time_partitioned())
+      {
+        /* MDEV-19191 allows FK for SYSTEM_TIME partitioning. We create foreign
+        keys for current partition. */
+        create_fk= form->is_vers_current_partition(this);
+      }
     }
 #endif /* WITH_PARTITION_STORAGE_ENGINE */
     /* We can't possibly have foreign key information when creating a

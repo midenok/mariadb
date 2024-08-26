@@ -4285,6 +4285,7 @@ handler *mysql_create_frm_image(THD *thd, HA_CREATE_INFO *create_info,
         DBUG_RETURN(NULL);
     }
   }
+#if 0
   /*
     Unless table's storage engine supports partitioning natively
     don't allow foreign keys on partitioned tables (they won't
@@ -4307,6 +4308,7 @@ handler *mysql_create_frm_image(THD *thd, HA_CREATE_INFO *create_info,
       }
     }
   }
+#endif
 #endif
 
   if (mysql_prepare_create_table_finalize(thd, create_info,
