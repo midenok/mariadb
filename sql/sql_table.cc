@@ -9397,7 +9397,7 @@ static bool fk_prepare_copy_alter_table(THD *thd, TABLE *table,
 
   DBUG_ENTER("fk_prepare_copy_alter_table");
 
-  table->file->get_parent_foreign_key_list(thd, &fk_parent_key_list);
+  table->file->get_parent_foreign_key_list(thd, &fk_parent_key_list); // FIXME: test
 
   /* OOM when building list. */
   if (unlikely(thd->is_error()))

@@ -5534,7 +5534,7 @@ that are reorganised.
         my_error(ER_PARTITION_DOES_NOT_EXIST, MYF(0));
         goto err;
       }
-      if (table->file->is_fk_defined_on_table_or_index(MAX_KEY))
+      if (table->file->is_fk_defined_on_table_or_index(MAX_KEY)) // FIXME: test
       {
         my_error(ER_ROW_IS_REFERENCED, MYF(0));
         goto err;

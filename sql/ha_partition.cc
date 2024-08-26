@@ -12438,6 +12438,35 @@ ulonglong ha_partition::index_blocks(uint index, uint ranges, ha_rows rows)
   return blocks;
 }
 
+/*
+   Get partition file for FK info. For SYSTEM_TIME this is current partition,
+   for other partitioning this is first read partition.
+*/
+handler *ha_partition::get_fk_file()
+{
+  uint i;
+  if (m_part_info->vers_info)
+  {
+    const uint32 sub_factor= m_part_info->num_subparts ? m_part_info->num_subparts : 1;
+    i= m_part_info->vers_info->now_part->id * sub_factor;
+  }
+  else
+    i= bitmap_get_first_set(&m_part_info->read_partitions);
+  return m_file[i];
+}
+
+int ha_partition::get_foreign_key_list(const THD *thd,
+                                       List<FOREIGN_KEY_INFO> *f_key_list)
+{
+  handler *fk_file= get_fk_file();
+  return fk_file->get_foreign_key_list(thd, f_key_list);
+}
+
+char* ha_partition::get_foreign_key_create_info()
+{
+  handler *fk_file= get_fk_file();
+  return fk_file->get_foreign_key_create_info();
+}
 
 struct st_mysql_storage_engine partition_storage_engine=
 { MYSQL_HANDLERTON_INTERFACE_VERSION };
