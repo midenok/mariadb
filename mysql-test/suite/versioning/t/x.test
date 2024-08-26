@@ -65,6 +65,7 @@ partition by system_time interval 1 day
 subpartition by system_time interval 2 hours
 (partition p1 history, partition pn current);
 
+--echo # Partititon by SYSTEM_TIME, subpartition by KEY
 create or replace table t2 (fk int references t1(id))
 with system versioning engine innodb
 partition by system_time
@@ -73,8 +74,8 @@ subpartition by key (fk) subpartitions 2
 
 insert into t1 values (1), (2), (3), (4), (5), (6);
 insert into t2 values (3), (4), (5);
-select * from t2 partition (pnsp0);
-select * from t2 partition (pnsp1);
+select * from t2 partition (pnsp0) order by fk;
+select * from t2 partition (pnsp1) order by fk;
 --error ER_ROW_IS_REFERENCED_2
 delete from t1 where id = 3;
 --error ER_ROW_IS_REFERENCED_2
@@ -83,6 +84,7 @@ delete from t1 where id = 4;
 delete from t1 where id = 5;
 --error ER_NO_REFERENCED_ROW_2
 insert into t2 values (7);
+delete from t1 where id = 1;
 --error ER_ROW_IS_REFERENCED_2
 delete from t1 where id > 2;
 delete from t2;
@@ -92,14 +94,48 @@ delete from t1 where id > 2;
 insert into t2 values (3), (5);
 insert into t2 values (2);
 
+insert into t1 values (3), (4), (5), (6);
+
+--echo # Partition by HASH
 create or replace table t2 (fk int references t1(id))
 engine innodb
 partition by hash (fk) partitions 2;
 
+insert into t2 values (3), (4), (5);
+select * from t2 partition (p0) order by fk;
+select * from t2 partition (p1) order by fk;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 3;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 4;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 5;
+--error ER_NO_REFERENCED_ROW_2
+insert into t2 values (7);
+delete from t1 where id = 1;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id > 2;
+delete from t2;
+select * from t2 order by fk;
+delete from t1 where id > 2;
+--error ER_NO_REFERENCED_ROW_2
+insert into t2 values (3), (5);
+insert into t2 values (2);
+select * from information_schema.innodb_sys_foreign;
+
+--error ER_NO_REFERENCED_ROW_2
+insert into t2 values (4);
+
+--echo # ALTER operations
+alter table t2 remove partitioning;
+# --error ER_NO_REFERENCED_ROW_2
+insert into t2 values (4);
+select * from information_schema.innodb_sys_foreign;
+select * from information_schema.innodb_sys_foreign_cols;
+
 # FIXME: partitioning alter operations
 
-select * from information_schema.innodb_sys_indexes;
-select * from information_schema.innodb_sys_tables;
-select * from information_schema.innodb_sys_foreign;
+# select * from information_schema.innodb_sys_indexes;
+# select * from information_schema.innodb_sys_tables;
 
 drop tables t2, t1;
