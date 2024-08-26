@@ -5052,7 +5052,7 @@ prepare_fk_prelocking_list(THD *thd, Query_tables_list *prelocking_ctx,
 
   arena= thd->activate_stmt_arena_if_needed(&backup);
 
-  table->file->get_parent_foreign_key_list(thd, &fk_list);
+  table->file->get_parent_foreign_key_list(thd, &fk_list); // FIXME: test
   if (unlikely(thd->is_error()))
   {
     if (arena)

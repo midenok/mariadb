@@ -12237,16 +12237,20 @@ create_table_info_t::create_foreign_keys()
 	ulint                 number          = 1;
 	const char*	      column_names[MAX_COLS_PER_FK];
 	const char*	      ref_column_names[MAX_COLS_PER_FK];
+	/* Quoted form `db`.`table` used for warning messages */
 	char		      create_name[MAX_DATABASE_NAME_LEN + 1 +
 					  MAX_TABLE_NAME_LEN + 1];
+	/* Name of original table in filename charset (or system charset for mysql50 name) */
 	char db_name[MAX_DATABASE_NAME_LEN + 1];
 	char t_name[MAX_TABLE_NAME_LEN + 1];
 	const bool	      tmp_table = m_flags2 & DICT_TF2_TEMPORARY;
 	const CHARSET_INFO*   cs	= thd_charset(m_thd);
 	const char*	      operation = "Create ";
+        /* Name of innodb table without db */
 	const char*	      basename;
 
 	enum_sql_command sqlcom = enum_sql_command(thd_sql_command(m_thd));
+        /* Name of innodb table with db */
 	LEX_CSTRING name= {m_table_name, strlen(m_table_name)};
 
 	ut_ad(!partitioned);
@@ -12345,7 +12349,7 @@ create_table_info_t::create_foreign_keys()
 	basename = table->name.basename();
 
 	while (Key* key = key_it++) {
-		if (key->type != Key::FOREIGN_KEY || key->old)
+		if (key->type != Key::FOREIGN_KEY)
 			continue;
 
 		if (tmp_table) {
@@ -15562,6 +15566,7 @@ get_foreign_key_info(
 	char			tmp_buff[NAME_LEN+1];
 	char			name_buff[NAME_LEN+1];
 	const char*		ptr;
+	const char*		ptr2;
 	LEX_CSTRING*		name = NULL;
 
 	if (dict_table_t::is_temporary_name(foreign->foreign_table_name)) {
@@ -15590,7 +15595,7 @@ get_foreign_key_info(
 	f_key_info.referenced_table = thd_make_lex_string(
 		thd, 0, name_buff, len, 1);
 
-	/* Dependent (child) database name */
+	/* Foreign (child) database name */
 	len = dict_get_db_name_len(foreign->foreign_table_name);
 	ut_a(len < sizeof(tmp_buff));
 	memcpy(tmp_buff, foreign->foreign_table_name, len);
@@ -15600,8 +15605,14 @@ get_foreign_key_info(
 	f_key_info.foreign_db = thd_make_lex_string(
 		thd, 0, name_buff, len, 1);
 
-	/* Dependent (child) table name */
+	/* Foreign (child) table name */
 	ptr = dict_remove_db_name(foreign->foreign_table_name);
+	if ((ptr2 = is_partition(ptr))) {
+		len = ptr2 - ptr;
+		memcpy(tmp_buff, ptr, len);
+		tmp_buff[len] = 0;
+		ptr = tmp_buff;
+	}
 	len = filename_to_tablename(ptr, name_buff, sizeof(name_buff), 1);
 	f_key_info.foreign_table = thd_make_lex_string(
 		thd, 0, name_buff, len, 1);

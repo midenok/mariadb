@@ -126,8 +126,15 @@ select * from information_schema.innodb_sys_foreign;
 --error ER_NO_REFERENCED_ROW_2
 insert into t2 values (4);
 
+# FIXME check with explicit id
+create table t3 (fk int references t1(id)) engine innodb;
+show create table t2;
+show create table t3;
+drop table t3;
+
 --echo # ALTER operations
 alter table t2 remove partitioning;
+show create table t2;
 # --error ER_NO_REFERENCED_ROW_2
 insert into t2 values (4);
 select * from information_schema.innodb_sys_foreign;
