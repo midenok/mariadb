@@ -5289,7 +5289,8 @@ create_table_info_t::create_table_info_t(
 	const TABLE*	form,
 	HA_CREATE_INFO*	create_info,
 	bool		file_per_table,
-	trx_t*		trx)
+	trx_t*		trx,
+	ha_innobase *	file)
 	: m_thd(thd),
 	  m_trx(trx),
 	  m_form(form),
@@ -5298,7 +5299,10 @@ create_table_info_t::create_table_info_t(
 	  m_table(NULL),
 	  m_innodb_file_per_table(file_per_table),
 	  m_creating_stub(thd_ddl_options(thd)->import_tablespace()),
-	  partitioned(false),
+	  m_file(file),
+	  part_suffix(NULL),
+	   primary_part(false),
+	  alter(false),
 	  alter_table(NULL)
 {
   m_table_name[0]= '\0';
@@ -12253,7 +12257,7 @@ create_table_info_t::create_foreign_keys()
         /* Name of innodb table with db */
 	LEX_CSTRING name= {m_table_name, strlen(m_table_name)};
 
-	ut_ad(!partitioned);
+	ut_ad(!part_suffix);
 	if (sqlcom == SQLCOM_ALTER_TABLE) {
 		mem_heap_t* heap = mem_heap_create(10000);
 		LEX_CSTRING table_name = m_form->s->table_name;
@@ -12322,14 +12326,15 @@ create_table_info_t::create_foreign_keys()
 				       n, strlen(n), m_thd) = '\0';
 		mem_heap_free(heap);
 		operation = "Alter ";
+		alter = true;
 	} else {
 		*innobase_convert_name(create_name, sizeof create_name,
 				       LEX_STRING_WITH_LEN(name), m_thd)= '\0';
 	}
 
-	if (is_partition(name.str)) {
+	if ((part_suffix= is_partition(name.str))) {
 		/* Partitioned table */
-		partitioned = true;
+		primary_part = m_form->is_first_partition(m_file);
 	}
 
 	Alter_info* alter_info = m_create_info->alter_info;
@@ -12480,7 +12485,7 @@ create_table_info_t::create_foreign_key(
 
 		if (fk->constraint_name.str) {
 			ulint db_len;
-			const bool tmp= alter_table;
+			const bool tmp= alter;
 
 			/* Catenate 'databasename/' to the constraint name
 			specified by the user: we conceive the constraint as
@@ -12488,10 +12493,13 @@ create_table_info_t::create_foreign_key(
 			itself. We store the name to foreign->id. */
 
 			db_len = dict_get_db_name_len(table->name.m_name);
-
+			size_t alloc_len = (tmp ? 3 : 2) + db_len + fk->constraint_name.length;
+			if (part_suffix)
+			{
+				alloc_len += strlen(part_suffix) + 1;
+			}
 			foreign->id = static_cast<char*>(mem_heap_alloc(
-				foreign->heap, (tmp ? 3 : 2)
-				+ db_len + fk->constraint_name.length));
+				foreign->heap, alloc_len));
 
 			char *pos = foreign->id;
 			memcpy(pos, table->name.m_name, db_len);
@@ -12501,11 +12509,30 @@ create_table_info_t::create_foreign_key(
 				*(pos++) = '\xFF';
 			}
 			strcpy(pos, fk->constraint_name.str);
+			pos+= fk->constraint_name.length;
+			if (part_suffix)
+			{
+				*(pos++) = '\xFF';
+				strcpy(pos, part_suffix);
+			}
 		}
 
 		if (foreign->id == NULL) {
+			char *innodb_name = table->name.m_name;
+			bool check_ident = true;
+			char buf[FN_REFLEN]; // FIXME: what constant to use?
+			if (part_suffix)
+			{
+				strcpy(buf, innodb_name);
+				char *pos = is_partition(buf);
+				ut_ad(pos);
+				*(pos++) = '\xFF';
+				strcpy(pos, part_suffix);
+				check_ident = false;
+				innodb_name = buf;
+			}
 			error = dict_create_add_foreign_id(
-				&number, table->name.m_name, foreign);
+				&number, innodb_name, foreign, check_ident);
 			if (error != DB_SUCCESS) {
 				dict_foreign_free(foreign);
 				return (error);
@@ -12724,14 +12751,14 @@ name_converted:
 		case FK_OPTION_RESTRICT:
 			break;
 		case FK_OPTION_CASCADE:
-			if (partitioned)
+			if (part_suffix)
 			{
 				goto cascade_partitioned;
 			}
 			foreign->type |= DICT_FOREIGN_ON_DELETE_CASCADE;
 			break;
 		case FK_OPTION_SET_NULL:
-			if (partitioned)
+			if (part_suffix)
 			{
 				goto cascade_partitioned;
 			}
@@ -12753,14 +12780,14 @@ name_converted:
 		case FK_OPTION_RESTRICT:
 			break;
 		case FK_OPTION_CASCADE:
-			if (partitioned)
+			if (part_suffix)
 			{
 				goto cascade_partitioned;
 			}
 			foreign->type |= DICT_FOREIGN_ON_UPDATE_CASCADE;
 			break;
 		case FK_OPTION_SET_NULL:
-			if (partitioned)
+			if (part_suffix)
 			{
 cascade_partitioned:
 				key_text k(fk);
@@ -13289,7 +13316,7 @@ ha_innobase::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
   DBUG_ASSERT(table_share->table_type == TABLE_TYPE_SEQUENCE ||
               table_share->table_type == TABLE_TYPE_NORMAL);
 
-  create_table_info_t info(ha_thd(), form, create_info, file_per_table, trx);
+  create_table_info_t info(ha_thd(), form, create_info, file_per_table, trx, this);
 
   int error= info.initialize();
   if (!error)
@@ -15574,8 +15601,13 @@ get_foreign_key_info(
  	}
 
 	ptr = dict_remove_db_name(foreign->id);
+	if ((ptr2= strchr(ptr, '\xFF')) && ptr2 > ptr) {
+		len= size_t(ptr2 - ptr);
+	} else {
+		len= strlen(ptr);
+	}
 	f_key_info.foreign_id = thd_make_lex_string(
-		thd, 0, ptr, strlen(ptr), 1);
+		thd, 0, ptr, len, 1);
 
 	/* Name format: database name, '/', table name, '\0' */
 

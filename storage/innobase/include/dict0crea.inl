@@ -40,7 +40,8 @@ dict_create_add_foreign_id(
 	ulint*		id_nr,	/*!< in/out: number to use in id generation;
 				incremented if used */
 	const char*	name,	/*!< in: table name */
-	dict_foreign_t*	foreign)/*!< in/out: foreign key */
+	dict_foreign_t*	foreign, /*!< in/out: foreign key */
+	bool check_ident)
 {
 	DBUG_ENTER("dict_create_add_foreign_id");
 
@@ -78,7 +79,7 @@ dict_create_add_foreign_id(
 			sprintf(id, "%s_ibfk_%lu", table_name,
 				(ulong) (*id_nr)++);
 
-			if (innobase_check_identifier_length(
+			if (check_ident && innobase_check_identifier_length(
 				strchr(id,'/') + 1)) {
 				DBUG_RETURN(DB_IDENTIFIER_TOO_LONG);
 			}

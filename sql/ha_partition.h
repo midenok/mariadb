@@ -1653,6 +1653,7 @@ public:
     }
     return NULL;
   }
+  handler *get_fk_file();
 
   int notify_tabledef_changed(LEX_CSTRING *db, LEX_CSTRING *table,
                               LEX_CUSTRING *frm, LEX_CUSTRING *version);
@@ -1673,8 +1674,6 @@ public:
   {
     my_free(str);
   }
-private:
-  handler *get_fk_file();
 };
 
 #endif /* HA_PARTITION_INCLUDED */

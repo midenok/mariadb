@@ -10911,4 +10911,10 @@ bool TABLE::is_vers_current_partition(handler *part_file) const
   partition_element *el= hp->part_elem_by_file(part_file);
   return part_info->vers_info->now_part == el;
 }
+bool TABLE::is_first_partition(handler *part_file) const
+{
+  DBUG_ASSERT(part_info);
+  ha_partition *hp= static_cast<ha_partition *>(file);
+  return hp->get_fk_file() == part_file;
+}
 #endif /* WITH_PARTITION_STORAGE_ENGINE */
