@@ -631,7 +631,8 @@ public:
 		const TABLE*	form,
 		HA_CREATE_INFO*	create_info,
 		bool		file_per_table,
-		trx_t*		trx = NULL);
+		trx_t*		trx = NULL,
+		ha_innobase *	file = NULL);
 
 	/** Initialize the object. */
 	int initialize();
@@ -780,9 +781,15 @@ private:
 
 	/** Whether we are creating a stub table for importing. */
 	const bool	m_creating_stub;
-	bool partitioned;
+	ha_innobase *	m_file;
+	const char *	part_suffix;
+	bool primary_part;
+	bool secondary_part()
+	{
+		return part_suffix && !primary_part;
+	}
+	bool alter;
 	dict_table_t* alter_table;
-
 };
 
 /**

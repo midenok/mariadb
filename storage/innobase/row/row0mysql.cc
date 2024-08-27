@@ -2556,6 +2556,7 @@ row_rename_table_for_mysql(
 	ulint		n_constraints_to_drop	= 0;
 	ibool		old_is_tmp, new_is_tmp;
 	pars_info_t*	info			= NULL;
+	const bool do_rename_fk = (fk == RENAME_FK || fk == RENAME_ALTER_COPY);
 
 	ut_a(old_name != NULL);
 	ut_a(new_name != NULL);
@@ -2568,6 +2569,11 @@ row_rename_table_for_mysql(
 
 	trx->op_info = "renaming table";
 
+#if 0 // FIXME: remove
+	old_is_tmp = dict_table_t::is_temporary_name(old_name) ||
+		(is_partition(old_name) &&
+		0 == memcmp(old_name + strlen(old_name) - 5, "#TMP#", 5));
+#endif
 	old_is_tmp = dict_table_t::is_temporary_name(old_name);
 	new_is_tmp = dict_table_t::is_temporary_name(new_name);
 
@@ -2676,12 +2682,11 @@ row_rename_table_for_mysql(
 		goto rollback_and_exit;
 	}
 
-	if (fk == RENAME_IGNORE_FK || fk == RENAME_FK || !new_is_tmp) {
+	if (fk == RENAME_IGNORE_FK || do_rename_fk || !new_is_tmp) {
 		/* Rename all constraints. */
 		char	new_table_name[MAX_TABLE_NAME_LEN + 1];
 		char	old_table_utf8[MAX_TABLE_NAME_LEN + 1];
 		uint	errors = 0;
-		const bool do_rename_fk = (fk == RENAME_FK || fk == RENAME_ALTER_COPY);
 
 		strncpy(old_table_utf8, old_name, MAX_TABLE_NAME_LEN);
 		old_table_utf8[MAX_TABLE_NAME_LEN] = '\0';

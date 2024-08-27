@@ -9978,6 +9978,7 @@ innobase_update_foreign_try(
 	foreign_id++;
 
 	for (i = 0; i < ctx->num_to_add_fk; i++) {
+		// FIXME: test with partitions
 		dict_foreign_t*		fk = ctx->add_fk[i];
 
 		ut_ad(fk->foreign_table == ctx->new_table
