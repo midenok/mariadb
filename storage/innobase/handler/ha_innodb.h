@@ -782,12 +782,9 @@ private:
 	/** Whether we are creating a stub table for importing. */
 	const bool	m_creating_stub;
 	ha_innobase *	m_file;
+	char		part_suffix_buf[FN_REFLEN];
 	const char *	part_suffix;
-	bool primary_part;
-	bool secondary_part()
-	{
-		return part_suffix && !primary_part;
-	}
+	size_t		part_suffix_len;
 	bool alter;
 	dict_table_t* alter_table;
 };

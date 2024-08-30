@@ -184,8 +184,6 @@ select * from information_schema.innodb_sys_foreign where for_name like 'test/t3
 
 # FIXME: check CONVERT IN
 
-# FIXME: partitioning alter operations
-
 # FIXME: interval/limit rotation
 
 # FIXME: is there any inplace operations that may affect?
