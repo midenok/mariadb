@@ -953,3 +953,6 @@ which is in the prepared state
 
 @return 0 or error number */
 int innobase_rollback_by_xid(handlerton* hton, XID* xid);
+
+char*
+is_partition(const char *file_name);
