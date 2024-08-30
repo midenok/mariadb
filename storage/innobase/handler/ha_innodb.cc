@@ -5301,7 +5301,6 @@ create_table_info_t::create_table_info_t(
 	  m_creating_stub(thd_ddl_options(thd)->import_tablespace()),
 	  m_file(file),
 	  part_suffix(NULL),
-	   primary_part(false),
 	  alter(false),
 	  alter_table(NULL)
 {
@@ -12334,7 +12333,15 @@ create_table_info_t::create_foreign_keys()
 
 	if ((part_suffix= is_partition(name.str))) {
 		/* Partitioned table */
-		primary_part = m_form->is_first_partition(m_file);
+		part_suffix_len= strlen(part_suffix);
+		/* We don't need #TMP# suffix in temporary FK is it is handled
+		   by \xFF technology. #TMP# is not handled by rename_constraint_ids. */
+		if (0 == memcmp(part_suffix + part_suffix_len - 5, "#TMP#", 5)) {
+			part_suffix_len-= 5;
+			memcpy(part_suffix_buf, part_suffix, part_suffix_len);
+			part_suffix= part_suffix_buf;
+			part_suffix_buf[part_suffix_len]= 0;
+		}
 	}
 
 	Alter_info* alter_info = m_create_info->alter_info;
@@ -12496,7 +12503,7 @@ create_table_info_t::create_foreign_key(
 			size_t alloc_len = (tmp ? 3 : 2) + db_len + fk->constraint_name.length;
 			if (part_suffix)
 			{
-				alloc_len += strlen(part_suffix) + 1;
+				alloc_len += part_suffix_len + 1;
 			}
 			foreign->id = static_cast<char*>(mem_heap_alloc(
 				foreign->heap, alloc_len));

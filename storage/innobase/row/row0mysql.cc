@@ -2569,11 +2569,6 @@ row_rename_table_for_mysql(
 
 	trx->op_info = "renaming table";
 
-#if 0 // FIXME: remove
-	old_is_tmp = dict_table_t::is_temporary_name(old_name) ||
-		(is_partition(old_name) &&
-		0 == memcmp(old_name + strlen(old_name) - 5, "#TMP#", 5));
-#endif
 	old_is_tmp = dict_table_t::is_temporary_name(old_name);
 	new_is_tmp = dict_table_t::is_temporary_name(new_name);
 

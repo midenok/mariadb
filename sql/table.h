@@ -1859,7 +1859,6 @@ public:
   /* These are for InnoDB, so they cannot be inline */
   bool vers_system_time_partitioned() const;
   bool is_vers_current_partition(handler *file) const;
-  bool is_first_partition(handler *file) const;
 #else
   bool vers_system_time_partitioned() const
   {
