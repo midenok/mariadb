@@ -68,7 +68,7 @@ subpartition by system_time interval 2 hours
 --echo # Partititon by SYSTEM_TIME, subpartition by KEY
 create or replace table t2 (fk int references t1(id))
 with system versioning engine innodb
-partition by system_time
+partition by system_time limit 1 auto
 subpartition by key (fk) subpartitions 2
 (partition p1 history, partition pn current);
 
@@ -91,16 +91,24 @@ insert into t2 values (7);
 delete from t1 where id = 1;
 --error ER_ROW_IS_REFERENCED_2
 delete from t1 where id > 2;
-delete from t2;
+--echo # Partition auto-creation does not affect foreign keys
+delete from t2 where fk = 3;
+update t2 set fk= fk - 1;
+delete from t2 where fk = 3;
+update t2 set fk= fk - 1;
+delete from t2 where fk = 3;
 select * from t2 for system_time all order by fk;
 delete from t1 where id > 2;
 --error ER_NO_REFERENCED_ROW_2
 insert into t2 values (3), (5);
 insert into t2 values (2);
 
-insert into t1 values (3), (4), (5), (6);
+show create table t2;
+select * from information_schema.innodb_sys_foreign;
 
 --echo # Partition by HASH, explicit constraint id
+insert into t1 values (3), (4), (5), (6);
+
 create or replace table t2 (
   fk int,
   foreign key fk01 (fk) references t1(id))
@@ -274,8 +282,6 @@ drop table tp0;
 # FIXME: interval/limit rotation
 
 # FIXME: is there any inplace operations that may affect?
-
-# FIXME: test drop/add foreign keys from partitions
 
 # select * from information_schema.innodb_sys_indexes;
 # select * from information_schema.innodb_sys_tables;
