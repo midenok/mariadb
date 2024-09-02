@@ -1668,11 +1668,30 @@ public:
   void update_optimizer_costs(OPTIMIZER_COSTS *costs) override;
   virtual ulonglong index_blocks(uint index, uint ranges, ha_rows rows) override;
   virtual ulonglong row_blocks() override;
-  virtual int get_foreign_key_list(const THD *thd, List<FOREIGN_KEY_INFO> *f_key_list) override;
-  virtual char* get_foreign_key_create_info() override;
+  virtual int get_foreign_key_list(const THD *thd, List<FOREIGN_KEY_INFO> *f_key_list) override
+  {
+    handler *fk_file= get_fk_file();
+    return fk_file->get_foreign_key_list(thd, f_key_list);
+  }
+  virtual char* get_foreign_key_create_info() override
+  {
+    handler *fk_file= get_fk_file();
+    return fk_file->get_foreign_key_create_info();
+  }
   virtual void free_foreign_key_create_info(char* str) override
   {
     my_free(str);
+  }
+  virtual int
+  get_parent_foreign_key_list(const THD *thd, List<FOREIGN_KEY_INFO> *f_key_list) override
+  {
+    handler *fk_file= get_fk_file();
+    return fk_file->get_parent_foreign_key_list(thd, f_key_list);
+  }
+  virtual uint referenced_by_foreign_key() override
+  {
+    handler *fk_file= get_fk_file();
+    return fk_file->referenced_by_foreign_key();
   }
 };
 

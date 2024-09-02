@@ -12450,19 +12450,6 @@ handler *ha_partition::get_fk_file()
   return m_file[i];
 }
 
-int ha_partition::get_foreign_key_list(const THD *thd,
-                                       List<FOREIGN_KEY_INFO> *f_key_list)
-{
-  handler *fk_file= get_fk_file();
-  return fk_file->get_foreign_key_list(thd, f_key_list);
-}
-
-char* ha_partition::get_foreign_key_create_info()
-{
-  handler *fk_file= get_fk_file();
-  return fk_file->get_foreign_key_create_info();
-}
-
 struct st_mysql_storage_engine partition_storage_engine=
 { MYSQL_HANDLERTON_INTERFACE_VERSION };
 

@@ -58,6 +58,13 @@ create or replace table t2 (
 with system versioning engine innodb
 partition by system_time partitions 2;
 
+create or replace table t2 (
+  fk int,
+  foreign key(fk) references t1(id)
+  on delete cascade) engine innodb;
+--error ER_CANT_CREATE_TABLE
+alter table t2 partition by hash(fk) partitions 5;
+
 --echo # Subpartition by SYSTEM_TIME is prohibited at parser layer
 --error ER_PARSE_ERROR
 create or replace table t2 (i int) with system versioning

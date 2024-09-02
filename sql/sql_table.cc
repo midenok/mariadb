@@ -10600,7 +10600,7 @@ bool mysql_alter_table(THD *thd, const LEX_CSTRING *new_db,
 
   if ((create_info->db_type != table->s->db_type() ||
        (alter_info->partition_flags & ALTER_PARTITION_INFO)) &&
-      !table->file->can_switch_engines())
+        table->file->referenced_by_foreign_key())
   {
     my_error(ER_ROW_IS_REFERENCED, MYF(0));
     DBUG_RETURN(true);
