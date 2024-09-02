@@ -144,24 +144,61 @@ subpartition by hash (fk) subpartitions 2 (
 show create table t2;
 show create table t3;
 
+--echo # Same constraint id in non-partitioned
+# Same name is allowed. Uniqueness per-db is rather implementation restriction
+# that real user requirements.
+create table t4 (fk int, foreign key fk02 (fk) references t1(id)) engine innodb;
+# For non-partitioned the restriction still holds. It is not a feature so
+# we may loosen this restriction at least partly for MDEV-19191.
+# MDEV-16417 removes it compeletely.
+--error ER_CANT_CREATE_TABLE
+create table t5 (fk int, foreign key fk02 (fk) references t1(id)) engine innodb;
+drop table t4;
+
+--error ER_NO_REFERENCED_ROW_2
+insert into t3 values (10);
+insert into t1 values (10);
+insert into t3 values (10);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 10;
+
 select * from information_schema.innodb_sys_foreign;
 select * from information_schema.innodb_sys_foreign_cols;
+
+--echo ### Alter operations ###
 
 --echo # RENAME TABLE
 rename table t3 to t4;
 show create table t4;
 
+--error ER_NO_REFERENCED_ROW_2
+insert into t4 values (11);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 10;
+
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t4%';
 alter table t4 rename to t3;
 
---echo # ALTER operations
+--error ER_NO_REFERENCED_ROW_2
+insert into t3 values (11);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 10;
+
+--echo # REMOVE PARTITIONING
 alter table t2 remove partitioning;
 show create table t2;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 2;
 --error ER_NO_REFERENCED_ROW_2
 insert into t2 values (4);
-insert into t2 values (2);
+insert into t2 values (10);
+delete from t2;
 
+--echo # DROP PARTITION
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 10;
 alter table t3 drop partition p0;
+delete from t1 where id = 10;
 
 show create table t3;
 select * from information_schema.innodb_sys_foreign;
@@ -171,12 +208,38 @@ select * from information_schema.innodb_sys_foreign_cols;
 --error ER_RANGE_NOT_INCREASING_ERROR
 alter table t3 add partition (partition p0 values less than (1));
 
+--echo # REORGANIZE PARTITION
+select * from t1;
+--error ER_NO_REFERENCED_ROW_2
+insert t3 values (3);
+insert t3 values (2);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 2;
 alter table t3 reorganize partition p1 into (
     partition p0 values less than (10),
     partition p1 values less than (1000));
 
 show create table t3;
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
+
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 2;
+alter table t3 drop partition p0;
+delete from t1 where id = 2;
+
+--echo # CONVERT OUT
+create or replace table t3 (
+  fk int,
+  foreign key fk02(fk) references t1(id))
+engine innodb
+partition by range columns (fk) (
+    partition p0 values less than (100),
+    partition p1 values less than (1000));
+
+alter table t3 convert partition p0 to table tp0;
+select * from information_schema.innodb_sys_foreign;
+show create table tp0;
+drop table tp0;
 
 # List partitions are always added to the end
 # HASH/Key partitions are added through full
