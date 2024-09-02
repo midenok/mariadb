@@ -115,8 +115,9 @@ R"===(PROCEDURE RENAME_CONSTRAINT_IDS () IS
       END IF;
     END IF;
   END LOOP;
-  UPDATE SYS_FOREIGN SET REF_NAME = :new_table_name
-  WHERE REF_NAME = :old_table_name
-    AND TO_BINARY(REF_NAME)
-      = TO_BINARY(:old_table_name);
+  IF (:rename_refs > 0) THEN
+    UPDATE SYS_FOREIGN SET REF_NAME = :new_table_name
+    WHERE REF_NAME = :old_table_name
+    AND TO_BINARY(REF_NAME) = TO_BINARY(:old_table_name);
+  END IF;
 END;)===";

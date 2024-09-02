@@ -2680,6 +2680,7 @@ row_rename_table_for_mysql(
 	}
 
 	if (fk == RENAME_IGNORE_FK || do_rename_fk || !new_is_tmp) {
+		const bool rename_refs= (fk != RENAME_ALTER_COPY || !new_is_tmp);
 		/* Rename all constraints. */
 		char	new_table_name[MAX_TABLE_NAME_LEN + 1];
 		char	old_table_utf8[MAX_TABLE_NAME_LEN + 1];
@@ -2734,6 +2735,7 @@ row_rename_table_for_mysql(
 		pars_info_add_str_literal(info, "new_part", new_is_part ? new_is_part : "");
 		pars_info_add_int4_literal(info, "old_is_part", old_is_part != NULL);
 		pars_info_add_int4_literal(info, "new_is_part", new_is_part != NULL);
+		pars_info_add_int4_literal(info, "rename_refs", rename_refs);
 
 		err = que_eval_sql(info, rename_constraint_ids, trx);
 		/*
@@ -2802,13 +2804,14 @@ row_rename_table_for_mysql(
 		an ALTER TABLE, not in a RENAME. */
 		dict_names_t	fk_tables;
 
-		err = dict_load_foreigns(
-			new_name, nullptr, trx->id,
-			!old_is_tmp || trx->check_foreigns,
-			fk == RENAME_FK || fk == RENAME_ALTER_COPY
-			? DICT_ERR_IGNORE_NONE
-			: DICT_ERR_IGNORE_FK_NOKEY,
-			fk_tables);
+		if (!new_is_tmp)
+			err = dict_load_foreigns(
+				new_name, nullptr, trx->id,
+				!old_is_tmp || trx->check_foreigns,
+				fk == RENAME_FK || fk == RENAME_ALTER_COPY
+				? DICT_ERR_IGNORE_NONE
+				: DICT_ERR_IGNORE_FK_NOKEY,
+				fk_tables);
 
 		if (err != DB_SUCCESS) {
 			if (old_is_tmp) {
