@@ -13353,7 +13353,7 @@ ha_innobase::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
   if (!error)
   {
 #ifdef WITH_PARTITION_STORAGE_ENGINE
-    if (form->part_info)
+    if (create_fk && form->part_info)
     {
       if (form->vers_system_time_partitioned())
       {

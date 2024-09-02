@@ -12444,11 +12444,9 @@ ulonglong ha_partition::index_blocks(uint index, uint ranges, ha_rows rows)
 */
 handler *ha_partition::get_fk_file()
 {
-  uint i;
-  if (m_part_info->vers_info)
-   i= m_part_info->num_parts - 1;
-  else
-    i= bitmap_get_first_set(&m_part_info->read_partitions);
+  uint i= m_part_info->vers_info ?
+    m_tot_parts - 1 :
+    bitmap_get_first_set(&m_part_info->read_partitions);
   return m_file[i];
 }
 
