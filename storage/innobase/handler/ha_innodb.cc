@@ -12480,7 +12480,10 @@ create_table_info_t::create_foreign_key(
 			table, NULL, column_names, i, NULL, TRUE, FALSE,
 			&index_error, &err_col, &err_index);
 
-		if (!index) {
+		/* ALTER now renames FK for backup table, so it creates new versions
+		for new table. We have to respect check_foreigns for such commands
+		as DROP INDEX. */
+		if (!index && m_trx->check_foreigns) {
 			foreign_push_index_error(m_trx, operation, create_name,
 						 key_text(fk).str(),
 						 column_names,
