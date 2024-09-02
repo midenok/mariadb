@@ -2554,7 +2554,6 @@ row_rename_table_for_mysql(
 	mem_heap_t*	heap			= NULL;
 	const char**	constraints_to_drop	= NULL;
 	ulint		n_constraints_to_drop	= 0;
-	ibool		old_is_tmp, new_is_tmp;
 	pars_info_t*	info			= NULL;
 	const bool do_rename_fk = (fk == RENAME_FK || fk == RENAME_ALTER_COPY);
 
@@ -2569,8 +2568,11 @@ row_rename_table_for_mysql(
 
 	trx->op_info = "renaming table";
 
-	old_is_tmp = dict_table_t::is_temporary_name(old_name);
-	new_is_tmp = dict_table_t::is_temporary_name(new_name);
+	const bool old_is_tmp = dict_table_t::is_temporary_name(old_name);
+	const bool new_is_tmp = dict_table_t::is_temporary_name(new_name);
+	const char * old_is_part = is_partition(old_name);
+	const char * new_is_part = is_partition(new_name);
+
 
 	table = dict_table_open_on_name(old_name, true,
 					DICT_ERR_IGNORE_FK_NOKEY);
@@ -2729,6 +2731,9 @@ row_rename_table_for_mysql(
 			db_name/\xFF\xFFconstraint_name */
 		pars_info_add_int4_literal(info, "new_is_tmp",
 					   do_rename_fk && new_is_tmp);
+		pars_info_add_str_literal(info, "new_part", new_is_part ? new_is_part : "");
+		pars_info_add_int4_literal(info, "old_is_part", old_is_part != NULL);
+		pars_info_add_int4_literal(info, "new_is_part", new_is_part != NULL);
 
 		err = que_eval_sql(info, rename_constraint_ids, trx);
 		/*
