@@ -7885,6 +7885,7 @@ ha_innobase::prepare_inplace_alter_table(
 	bool		add_fts_idx		= false;
 	dict_s_col_list*s_cols			= NULL;
 	mem_heap_t*	s_heap			= NULL;
+	char foreign_id[FN_REFLEN]; // FIXME: what constant to use?
 
 	DBUG_ENTER("prepare_inplace_alter_table");
 	DBUG_ASSERT(!ha_alter_info->handler_ctx);
@@ -8219,8 +8220,17 @@ check_if_ok_to_rename:
 				the FOREIGN KEY constraint name, compare
 				to the full constraint name. */
 				fid = fid ? fid + 1 : foreign->id;
-
-				if (Lex_ident_column(Lex_cstring_strlen(fid)).
+				Lex_cstring id;
+				id.str= fid;
+				const char *suff= strchr(fid, '\xFF');
+				if (suff) {
+					id.length= size_t(suff - fid);
+					memcpy(foreign_id, fid, id.length);
+					id.str= foreign_id;
+					foreign_id[id.length]= 0;
+				} else
+					id.length = strlen(fid);
+				if (Lex_ident_column(id).
 				      streq(drop.name)) {
 					goto found_fk;
 				}

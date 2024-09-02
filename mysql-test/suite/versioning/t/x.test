@@ -227,7 +227,18 @@ delete from t1 where id = 2;
 alter table t3 drop partition p0;
 delete from t1 where id = 2;
 
+--echo # Add/drop foreign keys
+--error ER_CANT_CREATE_TABLE
+alter table t3 add foreign key fk03(fk) references t1(id) on delete cascade;
+alter table t3 add foreign key fk03(fk) references t1(id);
+show create table t3;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
+alter table t3 drop foreign key fk03;
+show create table t3;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
+
 --echo # CONVERT OUT
+insert t1 values (1), (2), (300);
 create or replace table t3 (
   fk int,
   foreign key fk02(fk) references t1(id))
@@ -236,14 +247,27 @@ partition by range columns (fk) (
     partition p0 values less than (100),
     partition p1 values less than (1000));
 
+insert t3 values (2), (300);
 alter table t3 convert partition p0 to table tp0;
 select * from information_schema.innodb_sys_foreign;
 show create table tp0;
+select * from t3;
+select * from tp0;
+delete from t1 where id = 1;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 2;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 300;
+
+--echo # CONVERT IN
+insert t1 values (4);
+insert tp0 values (4);
 drop table tp0;
+
+# alter table t3 convert table tp0 to partition p0 values less than (10);
 
 # List partitions are always added to the end
 # HASH/Key partitions are added through full
-
 
 # FIXME: check CONVERT IN
 
