@@ -12446,10 +12446,7 @@ handler *ha_partition::get_fk_file()
 {
   uint i;
   if (m_part_info->vers_info)
-  {
-    const uint32 sub_factor= m_part_info->num_subparts ? m_part_info->num_subparts : 1;
-    i= m_part_info->vers_info->now_part->id * sub_factor;
-  }
+   i= m_part_info->num_parts - 1;
   else
     i= bitmap_get_first_set(&m_part_info->read_partitions);
   return m_file[i];
