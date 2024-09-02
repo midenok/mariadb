@@ -958,10 +958,14 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd)
   first_table->table->s->tdc->flush(thd, true);
 
   partition= (ha_partition*) first_table->table->file;
+  auto old_sql_command= thd->lex->sql_command;
+  thd->lex->sql_command= SQLCOM_TRUNCATE;
   /* Invoke the handler method responsible for truncating the partition. */
-  if (unlikely(error= partition->truncate_partition(alter_info,
-                                                    &binlog_stmt)))
+  error= partition->truncate_partition(alter_info, &binlog_stmt);
+  thd->lex->sql_command= old_sql_command;
+  if (unlikely(error))
     partition->print_error(error, MYF(0));
+
 
   /*
     All effects of a truncate operation are committed even if the
