@@ -191,7 +191,8 @@ public:
 		TABLE*			form,
 		HA_CREATE_INFO*		create_info,
 		bool			file_per_table,
-		trx_t*			trx);
+		trx_t*			trx= nullptr,
+		bool			create_fk= true);
 
 	int create(
 		const char*		name,

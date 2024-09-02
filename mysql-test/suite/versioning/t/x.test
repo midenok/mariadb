@@ -91,7 +91,7 @@ insert into t2 values (7);
 delete from t1 where id = 1;
 --error ER_ROW_IS_REFERENCED_2
 delete from t1 where id > 2;
---echo # Partition auto-creation does not affect foreign keys
+--echo # Partition auto-creation does not affect foreign keys in current partition
 delete from t2 where fk = 3;
 update t2 set fk= fk - 1;
 delete from t2 where fk = 3;
@@ -267,6 +267,27 @@ delete from t1 where id = 2;
 --error ER_ROW_IS_REFERENCED_2
 delete from t1 where id = 300;
 
+--echo # TRUNCATE
+truncate t3;
+show create table t3;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 2;
+delete from t1 where id = 300;
+
+--echo # PARTITION BY LIST
+create or replace table t3 (
+  fk int,
+  foreign key fk03(fk) references t1(id))
+engine innodb
+partition by list (fk) (
+    partition p0 values in (0, 1, 2, 3),
+    partition p1 values in (4, 5, 6, 7));
+
+show create table t3;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
+
+
 --echo # CONVERT IN
 insert t1 values (4);
 insert tp0 values (4);
@@ -278,8 +299,6 @@ drop table tp0;
 # HASH/Key partitions are added through full
 
 # FIXME: check CONVERT IN
-
-# FIXME: interval/limit rotation
 
 # FIXME: is there any inplace operations that may affect?
 
