@@ -13316,7 +13316,7 @@ create_table_info_t::allocate_trx()
 @retval	0 on success */
 int
 ha_innobase::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
-                    bool file_per_table, trx_t *trx= nullptr)
+                    bool file_per_table, trx_t *trx, bool create_fk)
 {
   DBUG_ENTER("ha_innobase::create");
   DBUG_ASSERT(form->s == table_share);
@@ -13349,7 +13349,6 @@ ha_innobase::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
 
   if (!error)
   {
-    bool create_fk= true;
 #ifdef WITH_PARTITION_STORAGE_ENGINE
     if (form->part_info)
     {
@@ -14026,7 +14025,7 @@ int ha_innobase::truncate()
     row_mysql_lock_data_dictionary(trx);
     ib_table->release();
     dict_sys.remove(ib_table, false, true);
-    int err= create(ib_table->name.m_name, table, &info, true, trx);
+    int err= create(ib_table->name.m_name, table, &info, true, trx, false);
     row_mysql_unlock_data_dictionary(trx);
 
     ut_ad(!err);
@@ -14153,7 +14152,7 @@ int ha_innobase::truncate()
     m_prebuilt->table= nullptr;
 
     err= create(name, table, &info, dict_table_is_file_per_table(ib_table),
-                trx);
+                trx, false);
     if (!err)
     {
       m_prebuilt->table->acquire();
