@@ -3417,14 +3417,16 @@ innobase_convert_identifier(
 	THD*		thd)
 {
 	const char*	s	= id;
-
-	char nz[MAX_TABLE_NAME_LEN + 1];
-	char nz2[MAX_TABLE_NAME_LEN + 1];
+	// db/table_name#P#part_name#SP#subpart_name
+	static const size_t ID_LEN= MAX_TABLE_NAME_LEN * 3 + 1 + 3 + 4 + 1;
+	char nz[ID_LEN];
+	char nz2[ID_LEN];
 
 	/* Decode the table name.  The MySQL function expects
 	a NUL-terminated string.  The input and output strings
 	buffers must not be shared. */
-	ut_a(idlen <= MAX_TABLE_NAME_LEN);
+        // ut_a(db/table_name#P#part_name#SP#subpart_name)
+	ut_a(idlen < ID_LEN);
 	memcpy(nz, id, idlen);
 	nz[idlen] = 0;
 
