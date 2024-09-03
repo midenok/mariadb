@@ -786,7 +786,7 @@ private:
 	char		part_suffix_buf[FN_REFLEN];
 	const char *	part_suffix;
 	size_t		part_suffix_len;
-	bool alter;
+	bool tmp_name;
 	dict_table_t* alter_table;
 };
 

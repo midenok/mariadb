@@ -5303,7 +5303,7 @@ create_table_info_t::create_table_info_t(
 	  m_creating_stub(thd_ddl_options(thd)->import_tablespace()),
 	  m_file(file),
 	  part_suffix(NULL),
-	  alter(false),
+	  tmp_name(false),
 	  alter_table(NULL)
 {
   m_table_name[0]= '\0';
@@ -12327,7 +12327,9 @@ create_table_info_t::create_foreign_keys()
 				       n, strlen(n), m_thd) = '\0';
 		mem_heap_free(heap);
 		operation = "Alter ";
-		alter = true;
+		/* Alter does not mean temporary name. F.ex. ADD PARTITION adds
+		as is name. */
+		tmp_name = dict_table_t::is_temporary_name(name.str);
 	} else {
 		*innobase_convert_name(create_name, sizeof create_name,
 				       LEX_STRING_WITH_LEN(name), m_thd)= '\0';
@@ -12497,7 +12499,6 @@ create_table_info_t::create_foreign_key(
 
 		if (fk->constraint_name.str) {
 			ulint db_len;
-			const bool tmp= alter;
 
 			/* Catenate 'databasename/' to the constraint name
 			specified by the user: we conceive the constraint as
@@ -12505,7 +12506,7 @@ create_table_info_t::create_foreign_key(
 			itself. We store the name to foreign->id. */
 
 			db_len = dict_get_db_name_len(table->name.m_name);
-			size_t alloc_len = (tmp ? 3 : 2) + db_len + fk->constraint_name.length;
+			size_t alloc_len = (tmp_name ? 3 : 2) + db_len + fk->constraint_name.length;
 			if (part_suffix)
 			{
 				alloc_len += part_suffix_len + 1;
@@ -12517,7 +12518,7 @@ create_table_info_t::create_foreign_key(
 			memcpy(pos, table->name.m_name, db_len);
 			pos += db_len;
 			*(pos++) = '/';
-			if (tmp) {
+			if (tmp_name) {
 				*(pos++) = '\xFF';
 			}
 			strcpy(pos, fk->constraint_name.str);
