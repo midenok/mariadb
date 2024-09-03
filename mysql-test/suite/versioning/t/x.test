@@ -282,34 +282,96 @@ select * from information_schema.innodb_sys_foreign where for_name like 'test/t3
 delete from t1 where id = 2;
 delete from t1 where id = 300;
 
---echo # PARTITION BY LIST
-create or replace table t3 (
-  fk int,
-  foreign key fk03(fk) references t1(id))
-engine innodb
-partition by list (fk) (
-    partition p0 values in (0, 1, 2, 3),
+--echo # PARTITION BY LIST, engine change, add partitioning, add partitition, drop partition
+create or replace table t3 (fk int) engine myisam;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
+alter table t3 add foreign key fk03(fk) references t1(id);
+# Foreign keys are not stored in non-InnoDB
+show create table t3;
+alter table t3 engine innodb;
+alter table t3 add foreign key fk03(fk) references t1(id);
+show create table t3;
+alter table t3 partition by list (fk) (
     partition p1 values in (4, 5, 6, 7));
+alter table t3 engine myisam;
+alter table t3 engine innodb;
+alter table t3 add foreign key fk03(fk) references t1(id);
+alter table t1 drop system versioning;
+# Referenced not allowed to change engine
+--error ER_ROW_IS_REFERENCED
+alter table t1 engine myisam;
+insert t1 values (0), (4);
+insert t3 values (4);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 4;
+--error ER_NO_PARTITION_FOR_GIVEN_VALUE
+insert t3 values (0);
+alter table t3 add partition (partition p0 values in (0, 1, 2, 3));
+insert t3 values (0);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 0;
 
 show create table t3;
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
 
+alter table t3 drop partition p0;
+delete from t1 where id = 0;
+
+show create table t3;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
 
 --echo # CONVERT IN
-insert t1 values (4);
-insert tp0 values (4);
-drop table tp0;
+--error ER_NO_REFERENCED_ROW_2
+insert tp0 values (0);
+insert t1 values (0);
+insert tp0 values (0);
+--error ER_TABLES_DIFFERENT_METADATA
+alter table t3 convert table tp0 to partition p0 values in (0, 1);
+alter table tp0 drop foreign key fk02;
+alter table tp0 add foreign key fk03(fk) references t1(id);
+show create table t3;
+show create table tp0;
+alter table t3 convert table tp0 to partition p0 values in (0, 1, 2);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 0;
 
-# alter table t3 convert table tp0 to partition p0 values less than (10);
+show create table t3;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
 
-# List partitions are always added to the end
-# HASH/Key partitions are added through full
+--echo # COALESCE
+create or replace table t3 (
+  fk int,
+  foreign key fk01 (fk) references t1(id))
+engine innodb
+partition by hash (fk) partitions 4;
 
-# FIXME: check CONVERT IN
+delete from t1;
+insert into t1 values (0), (1), (2), (3);
+insert into t3 values (0), (1), (2), (3);
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 0;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 1;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 2;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 3;
 
-# FIXME: is there any inplace operations that may affect?
+show create table t3;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
 
-# select * from information_schema.innodb_sys_indexes;
-# select * from information_schema.innodb_sys_tables;
+alter table t3 coalesce partition 2;
+
+show create table t3;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t3%';
+
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 0;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 1;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 2;
+--error ER_ROW_IS_REFERENCED_2
+delete from t1 where id = 3;
 
 drop tables t3, t2, t1;
