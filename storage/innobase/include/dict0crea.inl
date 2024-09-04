@@ -35,6 +35,7 @@ where the numbers start from 1, and are given locally for this table, that is,
 the number is not global, as it used to be before MySQL 4.0.18.  */
 UNIV_INLINE
 dberr_t
+// Used in inplace add foreign key
 dict_create_add_foreign_id(
 /*=======================*/
 	ulint*		id_nr,	/*!< in/out: number to use in id generation;
@@ -51,6 +52,7 @@ dict_create_add_foreign_id(
 		ulint	namelen	= strlen(name);
 		char*	id	= static_cast<char*>(
 					mem_heap_alloc(foreign->heap,
+// +1 for \xFF
 						       namelen + 21));
 		int idlen;
 		char buf[FN_REFLEN]; // FIXME: what constant to use?
@@ -90,12 +92,14 @@ dict_create_add_foreign_id(
 			idlen= sprintf(id, "%s_ibfk_%lu", table_name,
 				(ulong) (*id_nr)++);
 
+// \xFF does not validate well. We don't check part that is not visible at SQL layer.
 			if (innobase_check_identifier_length(
 				strchr(id,'/') + 1)) {
 				DBUG_RETURN(DB_IDENTIFIER_TOO_LONG);
 			}
 		}
 
+// Add partition suffix
 		if (part_suffix)
 		{
 			id[idlen++]= '\xFF';

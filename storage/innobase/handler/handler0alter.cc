@@ -10013,6 +10013,7 @@ innobase_update_foreign_try(
 
 	foreign_id++;
 
+// Inplace add foreign key
 	const char *part_suffix= is_partition(ctx->old_table->name.m_name);
 	size_t part_suffix_len= part_suffix ? strlen(part_suffix) : 0;
 

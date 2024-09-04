@@ -1583,6 +1583,7 @@ struct dict_foreign_matches_id {
 		: m_id(id)
 	{}
 
+	// Used in copy drop foreign key
 	bool operator()(const dict_foreign_t*	foreign) const
 	{
 		const Lex_ident_column ident = Lex_cstring_strlen(m_id);

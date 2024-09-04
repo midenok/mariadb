@@ -3800,6 +3800,8 @@ dict_print_info_on_foreign_key_in_create_format(
 	const char*	stripped_id;
 	ulint	i;
 	std::string	str;
+	// When returning FKs to SQL layer remove partition suffix from foreign ID
+	// (constraint name).
 	char foreign_id[FN_REFLEN]; // FIXME: what constant to use?
 	const char* s;
 
