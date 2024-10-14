@@ -913,7 +913,7 @@ void ha_end_backup()
 void handler::log_not_redoable_operation(const char *operation)
 {
   DBUG_ENTER("log_not_redoable_operation");
-  if (!table->s->tmp_table != NO_TMP_TABLE)
+  if (table->s->tmp_table == NO_TMP_TABLE)
   {
     backup_log_info ddl_log;
     bzero(&ddl_log, sizeof(ddl_log));

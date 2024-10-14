@@ -2525,7 +2525,6 @@ int collect_statistics_for_index(THD *thd, TABLE *table, uint index)
 {
   int rc= 0;
   KEY *key_info= &table->key_info[index];
-  ha_rows rows= 0;
 
   DBUG_ENTER("collect_statistics_for_index");
 
@@ -2560,7 +2559,6 @@ int collect_statistics_for_index(THD *thd, TABLE *table, uint index)
 
     if (rc)
       break;
-    rows++;
     index_prefix_calc.add();
     rc= table->file->ha_index_next(table->record[0]);
   }

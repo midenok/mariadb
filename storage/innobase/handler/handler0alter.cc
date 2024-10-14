@@ -9242,14 +9242,12 @@ innobase_rename_columns_try(
 	const char*		table_name)
 {
 	uint	i = 0;
-	ulint	num_v = 0;
 
 	DBUG_ASSERT(ctx->need_rebuild());
 	DBUG_ASSERT(ha_alter_info->handler_flags
 		    & ALTER_COLUMN_NAME);
 
 	for (Field** fp = table->field; *fp; fp++, i++) {
-		const bool is_virtual = !(*fp)->stored_in_db();
 		if (!((*fp)->flags & FIELD_IS_RENAMED)) {
 			goto processed_field;
 		}
@@ -9269,10 +9267,6 @@ innobase_rename_columns_try(
 
 		ut_error;
 processed_field:
-		if (is_virtual) {
-			num_v++;
-		}
-
 		continue;
 	}
 

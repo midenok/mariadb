@@ -2430,7 +2430,11 @@ static bool srv_purge_should_exit()
     return true;
 
   /* Slow shutdown was requested. */
+#if defined HAVE_SYSTEMD && !defined EMBEDDED_LIBRARY
   if (const uint32_t history_size= trx_sys.rseg_history_len)
+#else
+  if (trx_sys.rseg_history_len)
+#endif
   {
     static time_t progress_time;
     time_t now= time(NULL);
