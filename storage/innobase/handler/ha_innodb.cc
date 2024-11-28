@@ -120,6 +120,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 extern "C" void thd_mark_transaction_to_rollback(MYSQL_THD thd, bool all);
 unsigned long long thd_get_query_id(const MYSQL_THD thd);
+uint32 thd_get_query_length(const MYSQL_THD thd);
+char* thd_get_query(const MYSQL_THD thd);
+
 void thd_clear_error(MYSQL_THD thd);
 
 TABLE *find_fk_open_table(THD *thd, const char *db, size_t db_len,
@@ -21993,4 +21996,12 @@ void ins_node_t::vers_update_end(row_prebuilt_t *prebuilt, bool history_row)
   {
     mem_heap_free(local_heap);
   }
+}
+
+void ib_print_query(trx_t* trx)
+{
+  THD *thd= trx->mysql_thd;
+  ib::warn() << "Query ID: " << thd_get_query_id(thd);
+  if (thd_get_query_length(thd))
+    ib::warn() << thd_get_query(thd);
 }

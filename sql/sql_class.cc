@@ -4899,6 +4899,16 @@ unsigned long long thd_get_query_id(const MYSQL_THD thd)
   return((unsigned long long)thd->query_id);
 }
 
+uint32 thd_get_query_length(const MYSQL_THD thd)
+{
+  return thd->query_length();
+}
+
+char* thd_get_query(const MYSQL_THD thd)
+{
+  return thd->query();
+}
+
 void thd_clear_error(MYSQL_THD thd)
 {
   thd->clear_error();

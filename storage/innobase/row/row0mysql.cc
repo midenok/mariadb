@@ -2462,7 +2462,7 @@ err_exit:
 		/* We already have .ibd file here. it should be deleted. */
 
 		if (dict_table_is_file_per_table(table)
-		    && fil_delete_tablespace(table->space_id) != DB_SUCCESS) {
+		    && fil_delete_tablespace(table->space_id, trx) != DB_SUCCESS) {
 			ib::error() << "Cannot delete the file of table "
 				<< table->name;
 		}
@@ -3078,7 +3078,7 @@ row_discard_tablespace(
 	}
 
 	/* Discard the physical file that is used for the tablespace. */
-	err = fil_delete_tablespace(table->space_id);
+	err = fil_delete_tablespace(table->space_id, trx);
 	switch (err) {
 	case DB_IO_ERROR:
 		ib::warn() << "ALTER TABLE " << table->name
@@ -3776,7 +3776,7 @@ do_drop:
 		ut_ad(!filepath);
 
 		if (space->id != TRX_SYS_SPACE) {
-			err = fil_delete_tablespace(space->id);
+			err = fil_delete_tablespace(space->id, trx);
 		}
 		break;
 

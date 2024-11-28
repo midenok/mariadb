@@ -500,6 +500,8 @@ ib_push_warning(
 	const char	*format,/*!< in: warning message */
 	...);
 
+void ib_print_query(trx_t* trx);
+
 /*****************************************************************//**
 Normalizes a table name string. A normalized name consists of the
 database name catenated to '/' and table name. An example:

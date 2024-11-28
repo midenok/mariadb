@@ -40,6 +40,7 @@ Modified           Jan Lindström jan.lindstrom@mariadb.com
 #include "fsp0fsp.h"
 #include "fil0pagecompress.h"
 #include <my_crypt.h>
+#include <trx0trx.h>
 
 static bool fil_crypt_threads_inited = false;
 
@@ -2678,7 +2679,8 @@ Wait for crypt threads to stop accessing space
 UNIV_INTERN
 void
 fil_space_crypt_close_tablespace(
-	const fil_space_t*	space)
+	const fil_space_t*	space,
+	trx_t* trx)
 {
 	fil_space_crypt_t* crypt_data = space->crypt_data;
 
@@ -2716,14 +2718,19 @@ fil_space_crypt_close_tablespace(
 
 		time_t now = time(0);
 
-		if (now >= last + 30) {
+		if (DBUG_EVALUATE_IF("dbug_warn_waited", 1, 0) ||
+			now >= last + 30) {
 			ib::warn() << "Waited "
 				   << now - start
 				   << " seconds to drop space: "
 				   << space->name << " ("
 				   << space->id << ") active threads "
-				   << cnt << "flushing="
+				   << cnt << "; flushing="
 				   << flushing << ".";
+			/* If no trx this should be the row purge thread */
+			if (trx && trx->mysql_thd) {
+				ib_print_query(trx);
+			}
 			last = now;
 		}
 	}

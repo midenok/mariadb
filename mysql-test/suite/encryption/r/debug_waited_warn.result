@@ -1,0 +1,26 @@
+set @save_threads= @@global.innodb_encryption_threads;
+set global innodb_encryption_threads= 4;
+set default_storage_engine= innodb;
+create table t1 (
+x int, pk int auto_increment, y int,
+key (x), primary key (pk));
+set @old_dbug=@@global.debug_dbug;
+set @@global.debug_dbug="d,dbug_warn_waited";
+connect  con2,localhost,root,,test;
+connect  con1,localhost,root,,test;
+set global innodb_encrypt_tables= on;
+connection default;
+create or replace table t2 as select * from t1;
+connection con2;
+create or replace table t2 as select * from t1;
+connection default;
+create or replace table t2 as select * from t1;
+connection con1;
+set global innodb_encrypt_tables= off;
+connection con2;
+disconnect con1;
+disconnect con2;
+connection default;
+drop tables t2, t1;
+set global debug_dbug=@old_dbug;
+set global innodb_encryption_threads= @save_threads;

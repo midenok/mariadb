@@ -1203,7 +1203,7 @@ bool fil_table_accessible(const dict_table_t* table)
 @param[in]	id		tablespace identifier
 @param[in]	if_exists	whether to ignore missing tablespace
 @return	DB_SUCCESS or error */
-dberr_t fil_delete_tablespace(ulint id, bool if_exists= false);
+dberr_t fil_delete_tablespace(ulint id, trx_t* trx, bool if_exists= false);
 
 /** Prepare to truncate an undo tablespace.
 @param[in]	space_id	undo tablespace id

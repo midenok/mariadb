@@ -446,7 +446,8 @@ Wait for crypt threads to stop accessing space
 UNIV_INTERN
 void
 fil_space_crypt_close_tablespace(
-	const fil_space_t*	space);
+	const fil_space_t*	space,
+	trx_t* trx);
 
 /*********************************************************************
 Get crypt status for a space (used by information_schema)

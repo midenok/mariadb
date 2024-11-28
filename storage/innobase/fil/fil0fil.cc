@@ -2260,7 +2260,8 @@ fil_check_pending_operations(
 	fil_operation_t	operation,	/*!< in: File operation */
 	fil_space_t**	space,		/*!< out: tablespace instance
 					in memory */
-	char**		path)		/*!< out/own: tablespace path */
+	char**		path,		/*!< out/own: tablespace path */
+	trx_t*		trx)
 {
 	ulint		count = 0;
 
@@ -2275,7 +2276,7 @@ fil_check_pending_operations(
 	if (sp) {
 		if (sp->crypt_data && sp->acquire()) {
 			mutex_exit(&fil_system.mutex);
-			fil_space_crypt_close_tablespace(sp);
+			fil_space_crypt_close_tablespace(sp, trx);
 			mutex_enter(&fil_system.mutex);
 			sp->release();
 		}
@@ -2349,7 +2350,7 @@ fil_close_tablespace(
 	ut_a(!is_system_tablespace(id));
 
 	err = fil_check_pending_operations(id, FIL_OPERATION_CLOSE,
-					   &space, &path);
+					   &space, &path, trx);
 
 	if (err != DB_SUCCESS) {
 		return(err);
@@ -2421,7 +2422,7 @@ bool fil_table_accessible(const dict_table_t* table)
 @param[in]	id		tablespace identifier
 @param[in]	if_exists	whether to ignore missing tablespace
 @return	DB_SUCCESS or error */
-dberr_t fil_delete_tablespace(ulint id, bool if_exists)
+dberr_t fil_delete_tablespace(ulint id, trx_t* trx, bool if_exists)
 {
 	char*		path = 0;
 	fil_space_t*	space = 0;
@@ -2429,7 +2430,7 @@ dberr_t fil_delete_tablespace(ulint id, bool if_exists)
 	ut_a(!is_system_tablespace(id));
 
 	dberr_t err = fil_check_pending_operations(
-		id, FIL_OPERATION_DELETE, &space, &path);
+		id, FIL_OPERATION_DELETE, &space, &path, trx);
 
 	if (err != DB_SUCCESS) {
 		if (!if_exists) {
@@ -2548,7 +2549,7 @@ fil_space_t* fil_truncate_prepare(ulint space_id)
 	pages are flushed to disk. */
 	fil_space_t* space;
 	if (fil_check_pending_operations(space_id, FIL_OPERATION_TRUNCATE,
-					 &space, NULL) != DB_SUCCESS) {
+					 &space, NULL, NULL) != DB_SUCCESS) {
 		return NULL;
 	}
 	ut_ad(space != NULL);
@@ -2729,7 +2730,7 @@ retry:
 			ib::info() << "TRUNCATE rollback: " << id
 				<< "," << new_path;
 			mutex_exit(&fil_system.mutex);
-			dberr_t err = fil_delete_tablespace(id);
+			dberr_t err = fil_delete_tablespace(id, NULL);
 			if (err != DB_SUCCESS) {
 				return err;
 			}
