@@ -753,6 +753,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %token  <kwd>  DISK_SYM
 %token  <kwd>  DO_SYM
 %token  <kwd>  DRY_SYM
+%token  <kwd>  DRY_RUN_SYM
 %token  <kwd>  DUMPFILE
 %token  <kwd>  DUPLICATE_SYM
 %token  <kwd>  DYNAMIC_SYM                   /* SQL-2003-R */
@@ -8667,6 +8668,10 @@ alter_list_item:
             Lex->alter_info.drop_list.push_back(ad, thd->mem_root);
             Lex->alter_info.flags|= ALTER_DROP_CHECK_CONSTRAINT;
           }
+        | DRY_RUN_SYM
+          {
+            Lex->describe|= DESCRIBE_DRY_RUN;
+          }
         ;
 
 opt_index_lock_algorithm:
@@ -16446,6 +16451,7 @@ keyword_sp_var_and_label:
         | DISCARD
         | DISK_SYM
         | DRY_SYM
+        | DRY_RUN_SYM
         | DUMPFILE
         | DUPLICATE_SYM
         | DYNAMIC_SYM
