@@ -58,6 +58,9 @@ my %debuggers = (
   windbg => {
     options => '{exe} {args}',
   },
+  heaptrack => {
+    options => '{exe} {args}',
+  },
   lldb => {
     term => 1,
     options => '-s {script} {exe}',
