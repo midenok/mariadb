@@ -1825,6 +1825,10 @@ wait_suspend_loop:
 
 	service_manager_extend_timeout(INNODB_EXTEND_TIMEOUT_INTERVAL,
 				       "Free innodb buffer pool");
+	/* log_preflush_pool_modified_pages() is done as part of
+	log_make_checkpoint() so all pages should be flushed,
+	presumably the failure of buf_all_freed() may happen because
+	of fixed pages only. */
 	buf_all_freed();
 
 	ut_a(lsn == log_sys.lsn

@@ -1746,7 +1746,7 @@ static
 const buf_block_t*
 buf_chunk_not_freed(
 /*================*/
-	buf_chunk_t*	chunk)	/*!< in: chunk being checked */
+	buf_chunk_t*	chunk, bool &dirty)	/*!< in: chunk being checked */
 {
 	buf_block_t*	block;
 	ulint		i;
@@ -1790,6 +1790,10 @@ buf_chunk_not_freed(
 
 			buf_page_mutex_enter(block);
 			ready = buf_flush_ready_for_replace(&block->page);
+			if (!ready && (block->page.oldest_modification ||
+				buf_page_get_io_fix(&block->page) == BUF_IO_WRITE)) {
+				dirty = true;
+			}
 			buf_page_mutex_exit(block);
 
 			if (!ready) {
@@ -6241,9 +6245,10 @@ buf_all_freed_instance(
 
 	for (i = buf_pool->n_chunks; i--; chunk++) {
 
-		if (const buf_block_t* block = buf_chunk_not_freed(chunk)) {
-			ib::fatal() << "Page " << block->page.id
-				<< " still fixed or dirty";
+		bool dirty = false;
+		if (const buf_block_t* block = buf_chunk_not_freed(chunk, dirty)) {
+			ib::error() << "Page " << block->page.id
+				<< " still " << (dirty ? "dirty" : "fixed");
 		}
 	}
 
