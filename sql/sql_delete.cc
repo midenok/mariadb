@@ -868,6 +868,13 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
 	  error= -1;
 	  break;
 	}
+        if (select && select->quick &&
+            table->s->db_type()->db_type == DB_TYPE_HEAP)
+        {
+          end_read_record(&info);
+          select->quick->reset();
+          error= init_read_record(&info, thd, table, select, file_sort, 1, 1, FALSE);
+        }
       }
       else
       {
