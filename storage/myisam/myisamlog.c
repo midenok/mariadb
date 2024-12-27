@@ -62,7 +62,7 @@ static int test_if_open(void *key, element_count count, void *param);
 static void fix_blob_pointers(MI_INFO *isam,uchar *record);
 static int test_when_accessed(void *key, element_count count,
                               void *access_param);
-static int file_info_free(void*, TREE_FREE, void *);
+static int file_info_free(TREE *, TREE_ELEMENT *, TREE_FREE);
 static int close_some_file(TREE *tree);
 static int reopen_closed_file(TREE *tree,struct file_info *file_info);
 static int find_record_with_key(struct file_info *file_info,uchar *record);
@@ -329,7 +329,7 @@ static int examine_log(char * file_name, char **table_names)
   init_io_cache(&cache,file,0,READ_CACHE,start_offset,0,MYF(0));
   bzero((uchar*) com_count,sizeof(com_count));
   init_tree(&tree,0,0,sizeof(file_info), file_info_compare,
-	          file_info_free, NULL, MYF(MY_TREE_WITH_DELETE));
+            (tree_element_free) file_info_free, NULL, MYF(MY_TREE_WITH_DELETE));
   (void) init_key_cache(dflt_key_cache,KEY_CACHE_BLOCK_SIZE,KEY_CACHE_SIZE,
                         0, 0, 0, 0);
 
@@ -753,10 +753,9 @@ static int test_when_accessed (void *key_,
 }
 
 
-static int file_info_free(void* arg, TREE_FREE mode __attribute__((unused)),
-                          void *unused __attribute__((unused)))
+static int file_info_free(TREE *tree, TREE_ELEMENT *element, TREE_FREE)
 {
-  struct file_info *fileinfo= arg;
+  struct file_info *fileinfo= (struct file_info *) ELEMENT_KEY(tree, element);
   DBUG_ENTER("file_info_free");
   if (update)
   {

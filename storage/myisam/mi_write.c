@@ -935,14 +935,14 @@ static int keys_compare(void *param_, const void *key1_, const void *key2_)
 }
 
 
-static int keys_free(void* key_arg, TREE_FREE mode, void *param_arg)
+static int keys_free(TREE *tree, TREE_ELEMENT *element, TREE_FREE mode)
 {
   /*
     Probably I can use info->lastkey here, but I'm not sure,
     and to be safe I'd better use local lastkey.
   */
-  bulk_insert_param *param= (bulk_insert_param*)param_arg;
-  uchar lastkey[HA_MAX_KEY_BUFF], *key= (uchar*)key_arg;
+  bulk_insert_param *param= (bulk_insert_param*) tree->custom_arg;
+  uchar lastkey[HA_MAX_KEY_BUFF], *key= (uchar*) ELEMENT_KEY(tree, element);
   uint keylen;
   MI_KEYDEF *keyinfo;
 

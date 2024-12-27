@@ -108,6 +108,7 @@ typedef struct st_heap_block
 } HP_BLOCK;
 
 struct st_heap_info;			/* For reference */
+struct st_heap_share;
 
 typedef struct st_hp_keydef		/* Key definition with open */
 {
@@ -123,6 +124,7 @@ typedef struct st_hp_keydef		/* Key definition with open */
   */
   ha_rows hash_buckets; 
   TREE rb_tree;
+  struct st_heap_share *s;
   int (*write_key)(struct st_heap_info *info, struct st_hp_keydef *keyinfo,
 		   const uchar *record, uchar *recpos);
   int (*delete_key)(struct st_heap_info *info, struct st_hp_keydef *keyinfo,
@@ -150,6 +152,7 @@ typedef struct st_heap_share
   uint currently_disabled_keys;    /* saved value from "keys" when disabled */
   uint open_count;
   uchar *del_link;			/* Link to next block with del. rec */
+  TREE_ELEMENT *last_freed;
   char * name;			/* Name of "memory-file" */
   time_t create_time;
   THR_LOCK lock;

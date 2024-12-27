@@ -305,9 +305,10 @@ bool get_ev_num_info(EV_NUM_INFO *ev_info, NUM_INFO *info, const char *num)
 } // get_ev_num_info
 
 
-int free_string(void* str, TREE_FREE, void*)
+int free_string(TREE *tree, TREE_ELEMENT *element, TREE_FREE)
 {
-  ((String*)str)->free();
+  String *str= (String *) ELEMENT_KEY(tree, element);
+  str->free();
   return 0;
 }
 

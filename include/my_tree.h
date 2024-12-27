@@ -48,7 +48,7 @@ typedef uint32 element_count;
 typedef int (*tree_walk_action)(void *,element_count,void *);
 
 typedef enum { free_init, free_free, free_end } TREE_FREE;
-typedef int (*tree_element_free)(void*, TREE_FREE, void *);
+typedef int (*tree_element_free)(void*, void*, TREE_FREE);
 
 typedef struct st_tree_element {
   struct st_tree_element *left,*right;

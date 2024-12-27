@@ -20,6 +20,23 @@ static int keys_compare(void *heap_rb, const void *key1, const void *key2);
 static void init_block(HP_BLOCK *block,uint reclength,ulong min_records,
 		       ulong max_records);
 
+#if 0
+#define ELEMENT_KEY(tree,element)\
+(tree->offset_to_key ? (void*)((uchar*) element+tree->offset_to_key) :\
+			*((void**) (element+1)))
+#endif
+static int tree_free(TREE *tree, TREE_ELEMENT *element, TREE_FREE action)
+{
+//   HP_KEYDEF *k= (HP_KEYDEF *) arg;
+//   TREE *tree= &k->rb_tree;
+//   uint offset= tree->offset_to_key ? tree->offset_to_key : 1;
+//   TREE_ELEMENT *element= element_key - offset;
+  if (action != free_free)
+    return 0;
+//   k->s->last_freed= element;
+  return 0;
+}
+
 /* Create a heap table */
 
 int heap_create(const char *name, HP_CREATE_INFO *create_info,
@@ -61,7 +78,7 @@ int heap_create(const char *name, HP_CREATE_INFO *create_info,
       We have to store sometimes uchar* del_link in records,
       so the visible_offset must be least at sizeof(uchar*)
     */
-    visible_offset= MY_MAX(reclength, sizeof (char*));
+    visible_offset= MY_MAX(reclength, sizeof (char*) * 2);
     
     for (i= key_segs= max_length= 0, keyinfo= keydef; i < keys; i++, keyinfo++)
     {
@@ -176,6 +193,7 @@ int heap_create(const char *name, HP_CREATE_INFO *create_info,
     for (i= 0, keyinfo= share->keydef; i < keys; i++, keyinfo++)
     {
       keyinfo->seg= keyseg;
+      keyinfo->s= share;
       memcpy(keyseg, keydef[i].seg,
 	     (size_t) (sizeof(keyseg[0]) * keydef[i].keysegs));
       keyseg+= keydef[i].keysegs;
@@ -190,7 +208,7 @@ int heap_create(const char *name, HP_CREATE_INFO *create_info,
 	keyseg++;
 
 	init_tree(&keyinfo->rb_tree, 0, 0, sizeof(uchar*),
-		  keys_compare, NULL, NULL,
+		  keys_compare, (tree_element_free) tree_free, NULL,
                   MYF((create_info->internal_table ? MY_THREAD_SPECIFIC : 0) |
                       MY_TREE_WITH_DELETE));
 	keyinfo->delete_key= hp_rb_delete_key;

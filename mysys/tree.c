@@ -156,11 +156,11 @@ static int free_tree(TREE *tree, my_bool abort, myf free_flags)
       if (tree->free)
       {
         if (tree->memory_limit)
-          (*tree->free)(NULL, free_init, tree->custom_arg);
+          (*tree->free)(tree, NULL, free_init);
 	if ((error= delete_tree_element(tree, tree->root, abort)))
           first_error= first_error ? first_error : error;
         if (tree->memory_limit)
-          (*tree->free)(NULL, free_end, tree->custom_arg);
+          (*tree->free)(tree, NULL, free_end);
       }
       free_root(&tree->mem_root, free_flags);
     }
@@ -211,8 +211,7 @@ static int delete_tree_element(TREE *tree, TREE_ELEMENT *element,
       abort= 1;
     if (!abort && tree->free)
     {
-      if ((error= (*tree->free)(ELEMENT_KEY(tree,element), free_free,
-                                tree->custom_arg)))
+      if ((error= (*tree->free)(tree, element, free_free)))
       {
         first_error= first_error ? first_error : error;
         abort= 1;
@@ -367,7 +366,7 @@ int tree_delete(TREE *tree, void *key, uint key_size, void *custom_arg)
   if (remove_colour == BLACK)
     rb_delete_fixup(tree,parent);
   if (tree->free)
-    (*tree->free)(ELEMENT_KEY(tree,element), free_free, tree->custom_arg);
+    (*tree->free)(tree, element, free_free);
   tree->allocated-= sizeof(TREE_ELEMENT) + tree->size_of_element + key_size;
   my_free(element);
   tree->elements_in_tree--;
