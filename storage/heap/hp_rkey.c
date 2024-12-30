@@ -52,7 +52,6 @@ int heap_rkey(HP_INFO *info, uchar *record, int inx, const uchar *key,
     if (!(pos= tree_search_key(&keyinfo->rb_tree, info->lastkey, info->parents,
 			       &info->last_pos, find_flag, &custom_arg)))
     {
-      info->last_pos= NULL;
       info->update= HA_STATE_NO_KEY;
       DBUG_RETURN(my_errno= HA_ERR_KEY_NOT_FOUND);
     }

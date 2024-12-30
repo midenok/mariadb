@@ -42,7 +42,6 @@ int heap_rlast(HP_INFO *info, uchar *record, int inx)
     }
     else
     {
-      info->last_pos= NULL;
       my_errno = HA_ERR_END_OF_FILE;
       DBUG_RETURN(my_errno);
     }

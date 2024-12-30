@@ -431,6 +431,7 @@ void *tree_search_key(TREE *tree, const void *key,
 	cmp= -1;
 	break;
       default:
+        *last_pos= NULL;
 	return NULL;
       }
     }
@@ -466,6 +467,7 @@ void *tree_search_key(TREE *tree, const void *key,
     *last_pos= last_equal_element ? last_equal_element : last_right_step_parent;
     break;
   default:
+    *last_pos= NULL;
     return NULL;
   }
   return *last_pos ? ELEMENT_KEY(tree, **last_pos) : NULL;
