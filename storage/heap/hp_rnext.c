@@ -98,6 +98,7 @@ int heap_rnext(HP_INFO *info, uchar *record)
     }
     else
     {
+      info->last_pos= NULL;
       my_errno = HA_ERR_KEY_NOT_FOUND;
     }
   }
