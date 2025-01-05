@@ -421,7 +421,8 @@ rename_table_and_triggers(THD *thd, rename_param *param,
         debug_crash_here("ddl_log_rename_after_failed_rename_trigger");
         (void) mysql_rename_table(hton, new_db, new_alias,
                                   &ren_table->db, old_alias, &param->old_version,
-                                  QRMT_DEFAULT | NO_FK_CHECKS);
+                                  QRMT_DEFAULT | NO_FK_CHECKS |
+                                  param->reverse_flags());
         debug_crash_here("ddl_log_rename_after_revert_rename_table");
         if (ddl_log_state)
           ddl_log_disable_entry(ddl_log_state);

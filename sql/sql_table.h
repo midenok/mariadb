@@ -148,6 +148,16 @@ struct rename_param
   rename_param() :
     from_table_hton(NULL),
     rename_flags(0) {}
+
+  int reverse_flags()
+  {
+    int flags= rename_flags & ~FN_IS_TMP;
+    if (rename_flags & FN_FROM_IS_TMP)
+      flags|= FN_TO_IS_TMP;
+    if (rename_flags & FN_TO_IS_TMP)
+      flags|= FN_FROM_IS_TMP;
+    return flags;
+  }
 };
 
 bool
