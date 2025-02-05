@@ -53,6 +53,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "sql_type_geom.h"
 #include "scope.h"
 #include "srv0srv.h"
+#include "sql_funcs.h"
+
 
 extern my_bool opt_readonly;
 
@@ -12495,6 +12497,38 @@ create_table_info_t::create_foreign_keys()
 	return (error);
 }
 
+static ibool pars_get_true(void *row
+                           __attribute__((unused)), /*!< in: sel_node_t* */
+                           void *user_arg)          /*!< in: bool do_upgrade */
+{
+  *(ib_uint32_t *) user_arg= 1;
+  return 0;
+}
+
+dberr_t
+create_table_info_t::fk_check_id(const char *foreign_id)
+{
+  pars_info_t *info;
+  ib_uint32_t match= 0;
+  dberr_t err;
+  std::string id(foreign_id);
+
+  info= pars_info_create();
+  if (!info)
+    return DB_OUT_OF_MEMORY;
+
+  pars_info_bind_function(info, "get_match", pars_get_true, &match);
+  pars_info_bind_int4_literal(info, "match", &match);
+  pars_info_add_str_literal(info, "foreign_id", foreign_id);
+
+  ut_ad(dict_sys.locked());
+  err= que_eval_sql(info, fk_check_id_sql, m_trx);
+  if (err != DB_SUCCESS)
+    return err;
+
+  return match ? DB_DUPLICATE_KEY : DB_SUCCESS;
+}
+
 /** Adds the given set of foreign key objects to the dictionary tables
 in the database. This function does not modify the dictionary cache. The
 caller must ensure that all foreign key objects contain a valid constraint
@@ -12515,13 +12549,24 @@ create_table_info_t::add_foreigns_to_dictionary(
     return DB_ERROR;
   }
 
+  bool check_first= true;
+
   for (auto fk : local_fk_set)
+  {
+    dberr_t error;
+    if (check_first)
+    {
+      if ((error= fk_check_id(fk->id)))
+        return error;
+      check_first= false;
+    }
     if (m_trx->check_foreigns &&
         !fk->check_fk_constraint_valid())
       return DB_CANNOT_ADD_CONSTRAINT;
     else if (dberr_t error= dict_create_add_foreign_to_dictionary
              (m_table->name.m_name, fk, m_trx))
       return error;
+  }
 
   return DB_SUCCESS;
 }
@@ -13437,6 +13482,7 @@ ha_innobase::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
   DBUG_ASSERT(form->s == table_share);
   DBUG_ASSERT(table_share->table_type == TABLE_TYPE_SEQUENCE ||
               table_share->table_type == TABLE_TYPE_NORMAL);
+  DBUG_ASSERT(!create_fk || !create_info->like());
 
   create_table_info_t info(ha_thd(), form, create_info, file_per_table, trx);
 
@@ -13534,7 +13580,7 @@ ha_innobase::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
 int ha_innobase::create(const char *name, TABLE *form,
                         HA_CREATE_INFO *create_info)
 {
-  return create(name, form, create_info, srv_file_per_table);
+  return create(name, form, create_info, srv_file_per_table, nullptr, !create_info->like());
 }
 
 /*****************************************************************//**

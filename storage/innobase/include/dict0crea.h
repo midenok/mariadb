@@ -133,6 +133,7 @@ dict_create_add_foreign_id(
 	const char *	part_suffix,
 	size_t		part_suffix_len);
 
+#if 0
 /** Adds the given set of foreign key objects to the dictionary tables
 in the database. This function does not modify the dictionary cache. The
 caller must ensure that all foreign key objects contain a valid constraint
@@ -150,6 +151,7 @@ dict_create_add_foreigns_to_dictionary(
 	const dict_table_t*	table,
 	trx_t*			trx)
 	MY_ATTRIBUTE((nonnull, warn_unused_result));
+#endif
 
 /** Check if a foreign constraint is on columns server as base columns
 of any stored column. This is to prevent creating SET NULL or CASCADE
