@@ -12497,9 +12497,8 @@ create_table_info_t::create_foreign_keys()
 	return (error);
 }
 
-static ibool pars_get_true(void *row
-                           __attribute__((unused)), /*!< in: sel_node_t* */
-                           void *user_arg)          /*!< in: bool do_upgrade */
+static ibool pars_get_true(void *row __attribute__((unused)),
+                           void *user_arg)
 {
   *(ib_uint32_t *) user_arg= 1;
   return 0;
@@ -12511,18 +12510,55 @@ create_table_info_t::fk_check_id(const char *foreign_id)
   pars_info_t *info;
   ib_uint32_t match= 0;
   dberr_t err;
-  std::string id(foreign_id);
+  size_t id_len= strlen(foreign_id);
+
+  static const char wildcard= '%';
+  static const char nullbyte= '\0';
+  static const char xff= '\xFF';
+
+  if (part_suffix)
+  {
+    ut_ad(id_len > part_suffix_len + 1);
+    ut_ad(0 == memcmp(part_suffix, foreign_id + id_len - part_suffix_len,
+                      part_suffix_len));
+    ut_ad(foreign_id[id_len - part_suffix_len - 1] == xff);
+    id_len-= part_suffix_len + 1;
+  }
+  char *tmpchar= (char *) memchr((void *)foreign_id, xff, id_len);
+  const size_t id_size= id_len + sizeof(nullbyte) - (tmpchar ? 1 : 0);
+
+  char *wc= static_cast<char*>
+    (my_malloc(PSI_INSTRUMENT_ME, id_size + sizeof(wildcard), MYF(0)));
+  if (!wc)
+    return DB_OUT_OF_MEMORY;
+  if (tmpchar)
+  {
+    id_len--;
+    const size_t s0= tmpchar - foreign_id;
+    const size_t s1= id_len - s0;
+    ut_ad(s0 + s1 == id_size - sizeof(nullbyte));
+    memcpy(wc, foreign_id, s0);
+    memcpy(wc + s0, tmpchar + 1, s1);
+  }
+  else
+    memcpy(wc, foreign_id, id_len);
+
+  wc[id_len]= wildcard;
+  wc[id_len + 1]= nullbyte;
 
   info= pars_info_create();
   if (!info)
+  {
+    my_free(wc);
     return DB_OUT_OF_MEMORY;
+  }
 
   pars_info_bind_function(info, "get_match", pars_get_true, &match);
-  pars_info_bind_int4_literal(info, "match", &match);
-  pars_info_add_str_literal(info, "foreign_id", foreign_id);
+  pars_info_add_str_literal(info, "foreign_wc", wc);
 
   ut_ad(dict_sys.locked());
   err= que_eval_sql(info, fk_check_id_sql, m_trx);
+  my_free(wc);
   if (err != DB_SUCCESS)
     return err;
 
