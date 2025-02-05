@@ -743,6 +743,8 @@ private:
 	/** Create the internal innodb table definition. */
 	int create_table_def();
 
+        dberr_t fk_check_id(const char *foreign_id);
+
         /** Adds the given set of foreign key objects to the dictionary tables
         in the database. This function does not modify the dictionary cache. The
         caller must ensure that all foreign key objects contain a valid constraint

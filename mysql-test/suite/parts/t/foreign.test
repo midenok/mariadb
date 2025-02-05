@@ -1,5 +1,6 @@
 --source include/have_partition.inc
 --source include/have_innodb.inc
+--source include/lcase_names.inc
 
 --echo #
 --echo # MDEV-19191 Partial support of foreign keys in partitioned tables
@@ -207,6 +208,18 @@ delete from t1 where id = 10;
 --replace_result #p# #P# #sp# #SP#
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t4%';
 alter table t4 rename to t3;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
+
+create table tT like t2;
+--echo # CREATE LIKE does not copy foreign keys
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
+alter table tT add constraint fk02 foreign key (fk) references t1(id);
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
+alter table tT rename to T2;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
+rename table T2 to t4;
+select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
+drop table t4;
 
 --error ER_NO_REFERENCED_ROW_2
 insert into t3 values (11);

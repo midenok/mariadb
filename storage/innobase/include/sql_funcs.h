@@ -130,3 +130,49 @@ R"===(
     AND TO_BINARY(REF_NAME) = TO_BINARY(:old_table_name);
   END IF;
 END;)===";
+
+constexpr const char *fk_check_id_sql0=
+R"===(PROCEDURE FK_CHECK_ID () IS
+  pattern CHAR;
+
+  DECLARE FUNCTION get_match;
+
+  DECLARE CURSOR c IS
+    SELECT ID FROM SYS_FOREIGN
+    WHERE ID = :foreign_id;
+
+  DECLARE CURSOR d IS
+    SELECT ID FROM SYS_FOREIGN
+    WHERE ID LIKE pattern;
+
+BEGIN
+  OPEN c;
+  FETCH c INTO get_match();
+  CLOSE c;
+  IF (:match = 0) THEN
+    pattern := CONCAT(:foreign_id, ')===" "/\xFF" R"===(%');
+    OPEN d;
+    FETCH d INTO get_match();
+    CLOSE d;
+  END IF;
+END;)===";
+
+constexpr const char *fk_check_id_sql=
+R"===(PROCEDURE FK_CHECK_ID () IS
+  pattern CHAR;
+
+  DECLARE FUNCTION get_match;
+
+  DECLARE CURSOR c IS
+    SELECT ID FROM SYS_FOREIGN
+    WHERE ID = :foreign_id;
+
+  DECLARE CURSOR d IS
+    SELECT ID FROM SYS_FOREIGN
+    WHERE ID LIKE 'abc%';
+
+BEGIN
+  OPEN c;
+  FETCH c INTO get_match();
+  CLOSE c;
+END;)===";
