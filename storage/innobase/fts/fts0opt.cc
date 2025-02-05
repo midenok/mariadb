@@ -38,6 +38,7 @@ Completed 2011/7/10 Sunny and Jimmy Yang
 #include "fts0opt.h"
 #include "fts0vlc.h"
 #include "wsrep.h"
+#include <string.h>
 
 #ifdef WITH_WSREP
 extern Atomic_relaxed<bool> wsrep_sst_disable_writes;
@@ -488,6 +489,7 @@ fts_index_fetch_nodes(
 	pars_info_t*	info;
 	dberr_t		error;
 	char		table_name[MAX_FULL_NAME_LEN];
+        bool b = false;
 
 	trx->op_info = "fetching FTS index nodes";
 
@@ -535,12 +537,14 @@ fts_index_fetch_nodes(
 			"  END IF;\n"
 			"END LOOP;\n"
 			"CLOSE c;");
+                b = true;
 	}
 
 	for (;;) {
 		error = fts_eval_sql(trx, *graph);
 
 		if (UNIV_LIKELY(error == DB_SUCCESS)) {
+                        ut_ad(!strchr((char *)word->f_str, '%'));
 			fts_sql_commit(trx);
 
 			break;				/* Exit the loop. */

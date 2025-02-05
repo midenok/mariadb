@@ -610,9 +610,7 @@ opt_search_plan_for_table(
 		switch (best_last_op) {
 		case '=':
 		case PARS_LIKE_TOKEN_EXACT:
-		case PARS_LIKE_TOKEN_PREFIX:
-		case PARS_LIKE_TOKEN_SUFFIX:
-		case PARS_LIKE_TOKEN_SUBSTR:
+//                         ut_ad(best_last_op != PARS_LIKE_TOKEN_PREFIX);
 			break;
 		default:
 			n_fields--;

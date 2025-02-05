@@ -1732,6 +1732,7 @@ table_loop:
 
 	mtr.start();
 
+#if 0
 #ifdef BTR_CUR_HASH_ADAPT
 	if (node->read_view && plan->unique_search && !plan->pcur_is_open
 	    && !plan->must_get_clust) {
@@ -1753,6 +1754,7 @@ table_loop:
 		mtr.start();
 	}
 #endif /* BTR_CUR_HASH_ADAPT */
+#endif
 
 	if (!plan->pcur_is_open) {
 		/* Evaluate the expressions to build the search tuple and

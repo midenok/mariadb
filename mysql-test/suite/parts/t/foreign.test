@@ -214,6 +214,7 @@ create table tT like t2;
 --echo # CREATE LIKE does not copy foreign keys
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
 alter table tT add constraint fk02 foreign key (fk) references t1(id);
+--exit
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
 alter table tT rename to T2;
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
