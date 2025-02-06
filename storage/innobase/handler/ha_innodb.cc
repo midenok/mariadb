@@ -12505,12 +12505,12 @@ static ibool pars_get_true(void *row __attribute__((unused)),
 }
 
 dberr_t
-create_table_info_t::fk_check_id(const char *foreign_id)
+create_table_info_t::fk_check_dup(const dict_foreign_t *fk)
 {
   pars_info_t *info;
   ib_uint32_t match= 0;
   dberr_t err;
-  size_t id_len= strlen(foreign_id);
+  size_t id_len= strlen(fk->id);
 
   static const char wildcard= '%';
   static const char nullbyte= '\0';
@@ -12519,12 +12519,12 @@ create_table_info_t::fk_check_id(const char *foreign_id)
   if (part_suffix)
   {
     ut_ad(id_len > part_suffix_len + 1);
-    ut_ad(0 == memcmp(part_suffix, foreign_id + id_len - part_suffix_len,
+    ut_ad(0 == memcmp(part_suffix, fk->id + id_len - part_suffix_len,
                       part_suffix_len));
-    ut_ad(foreign_id[id_len - part_suffix_len - 1] == xff);
+    ut_ad(fk->id[id_len - part_suffix_len - 1] == xff);
     id_len-= part_suffix_len + 1;
   }
-  char *tmpchar= (char *) memchr((void *)foreign_id, xff, id_len);
+  char *tmpchar= (char *) memchr((void *)fk->id, xff, id_len);
   const size_t id_size= id_len + sizeof(nullbyte) - (tmpchar ? 1 : 0);
 
   char *wc= static_cast<char*>
@@ -12534,14 +12534,14 @@ create_table_info_t::fk_check_id(const char *foreign_id)
   if (tmpchar)
   {
     id_len--;
-    const size_t s0= tmpchar - foreign_id;
+    const size_t s0= tmpchar - fk->id;
     const size_t s1= id_len - s0;
     ut_ad(s0 + s1 == id_size - sizeof(nullbyte));
-    memcpy(wc, foreign_id, s0);
+    memcpy(wc, fk->id, s0);
     memcpy(wc + s0, tmpchar + 1, s1);
   }
   else
-    memcpy(wc, foreign_id, id_len);
+    memcpy(wc, fk->id, id_len);
 
   wc[id_len]= wildcard;
   wc[id_len + 1]= nullbyte;
@@ -12592,7 +12592,7 @@ create_table_info_t::add_foreigns_to_dictionary(
     dberr_t error;
     if (check_first)
     {
-      if ((error= fk_check_id(fk->id)))
+      if ((error= fk_check_dup(fk)))
         return error;
       check_first= false;
     }
