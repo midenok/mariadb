@@ -5303,7 +5303,8 @@ create_table_info_t::create_table_info_t(
 	HA_CREATE_INFO*	create_info,
 	bool		file_per_table,
 	trx_t*		trx)
-	: m_thd(thd),
+	  : first_part(false),
+	  m_thd(thd),
 	  m_trx(trx),
 	  m_form(form),
 	  m_default_row_format(innodb_default_row_format),
@@ -12512,7 +12513,6 @@ create_table_info_t::fk_check_dup(const dict_foreign_t *fk)
   dberr_t err;
   size_t id_len= strlen(fk->id);
 
-  static const char wildcard= '%';
   static const char nullbyte= '\0';
   static const char xff= '\xFF';
 
@@ -12528,7 +12528,7 @@ create_table_info_t::fk_check_dup(const dict_foreign_t *fk)
   const size_t id_size= id_len + sizeof(nullbyte) - (tmpchar ? 1 : 0);
 
   char *wc= static_cast<char*>
-    (my_malloc(PSI_INSTRUMENT_ME, id_size + sizeof(wildcard), MYF(0)));
+    (my_malloc(PSI_INSTRUMENT_ME, (id_size + sizeof(nullbyte)) * 2 + sizeof(xff), MYF(0)));
   if (!wc)
     return DB_OUT_OF_MEMORY;
   if (tmpchar)
@@ -12543,8 +12543,11 @@ create_table_info_t::fk_check_dup(const dict_foreign_t *fk)
   else
     memcpy(wc, fk->id, id_len);
 
-  wc[id_len]= wildcard;
+  wc[id_len]= xff;
   wc[id_len + 1]= nullbyte;
+  char *for_id= &wc[id_len + 2];
+  memcpy(for_id, wc, id_len);
+  for_id[id_len]= nullbyte;
 
   info= pars_info_create();
   if (!info)
@@ -12555,6 +12558,9 @@ create_table_info_t::fk_check_dup(const dict_foreign_t *fk)
 
   pars_info_bind_function(info, "get_match", pars_get_true, &match);
   pars_info_add_str_literal(info, "foreign_wc", wc);
+  pars_info_add_int4_literal(info, "len_wc", (ulint) id_len + 1);
+  pars_info_add_str_literal(info, "foreign", for_id);
+  pars_info_bind_int4_literal(info, "match", &match);
 
   ut_ad(dict_sys.locked());
   err= que_eval_sql(info, fk_check_id_sql, m_trx);
@@ -12585,17 +12591,13 @@ create_table_info_t::add_foreigns_to_dictionary(
     return DB_ERROR;
   }
 
-  bool check_first= true;
+  const bool check_dup= !part_suffix || first_part;
 
   for (auto fk : local_fk_set)
   {
     dberr_t error;
-    if (check_first)
-    {
-      if ((error= fk_check_dup(fk)))
-        return error;
-      check_first= false;
-    }
+    if (check_dup && (error= fk_check_dup(fk)))
+      return error;
     if (m_trx->check_foreigns &&
         !fk->check_fk_constraint_valid())
       return DB_CANNOT_ADD_CONSTRAINT;
@@ -13557,6 +13559,7 @@ ha_innobase::create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
         keys for current partition. */
         create_fk= form->is_vers_current_partition(this);
       }
+      info.first_part= form->is_first_partition(this);
     }
 #endif /* WITH_PARTITION_STORAGE_ENGINE */
     /* We can't possibly have foreign key information when creating a

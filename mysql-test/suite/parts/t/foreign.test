@@ -75,15 +75,11 @@ subpartition by system_time interval 2 hours
 (partition p1 history, partition pn current);
 
 --echo # Partititon by SYSTEM_TIME, subpartition by KEY
-drop table t2;
-select * from information_schema.innodb_sys_foreign;
-
 create or replace table t2 (fk int references t1(id))
 with system versioning engine innodb
 partition by system_time limit 1 auto
 subpartition by key (fk) subpartitions 2
 (partition p1 history, partition pn current);
---exit
 
 show create table t2;
 --replace_result #p# #P# #sp# #SP#
@@ -128,7 +124,6 @@ create or replace table t2 (
   foreign key fk01 (fk) references t1(id))
 engine innodb
 partition by hash (fk) partitions 2;
---exit
 
 insert into t2 values (3), (4), (5);
 select * from t2 partition (p0) order by fk;
@@ -169,15 +164,10 @@ show create table t2;
 show create table t3;
 
 --echo # Same constraint id in non-partitioned
-# Same name is allowed. Uniqueness per-db is rather implementation restriction
-# that real user requirements.
+--error ER_CANT_CREATE_TABLE
 create table t4 (fk int, foreign key fk02 (fk) references t1(id)) engine innodb;
-# For non-partitioned the restriction still holds. It is not a feature so
-# we may loosen this restriction at least partly for MDEV-19191.
-# MDEV-16417 removes it compeletely.
 --error ER_CANT_CREATE_TABLE
 create table t5 (fk int, foreign key fk02 (fk) references t1(id)) engine innodb;
-drop table t4;
 
 --error ER_NO_REFERENCED_ROW_2
 insert into t3 values (10);
@@ -218,7 +208,7 @@ select * from information_schema.innodb_sys_foreign where for_name like 'test/t%
 create table tT like t2;
 --echo # CREATE LIKE does not copy foreign keys
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
-alter table tT add constraint fk02 foreign key (fk) references t1(id);
+alter table tT add constraint fk03 foreign key (fk) references t1(id);
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';
 alter table tT rename to T2;
 select * from information_schema.innodb_sys_foreign where for_name like 'test/t%';

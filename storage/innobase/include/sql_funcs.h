@@ -135,12 +135,27 @@ constexpr const char *fk_check_id_sql=
 R"===(PROCEDURE FK_CHECK_ID () IS
   DECLARE FUNCTION get_match;
 
-  DECLARE CURSOR c IS
+)==="
+    // Match either non-partitioned foreign id or partition-suffixed foreign id
+    // (foreign_wc == foreign + '\xff')
+R"===(
+    DECLARE CURSOR full_id_check IS
     SELECT ID FROM SYS_FOREIGN
-    WHERE ID LIKE :foreign_wc;
+    WHERE ID = :foreign;
+
+    DECLARE CURSOR part_id_check IS
+    SELECT ID FROM SYS_FOREIGN
+    WHERE SUBSTR(ID, 0, :len_wc) = :foreign_wc;
 
 BEGIN
-  OPEN c;
-  FETCH c INTO get_match();
-  CLOSE c;
+  OPEN full_id_check;
+  FETCH full_id_check INTO get_match();
+  CLOSE full_id_check;
+
+  IF (:match = 0)
+  THEN
+    OPEN part_id_check;
+    FETCH part_id_check INTO get_match();
+    CLOSE part_id_check;
+  END IF;
 END;)===";

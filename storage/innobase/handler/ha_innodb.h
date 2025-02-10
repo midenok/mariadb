@@ -733,6 +733,7 @@ public:
 
 	THD* thd() const { return(m_thd); }
 
+	bool		first_part;
 private:
 	/** Parses the table name into normal name and either temp path or
 	remote path if needed.*/
