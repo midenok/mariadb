@@ -140,11 +140,11 @@ R"===(PROCEDURE FK_CHECK_ID () IS
     // (foreign_wc == foreign + '\xff')
 R"===(
     DECLARE CURSOR full_id_check IS
-    SELECT ID FROM SYS_FOREIGN
+    SELECT ID, FOR_NAME FROM SYS_FOREIGN
     WHERE ID = :foreign;
 
     DECLARE CURSOR part_id_check IS
-    SELECT ID FROM SYS_FOREIGN
+    SELECT ID, FOR_NAME FROM SYS_FOREIGN
     WHERE SUBSTR(ID, 0, :len_wc) = :foreign_wc;
 
 BEGIN

@@ -3535,16 +3535,14 @@ innobase_convert_identifier(
 {
 	const char*	s	= id;
 // That was wrong buffer size assumption as id is full identifier of format:
-	/* db/table_name#P#part_name#SP#subpart_name */
-	static const size_t ID_LEN= MAX_TABLE_NAME_LEN * 3 + 1 + 3 + 4 + 1;
-	char nz[ID_LEN];
-	char nz2[ID_LEN];
+	char nz[MAX_FOREIGN_ID_LEN];
+	char nz2[MAX_FOREIGN_ID_LEN];
 
 	/* Decode the table name.  The MySQL function expects
 	a NUL-terminated string.  The input and output strings
 	buffers must not be shared. */
         /* ut_a(db/table_name#P#part_name#SP#subpart_name) */
-	ut_a(idlen < ID_LEN);
+	ut_a(idlen < MAX_FOREIGN_ID_LEN);
 	memcpy(nz, id, idlen);
 	nz[idlen] = 0;
 
@@ -12394,6 +12392,7 @@ create_table_info_t::create_foreign_keys()
 
 		*innobase_convert_name(create_name, sizeof create_name,
 				       n, strlen(n), m_thd) = '\0';
+		strcpy(orig_name, n);
 		mem_heap_free(heap);
 		operation = "Alter ";
 		/* Alter does not mean temporary name. F.ex. ADD PARTITION adds
@@ -12402,6 +12401,7 @@ create_table_info_t::create_foreign_keys()
 	} else {
 		*innobase_convert_name(create_name, sizeof create_name,
 				       LEX_STRING_WITH_LEN(name), m_thd)= '\0';
+		strcpy(orig_name, name.str); // FIXME: test
 	}
 
 	if ((part_suffix= is_partition(name.str))) {
@@ -12498,10 +12498,53 @@ create_table_info_t::create_foreign_keys()
 	return (error);
 }
 
-static ibool pars_get_true(void *row __attribute__((unused)),
-                           void *user_arg)
+struct fk_check_dup_arg
 {
-  *(ib_uint32_t *) user_arg= 1;
+  static constexpr auto suffix_len= sizeof(table_name_t::part_suffix) - 1;
+  ib_uint32_t match;
+  const char *orig_name;
+  size_t orig_name_len;
+  char orig_name_wc[MAX_TABLE_NAME_LEN + suffix_len + 1];
+  fk_check_dup_arg(const char *orig_name) : match{0}, orig_name{orig_name}
+  {
+    orig_name_len= strlen(orig_name);
+    ut_ad(orig_name_len <= MAX_TABLE_NAME_LEN);
+    memcpy(orig_name_wc, orig_name, orig_name_len);
+    memcpy(orig_name_wc + orig_name_len, table_name_t::part_suffix,
+           sizeof(table_name_t::part_suffix));
+    orig_name_wc[orig_name_len + sizeof(table_name_t::part_suffix)]= 0;
+  }
+
+  bool name_matches(const byte *name, ulint len)
+  {
+    if (len == orig_name_len &&
+        0 == memcmp(orig_name, name, orig_name_len))
+      return true;
+    if (len > orig_name_len + suffix_len &&
+        0 == memcmp(orig_name, name, orig_name_len) &&
+        0 == memcmp(name + orig_name_len, table_name_t::part_suffix, suffix_len))
+      return true;
+    return false;
+  }
+};
+
+static ibool fk_check_dup_rec(void *node_void, void *user_arg)
+{
+  fk_check_dup_arg *arg= (fk_check_dup_arg *) user_arg;
+  sel_node_t* node = (sel_node_t*) node_void;
+  // First column is ID
+  que_common_t* cnode = static_cast<que_common_t*>(node->select_list);
+  // Next column is FOR_NAME
+  cnode = static_cast<que_common_t*>(que_node_get_next(cnode));
+
+  const byte* data;
+  dfield_t* dfield = que_node_get_val(cnode);
+  dtype_t* type = dfield_get_type(dfield);
+  ulint len = dfield_get_len(dfield);
+  ut_a(dtype_get_mtype(type) == DATA_VARCHAR);
+  data = static_cast<const byte*>(dfield_get_data(dfield));
+  if (!arg->name_matches(data, len))
+    arg->match= 1;
   return 0;
 }
 
@@ -12509,12 +12552,13 @@ dberr_t
 create_table_info_t::fk_check_dup(const dict_foreign_t *fk)
 {
   pars_info_t *info;
-  ib_uint32_t match= 0;
+  fk_check_dup_arg arg(orig_name);
   dberr_t err;
   size_t id_len= strlen(fk->id);
-
   static const char nullbyte= '\0';
   static const char xff= '\xFF';
+  char wc[MAX_FOREIGN_ID_LEN];
+  char for_id[MAX_FOREIGN_ID_LEN];
 
   if (part_suffix)
   {
@@ -12527,10 +12571,6 @@ create_table_info_t::fk_check_dup(const dict_foreign_t *fk)
   char *tmpchar= (char *) memchr((void *)fk->id, xff, id_len);
   const size_t id_size= id_len + sizeof(nullbyte) - (tmpchar ? 1 : 0);
 
-  char *wc= static_cast<char*>
-    (my_malloc(PSI_INSTRUMENT_ME, (id_size + sizeof(nullbyte)) * 2 + sizeof(xff), MYF(0)));
-  if (!wc)
-    return DB_OUT_OF_MEMORY;
   if (tmpchar)
   {
     id_len--;
@@ -12545,30 +12585,25 @@ create_table_info_t::fk_check_dup(const dict_foreign_t *fk)
 
   wc[id_len]= xff;
   wc[id_len + 1]= nullbyte;
-  char *for_id= &wc[id_len + 2];
   memcpy(for_id, wc, id_len);
   for_id[id_len]= nullbyte;
 
   info= pars_info_create();
   if (!info)
-  {
-    my_free(wc);
     return DB_OUT_OF_MEMORY;
-  }
 
-  pars_info_bind_function(info, "get_match", pars_get_true, &match);
+  pars_info_bind_function(info, "get_match", fk_check_dup_rec, &arg);
   pars_info_add_str_literal(info, "foreign_wc", wc);
   pars_info_add_int4_literal(info, "len_wc", (ulint) id_len + 1);
   pars_info_add_str_literal(info, "foreign", for_id);
-  pars_info_bind_int4_literal(info, "match", &match);
+  pars_info_bind_int4_literal(info, "match", &arg.match);
 
   ut_ad(dict_sys.locked());
   err= que_eval_sql(info, fk_check_id_sql, m_trx);
-  my_free(wc);
   if (err != DB_SUCCESS)
     return err;
 
-  return match ? DB_DUPLICATE_KEY : DB_SUCCESS;
+  return arg.match ? DB_DUPLICATE_KEY : DB_SUCCESS;
 }
 
 /** Adds the given set of foreign key objects to the dictionary tables
