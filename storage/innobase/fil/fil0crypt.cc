@@ -476,6 +476,8 @@ fil_parse_write_crypt_data(
 
 	if ((type != CRYPT_SCHEME_1 && type != CRYPT_SCHEME_UNENCRYPTED)
 	    || len != CRYPT_SCHEME_1_IV_LEN) {
+		LOG_CRPTN << "Data corrupted "
+			": type: " << type << "; len: " << len;
 		*err = DB_CORRUPTION;
 		return NULL;
 	}

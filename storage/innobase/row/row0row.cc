@@ -1136,9 +1136,8 @@ row_build_row_ref_in_tuple(
 		pos = dict_index_get_nth_field_pos(index, clust_index, i);
 
 		if (pos == ULINT_UNDEFINED) {
-			ib::error() << "Table " << index->table->name
-				<< " has corrupted index "
-				<< index->name;
+			LOG_CRPTN_INDEX(index->table->name, index->name) <<
+				": dict_index_get_nth_field_pos(" << i << ") failed";
 			return DB_CORRUPTION;
 		}
 

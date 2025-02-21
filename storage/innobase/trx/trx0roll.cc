@@ -293,6 +293,7 @@ dberr_t trx_rollback_for_mysql(trx_t* trx)
 	}
 
 	ut_error;
+	LOG_CRPTN << "Transaction " << trx->id << ": rollback failed";
 	return(DB_CORRUPTION);
 }
 
@@ -345,6 +346,7 @@ trx_rollback_last_sql_stat_for_mysql(
 	}
 
 	ut_error;
+	LOG_CRPTN << "Transaction " << trx->id << ": rollback failed";
 	return(DB_CORRUPTION);
 }
 
@@ -515,6 +517,7 @@ trx_rollback_to_savepoint_for_mysql(
 	}
 
 	ut_error;
+	LOG_CRPTN << "Transaction " << trx->id << ": rollback failed";
 	return(DB_CORRUPTION);
 }
 

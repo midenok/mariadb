@@ -4593,6 +4593,8 @@ evict_from_pool:
 				rw_lock_x_unlock(&fix_block->lock);
 
 				if (err) {
+					LOG_CRPTN_PAGE(page_id) <<
+						": buf_zip_decompress() failed";
 					*err = DB_PAGE_CORRUPTED;
 				}
 				return NULL;
@@ -4776,6 +4778,8 @@ evict_from_pool:
 #endif /* UNIV_DEBUG */
 
 		if (err) {
+			LOG_CRPTN_PAGE(page_id) <<
+				": fix_block page id mismatch: " << fix_block->page.id;
 			*err = DB_PAGE_CORRUPTED;
 		}
 
@@ -5908,9 +5912,12 @@ static dberr_t buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 		|| space->purpose == FIL_TYPE_TEMPORARY)) {
 		if (buf_page_full_crc32_is_corrupted(
 			    space->id, dst_frame, space->is_compressed())) {
+			LOG_CRPTN_PAGE(bpage->id) <<
+				": full CRC32 is corrupted";
 			err = DB_PAGE_CORRUPTED;
 		}
 	} else if (buf_page_is_corrupted(true, dst_frame, space->flags)) {
+		LOG_CRPTN_PAGE(bpage->id);
 		err = DB_PAGE_CORRUPTED;
 	}
 
@@ -6000,9 +6007,8 @@ buf_page_io_complete(buf_page_t* bpage, bool dblwr, bool evict)
 			buf_pool->n_pend_unzip--;
 
 			if (!ok) {
-				ib::info() << "Page "
-					   << bpage->id
-					   << " zip_decompress failure.";
+				LOG_CRPTN_PAGE(bpage->id)
+					   << ": zip_decompress failure";
 
 				err = DB_PAGE_CORRUPTED;
 				goto database_corrupted;
