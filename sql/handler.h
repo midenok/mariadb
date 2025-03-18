@@ -3070,7 +3070,6 @@ protected:
 
   ha_rows estimation_rows_to_insert;
   handler *lookup_handler;
-  handler *delete_handler;
 public:
   handlerton *ht;                 /* storage engine of this handler */
   uchar *ref;				/* Pointer to current row */
@@ -3270,7 +3269,7 @@ public:
   handler(handlerton *ht_arg, TABLE_SHARE *share_arg)
     :table_share(share_arg), table(0),
     estimation_rows_to_insert(0),
-    lookup_handler(this), delete_handler(this),
+    lookup_handler(this),
     ht(ht_arg), ref(0), lookup_buffer(NULL), end_range(NULL),
     implicit_emptied(0),
     mark_trx_read_write_done(0),
@@ -4716,7 +4715,6 @@ private:
   bool check_table_binlog_row_based_internal();
 
   int create_lookup_handler();
-  int create_delete_handler();
   void alloc_lookup_buffer();
   int check_duplicate_long_entries(const uchar *new_rec);
   int check_duplicate_long_entries_update(const uchar *new_rec);
@@ -5048,9 +5046,6 @@ public:
                                          const Column_definition &new_field,
                                          const KEY_PART_INFO &old_part,
                                          const KEY_PART_INFO &new_part) const;
-
-  /** Use delete_handler to position record and delete */
-  int ha_pos_and_delete_row(uchar *buf);
 
 protected:
   Handler_share *get_ha_share_ptr();
