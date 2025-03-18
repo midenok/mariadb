@@ -291,7 +291,9 @@ int TABLE::delete_row()
      don't need one more history row.
   */
   if (err == HA_ERR_FOREIGN_DUPLICATE_KEY)
-    return file->ha_delete_row(record[0]);
+  {
+    err= file->ha_pos_and_delete_row(record[0]);
+  }
   return err;
 }
 

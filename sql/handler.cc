@@ -2984,6 +2984,17 @@ int handler::create_lookup_handler()
   return lookup_handler->ha_external_lock(table->in_use, F_RDLCK);
 }
 
+int handler::create_delete_handler()
+{
+  handler *tmp;
+  if (delete_handler != this)
+    return 0;
+  if (!(tmp= clone(table->s->normalized_path.str, table->in_use->mem_root)))
+    return 1;
+  delete_handler= tmp;
+  return delete_handler->ha_external_lock(table->in_use, F_WRLCK);
+}
+
 LEX_CSTRING *handler::engine_name()
 {
   return hton_name(ht);
@@ -6912,6 +6923,13 @@ int handler::ha_reset()
     delete lookup_handler;
     lookup_handler= this;
   }
+  if (delete_handler != this)
+  {
+    delete_handler->ha_external_unlock(table->in_use);
+    delete_handler->close();
+    delete delete_handler;
+    delete_handler= this;
+  }
   DBUG_RETURN(reset());
 }
 
@@ -7225,6 +7243,23 @@ int handler::ha_check_overlaps(const uchar *old_data, const uchar* new_data)
   }
 
   return error;
+}
+
+int handler::ha_pos_and_delete_row(uchar *buf)
+{
+  int err;
+  if (delete_handler == this)
+  {
+    if ((err= create_delete_handler()))
+      return err;
+  }
+  if ((err= delete_handler->ha_rnd_pos_by_record(buf)))
+    return err;
+  err= delete_handler->ha_delete_row(buf);
+  int end_err= delete_handler->ha_end_keyread();
+  if (!err && end_err)
+    err= end_err;
+  return err;
 }
 
 
