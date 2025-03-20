@@ -1,0 +1,31 @@
+--source include/have_debug.inc
+--source include/not_embedded.inc
+--source include/have_innodb.inc
+
+create table t1 (f1 int primary key, f2 blob) engine=innodb;
+
+select @@global.innodb_file_per_table;
+select * from information_schema.innodb_sys_datafiles;
+select * from information_schema.innodb_sys_tablespaces;
+
+select name from information_schema.innodb_sys_tablespaces where space = 5;
+
+start transaction;
+insert into t1 values(1, repeat('#',12));
+insert into t1 values(2, repeat('+',12));
+insert into t1 values(3, repeat('/',12));
+insert into t1 values(4, repeat('-',12));
+insert into t1 values(5, repeat('.',12));
+commit work;
+
+begin;
+insert into t1 values (6, repeat('%', 12));
+
+set @@global.debug_dbug= '+d,innodb_report_dirty';
+--source include/restart_mysqld.inc
+--disable_result_log
+select * from t1;
+--enable_result_log
+set @@global.debug_dbug= '+d,innodb_report_fixed';
+--source include/restart_mysqld.inc
+drop table t1;

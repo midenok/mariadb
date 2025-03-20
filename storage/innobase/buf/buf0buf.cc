@@ -1794,6 +1794,8 @@ buf_chunk_not_freed(
 				buf_page_get_io_fix(&block->page) == BUF_IO_WRITE)) {
 				dirty = true;
 			}
+			DBUG_EXECUTE_IF("innodb_report_dirty", ready= false; dirty= true;);
+			DBUG_EXECUTE_IF("innodb_report_fixed", ready= false; dirty= false;);
 			buf_page_mutex_exit(block);
 
 			if (!ready) {
@@ -6231,6 +6233,10 @@ release_page:
 	return DB_SUCCESS;
 }
 
+char*
+dict_get_first_path(
+	ulint	space_id);
+
 /*********************************************************************//**
 Asserts that all file pages in the buffer are in a replaceable state.
 @return TRUE */
@@ -6253,8 +6259,14 @@ buf_all_freed_instance(
 
 		bool dirty = false;
 		if (const buf_block_t* block = buf_chunk_not_freed(chunk, dirty)) {
-			ib::error() << "Page " << block->page.id
+			mutex_enter(&dict_sys.mutex);
+			buf_pool_mutex_enter_all();
+
+			ib::error() << "Table " << dict_get_first_path(block->page.id.space())
+				<< ": page " << block->page.id
 				<< " still " << (dirty ? "dirty" : "fixed");
+			buf_pool_mutex_exit_all();
+			mutex_exit(&dict_sys.mutex);
 		}
 	}
 
