@@ -19214,7 +19214,7 @@ static MYSQL_SYSVAR_ULONG(page_cleaners, srv_n_page_cleaners,
   PLUGIN_VAR_RQCMDARG,
   "Page cleaner threads can be from 1 to 64. Default is 4.",
   NULL,
-  innodb_page_cleaners_threads_update, 4, 1, 64, 0);
+  innodb_page_cleaners_threads_update, 4, 0, 64, 0);
 
 static MYSQL_SYSVAR_DOUBLE(max_dirty_pages_pct, srv_max_buf_pool_modified_pct,
   PLUGIN_VAR_RQCMDARG,

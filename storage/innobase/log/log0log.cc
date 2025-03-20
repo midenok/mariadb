@@ -1793,10 +1793,13 @@ wait_suspend_loop:
 		return;
 	}
 
-	if (!srv_read_only_mode) {
+	if (!opt_bootstrap) {
+          lsn = log_sys.lsn;
+          srv_fast_shutdown = 2;
+        } else if (!srv_read_only_mode) {
 		service_manager_extend_timeout(INNODB_EXTEND_TIMEOUT_INTERVAL,
 			"ensuring dirty buffer pool are written to log");
-		log_make_checkpoint();
+                log_make_checkpoint();
 
 		log_mutex_enter();
 
