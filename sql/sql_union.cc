@@ -1295,8 +1295,7 @@ bool st_select_lex_unit::prepare(TABLE_LIST *derived_arg,
   uint union_part_count= 0;
   select_result *tmp_result;
   bool is_union_select;
-  bool have_except= false, have_intersect= false,
-    have_except_all_or_intersect_all= false;
+  bool have_except= false, have_intersect= false;
   bool instantiate_tmp_table= false;
   bool single_tvc= !first_sl->next_select() && first_sl->tvc;
   bool single_tvc_wo_order= single_tvc && !first_sl->order_list.elements;
@@ -2164,6 +2163,7 @@ bool st_select_lex_unit::exec()
   bool first_execution= !executed;
   DBUG_ENTER("st_select_lex_unit::exec");
   bool was_executed= executed;
+  int error;
 
   if (executed && !uncacheable && !describe)
     DBUG_RETURN(FALSE);
@@ -2247,18 +2247,58 @@ bool st_select_lex_unit::exec()
       if (likely(!saved_error))
       {
 	records_at_start= table->file->stats.records;
+#if 0
+        /*
+          We cannot disable indexes in the middle of query because
+          enable indexes requires table to be empty (see heap_enable_indexes()).
+        */
+        if ((thd->variables.sql_mode & MODE_ORACLE) &&
+            union_result &&
+            table->file->is_open() &&
+            !have_except_all_or_intersect_all &&
+            sl->linkage == UNION_TYPE)
+        {
+          if (!table->no_keyread &&
+              !sl->distinct)
+          {
+            if ((error= table->file->ha_disable_indexes(key_map(0), false)))
+            {
+              table->file->print_error(error, MYF(0));
+              DBUG_ASSERT(0);
+              DBUG_RETURN(TRUE);
+            }
+            table->no_keyread= 1;
+          }
+          else if (table->no_keyread && sl->distinct)
+          {
+            if ((error= table->file->ha_enable_indexes(key_map(table->s->keys), false)))
+            {
+              table->file->print_error(error, MYF(0));
+              DBUG_ASSERT(0);
+              DBUG_RETURN(TRUE);
+            }
+            table->no_keyread= 0;
+          }
+        }
+#endif
+        /* select_unit::send_data() writes row to temporary table */
 	if (sl->tvc)
 	  sl->tvc->exec(sl);
 	else
 	  sl->join->exec();
-        if (!(thd->variables.sql_mode & MODE_ORACLE) &&
-            sl == union_distinct && !have_except_all_or_intersect_all &&
+        if (/*!(thd->variables.sql_mode & MODE_ORACLE) &&*/
+            sl == union_distinct &&
+            !have_except_all_or_intersect_all &&
             !(with_element && with_element->is_recursive))
 	{
           // This is UNION DISTINCT, so there should be a fake_select_lex
           DBUG_ASSERT(fake_select_lex != NULL);
-	  if (table->file->ha_disable_indexes(key_map(0), false))
+	  if ((error= table->file->ha_disable_indexes(key_map(0), false)))
+          {
+            table->file->print_error(error, MYF(0));
+            DBUG_ASSERT(0);
 	    DBUG_RETURN(TRUE);
+          }
 	  table->no_keyread=1;
 	}
 	if (!sl->tvc)
