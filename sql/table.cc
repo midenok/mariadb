@@ -7887,8 +7887,7 @@ void TABLE::mark_columns_needed_for_insert()
 }
 
 /*
-  Mark columns according the binlog row image option
-  or mark virtual columns for slave.
+  Mark columns according the binlog row image option.
 
   Columns to be written are stored in 'rpl_write_set'
 
@@ -7919,10 +7918,6 @@ void TABLE::mark_columns_needed_for_insert()
   the read_set at binlogging time (for those cases that
   we only want to log a PK and we needed other fields for
   execution).
-
-  If binlog row image is off on slave we mark virtual columns
-  for read as InnoDB requires correct field metadata which is set
-  by update_virtual_fields().
 */
 
 void TABLE::mark_columns_per_binlog_row_image()
@@ -7939,7 +7934,7 @@ void TABLE::mark_columns_per_binlog_row_image()
     If in RBR we may need to mark some extra columns,
     depending on the binlog-row-image command line argument.
    */
-  if (file->row_logging &&
+  if ((file->row_logging || thd->rgi_slave) &&
       !ha_check_storage_engine_flag(s->db_type(), HTON_NO_BINLOG_ROW_OPT))
   {
     /* if there is no PK, then mark all columns for the BI. */
@@ -8008,11 +8003,6 @@ void TABLE::mark_columns_per_binlog_row_image()
         DBUG_ASSERT(FALSE);
       }
     }
-    file->column_bitmaps_signal();
-  }
-  else if (thd->rgi_slave)
-  {
-    /* Call mark_virtual_column_with_deps() */
     file->column_bitmaps_signal();
   }
 
