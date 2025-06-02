@@ -5816,6 +5816,7 @@ int Rows_log_event::do_apply_event(rpl_group_info *rgi)
                              &m_cols_ai : &m_cols);
     bitmap_intersect(table->write_set, after_image);
 
+
     this->slave_exec_mode= slave_exec_mode_options; // fix the mode
 
     // Do event specific preparations 
@@ -5848,6 +5849,11 @@ int Rows_log_event::do_apply_event(rpl_group_info *rgi)
       THD* old_thd= table->in_use;
       if (!table->in_use)
         table->in_use= thd;
+
+      if (table->vfield && (
+          get_general_type_code() == DELETE_ROWS_EVENT ||
+          get_general_type_code() == UPDATE_ROWS_EVENT))
+        table->mark_virtual_columns_for_write(0);
 
       error= do_exec_row(rgi);
 
