@@ -8794,7 +8794,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
           def->change= Lex_ident_column(alter->name);
           def->field_name= Lex_ident_column(alter->new_name);
           if (vers_system_invisible)
-            def->invisible= VISIBLE;
+            def->invisible= alter->invisible;
           column_rename_param.fields.push_back(def);
           if (field->flags & VERS_ROW_START)
           {

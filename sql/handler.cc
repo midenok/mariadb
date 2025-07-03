@@ -9018,7 +9018,8 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
             (old->flags & UNSIGNED_FLAG) == (f->flags & UNSIGNED_FLAG))
         {
           alter_info->flags|= ALTER_VERS_EXPLICIT;
-          alter_info->add_alter_list(thd, old->field_name, f->field_name, false);
+          alter_info->add_alter_list(thd, old->field_name, f->field_name, false,
+                                     f->invisible);
           it.remove();
         }
         else
@@ -9064,16 +9065,53 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
 
       if (alter_info->create_list.elements)
       {
+        Field *sys_changed= nullptr;
         List_iterator_fast<Create_field> it(alter_info->create_list);
         while (Create_field *f= it++)
         {
-          if (f->versioning == Column_definition::WITHOUT_VERSIONING)
-            f->flags|= VERS_UPDATE_UNVERSIONED_FLAG;
-
-          if (f->change.str && (start.streq(f->change) || end.streq(f->change)))
+          if (f->change.str)
           {
-            my_error(ER_VERS_ALTER_SYSTEM_FIELD, MYF(0), f->change.str);
-            return true;
+            if (start.streq(f->change))
+            {
+              sys_changed= share->vers_start_field();
+              goto validate_sys_changed;
+            }
+            else if (end.streq(f->change))
+            {
+              sys_changed= share->vers_end_field();
+validate_sys_changed:
+              /*
+                sys_changed->flags contains:
+                BINARY_FLAG
+                NOT_NULL_FLAG
+                NO_DEFAULT_VALUE_FLAG
+                VERS_SYSTEM_FIELD
+                UNSIGNED_FLAG
+
+                f->flags contains:
+                UNSIGNED_FLAG
+              */
+              static const uint32 flags_cmp= ~(VERS_SYSTEM_FIELD | BINARY_FLAG |
+                                               NOT_NULL_FLAG | NO_DEFAULT_VALUE_FLAG);
+              if (sys_changed->type_handler() != f->type_handler() ||
+                  sys_changed->field_length != f->length ||
+                  sys_changed->decimals() != f->decimals ||
+                  (sys_changed->flags & flags_cmp) != f->flags)
+              {
+                my_error(ER_VERS_ALTER_SYSTEM_FIELD, MYF(0), f->change.str);
+                return true;
+              }
+            }
+          }
+
+          if (f->versioning == Column_definition::WITHOUT_VERSIONING)
+          {
+            f->flags|= VERS_UPDATE_UNVERSIONED_FLAG;
+            if (sys_changed)
+            {
+              my_error(ER_VERS_ALTER_SYSTEM_FIELD, MYF(0), f->change.str);
+              return true;
+            }
           }
         }
       }
