@@ -9005,14 +9005,9 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
           my_error(ER_VERS_NOT_VERSIONED, MYF(0), table->s->table_name.str);
           return true;
         }
-        if (!table->vers_implicit())
-        {
-          my_error(ER_VERS_DUPLICATE_ROW_START_END, MYF(0),
-                  f->flags & VERS_ROW_START ? "START" : "END", f->field_name.str);
-
-          return true;
-        }
         Field *old= f->flags & VERS_ROW_START ? table->vers_start_field() : table->vers_end_field();
+        if (!old->field_name.streq(f->field_name))
+          continue;
         if (old->type_handler() == f->type_handler() &&
             old->field_length == f->length &&
             (old->flags & UNSIGNED_FLAG) == (f->flags & UNSIGNED_FLAG))
@@ -9053,7 +9048,8 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
     DBUG_ASSERT(share->vers_start_field());
     DBUG_ASSERT(share->vers_end_field());
 
-    if (!(alter_info->flags & ALTER_VERS_EXPLICIT))
+    if (!(alter_info->flags & ALTER_VERS_EXPLICIT) ||
+        !table->vers_implicit())
     {
       Lex_ident_column start(share->vers_start_field()->field_name);
       Lex_ident_column end(share->vers_end_field()->field_name);
@@ -9083,16 +9079,17 @@ validate_sys_changed:
               /*
                 sys_changed->flags contains:
                 BINARY_FLAG
-                NOT_NULL_FLAG
                 NO_DEFAULT_VALUE_FLAG
+                NOT_NULL_FLAG
+                UNSIGNED_FLAG
                 VERS_SYSTEM_FIELD
-                UNSIGNED_FLAG
 
-                f->flags contains:
+                f->flags should contain:
                 UNSIGNED_FLAG
+                VERS_SYSTEM_FIELD
               */
-              static const uint32 flags_cmp= ~(VERS_SYSTEM_FIELD | BINARY_FLAG |
-                                               NOT_NULL_FLAG | NO_DEFAULT_VALUE_FLAG);
+              static const uint32 flags_cmp=
+                ~(BINARY_FLAG | NOT_NULL_FLAG | NO_DEFAULT_VALUE_FLAG);
               if (sys_changed->type_handler() != f->type_handler() ||
                   sys_changed->field_length != f->length ||
                   sys_changed->decimals() != f->decimals ||
