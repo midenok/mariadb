@@ -4087,6 +4087,11 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
                           *key_info_buffer, *key_count);
   );
 
+  if (create_info->check_fields(thd, alter_info,
+                                alter_info->table_name,
+                                alter_info->db))
+    DBUG_RETURN(TRUE);
+
   DBUG_RETURN(FALSE);
 }
 
@@ -8757,7 +8762,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
       /* "dropping" a versioning field only hides it from the user */
       def= new (root) Create_field(thd, field, field);
       def->invisible= INVISIBLE_SYSTEM;
-      alter_info->flags|= ALTER_CHANGE_COLUMN;
+      alter_info->flags|= (ALTER_VERS_IMPLICIT | ALTER_CHANGE_COLUMN);
       if (field->flags & VERS_ROW_START)
         create_info->vers_info.period.start=
           create_info->vers_info.as_row.start=
@@ -13643,9 +13648,7 @@ bool Sql_cmd_create_table_like::execute(THD *thd)
     }
     else
     {
-      if (create_info.fix_create_fields(thd, &alter_info, *create_table) ||
-          create_info.check_fields(thd, &alter_info,
-                                   create_table->table_name, create_table->db))
+      if (create_info.fix_create_fields(thd, &alter_info, *create_table))
 	goto end_with_restore_list;
 
 #ifdef WITH_WSREP

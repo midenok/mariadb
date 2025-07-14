@@ -74,10 +74,14 @@ alter table t add column trx_start timestamp(6) as row start;
 alter table t add system versioning;
 show create table t;
 
---error ER_MISSING
+--error ER_WRONG_FIELD_SPEC
 alter table t add column trx_start timestamp(6) as row start;
+--error ER_MISSING
+alter table t add column row_start timestamp(6) as row start;
 --error ER_WRONG_FIELD_SPEC
 alter table t modify a int as row start;
+--error ER_WRONG_FIELD_SPEC
+alter table t modify row_start int as row start;
 
 alter table t add column b int;
 show create table t;
