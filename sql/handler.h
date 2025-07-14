@@ -2181,7 +2181,6 @@ struct Vers_parse_info: public Table_period_info
 
   Vers_parse_info() :
     Table_period_info(STRING_WITH_LEN("SYSTEM_TIME")),
-    fieldno{FIELDNO_UNSET, FIELDNO_UNSET},
     versioned_fields(false),
     unversioned_fields(false),
     can_native(-1)
@@ -2189,9 +2188,9 @@ struct Vers_parse_info: public Table_period_info
 
   Table_period_info::start_end_t as_row;
   /*
-    Field indexes for FRM creation.
+    Field names for FRM creation.
   */
-  field_index_t fieldno[2];
+  Table_period_info::start_end_t sys_fields;
 
   friend struct Table_scope_and_contents_source_st;
   void set_start(const Lex_ident_column field_name)
@@ -2228,8 +2227,7 @@ public:
   bool fix_create_like(Alter_info &alter_info, HA_CREATE_INFO &create_info,
                        TABLE_LIST &src_table, TABLE_LIST &table);
   /*
-    Check data types of System Versioniong system fields and apply
-    field indexes for FRM creation (see Vers_parse_info::fieldno).
+    Check data types of System Versioniong system fields.
   */
   bool check_sys_fields(const Lex_ident_table &table_name,
                         const Lex_ident_db &db, Alter_info *alter_info);

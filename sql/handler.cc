@@ -8803,11 +8803,11 @@ bool Vers_parse_info::create_sys_field(THD *thd,
 
   alter_info->flags|= ALTER_PARSER_ADD_COLUMN;
   if (flags & VERS_ROW_START)
-    fieldno[0]= alter_info->create_list.size();
+    sys_fields.start= field_name;
   else
   {
     DBUG_ASSERT(flags & VERS_ROW_END);
-    fieldno[1]= alter_info->create_list.size();
+    sys_fields.end= field_name;
   }
   alter_info->create_list.push_back(f);
 
@@ -8879,8 +8879,16 @@ bool Table_scope_and_contents_source_st::vers_fix_system_fields(
   List_iterator<Create_field> it(alter_info->create_list);
   while (Create_field *f= it++)
   {
-    if (f->vers_sys_field())
+    if (f->flags & VERS_ROW_START)
+    {
+      vers_info.sys_fields.start= f->field_name;
       continue;
+    }
+    else if (f->flags & VERS_ROW_END)
+    {
+      vers_info.sys_fields.end= f->field_name;
+      continue;
+    }
     if ((f->versioning == Column_definition::VERSIONING_NOT_SET && !add_versioning) ||
         f->versioning == Column_definition::WITHOUT_VERSIONING)
     {
@@ -8967,7 +8975,7 @@ bool Table_scope_and_contents_source_st::vers_check_system_fields(
 
   return (alter_info->flags & ALTER_VERS_CHANGE) ?
             vers_info.check_parser_data(table_name, db, alter_info) :
-            false;
+            vers_info.check_sys_fields(table_name, db, alter_info);
 }
 
 
@@ -9192,6 +9200,7 @@ Vers_parse_info::fix_create_like(Alter_info &alter_info, HA_CREATE_INFO &create_
     return false;
   }
 
+  // TODO: remake via vers_fix_system_fields()?
   while ((f= it++))
   {
     if (f->flags & VERS_ROW_START)
@@ -9216,6 +9225,7 @@ Vers_parse_info::fix_create_like(Alter_info &alter_info, HA_CREATE_INFO &create_
   }
 
   as_row= start_end_t(f_start->field_name, f_end->field_name);
+  sys_fields= as_row;
   period= as_row;
 
   create_info.options|= HA_VERSIONED_TABLE;
@@ -9363,9 +9373,6 @@ bool Vers_parse_info::check_sys_fields(const Lex_ident_table &table_name,
   List_iterator<Create_field> it(alter_info->create_list);
   const Create_field *row_start= nullptr;
   const Create_field *row_end= nullptr;
-  field_index_t row_start_no;
-  field_index_t row_end_no;
-  field_index_t f_idx= 0;
   while (const Create_field *f= it++)
   {
     DBUG_ASSERT(!(f->flags & VERS_ROW_START) || !row_start);
@@ -9373,18 +9380,15 @@ bool Vers_parse_info::check_sys_fields(const Lex_ident_table &table_name,
     if (f->flags & VERS_ROW_START && !row_start)
     {
       row_start= f;
-      row_start_no= f_idx;
       if (row_end)
         break;
     }
     if (f->flags & VERS_ROW_END && !row_end)
     {
       row_end= f;
-      row_end_no= f_idx;
       if (row_start)
         break;
     }
-    ++f_idx;
   }
 
   if (!row_start || !row_end)
@@ -9404,8 +9408,6 @@ bool Vers_parse_info::check_sys_fields(const Lex_ident_table &table_name,
   if (row_start_vers->check_sys_fields(table_name, row_start, row_end))
     return true;
 
-  fieldno[0]= row_start_no;
-  fieldno[1]= row_end_no;
   return false;
 }
 

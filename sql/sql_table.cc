@@ -4281,8 +4281,8 @@ bool Column_definition::sp_prepare_create_field(THD *thd, MEM_ROOT *mem_root)
 static int append_system_key_parts(THD *thd, HA_CREATE_INFO *create_info,
                                     Key *key)
 {
-  const Lex_ident_column &row_start_field= create_info->vers_info.as_row.start;
-  const Lex_ident_column &row_end_field= create_info->vers_info.as_row.end;
+  const Lex_ident_column &row_start_field= create_info->vers_info.sys_fields.start;
+  const Lex_ident_column &row_end_field= create_info->vers_info.sys_fields.end;
   DBUG_ASSERT(!create_info->versioned() || (row_start_field && row_end_field));
 
   int result = 0;
@@ -11295,6 +11295,7 @@ do_continue:;
   if (!alter_ctx.fast_alter_partition)
     Create_field::upgrade_data_types(alter_info->create_list);
 
+  // FIXME: remove?
   if (create_info->check_fields(thd, alter_info,
                                 table_list->table_name, table_list->db) ||
       create_info->fix_period_fields(thd, alter_info))
