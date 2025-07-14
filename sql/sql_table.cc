@@ -3277,6 +3277,9 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
       DBUG_RETURN(TRUE);
   }
 
+  if (create_info->check_fields(thd, alter_info, alter_info->table_name,
+                                alter_info->db))
+    DBUG_RETURN(TRUE);
 
   for (field_no=0; (sql_field=it++) ; field_no++)
   {
@@ -4086,11 +4089,6 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
     Debug_key::print_keys(thd, "prep_create_table: ",
                           *key_info_buffer, *key_count);
   );
-
-  if (create_info->check_fields(thd, alter_info,
-                                alter_info->table_name,
-                                alter_info->db))
-    DBUG_RETURN(TRUE);
 
   DBUG_RETURN(FALSE);
 }

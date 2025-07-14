@@ -2155,6 +2155,10 @@ struct Table_period_info: Sql_alloc
       end(_end) {}
     Lex_ident_column start;
     Lex_ident_column end;
+    bool is_set()
+    {
+      return bool(start) && bool(end);
+    }
   };
   start_end_t period;
   bool create_if_not_exists;

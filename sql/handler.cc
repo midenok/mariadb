@@ -9023,6 +9023,7 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
 
   if (!(alter_info->flags & ALTER_ADD_SYSTEM_VERSIONING))
   {
+    const bool has_add_period= create_info->vers_info.period.is_set();
     List_iterator<Create_field> it(alter_info->create_list);
     while (Create_field *f= it++)
     {
@@ -9034,24 +9035,31 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
           return true;
         }
         Field *old= f->flags & VERS_ROW_START ? table->vers_start_field() : table->vers_end_field();
-        if (old->field_name.streq(f->field_name) &&
-            old->type_handler() == f->type_handler() &&
+        if (old->type_handler() == f->type_handler() &&
             old->field_length == f->length &&
             (old->flags & UNSIGNED_FLAG) == (f->flags & UNSIGNED_FLAG))
         {
-          alter_info->flags|= ALTER_VERS_EXPLICIT;
-          alter_info->add_alter_list(thd, old->field_name, f->field_name, false,
-                                     f->invisible);
-          it.remove();
+          if (has_add_period)
+          {
+            alter_info->flags|= ALTER_VERS_EXPLICIT;
+            alter_info->add_alter_list(thd, old->field_name, f->field_name, false,
+                                      f->invisible);
+            it.remove();
+          }
+          else if (table->vers_implicit() ||
+                   !f->change ||
+                   !old->field_name.streq(f->field_name))
+            goto wrong_spec;
         }
         else
         {
+wrong_spec:
           my_error(ER_WRONG_FIELD_SPEC, MYF(0), f->field_name.str);
           return true;
-        }
-      }
-    }
-  }
+        } /* else (old type != f type) */
+      } /* if (VERS_SYSTEM_FIELD) */
+    } /* while (Create_field *f) */
+  } /* if (!ALTER_ADD_SYSTEM_VERSIONING) */
 
   if ((alter_info->flags & ALTER_DROP_PERIOD ||
        versioned_fields || unversioned_fields) && !share->versioned)
@@ -9069,86 +9077,81 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
       return true;
     }
 
-    // copy info from existing table
     create_info->options|= HA_VERSIONED_TABLE;
 
     DBUG_ASSERT(share->vers_start_field());
     DBUG_ASSERT(share->vers_end_field());
 
-    if (!(alter_info->flags & ALTER_VERS_EXPLICIT) ||
-        !table->vers_implicit())
+    const bool make_explicit= alter_info->flags & ALTER_VERS_EXPLICIT;
+
+    Lex_ident_column start(share->vers_start_field()->field_name);
+    Lex_ident_column end(share->vers_end_field()->field_name);
+    DBUG_ASSERT(start);
+    DBUG_ASSERT(end);
+
+    Field *sys_changed= nullptr;
+    List_iterator_fast<Create_field> it(alter_info->create_list);
+    while (Create_field *f= it++)
     {
-      Lex_ident_column start(share->vers_start_field()->field_name);
-      Lex_ident_column end(share->vers_end_field()->field_name);
-      DBUG_ASSERT(start.str);
-      DBUG_ASSERT(end.str);
-
-// FIXME: remove
-//       as_row= start_end_t(start, end);
-//       period= as_row;
-
-      if (alter_info->create_list.elements)
+      /* Validate changes for explicit system fields */
+      if (!make_explicit && f->change)
       {
-        Field *sys_changed= nullptr;
-        List_iterator_fast<Create_field> it(alter_info->create_list);
-        while (Create_field *f= it++)
+        /*
+          Note: here we compare by name because change may omit AS ROW clause
+          and this should be handled as error in flag comparison below.
+        */
+        if (start.streq(f->change))
         {
-          if (f->change.str)
-          {
-            if (start.streq(f->change))
-            {
-              sys_changed= share->vers_start_field();
-              goto validate_sys_changed;
-            }
-            else if (end.streq(f->change))
-            {
-              sys_changed= share->vers_end_field();
+          DBUG_ASSERT(start.streq(f->change));
+          sys_changed= share->vers_start_field();
+          goto validate_sys_changed;
+        }
+        else if (end.streq(f->change))
+        {
+          sys_changed= share->vers_end_field();
 validate_sys_changed:
-              /*
-                sys_changed->flags contains:
-                BINARY_FLAG
-                NO_DEFAULT_VALUE_FLAG
-                NOT_NULL_FLAG
-                UNSIGNED_FLAG
-                VERS_SYSTEM_FIELD
+          DBUG_ASSERT(!table->vers_implicit());
+          /*
+            sys_changed->flags contains:
+            BINARY_FLAG
+            NO_DEFAULT_VALUE_FLAG
+            NOT_NULL_FLAG
+            UNSIGNED_FLAG
+            VERS_SYSTEM_FIELD
 
-                f->flags should contain:
-                UNSIGNED_FLAG
-                VERS_SYSTEM_FIELD
-              */
-              static const uint32 flags_cmp=
-                ~(BINARY_FLAG | NOT_NULL_FLAG | NO_DEFAULT_VALUE_FLAG);
-              if (sys_changed->type_handler() != f->type_handler() ||
-                  sys_changed->field_length != f->length ||
-                  sys_changed->decimals() != f->decimals ||
-                  (sys_changed->flags & flags_cmp) != f->flags)
-              {
-                my_error(ER_VERS_ALTER_SYSTEM_FIELD, MYF(0), f->change.str);
-                return true;
-              }
-            }
-          }
-
-          if (f->versioning == Column_definition::WITHOUT_VERSIONING)
+            f->flags should contain:
+            UNSIGNED_FLAG
+            VERS_SYSTEM_FIELD
+            (other flags depend on place invoked)
+          */
+          static const uint32 flags_cmp= ~(BINARY_FLAG);
+          if (sys_changed->type_handler() != f->type_handler() ||
+              sys_changed->field_length != f->length ||
+              sys_changed->decimals() != f->decimals ||
+              (sys_changed->flags & flags_cmp) != f->flags)
           {
-            f->flags|= VERS_UPDATE_UNVERSIONED_FLAG;
-            if (sys_changed)
-            {
-              my_error(ER_VERS_ALTER_SYSTEM_FIELD, MYF(0), f->change.str);
-              return true;
-            }
+            my_error(ER_VERS_ALTER_SYSTEM_FIELD, MYF(0), f->change.str);
+            return true;
           }
         }
       }
-    } /* if (!convert_explicit) */
-    // FIXME:
-//     return check_conditions(table_name, share->db);
+
+      if (f->versioning == Column_definition::WITHOUT_VERSIONING)
+      {
+        if (f->vers_sys_field())
+        {
+          my_error(ER_VERS_ALTER_SYSTEM_FIELD, MYF(0), f->change.str);
+          return true;
+        }
+        f->flags|= VERS_UPDATE_UNVERSIONED_FLAG;
+      } /* if (Column_definition::WITHOUT_VERSIONING) */
+    } /* while (Create_field *f) */
     return false;
   } /* if (share->versioned) */
 
   if ((alter_info->flags & ALTER_ADD_SYSTEM_VERSIONING) &&
       (fix_implicit(thd, alter_info) ||
-        check_sys_fields(table_name, share->db, alter_info)))
+       check_sys_fields(table_name, share->db, alter_info)))
     return true;
 
   return false;
@@ -9395,6 +9398,16 @@ bool Vers_parse_info::check_sys_fields(const Lex_ident_table &table_name,
   {
     my_error(ER_VERS_PERIOD_COLUMNS, MYF(0), as_row.start.str, as_row.end.str);
     return true;
+  }
+
+  /*
+    For CREATE TABLE sys_fields are set in vers_fix_system_fields() but not
+    for ALTER TABLE.
+  */
+  if (!sys_fields.start.str)
+  {
+    sys_fields.start= row_start->field_name;
+    sys_fields.end= row_end->field_name;
   }
 
   const Vers_type_handler *row_start_vers= row_start->type_handler()->vers();

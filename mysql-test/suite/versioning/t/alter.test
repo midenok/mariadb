@@ -76,7 +76,7 @@ show create table t;
 
 --error ER_WRONG_FIELD_SPEC
 alter table t add column trx_start timestamp(6) as row start;
---error ER_MISSING
+--error ER_WRONG_FIELD_SPEC
 alter table t add column row_start timestamp(6) as row start;
 --error ER_WRONG_FIELD_SPEC
 alter table t modify a int as row start;
@@ -795,11 +795,11 @@ set @old_system_versioning_alter_history= @@system_versioning_alter_history;
 set @@system_versioning_alter_history= keep;
 alter table t1 add column y int;
 show create table t1;
---error ER_MISSING
+--error ER_WRONG_FIELD_SPEC
 alter table t1 add column rs timestamp(6) as row start;
 --error ER_MISSING
 alter table t1 add column re timestamp(6) as row end, add period for system_time (row_start, re);
---error ER_MISSING
+--error ER_WRONG_FIELD_SPEC
 alter table t1 add column rs timestamp(6) as row start, add column re timestamp(6) as row end;
 --error ER_BAD_FIELD_ERROR
 alter table t1 rename column row_start to re;
