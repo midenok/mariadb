@@ -8879,16 +8879,8 @@ bool Table_scope_and_contents_source_st::vers_fix_system_fields(
   List_iterator<Create_field> it(alter_info->create_list);
   while (Create_field *f= it++)
   {
-    if (f->flags & VERS_ROW_START)
-    {
-      vers_info.sys_fields.start= f->field_name;
+    if (f->vers_sys_field())
       continue;
-    }
-    else if (f->flags & VERS_ROW_END)
-    {
-      vers_info.sys_fields.end= f->field_name;
-      continue;
-    }
     if ((f->versioning == Column_definition::VERSIONING_NOT_SET && !add_versioning) ||
         f->versioning == Column_definition::WITHOUT_VERSIONING)
     {
@@ -9150,8 +9142,7 @@ validate_sys_changed:
   } /* if (share->versioned) */
 
   if ((alter_info->flags & ALTER_ADD_SYSTEM_VERSIONING) &&
-      (fix_implicit(thd, alter_info) ||
-       check_sys_fields(table_name, share->db, alter_info)))
+      fix_implicit(thd, alter_info))
     return true;
 
   return false;
@@ -9400,15 +9391,8 @@ bool Vers_parse_info::check_sys_fields(const Lex_ident_table &table_name,
     return true;
   }
 
-  /*
-    For CREATE TABLE sys_fields are set in vers_fix_system_fields() but not
-    for ALTER TABLE.
-  */
-  if (!sys_fields.start.str)
-  {
-    sys_fields.start= row_start->field_name;
-    sys_fields.end= row_end->field_name;
-  }
+  sys_fields.start= row_start->field_name;
+  sys_fields.end= row_end->field_name;
 
   const Vers_type_handler *row_start_vers= row_start->type_handler()->vers();
 
