@@ -5807,6 +5807,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table,
       local_create_info.vers_info.fix_create_like(local_alter_info, local_create_info,
                                                   *src_table, *table))
   {
+    res= 1;
     goto err;
   }
 

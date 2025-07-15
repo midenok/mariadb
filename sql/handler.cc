@@ -9218,13 +9218,19 @@ Vers_parse_info::fix_create_like(Alter_info &alter_info, HA_CREATE_INFO &create_
     return true;
   }
 
-  as_row= start_end_t(f_start->field_name, f_end->field_name);
-  sys_fields= as_row;
-  period= as_row;
+  // FIXME: test
+  if (table.db.streq(MYSQL_SCHEMA_NAME))
+  {
+    my_error(ER_VERS_DB_NOT_SUPPORTED, MYF(0), MYSQL_SCHEMA_NAME.str);
+    return true;
+  }
+
+  sys_fields= start_end_t(f_start->field_name, f_end->field_name);
 
   create_info.options|= HA_VERSIONED_TABLE;
   alter_info.flags|= ALTER_ADD_SYSTEM_VERSIONING;
-  return check_parser_data(table.table_name, table.db, &alter_info);
+
+  return false;
 }
 
 bool Vers_parse_info::need_check(const Alter_info *alter_info) const
