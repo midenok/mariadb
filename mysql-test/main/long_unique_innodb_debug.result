@@ -21,7 +21,6 @@ insert t1 values(15, 'a');
 connect con2,localhost,root;
 set debug_sync="now WAIT_FOR checked_duplicate";
 # Insert secondary index key ('a', 5) in the GAP between Infimum and ('a', 10)
-set session innodb_lock_wait_timeout = 1;
 set transaction isolation level read committed;
 insert t1 values(5, 'a');
 set debug_sync="now SIGNAL do_insert";
@@ -56,7 +55,6 @@ set debug_sync="innodb_row_update_for_mysql_begin SIGNAL checked_duplicate WAIT_
 update t1 set col2='a' where col1=5;
 connect con2,localhost,root;
 set debug_sync="now WAIT_FOR checked_duplicate";
-set session innodb_lock_wait_timeout = 1;
 set transaction isolation level read committed;
 update t1 set col2='a' where col1=15;
 set debug_sync="now SIGNAL do_insert";
@@ -90,7 +88,6 @@ set debug_sync="innodb_row_ins_step_enter SIGNAL checked_duplicate WAIT_FOR do_i
 insert ignore t1 values(15, 'a'), (16, 'b');
 connect con2,localhost,root;
 set debug_sync="now WAIT_FOR checked_duplicate";
-set session innodb_lock_wait_timeout = 1;
 set transaction isolation level read committed;
 insert t1 values(5, 'a');
 set debug_sync="now SIGNAL do_insert";
@@ -128,7 +125,6 @@ set debug_sync="innodb_row_update_for_mysql_begin SIGNAL checked_duplicate WAIT_
 update ignore t1 set col2=chr(92+col1) where col1<=9;
 connect con2,localhost,root;
 set debug_sync="now WAIT_FOR checked_duplicate";
-set session innodb_lock_wait_timeout = 1;
 set transaction isolation level read committed;
 update t1 set col2='a' where col1=15;
 set debug_sync="now SIGNAL do_insert";
@@ -164,7 +160,6 @@ set debug_sync="innodb_row_update_for_mysql_begin SIGNAL checked_duplicate WAIT_
 update t1 set col2='a', col1=4 where col1=5;
 connect con2,localhost,root;
 set debug_sync="now WAIT_FOR checked_duplicate";
-set session innodb_lock_wait_timeout = 1;
 set transaction isolation level read committed;
 update t1 set col2='a' where col1=15;
 set debug_sync="now SIGNAL do_insert";
@@ -201,7 +196,6 @@ set debug_sync="innodb_row_update_for_mysql_begin SIGNAL checked_duplicate WAIT_
 update ignore t1 set col2=chr(92+col1), col1=col1-1 where col1<=9;
 connect con2,localhost,root;
 set debug_sync="now WAIT_FOR checked_duplicate";
-set session innodb_lock_wait_timeout = 1;
 set transaction isolation level read committed;
 update t1 set col2='a' where col1=15;
 set debug_sync="now SIGNAL do_insert";
