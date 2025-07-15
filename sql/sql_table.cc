@@ -3277,9 +3277,6 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
       DBUG_RETURN(TRUE);
   }
 
-  if (create_info->check_fields(thd, alter_info, alter_info->table_name,
-                                alter_info->db))
-    DBUG_RETURN(TRUE);
 
   for (field_no=0; (sql_field=it++) ; field_no++)
   {
@@ -11293,7 +11290,6 @@ do_continue:;
   if (!alter_ctx.fast_alter_partition)
     Create_field::upgrade_data_types(alter_info->create_list);
 
-  // FIXME: remove?
   if (create_info->check_fields(thd, alter_info,
                                 table_list->table_name, table_list->db) ||
       create_info->fix_period_fields(thd, alter_info))
@@ -13647,7 +13643,9 @@ bool Sql_cmd_create_table_like::execute(THD *thd)
     }
     else
     {
-      if (create_info.fix_create_fields(thd, &alter_info, *create_table))
+      if (create_info.fix_create_fields(thd, &alter_info, *create_table) ||
+          create_info.check_fields(thd, &alter_info,
+                                   create_table->table_name, create_table->db))
 	goto end_with_restore_list;
 
 #ifdef WITH_WSREP

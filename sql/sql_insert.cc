@@ -4876,6 +4876,11 @@ TABLE *select_create::create_table_from_items(THD *thd, List<Item> *items,
   */
   Create_field::upgrade_data_types(alter_info->create_list);
 
+  if (create_info->check_fields(thd, alter_info,
+                                table_list->table_name,
+                                table_list->db))
+    DBUG_RETURN(NULL);
+
   DEBUG_SYNC(thd,"create_table_select_before_create");
 
   /* Check if LOCK TABLES + CREATE OR REPLACE of existing normal table */
