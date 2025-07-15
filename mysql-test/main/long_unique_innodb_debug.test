@@ -1,6 +1,10 @@
 --source include/have_innodb.inc
 --source include/have_debug_sync.inc
 
+# New test files are not recommended as it increases test suite run time.
+# There is main.debug_sync, have_innodb.inc will not do any harm there (and I had
+# added it there in some of my bug fixes in my branch).
+
 --echo #
 --echo # MDEV-37199 UNIQUE KEY USING HASH accepting duplicate records
 --echo #

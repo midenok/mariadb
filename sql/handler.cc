@@ -7784,9 +7784,11 @@ int handler::ha_write_row(const uchar *buf)
     error= binlog_log_row(table, 0, buf, log_func);
   }
 
+#ifdef WITH_WSREP
   if (WSREP_NNULL(ha_thd()) && table_share->tmp_table == NO_TMP_TABLE &&
       ht->flags & HTON_WSREP_REPLICATION && !error)
     error= wsrep_after_row(ha_thd());
+#endif /* WITH_WSREP */
 
 err:
   DEBUG_SYNC_C("ha_write_row_end");
