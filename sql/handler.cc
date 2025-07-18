@@ -9040,7 +9040,7 @@ bool Vers_parse_info::fix_alter_info(THD *thd, Alter_info *alter_info,
           }
           else if (table->vers_implicit() ||
                    !f->change ||
-                   !old->field_name.streq(f->field_name))
+                   !old->field_name.streq(f->change))
             goto wrong_spec;
         }
         else

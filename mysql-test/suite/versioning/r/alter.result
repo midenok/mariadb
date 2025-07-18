@@ -936,4 +936,104 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci WITH SYSTEM VERSIONING
 set @@system_versioning_alter_history= @old_system_versioning_alter_history;
 drop table t1;
+#
+# MDEV-37008 ROW START/END columns added with ALTER TABLE are never INVISIBLE
+#
+set @svah_save= @@system_versioning_alter_history;
+set @@system_versioning_alter_history= keep;
+create table t (x int) with system versioning;
+# Fail on implicit system field
+alter table t change column row_end valid_until timestamp(6) as row end invisible;
+ERROR 42000: Incorrect column specifier for column 'valid_until'
+# Convert implicit to explicit
+alter table t
+add column valid_since timestamp(6) as row start invisible,
+add column valid_until timestamp(6) as row end invisible,
+add period for system_time (valid_since, valid_until);
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `x` int(11) DEFAULT NULL,
+  `valid_since` timestamp(6) GENERATED ALWAYS AS ROW START INVISIBLE,
+  `valid_until` timestamp(6) GENERATED ALWAYS AS ROW END INVISIBLE,
+  PERIOD FOR SYSTEM_TIME (`valid_since`, `valid_until`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci WITH SYSTEM VERSIONING
+create or replace table t (
+x int, row_start timestamp(6) as row start,
+row_end timestamp(6) as row end,
+period for system_time (row_start, row_end)) with system versioning;
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `x` int(11) DEFAULT NULL,
+  `row_start` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `row_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`row_start`, `row_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci WITH SYSTEM VERSIONING
+alter table t force;
+# Missing AS ROW START
+alter table t modify column row_start timestamp(6) invisible;
+ERROR HY000: Can not change system versioning field `row_start`
+# Fail on wrong name
+alter table t modify column abcd timestamp(6) as row start invisible;
+ERROR 42000: Incorrect column specifier for column 'abcd'
+# Add invisible
+alter table t modify column row_start timestamp(6) as row start invisible;
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `x` int(11) DEFAULT NULL,
+  `row_start` timestamp(6) GENERATED ALWAYS AS ROW START INVISIBLE,
+  `row_end` timestamp(6) GENERATED ALWAYS AS ROW END,
+  PERIOD FOR SYSTEM_TIME (`row_start`, `row_end`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci WITH SYSTEM VERSIONING
+# Missing AS ROW END
+alter table t change column row_start valid_since timestamp(6) invisible;
+ERROR HY000: Can not change system versioning field `row_start`
+# Rename and add invisible
+alter table t change column row_end valid_until timestamp(6) as row end invisible;
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `x` int(11) DEFAULT NULL,
+  `row_start` timestamp(6) GENERATED ALWAYS AS ROW START INVISIBLE,
+  `valid_until` timestamp(6) GENERATED ALWAYS AS ROW END INVISIBLE,
+  PERIOD FOR SYSTEM_TIME (`row_start`, `valid_until`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci WITH SYSTEM VERSIONING
+# Remove invisible and rename
+alter table t change column row_start valid_since timestamp(6) as row start;
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `x` int(11) DEFAULT NULL,
+  `valid_since` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `valid_until` timestamp(6) GENERATED ALWAYS AS ROW END INVISIBLE,
+  PERIOD FOR SYSTEM_TIME (`valid_since`, `valid_until`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci WITH SYSTEM VERSIONING
+# Fail on wrong name
+alter table t change column row_start valid_since timestamp(6) as row start invisible;
+ERROR 42000: Incorrect column specifier for column 'valid_since'
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `x` int(11) DEFAULT NULL,
+  `valid_since` timestamp(6) GENERATED ALWAYS AS ROW START,
+  `valid_until` timestamp(6) GENERATED ALWAYS AS ROW END INVISIBLE,
+  PERIOD FOR SYSTEM_TIME (`valid_since`, `valid_until`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci WITH SYSTEM VERSIONING
+# Add invisible, don't rename
+alter table t change column valid_since valid_since timestamp(6) as row start invisible;
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `x` int(11) DEFAULT NULL,
+  `valid_since` timestamp(6) GENERATED ALWAYS AS ROW START INVISIBLE,
+  `valid_until` timestamp(6) GENERATED ALWAYS AS ROW END INVISIBLE,
+  PERIOD FOR SYSTEM_TIME (`valid_since`, `valid_until`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci WITH SYSTEM VERSIONING
+create table t2 like t;
+create table mysql.t2 like t;
+ERROR HY000: System-versioned tables in the `mysql` database are not supported
+drop table t;
+set @@system_versioning_alter_history= @svah_save;
 # End of 11.6 tests
