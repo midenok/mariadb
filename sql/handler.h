@@ -2197,16 +2197,6 @@ struct Vers_parse_info: public Table_period_info
   Table_period_info::start_end_t sys_fields;
 
   friend struct Table_scope_and_contents_source_st;
-  void set_start(const Lex_ident_column field_name)
-  {
-    as_row.start= field_name;
-    period.start= field_name;
-  }
-  void set_end(const Lex_ident_column field_name)
-  {
-    as_row.end= field_name;
-    period.end= field_name;
-  }
 
 protected:
   bool is_start(const Create_field &f) const;

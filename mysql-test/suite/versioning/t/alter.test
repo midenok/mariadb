@@ -865,7 +865,7 @@ show create table t;
 create table t2 like t;
 --error ER_VERS_DB_NOT_SUPPORTED
 create table mysql.t2 like t;
-drop table t;
+drop tables t, t2;
 set @@system_versioning_alter_history= @svah_save;
 
 --echo # End of 11.6 tests

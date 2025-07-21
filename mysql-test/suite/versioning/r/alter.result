@@ -1034,6 +1034,6 @@ t	CREATE TABLE `t` (
 create table t2 like t;
 create table mysql.t2 like t;
 ERROR HY000: System-versioned tables in the `mysql` database are not supported
-drop table t;
+drop tables t, t2;
 set @@system_versioning_alter_history= @svah_save;
 # End of 11.6 tests
