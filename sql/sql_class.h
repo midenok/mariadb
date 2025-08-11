@@ -54,6 +54,8 @@
 #include "xa.h"
 #include "ddl_log.h"                            /* DDL_LOG_STATE */
 #include "ha_handler_stats.h"                    // ha_handler_stats */
+#include <mysqld_error.h>
+#include "sql_priv.h"
 #include <vector>
 #include <set>
 #include <map>

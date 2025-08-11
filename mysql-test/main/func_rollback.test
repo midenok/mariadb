@@ -475,6 +475,7 @@ eval
 CREATE TABLE t1_child (f1 BIGINT, f2 BIGINT, PRIMARY KEY(f1),
 FOREIGN KEY (f1) REFERENCES t1_parent(f1))
 ENGINE = $engine;
+--exit
 --error ER_NO_REFERENCED_ROW_2
 delimiter //;
 CREATE FUNCTION f1_two_inserts() RETURNS INTEGER
