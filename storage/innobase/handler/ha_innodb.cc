@@ -12360,12 +12360,26 @@ create_table_info_t::create_foreign_keys()
 	fkerr_t		      index_error = FK_SUCCESS;
 	dict_index_t*	      err_index	  = NULL;
 	ulint		      err_col	= 0;
+	const bool	      tmp_table = m_flags2 & DICT_TF2_TEMPORARY;
 	const CHARSET_INFO*   cs	= thd_charset(m_thd);
 	const char*	      operation = "Create ";
 	uint                  old_fkeys = m_create_info->alter_info->tmp_old_fkeys;
 
 	enum_sql_command sqlcom = enum_sql_command(thd_sql_command(m_thd));
 	LEX_CSTRING name= {m_table_name, strlen(m_table_name)};
+
+	if (tmp_table && !m_form->s->foreign_keys.is_empty()) {
+		ib_foreign_warn(m_trx, DB_CANNOT_ADD_CONSTRAINT,
+				m_table_name,
+				"%s table `%s`.`%s` with foreign key "
+				"constraint failed. "
+				"Temporary tables can't have "
+				"foreign key constraints.",
+				operation, m_form->s->db.str,
+				m_form->s->table_name.str);
+
+		return (DB_CANNOT_ADD_CONSTRAINT);
+	}
 
 	if (sqlcom == SQLCOM_ALTER_TABLE) {
 		mem_heap_t*   heap = mem_heap_create(10000);
