@@ -14524,9 +14524,18 @@ bool fk_prepare_create_table(THD *thd, Alter_info *alter_info,
     {
       Table_name ref(fk.ref_db(), fk.referenced_table);
       auto ref_it= ref_shares.find(ref);
-      if (!check_foreign && ref_it == ref_shares.end())
+      if (ref_it == ref_shares.end())
+      {
+        /*
+          On inexistent share do not interfere with ALTER unrelated action,
+          i.e. allow any action that does not touch this fk.
+
+          For CREATE TABLE inexistent ref_share is failed by fk_handle_create(),
+          for ALTER TABLE when adding/modifying fk it is failed by
+          mysql_prepare_alter_table() on building fk_tables_to_lock.
+        */
         continue;
-      DBUG_ASSERT(ref_it != ref_shares.end());
+      }
       ref_share= ref_it->second.share;
       DBUG_ASSERT(ref_share);
     }

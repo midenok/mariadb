@@ -10651,14 +10651,13 @@ FK_info::get_referenced_share(THD *thd, Share_map *ref_shares, myf MyFlags) cons
     return false;
 
   Share_acquire sa(thd, ref);
-  if (sa.fk_error(thd))
+  if (sa.fk_error(thd, false))
   {
-    my_error(ER_WRONG_FK_DEF, MyFlags, ref.name.str, "referenced table not found");
+    my_error(ER_WRONG_FK_DEF, MyFlags, ref.name.str, "referenced table failed");
     return MyFlags & (ME_WARNING | ME_NOTE) ? false : true;
   }
   if (!sa.share)
   {
-    DBUG_ASSERT(!thd->variables.check_foreign());
     return false; // skip non-existing referenced shares, allow CREATE
   }
   if (!ref_shares->insert(ref, std::move(sa)))
