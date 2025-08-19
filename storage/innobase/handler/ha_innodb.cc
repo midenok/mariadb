@@ -15649,9 +15649,7 @@ REPLACE, not an update.
 @return whether the table is referenced by a FOREIGN KEY */
 bool ha_innobase::referenced_by_foreign_key() const noexcept
 {
-  dict_sys.freeze(SRW_LOCK_CALL);
   const bool empty= m_prebuilt->table->referenced_set.empty();
-  dict_sys.unfreeze();
   return !empty;
 }
 
