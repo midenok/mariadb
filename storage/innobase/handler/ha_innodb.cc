@@ -12360,7 +12360,6 @@ create_table_info_t::create_foreign_keys()
 	fkerr_t		      index_error = FK_SUCCESS;
 	dict_index_t*	      err_index	  = NULL;
 	ulint		      err_col	= 0;
-	const bool	      tmp_table = m_flags2 & DICT_TF2_TEMPORARY;
 	const CHARSET_INFO*   cs	= thd_charset(m_thd);
 	const char*	      operation = "Create ";
 	uint                  old_fkeys = m_create_info->alter_info->tmp_old_fkeys;
