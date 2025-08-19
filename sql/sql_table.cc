@@ -2991,7 +2991,10 @@ my_bool init_key_part_spec(THD *thd, Alter_info *alter_info,
   */
   if (!column || (column->invisible > INVISIBLE_USER && !kp.generated))
   {
-    my_error(ER_KEY_COLUMN_DOES_NOT_EXIST, MYF(0), field_name.str);
+    if (key.foreign)
+      my_error(ER_WRONG_FK_DEF, MYF(0), field_name.str, "foreign field not found");
+    else
+      my_error(ER_KEY_COLUMN_DOES_NOT_EXIST, MYF(0), field_name.str);
     DBUG_RETURN(TRUE);
   }
 
@@ -14539,6 +14542,7 @@ bool fk_prepare_create_table(THD *thd, Alter_info *alter_info,
       }
       if (!cf)
       {
+        DBUG_ASSERT(0); // superseded by init_key_part_spec()
         /* NB: this may or may not be masked by ER_FK_NO_INDEX_CHILD */
         my_error(ER_WRONG_FK_DEF, MYF(0), ff.str, "foreign field not found");
         return true;
@@ -14572,11 +14576,12 @@ bool fk_prepare_create_table(THD *thd, Alter_info *alter_info,
           if (0 == cmp_ident(ref_field->field_name, rf))
             break;
         }
-        // NB: following code is 1-to-1 as if branch, only with Create_field type
+        // NB: the following code is similar if branch above, only with Create_field type
         if (!ref_field)
         {
           if (!check_foreign)
             continue;
+          DBUG_ASSERT(0);
           my_error(ER_WRONG_FK_DEF, MYF(0), rf.str,
                    "referenced field not found");
           return true;
