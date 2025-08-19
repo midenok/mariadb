@@ -1413,9 +1413,9 @@ bool Foreign_key_io::parse(THD *thd, LEX_CUSTRING& image)
   if (version > fk_io_version)
   {
     push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, ER_CANNOT_ADD_FOREIGN,
-                        "Foreign_key_io does not support %d version of binary data", version);
+                        "Foreign_key_io does not support %lu version of binary data", version);
     push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE, ER_CANNOT_ADD_FOREIGN,
-                        "Foreign_key_io max supported version is %d", fk_io_version);
+                        "Foreign_key_io max supported version is %llu", fk_io_version);
     return true;
   }
 
@@ -1579,7 +1579,7 @@ bool Foreign_key_io::parse(THD *thd, LEX_CUSTRING& image)
   if (!shallow_hints && (s->referenced_keys.elements != rk_count))
   {
     push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, ER_CANNOT_ADD_FOREIGN,
-                        "Expected %u refenced keys but found %u",
+                        "Expected %u refenced keys but found %lu",
                         s->referenced_keys.elements, rk_count);
   }
   return p.pos < p.end; // Error if some data is still left

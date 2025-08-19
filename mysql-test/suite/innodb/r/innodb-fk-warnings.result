@@ -25,10 +25,10 @@ Error	1822	Missing index for constraint 't2.a' in the referenced table 't1'
 drop table t1;
 create table t1(a int unique, b int) engine=innodb;
 create table t2(a int, b int, foreign key (a) references t1(a), foreign key (b) references t1(b)) engine=innodb;
-ERROR HY000: Missing index for constraint 't2.t2_ibfk_2' in the referenced table 't1'
+ERROR HY000: Missing index for constraint 't2.2' in the referenced table 't1'
 show warnings;
 Level	Code	Message
-Error	1822	Missing index for constraint 't2.t2_ibfk_2' in the referenced table 't1'
+Error	1822	Missing index for constraint 't2.2' in the referenced table 't1'
 drop table t1;
 create table t1(a int not null primary key, b int) engine=innodb;
 create table t2(a int, b int, constraint a foreign key a (a) references t1(a),
@@ -76,7 +76,7 @@ alter table t1 add foreign key(b) references t1(a);
 ERROR HY000: Can't create table `test`.`t1` (errno: 150 "Foreign key constraint is incorrectly formed")
 show warnings;
 Level	Code	Message
-Warning	150	Alter  table `test`.`t1` with foreign key constraint failed. Temporary tables can't have foreign key constraints.
+Warning	150	Alter  table `test`.`t1` with foreign key `1` constraint failed. Referenced table `test`.`t1` not found in the data dictionary.
 Error	1005	Can't create table `test`.`t1` (errno: 150 "Foreign key constraint is incorrectly formed")
 Warning	1215	Cannot add foreign key constraint for `t1`
 drop table t1;
@@ -106,7 +106,7 @@ create table t2(a int not null, foreign key(a) references t1(f1) on delete set n
 ERROR HY000: Can't create table `test`.`t2` (errno: 150 "Foreign key constraint is incorrectly formed")
 show warnings;
 Level	Code	Message
-Warning	150	Create  table `test`.`t2` with foreign key `t2_ibfk_1` constraint failed. You have defined a SET NULL condition but column 'a' is defined as NOT NULL.
+Warning	150	Create  table `test`.`t2` with foreign key `1` constraint failed. You have defined a SET NULL condition but column 'a' is defined as NOT NULL.
 Error	1005	Can't create table `test`.`t2` (errno: 150 "Foreign key constraint is incorrectly formed")
 Warning	1215	Cannot add foreign key constraint for `t2`
 drop table t1;

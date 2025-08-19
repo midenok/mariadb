@@ -271,5 +271,5 @@ t1яяяяяяяяяяььььььььььззззззззззшшшшшшшшш
 CREATE TABLE t (id INT PRIMARY KEY, f INT NOT NULL, KEY(f)) ENGINE=InnoDB;
 SET STATEMENT FOREIGN_KEY_CHECKS = OFF FOR
 ALTER TABLE t ADD FOREIGN KEY (f) REFERENCES t (id) ON UPDATE SET NULL;
-ERROR HY000: Failed to add the foreign key constraint on table 't'. Incorrect options in FOREIGN KEY constraint '(null)'
+ERROR HY000: Failed to add the foreign key constraint on table 't'. Incorrect options in FOREIGN KEY constraint '1'
 DROP TABLE t;

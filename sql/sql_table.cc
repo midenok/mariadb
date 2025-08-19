@@ -3182,9 +3182,6 @@ my_bool init_key_info(THD *thd, Alter_info *alter_info,
     */
     DBUG_ASSERT(!key.length);
 
-    if (key.foreign)
-      continue;
-
     int parts_added= append_system_key_parts(thd, create_info, &key);
     if (parts_added < 0)
       DBUG_RETURN(true);
@@ -5744,11 +5741,10 @@ make_unique_key_name(THD *thd, LEX_CSTRING prefix,
   char buf[MAX_FIELD_NAME - 1];
   char *ptr;
   Lex_ident_column ret;
-  DBUG_ASSERT(FK_INFIX.length < sizeof(buf));
 
   if (foreign)
   {
-    ptr= fk_make_prefix(buf, sizeof(buf), &prefix);
+    ptr= buf;
     *(ptr++)= '1';
   }
   else
@@ -5772,8 +5768,8 @@ make_unique_key_name(THD *thd, LEX_CSTRING prefix,
 
   if (foreign)
   {
-    ret.length-= 2;
-    ptr-= 2;
+    ret.length-= 1;
+    ptr-= 1;
   }
 
   /*
@@ -5784,11 +5780,17 @@ make_unique_key_name(THD *thd, LEX_CSTRING prefix,
     ret.length= sizeof(buf) - 4;
 
   size_t base_len= ret.length;
+  size_t n;
 
   for (uint i= 2 ; i < 100; i++)
   {
-    *ptr= '_';
-    size_t n= int10_to_str(i, ptr + 1, 10) - ptr;
+    if (foreign)
+      n= int10_to_str(i, ptr, 10) - ptr;
+    else
+    {
+      *ptr= '_';
+      n= int10_to_str(i, ptr + 1, 10) - ptr;
+    }
     ret.length= base_len + n;
     if (key_names.find(ret) == key_names.end())
     {
