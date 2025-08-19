@@ -59,6 +59,7 @@
 #include "ha_handler_stats.h"                    // ha_handler_stats */
 #include "sql_basic_types.h"                     // enum class active_dml_stmt
 #include "sql_trigger.h"
+#include "sql_priv.h"
 #include <vector>
 #include <set>
 #include <map>
