@@ -84,7 +84,7 @@ static const char *fk_info_str(THD *thd, FOREIGN_KEY_INFO *fk_info)
   res|= str.append('.');
   res|= append_identifier(thd, &str, &fk_info->foreign_table);
   res|= str.append(STRING_WITH_LEN(", CONSTRAINT "));
-  res|= append_identifier(thd, &str, &fk_info->foreign_id);
+  res|= append_identifier(thd, &str, &fk_info->name);
   res|= str.append(STRING_WITH_LEN(" FOREIGN KEY ("));
   res|= fk_info_append_fields(thd, &str, &fk_info->foreign_fields);
   res|= str.append(STRING_WITH_LEN(") REFERENCES "));

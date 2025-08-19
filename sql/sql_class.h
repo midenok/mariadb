@@ -778,9 +778,9 @@ public:
     foreign= true;
   }
   Foreign_key(const FK_info &src, MEM_ROOT *mem_root)
-    : Key(MULTIPLE, &src.foreign_id, default_key_create_info.algorithm, true,
+    : Key(MULTIPLE, &src.name, default_key_create_info.algorithm, true,
           DDL_options()),
-    constraint_name(src.foreign_id),
+    constraint_name(src.name),
     ref_db(src.referenced_db),
     ref_table(src.referenced_table),
     delete_opt(src.delete_method),

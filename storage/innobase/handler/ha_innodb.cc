@@ -12218,8 +12218,8 @@ public:
 	key_text(FK_info* key)
 	{
 		char* ptr = buf;
-		if (key->foreign_id.str) {
-			Lex_cstring& name = key->foreign_id;
+		if (key->name.str) {
+			Lex_cstring& name = key->name;
 			size_t len = std::min(name.length, MAX_TEXT - 2);
 			*(ptr++)   = '`';
 			memcpy(ptr, name.str, len);
@@ -12475,14 +12475,14 @@ create_table_info_t::create_foreign_keys()
 			return (DB_CANNOT_ADD_CONSTRAINT);
 		}
 
-		if (size_t fk_len = fk->foreign_id.length) {
+		if (size_t fk_len = fk->name.length) {
 			/* Prepend the table name to the constraint name. */
 			size_t s = strlen(table->name.m_name) + 2 + fk_len;
 			foreign->id = static_cast<char*>(
 				mem_heap_alloc(foreign->heap, s));
 			snprintf(foreign->id, s, "%s\377%.*s",
 				 table->name.m_name, int(fk_len),
-				 fk->foreign_id.str);
+				 fk->name.str);
 		} else {
 			dict_create_add_foreign_id(&number, table->name.m_name,
                                                    foreign);

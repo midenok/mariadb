@@ -3682,11 +3682,11 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
           DBUG_ASSERT(key->ignore_reason);
           fk= new (thd->mem_root) FK_info();
           fk->assign(fkey, new_name);
-          if (!fk->foreign_id.str)
+          if (!fk->name.str)
           {
-            fk->foreign_id= make_unique_key_name(thd, new_name.name, fkey_names,
+            fk->name= make_unique_key_name(thd, new_name.name, fkey_names,
                                                  true);
-            fkey.constraint_name= fk->foreign_id;
+            fkey.constraint_name= fk->name;
           }
           ignore_fixup.insert({key->ignore_reason, fk});
         }
@@ -3695,7 +3695,7 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
           my_error(ER_OUT_OF_RESOURCES, MYF(0));
           DBUG_RETURN(true);
         }
-        if (!fkey_names.insert(fk->foreign_id))
+        if (!fkey_names.insert(fk->name))
           DBUG_RETURN(true);				// Out of memory
 
         /*
@@ -3772,7 +3772,7 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
       FK_info *fk= new (thd->mem_root) FK_info();
       DBUG_ASSERT(fkey.constraint_name.str);
       fk->assign(fkey, new_name);
-      fk->foreign_id= fkey.constraint_name;
+      fk->name= fkey.constraint_name;
       fk->foreign_idx= key_info;
       if (foreign_keys.push_back(fk))
       {
@@ -4145,7 +4145,7 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
       if (!(fk.foreign_idx= fk.find_idx(*key_info_buffer, *key_count, true)) &&
           thd->variables.check_foreign())
       {
-        my_error(ER_FK_NO_INDEX_CHILD, MYF(0), fk.foreign_id.str,
+        my_error(ER_FK_NO_INDEX_CHILD, MYF(0), fk.name.str,
                  fk.foreign_table.str);
         DBUG_RETURN(true);
       }
@@ -4153,7 +4153,7 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
       if (!fk.find_idx(*key_info_buffer, *key_count, false))
       {
         my_error(ER_FK_NO_INDEX_PARENT, MYF(0), fk.foreign_table.str,
-                 fk.foreign_id.str, fk.referenced_table.str);
+                 fk.name.str, fk.referenced_table.str);
         DBUG_RETURN(true);
       }
   }
@@ -4163,7 +4163,7 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
       if (!rk.find_idx(*key_info_buffer, *key_count, false))
       {
         my_error(ER_FK_NO_INDEX_PARENT, MYF(0), rk.foreign_table.str,
-                rk.foreign_id.str, rk.referenced_table.str);
+                rk.name.str, rk.referenced_table.str);
         DBUG_RETURN(true);
       }
 
@@ -6850,7 +6850,7 @@ drop_create_field:
           List_iterator<FK_info> fk_key_it(table->s->foreign_keys);
           while ((f_key= fk_key_it++))
           {
-            if (Lex_ident_column(f_key->foreign_id).streq(drop->name))
+            if (Lex_ident_column(f_key->name).streq(drop->name))
             {
               remove_drop= FALSE;
               break;
@@ -7004,7 +7004,7 @@ drop_create_field:
         {
           while ((fk= fk_it++))
           {
-	    if (Lex_ident_column(fk->foreign_id).streq(new_fk->constraint_name))
+	    if (Lex_ident_column(fk->name).streq(new_fk->constraint_name))
               goto remove_key;
           }
         }
@@ -9532,12 +9532,12 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
   {
     Foreign_key *key;
     Alter_drop *drop;
-    DBUG_ASSERT(fk.foreign_id.str);
+    DBUG_ASSERT(fk.name.str);
     drop_it.rewind();
     while ((drop= drop_it++))
     {
       if (drop->type == Alter_drop::FOREIGN_KEY &&
-          fk.foreign_id.streq(drop->name))
+          fk.name.streq(drop->name))
         break;
     }
     if (drop)
@@ -9569,7 +9569,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
       while ((drop= drop_it++))
       {
         if (drop->type == Alter_drop::FOREIGN_KEY &&
-            fk.foreign_id.streq(drop->name))
+            fk.name.streq(drop->name))
           drop_it.remove();
       }
       continue;
@@ -10107,7 +10107,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
         if (!check->name.length || check->automatic_name)
           continue;
 
-        if (check->name.streq(f_key->foreign_id))
+        if (check->name.streq(f_key->name))
         {
           my_error(ER_DUP_CONSTRAINT_NAME, MYF(0), "CHECK", check->name.str);
           goto err;
@@ -10463,7 +10463,7 @@ static bool fk_prepare_copy_alter_table(THD *thd, TABLE *table,
           l_c_t_n > 0 modes case-insensitive comparison is used.
         */
         if ((drop->type == Alter_drop::FOREIGN_KEY) &&
-            drop->name.streq(f_key->foreign_id) &&
+            drop->name.streq(f_key->name) &&
             table->s->db.streq(f_key->foreign_db) &&
             table->s->table_name.streq(f_key->foreign_table))
           fk_parent_key_it.remove();
@@ -10500,7 +10500,7 @@ static bool fk_prepare_copy_alter_table(THD *thd, TABLE *table,
         strxnmov(buff, sizeof(buff)-1, f_key->foreign_db.str, ".",
                 f_key->foreign_table.str, NullS);
         my_error(ER_FK_COLUMN_CANNOT_CHANGE_CHILD, MYF(0), bad_column_name,
-                f_key->foreign_id.str, buff);
+                f_key->name.str, buff);
         DBUG_RETURN(true);
       }
       case FK_COLUMN_RENAMED:
@@ -10518,7 +10518,7 @@ static bool fk_prepare_copy_alter_table(THD *thd, TABLE *table,
         buff.append('.');
         append_identifier(thd, &buff, tbl);
         my_error(ER_FK_COLUMN_CANNOT_DROP_CHILD, MYF(0), bad_column_name,
-                f_key->foreign_id.str, buff.c_ptr());
+                f_key->name.str, buff.c_ptr());
         DBUG_RETURN(true);
       }
       default:
@@ -10544,7 +10544,7 @@ static bool fk_prepare_copy_alter_table(THD *thd, TABLE *table,
       {
         /* Names of foreign keys in InnoDB are case-insensitive. */
         if ((drop->type == Alter_drop::FOREIGN_KEY) &&
-            f_key->foreign_id.streq(drop->name))
+            f_key->name.streq(drop->name))
           fk_key_it.remove();
       }
     }
@@ -10566,7 +10566,7 @@ static bool fk_prepare_copy_alter_table(THD *thd, TABLE *table,
         break;
       case FK_COLUMN_DATA_CHANGE:
         my_error(ER_FK_COLUMN_CANNOT_CHANGE, MYF(0), bad_column_name,
-                f_key->foreign_id.str);
+                f_key->name.str);
         DBUG_RETURN(true);
       case FK_COLUMN_RENAMED:
         my_error(ER_ALTER_OPERATION_NOT_SUPPORTED_REASON, MYF(0),
@@ -10576,11 +10576,11 @@ static bool fk_prepare_copy_alter_table(THD *thd, TABLE *table,
         DBUG_RETURN(true);
       case FK_COLUMN_DROPPED:
 	my_error(ER_FK_COLUMN_CANNOT_DROP, MYF(0), bad_column_name,
-		 f_key->foreign_id.str);
+		 f_key->name.str);
 	DBUG_RETURN(true);
       case FK_COLUMN_NOT_NULL:
 	my_error(ER_FK_COLUMN_NOT_NULL, MYF(0), bad_column_name,
-		 f_key->foreign_id.str);
+		 f_key->name.str);
 	DBUG_RETURN(true);
       default:
 	DBUG_ASSERT(0);
@@ -11753,7 +11753,7 @@ bool mysql_alter_table(THD *thd, const LEX_CSTRING *new_db,
 
           while ((f_key= fk_key_it++))
           {
-            if (f_key->foreign_id.streq(drop->name))
+            if (f_key->name.streq(drop->name))
             {
               drop->type= Alter_drop::FOREIGN_KEY;
               alter_info->flags|= ALTER_DROP_FOREIGN_KEY;
@@ -14599,7 +14599,7 @@ bool fk_prepare_create_table(THD *thd, Alter_info *alter_info,
     {
       for (const Alter_table_ctx::FK_add_new &new_fk: alter_ctx->fk_added)
       {
-        if (new_fk.fk->constraint_name.str == fk.foreign_id.str)
+        if (new_fk.fk->constraint_name.str == fk.name.str)
         {
           /* foreign_idx was set by mysql_prepare_create_table() */
           DBUG_ASSERT(fk.foreign_idx);
@@ -14858,7 +14858,7 @@ bool Alter_table_ctx::fk_handle_alter(THD *thd)
     DBUG_ASSERT(new_fk.fk->constraint_name.str);
     while ((fk= fk_it++))
     {
-      if (0 == cmp_ident(fk->foreign_id, new_fk.fk->constraint_name))
+      if (0 == cmp_ident(fk->name, new_fk.fk->constraint_name))
       {
         fk_it.remove();
         break;
@@ -14896,7 +14896,7 @@ bool Alter_table_ctx::fk_handle_alter(THD *thd)
     List_iterator<FK_info> ref_it(ref_share->referenced_keys);
     while ((rk= ref_it++))
     {
-      if (cmp_ident(rk->foreign_id, dropped_fk.fk->foreign_id))
+      if (cmp_ident(rk->name, dropped_fk.fk->name))
         continue;
       ref_it.remove();
       break;
@@ -15081,8 +15081,8 @@ bool fk_handle_drop(THD *thd, TABLE_LIST *table, mbd::vector<FK_ddl_backup> &sha
           (!drop_db && 0 != cmp_table(rk.foreign_table, table->table_name)))
       {
         // NB: GTS_FK_SHALLOW_HINTS does not resolve foreign_id
-        if (rk.foreign_id.str)
-          my_error(ER_ROW_IS_REFERENCED_2, MYF(0), rk.foreign_id.str);
+        if (rk.name.str)
+          my_error(ER_ROW_IS_REFERENCED_2, MYF(0), rk.name.str);
         else
           my_error(ER_ROW_IS_REFERENCED, MYF(0));
         return true;
@@ -15200,7 +15200,7 @@ bool fk_handle_rename(THD *thd, TABLE_LIST *old_table, const Lex_ident_db *new_d
     LEX_CSTRING prefix= old_table->table_name;
     ptr= fk_make_prefix(buf, sizeof(buf), &prefix);
     prefix= { buf, (size_t) (ptr - buf) };
-    LEX_CSTRING id= fk.foreign_id;
+    LEX_CSTRING id= fk.name;
 
     /* Rename foreign_id if it was generated from table name */
     if (prefix.length < id.length && !cmp_prefix(id, prefix))
@@ -15215,7 +15215,7 @@ bool fk_handle_rename(THD *thd, TABLE_LIST *old_table, const Lex_ident_db *new_d
       memcpy(ptr, suffix.str, suffix.length);
       ptr+= suffix.length;
       *ptr= 0;
-      if (fk.foreign_id.strdup(&share->mem_root, id))
+      if (fk.name.strdup(&share->mem_root, id))
         goto mem_error;
     }
 

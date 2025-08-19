@@ -10496,7 +10496,7 @@ bool FK_info::assign(Foreign_key &src, Table_name table)
   DBUG_ASSERT(src.foreign);
   DBUG_ASSERT(src.type == Key::MULTIPLE);
 
-  foreign_id= src.constraint_name.str ? src.constraint_name : src.name;
+  name= src.constraint_name.str ? src.constraint_name : src.name;
   foreign_db= table.db;
   foreign_table= table.name;
   referenced_db= Lex_ident_db(src.ref_db);
@@ -10524,7 +10524,7 @@ FK_info * FK_info::clone(MEM_ROOT *mem_root) const
   if (!dst)
     return NULL;
 
-  if (dst->foreign_id.strdup(mem_root, foreign_id))
+  if (dst->name.strdup(mem_root, name))
     return NULL;
   if (dst->foreign_db.strdup(mem_root, foreign_db))
     return NULL;
@@ -10585,7 +10585,7 @@ Table_name FK_info::ref_table(MEM_ROOT *mem_root) const
 void FK_info::print(String& out)
 {
   out.append(STRING_WITH_LEN("foreign_id: "));
-  out.append(foreign_id.print());
+  out.append(name.print());
   out.append(STRING_WITH_LEN("; foreign_db: "));
   out.append(foreign_db.print());
   out.append(STRING_WITH_LEN("; foreign_table: "));
@@ -10888,7 +10888,7 @@ KEY * FK_info::find_referenced_idx(KEY *key_info, uint keys, myf MyFlags) const
     return key;
   }
 
-  my_error(ER_FK_NO_INDEX_PARENT, MyFlags, foreign_table.str, foreign_id.str,
+  my_error(ER_FK_NO_INDEX_PARENT, MyFlags, foreign_table.str, name.str,
            referenced_table.str);
 
   return NULL;

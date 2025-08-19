@@ -2167,7 +2167,7 @@ void fk_append_info(THD *thd, String *p, TABLE *table)
   for (const FK_info &fk: table->s->foreign_keys)
   {
     p->append(STRING_WITH_LEN(",\n  CONSTRAINT "));
-    append_identifier(thd, p, &fk.foreign_id);
+    append_identifier(thd, p, &fk.name);
     p->append(STRING_WITH_LEN(" FOREIGN KEY ("));
     bool comma= false;
     for (const Lex_cstring &fcol: fk.foreign_fields)
@@ -7799,8 +7799,8 @@ static int get_schema_constraints_record(THD *thd, TABLE_LIST *tables,
     for (const FK_info &fk: show_table->s->foreign_keys)
     {
       if (store_constraints(thd, table, db_name, table_name,
-                            fk.foreign_id.str,
-                            strlen(fk.foreign_id.str),
+                            fk.name.str,
+                            strlen(fk.name.str),
                             STRING_WITH_LEN("FOREIGN KEY")))
         DBUG_RETURN(1);
     }
@@ -8025,8 +8025,8 @@ get_schema_key_column_usage_record(THD *thd, TABLE_LIST *tables,
         f_idx++;
         restore_record(table, s->default_values);
         store_key_column_usage(table, db_name, table_name,
-                              fk.foreign_id.str,
-                              fk.foreign_id.length,
+                              fk.name.str,
+                              fk.name.length,
                               ff.str, ff.length,
                               (longlong) f_idx);
         table->field[8]->store((longlong) f_idx, true);
@@ -8875,7 +8875,7 @@ get_referential_constraints_record(THD *thd, TABLE_LIST *tables,
       table->field[0]->store(STRING_WITH_LEN("def"), cs);
       table->field[1]->store(db_name, cs);
       table->field[9]->store(table_name, cs);
-      table->field[2]->store(fk.foreign_id, cs);
+      table->field[2]->store(fk.name, cs);
       table->field[3]->store(STRING_WITH_LEN("def"), cs);
       table->field[4]->store(fk.ref_db(), cs);
       bool show_ref_table= true;

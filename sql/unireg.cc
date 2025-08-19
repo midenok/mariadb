@@ -1255,7 +1255,7 @@ err:
 ulonglong Foreign_key_io::fk_size(FK_info &fk)
 {
   ulonglong store_size= 0;
-  store_size+= string_size(fk.foreign_id);
+  store_size+= string_size(fk.name);
   store_size+= string_size(fk.referenced_db);
   store_size+= string_size(fk.referenced_table);
   store_size+= net_length_size(fk.update_method);
@@ -1295,7 +1295,7 @@ void Foreign_key_io::store_fk(FK_info &fk, uchar *&pos)
 #ifndef DBUG_OFF
   uchar *old_pos= pos;
 #endif
-  pos= store_string(pos, fk.foreign_id);
+  pos= store_string(pos, fk.name);
   pos= store_string(pos, fk.referenced_db, true);
   pos= store_string(pos, fk.referenced_table);
   pos= store_length(pos, fk.update_method);
@@ -1334,7 +1334,7 @@ bool Foreign_key_io::store(THD *thd, FK_list &foreign_keys,
   {
     fk_count++;
     store_size+= fk_size(fk);
-    if (!ids.insert(fk.foreign_id, &inserted))
+    if (!ids.insert(fk.name, &inserted))
       return true;
     if (!inserted)
     {
@@ -1427,7 +1427,7 @@ bool Foreign_key_io::parse(THD *thd, LEX_CUSTRING& image)
       my_error(ER_OUT_OF_RESOURCES, MYF(0));
       return true;
     }
-    if (read_string(dst->foreign_id, &s->mem_root, p))
+    if (read_string(dst->name, &s->mem_root, p))
       return true;
     dst->foreign_db= s->db;
     dst->foreign_table= s->table_name;
@@ -1593,8 +1593,8 @@ bool TABLE_SHARE::fk_resolve_referenced_keys(THD *thd, TABLE_SHARE *from)
 
   for (FK_info &rk: referenced_keys)
   {
-    DBUG_ASSERT(rk.foreign_id.length);
-    if (!ids.insert(rk.foreign_id, &inserted))
+    DBUG_ASSERT(rk.name.length);
+    if (!ids.insert(rk.name, &inserted))
       return true;
 
     DBUG_ASSERT(inserted);
@@ -1605,14 +1605,14 @@ bool TABLE_SHARE::fk_resolve_referenced_keys(THD *thd, TABLE_SHARE *from)
     if (0 != cmp_db_table(fk.referenced_db, fk.referenced_table))
       continue;
 
-    DBUG_ASSERT(fk.foreign_id.length);
-    if (!ids.insert(fk.foreign_id, &inserted))
+    DBUG_ASSERT(fk.name.length);
+    if (!ids.insert(fk.name, &inserted))
       return true;
 
     if (!inserted)
     {
       push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, ER_DUP_CONSTRAINT_NAME,
-                          "Foreign ID already exists `%s`", fk.foreign_id.str);
+                          "Foreign ID already exists `%s`", fk.name.str);
       continue;
     }
 

@@ -2110,7 +2110,7 @@ class Table_name;
 class FK_info : public Sql_alloc
 {
 public:
-  Lex_ident_column foreign_id;
+  Lex_ident_column name;
   // TODO: use Table_name
   Lex_ident_db foreign_db;
   Lex_ident_table foreign_table;
