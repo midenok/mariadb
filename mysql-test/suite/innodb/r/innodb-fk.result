@@ -52,7 +52,6 @@ CONSTRAINT fk3 FOREIGN KEY (f3) REFERENCES t3 (id) ON DELETE CASCADE
 ERROR 42S02: Table 'test.t3' doesn't exist
 show warnings;
 Level	Code	Message
-Error	1239	Incorrect foreign key definition for 't3': referenced table not found
 CREATE TABLE t2 (
 id int(11) NOT NULL AUTO_INCREMENT,
 f2 int(11) NOT NULL,
