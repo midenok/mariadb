@@ -1255,6 +1255,7 @@ err:
 ulonglong Foreign_key_io::fk_size(FK_info &fk)
 {
   ulonglong store_size= 0;
+  store_size+= sizeof(fk.uuid);
   store_size+= string_size(fk.name);
   store_size+= string_size(fk.referenced_db);
   store_size+= string_size(fk.referenced_table);
@@ -1295,6 +1296,7 @@ void Foreign_key_io::store_fk(FK_info &fk, uchar *&pos)
 #ifndef DBUG_OFF
   uchar *old_pos= pos;
 #endif
+  pos= store_uuid(pos, fk.uuid);
   pos= store_string(pos, fk.name);
   pos= store_string(pos, fk.referenced_db, true);
   pos= store_string(pos, fk.referenced_table);
@@ -1323,7 +1325,7 @@ bool Foreign_key_io::store(THD *thd, FK_list &foreign_keys,
 
   ulonglong fk_count= 0;
   mbd::set<Table_name> hints;
-  mbd::set<Lex_ident_column, Lex_ident_lt> ids;
+  mbd::set<uchar *, UUID_lt> ids;
   bool inserted;
 
   if (foreign_keys.is_empty() && referenced_keys.is_empty())
@@ -1334,7 +1336,7 @@ bool Foreign_key_io::store(THD *thd, FK_list &foreign_keys,
   {
     fk_count++;
     store_size+= fk_size(fk);
-    if (!ids.insert(fk.name, &inserted))
+    if (!ids.insert(fk.uuid, &inserted))
       return true;
     if (!inserted)
     {
@@ -1427,6 +1429,7 @@ bool Foreign_key_io::parse(THD *thd, LEX_CUSTRING& image)
       my_error(ER_OUT_OF_RESOURCES, MYF(0));
       return true;
     }
+    read_uuid(dst->uuid, p);
     if (read_string(dst->name, &s->mem_root, p))
       return true;
     dst->foreign_db= s->db;
@@ -1588,13 +1591,13 @@ bool Foreign_key_io::parse(THD *thd, LEX_CUSTRING& image)
 
 bool TABLE_SHARE::fk_resolve_referenced_keys(THD *thd, TABLE_SHARE *from)
 {
-  Lex_ident_set ids;
+  UUID_set ids;
   bool inserted;
 
   for (FK_info &rk: referenced_keys)
   {
     DBUG_ASSERT(rk.name.length);
-    if (!ids.insert(rk.name, &inserted))
+    if (!ids.insert(rk.uuid, &inserted))
       return true;
 
     DBUG_ASSERT(inserted);
@@ -1606,13 +1609,13 @@ bool TABLE_SHARE::fk_resolve_referenced_keys(THD *thd, TABLE_SHARE *from)
       continue;
 
     DBUG_ASSERT(fk.name.length);
-    if (!ids.insert(fk.name, &inserted))
+    if (!ids.insert(fk.uuid, &inserted))
       return true;
 
     if (!inserted)
     {
       push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, ER_DUP_CONSTRAINT_NAME,
-                          "Foreign ID already exists `%s`", fk.name.str);
+                          "Foreign UUID already exists for `%s`", fk.name.str);
       continue;
     }
 

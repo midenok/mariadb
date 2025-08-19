@@ -231,7 +231,14 @@ private:
       return true;
     }
     p.pos+= to.length;
+    DBUG_ASSERT(p.pos <= p.end);
     return false;
+  }
+  static void read_uuid(uchar *to, Pos &p)
+  {
+    memcpy(to, p.pos, MY_UUID_SIZE);
+    p.pos+= MY_UUID_SIZE;
+    DBUG_ASSERT(p.pos <= p.end);
   }
 public:
   Foreign_key_io(TABLE_SHARE *share) :
@@ -255,6 +262,11 @@ private:
     if (str.length)
       memcpy(pos, str.str, str.length);
     return pos + str.length;
+  }
+  static uchar *store_uuid(uchar *pos, uchar *uuid)
+  {
+    memcpy(pos, uuid, MY_UUID_SIZE);
+    return pos + MY_UUID_SIZE;
   }
   static ulonglong string_size(Lex_cstring str)
   {

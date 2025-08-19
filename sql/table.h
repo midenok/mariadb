@@ -2110,6 +2110,7 @@ class Table_name;
 class FK_info : public Sql_alloc
 {
 public:
+  uchar uuid[MY_UUID_SIZE];
   Lex_ident_column name;
   // TODO: use Table_name
   Lex_ident_db foreign_db;

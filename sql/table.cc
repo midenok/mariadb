@@ -10496,6 +10496,7 @@ bool FK_info::assign(Foreign_key &src, Table_name table)
   DBUG_ASSERT(src.foreign);
   DBUG_ASSERT(src.type == Key::MULTIPLE);
 
+  my_uuid(uuid);
   name= src.constraint_name.str ? src.constraint_name : src.name;
   foreign_db= table.db;
   foreign_table= table.name;
@@ -10524,6 +10525,7 @@ FK_info * FK_info::clone(MEM_ROOT *mem_root) const
   if (!dst)
     return NULL;
 
+  memcpy(dst->uuid, uuid, MY_UUID_SIZE);
   if (dst->name.strdup(mem_root, name))
     return NULL;
   if (dst->foreign_db.strdup(mem_root, foreign_db))

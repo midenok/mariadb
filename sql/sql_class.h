@@ -567,7 +567,7 @@ struct Table_name_lt
 };
 
 typedef mbd::set<Lex_ident_column, Lex_ident_lt> Lex_ident_set;
-
+typedef mbd::set<uchar *, UUID_lt> UUID_set;
 
 
 class Key_part_spec :public Sql_alloc {

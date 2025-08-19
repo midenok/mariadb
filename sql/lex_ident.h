@@ -706,5 +706,13 @@ struct Lex_ident_lt
   }
 };
 
+struct UUID_lt
+{
+  bool operator() (const uchar *lhs, const uchar *rhs) const
+  {
+    return memcmp(lhs, rhs, MY_UUID_SIZE) < 0;
+  }
+};
+
 
 #endif // LEX_IDENT_INCLUDED
