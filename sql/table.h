@@ -2147,6 +2147,8 @@ private:
     foreign key information
     @param thd thread to allocate the memory
     @param num_fields number of fields
+
+    FIXME: remove
   */
   void assign_nullable(THD *thd, unsigned num_fields) noexcept
   {

@@ -9003,6 +9003,16 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
 {
   /* New column definitions are added here */
   List<Create_field> new_create_list;
+  /*
+    Column definitions in new_create_list that changed nullability
+    and requires check agains foreign keys
+  */
+  List<Create_field> nullable_foreign;
+  /*
+    Column definitions in new_create_list that changed nullability
+    and requires check agains referenced keys
+  */
+  List<Create_field> nullable_referenced;
   /* System-invisible fields must be added last */
   List<Create_field> new_create_tail;
   /* New key definitions are added here */
@@ -9204,6 +9214,30 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
         of the list for now. Their positions will be corrected later.
       */
       new_create_list.push_back(def, root);
+      /*
+        MDEV-34392 Don't allow the foreign key column from NULL to NOT NULL
+        when:
+
+        1. Foreign key constraint type is ON UPDATE SET NULL;
+        2. Foreign key constraint type is ON DELETE SET NULL;
+        3. Foreign key constraint type is UPDATE CASCADE and referenced
+           column declared as NULL.
+
+        Don't allow the referenced key column from NOT NULL to NULL
+        when:
+
+        4. foreign key constraint type is UPDATE CASCADE
+           and referencing key columns doesn't allow NULL values.
+      */
+      if (!table->s->foreign_keys.is_empty() &&
+          !(field->flags & NOT_NULL_FLAG) &&
+          (def->flags & NOT_NULL_FLAG))
+        nullable_foreign.push_back(def, root);
+      if (!table->s->referenced_keys.is_empty() &&
+          (field->flags & NOT_NULL_FLAG) &&
+          !(def->flags & NOT_NULL_FLAG))
+        nullable_referenced.push_back(def, root);
+
       if (field->stored_in_db() != def->stored_in_db())
       {
         my_error(ER_UNSUPPORTED_ACTION_ON_GENERATED_COLUMN, MYF(0));
@@ -9312,7 +9346,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
       def= new (root) Create_field(thd, field, field);
       new_create_tail.push_back(def, root);
     }
-  }
+  } // for (f_ptr=table->field ; (field= *f_ptr) ; f_ptr++)
 
   /*
     If we are doing a rename of a column, update all references in virtual
@@ -9577,6 +9611,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
       }
       continue;
     }
+    /* Create Foreign_key and add it to new_key_list */
     key= new (thd->mem_root) Foreign_key(fk, thd->mem_root);
     if (!key || key->failed())
     {
@@ -9609,6 +9644,35 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
         // Update foreign_table of referenced_keys. FRM write required.
         if (alter_ctx->fk_renamed_table.push_back(fk_table))
           goto err;
+      }
+    }
+    if (fk.self_ref())
+      continue;
+    for (const Column_definition &def: nullable_foreign)
+    {
+      for (const Lex_ident_column &fcol: fk.foreign_fields)
+      {
+        if (0 != def.field_name.cmp(fcol))
+          continue;
+
+        /* Check rule 1. and 2. of MDEV-34392 (see above) */
+        if (fk.update_method == FK_OPTION_SET_NULL ||
+            fk.delete_method == FK_OPTION_SET_NULL)
+        {
+          my_error(ER_FK_COLUMN_NOT_NULL, MYF(0), fcol.str, fk.name.str);
+          goto err;
+        }
+        /* Start checking rule 3. of MDEV-34392, lock the table */
+        if (fk.update_method == FK_OPTION_CASCADE)
+        {
+          Table_name ref_table(fk.ref_table(thd->mem_root));
+          const FK_table_to_lock *x= fk_tables_to_lock.insert(ref_table);
+          if (!x)
+            goto err;
+          if (alter_ctx->fk_rule3_check.push_back(const_cast<FK_info *>(&fk)))
+            goto err;
+        }
+        break;
       }
     }
   } //  for (const FK_info &fk: table->s->foreign_keys)

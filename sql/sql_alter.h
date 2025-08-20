@@ -574,6 +574,7 @@ public:
   mbd::vector<FK_drop_old> fk_dropped;
   mbd::vector<Table_name> fk_renamed_table;
   mbd::vector<Table_name> rk_renamed_table;
+  mbd::vector<FK_info *> fk_rule3_check;
   /** FK list prepared by prepare_create_table() */
   FK_list            foreign_keys;
   /** RK list inherited from old table + self-refs from prepare_create_table() */
