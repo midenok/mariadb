@@ -9565,7 +9565,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
   /*
     Collect all foreign keys which are not in drop list.
   */
-  for (const FK_info &fk: table->s->foreign_keys)
+  for (FK_info &fk: table->s->foreign_keys)
   {
     Foreign_key *key;
     Alter_drop *drop;
@@ -9650,8 +9650,10 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
       continue;
     for (const Column_definition &def: nullable_foreign)
     {
+      List_iterator_fast<Lex_ident_column> rf_it(fk.referenced_fields);
       for (const Lex_ident_column &fcol: fk.foreign_fields)
       {
+        auto &ref_col= *(rf_it++);
         if (0 != def.field_name.cmp(fcol))
           continue;
 
@@ -9669,7 +9671,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
           const FK_table_to_lock *x= fk_tables_to_lock.insert(ref_table);
           if (!x)
             goto err;
-          if (alter_ctx->fk_rule3_check.push_back(const_cast<FK_info *>(&fk)))
+          if (alter_ctx->fk_rule3_check.push_back({ref_table, ref_col, &fk}))
             goto err;
         }
         break;
@@ -10364,11 +10366,9 @@ fk_check_column_changes(THD *thd, const TABLE *table,
     : fk->foreign_fields;
   List_iterator_fast<Lex_ident_column> column_it(fk_columns);
   Lex_ident_column *column;
-  int n_col= 0;
 
   *bad_column_name= NULL;
   enum fk_column_change_type result= FK_COLUMN_NO_CHANGE;
-  bool strict_mode= thd->is_strict_mode();
 
   while ((column= column_it++))
   {
@@ -10400,8 +10400,6 @@ fk_check_column_changes(THD *thd, const TABLE *table,
       new_field->flags&= ~AUTO_INCREMENT_FLAG;
       const bool equal_result= old_field->is_equal(*new_field);
       new_field->flags= flags;
-      const bool old_field_not_null= old_field->flags & NOT_NULL_FLAG;
-      const bool new_field_not_null= new_field->flags & NOT_NULL_FLAG;
 
       if ((equal_result == IS_EQUAL_NO))
       {
@@ -10411,44 +10409,6 @@ fk_check_column_changes(THD *thd, const TABLE *table,
         */
         result= FK_COLUMN_DATA_CHANGE;
         goto func_exit;
-      }
-
-      if (strict_mode && old_field_not_null != new_field_not_null)
-      {
-        if (referenced && !new_field_not_null)
-        {
-          /*
-            Don't allow referenced column to change from
-            NOT NULL to NULL when foreign key relation is
-            ON UPDATE CASCADE and the referencing column
-            is declared as NOT NULL
-          */
-          if (fk->update_method == FK_OPTION_CASCADE &&
-              table->s->field[n_col]->maybe_null() &&
-              !fk->is_nullable(false, n_col))
-          {
-            result= FK_COLUMN_DATA_CHANGE;
-            goto func_exit;
-          }
-        }
-        else if (!referenced && new_field_not_null)
-        {
-          /*
-            Don't allow the foreign column to change
-            from NULL to NOT NULL when foreign key type is
-            1) UPDATE SET NULL
-            2) DELETE SET NULL
-            3) UPDATE CASCADE and referenced column is declared as NULL
-	  */
-          if (fk->update_method == FK_OPTION_SET_NULL ||
-              fk->delete_method == FK_OPTION_SET_NULL ||
-              (fk->update_method == FK_OPTION_CASCADE &&
-               fk->is_nullable(true, n_col)))
-          {
-            result= FK_COLUMN_NOT_NULL;
-            goto func_exit;
-          }
-        }
       }
     }
     else
@@ -10465,7 +10425,6 @@ fk_check_column_changes(THD *thd, const TABLE *table,
       result= FK_COLUMN_DROPPED;
       goto func_exit;
     }
-    n_col++;
   }
   return FK_COLUMN_NO_CHANGE;
 func_exit:
@@ -14826,6 +14785,27 @@ bool Alter_table_ctx::fk_handle_alter(THD *thd)
   if (thd->mdl_context.upgrade_shared_locks(&fk_mdl_reqs, MDL_EXCLUSIVE,
                                             thd->variables.lock_wait_timeout))
     return true;
+
+  /* Check rule 3. (see MDEV-34392 above). No FRM write required. */
+  // TODO: don't upgrade to MDL_EXCLUSIVE if no FRM write is required for all ops on share
+  for (const FK_rule3_check &rule3: fk_rule3_check)
+  {
+    auto i= fk_shares.find(rule3.ref);
+    DBUG_ASSERT(i != fk_shares.end());
+    Share_acquire &ref_table= i->second;
+    DBUG_ASSERT(ref_table.share);
+    TABLE_SHARE *ref_share= ref_table.share;
+    for (Field **fld= ref_share->field; *fld ; fld++)
+    {
+      if (0 != (*fld)->field_name.cmp(rule3.ref_col))
+        continue;
+      if (!((*fld)->flags & NOT_NULL_FLAG))
+      {
+        my_error(ER_FK_COLUMN_NOT_NULL, MYF(0), rule3.ref_col.str, rule3.fk->name.str);
+        return true;
+      }
+    }
+  }
 
   /* Update foreign_fields of referenced tables. No FRM write required. */
   for (const FK_rename_col &ren_col: fk_renamed_cols)

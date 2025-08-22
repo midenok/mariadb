@@ -536,8 +536,8 @@ public:
   {
     Table_name table;
     Table_name altered_table;
-    Lex_cstring col_name;
-    Lex_cstring new_name;
+    Lex_ident_column col_name;
+    Lex_ident_column new_name;
     // NB: "operator<" is required for std::set
     bool operator< (const FK_rename_col &rhs) const
     {
@@ -563,6 +563,12 @@ public:
     Table_name ref;
     const FK_info *fk;
   };
+  struct FK_rule3_check
+  {
+    Table_name ref;
+    Lex_ident_column ref_col;
+    const FK_info *fk;
+  };
   mbd::vector<FK_add_new> fk_added; /* can contain self-refs */
   /*
     These five contain only non-self-refs. They are used to update info in
@@ -574,7 +580,7 @@ public:
   mbd::vector<FK_drop_old> fk_dropped;
   mbd::vector<Table_name> fk_renamed_table;
   mbd::vector<Table_name> rk_renamed_table;
-  mbd::vector<FK_info *> fk_rule3_check;
+  mbd::vector<FK_rule3_check> fk_rule3_check;
   /** FK list prepared by prepare_create_table() */
   FK_list            foreign_keys;
   /** RK list inherited from old table + self-refs from prepare_create_table() */
