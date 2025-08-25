@@ -481,10 +481,10 @@ info: Records: 0  Duplicates: 0  Warnings: 0
 set @@sql_mode = 'STRICT_TRANS_TABLES';
 alter table t2 add primary key (alpha), change a alpha int,
 change b beta int not null, change c charlie int not null;
-ERROR HY000: Column 'b' cannot be NOT NULL: needed in a foreign key constraint '1' SET NULL
+ERROR HY000: Column 'beta' cannot be NOT NULL: needed in a foreign key constraint '1' SET NULL
 alter table t2 add primary key (alpha), change a alpha int,
 change c charlie int not null, change d delta int not null;
-ERROR HY000: Column 'd' cannot be NOT NULL: needed in a foreign key constraint '3' SET NULL
+ERROR HY000: Column 'delta' cannot be NOT NULL: needed in a foreign key constraint '3' SET NULL
 alter table t2 add primary key (alpha), change a alpha int,
 change b beta int, modify c int not null;
 affected rows: 0
