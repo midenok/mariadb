@@ -23,6 +23,7 @@
 #include "lex_ident.h"
 #include "mdl.h"                                // MDL_request_list
 #include "handler.h"
+#include "table.h"
 
 #define ERROR_INJECT(code) \
   ((DBUG_IF("crash_" code) && (DBUG_SUICIDE(), 0)) || \

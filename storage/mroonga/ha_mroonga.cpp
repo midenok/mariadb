@@ -16684,7 +16684,7 @@ int ha_mroonga::storage_get_foreign_key_list(THD *thd,
     grn_id ref_table_id = grn_obj_get_range(ctx, column);
     grn_obj *ref_table = grn_ctx_at(ctx, ref_table_id);
     FOREIGN_KEY_INFO f_key_info;
-    thd_make_lex_string(thd, &f_key_info.foreign_id, column_name.c_str(),
+    thd_make_lex_string(thd, &f_key_info.name, column_name.c_str(),
                         column_name.length(), false);
     thd_make_lex_string(thd, &f_key_info.foreign_db, table_share->db.str,
                         table_share->db.length, false);

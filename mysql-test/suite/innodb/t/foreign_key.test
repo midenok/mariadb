@@ -7,6 +7,7 @@ call mtr.add_suppression("Invalid \\(old\\?\\) table or database name '#mysql50#
 --enable_query_log
 
 SET GLOBAL innodb_stats_persistent = 0;
+let $innodb_lock_wait_timeout_save= `select @@innodb_lock_wait_timeout`;
 
 --echo #
 --echo # Bug #19027905 ASSERT RET.SECOND DICT_CREATE_FOREIGN_CONSTRAINTS_LOW
@@ -589,7 +590,8 @@ UPDATE t2 SET f = 11 WHERE id = 1;
 SET innodb_lock_wait_timeout= 0;
 --error ER_LOCK_WAIT_TIMEOUT
 DELETE FROM t1 WHERE id = 1;
-SET innodb_lock_wait_timeout= 1;
+select @innodb_lock_wait_timeout_save;
+eval SET innodb_lock_wait_timeout= $innodb_lock_wait_timeout_save;
 
 --connection con1
 COMMIT;
@@ -1095,6 +1097,7 @@ BEGIN;
 --error ER_NO_REFERENCED_ROW_2
 INSERT INTO child SET a=1;
 connection default;
+SET innodb_lock_wait_timeout= 1;
 --error ER_TRUNCATE_ILLEGAL_FK
 TRUNCATE TABLE parent;
 --error ER_ROW_IS_REFERENCED_2
@@ -1121,7 +1124,7 @@ connection con1;
 COMMIT;
 connection default;
 # Restore the timeout to avoid occasional races with purge.
-SET innodb_lock_wait_timeout=DEFAULT;
+eval SET innodb_lock_wait_timeout= $innodb_lock_wait_timeout_save;
 TRUNCATE TABLE parent;
 ALTER TABLE parent FORCE, ALGORITHM=COPY;
 ALTER TABLE parent FORCE, ALGORITHM=INPLACE;
