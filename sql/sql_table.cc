@@ -10228,9 +10228,10 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
 
   if (alter_info->drop_list.elements)
   {
+    DBUG_ASSERT(alter_info->drop_list.head()->name.length);
     my_error(ER_CANT_DROP_FIELD_OR_KEY, MYF(0),
              alter_info->drop_list.head()->type_name(),
-             alter_info->drop_list.head()->name);
+             alter_info->drop_list.head()->name.str);
     goto err;
   }
 
