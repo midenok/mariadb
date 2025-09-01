@@ -207,7 +207,7 @@ bool mysql_rename_tables(THD *thd, TABLE_LIST *table_list, bool silent,
   {
     for (FK_rename_backup &bak: fk_rename_backup)
     {
-      error= fk_install_shadow_frm(bak.old_name, bak.new_name);
+      error= fk_install_shadow_frm(thd, bak.old_name, bak.new_name);
       if (error)
         break;
     }
@@ -223,7 +223,7 @@ bool mysql_rename_tables(THD *thd, TABLE_LIST *table_list, bool silent,
     /* Revert the renames of normal tables with the help of the ddl log */
     ddl_log_revert(thd, &ddl_log_state);
     for (FK_rename_backup &bak: fk_rename_backup)
-      bak.rollback();
+      bak.rollback(thd);
   }
 
 err:

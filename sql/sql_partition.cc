@@ -6652,17 +6652,6 @@ static bool write_log_convert_partition(ALTER_PARTITION_PARAM_TYPE *lpt,
 }
 
 
-static inline
-uint build_table_shadow_filename(char *buff, size_t bufflen,
-                                 ALTER_PARTITION_PARAM_TYPE *lpt,
-                                 bool backup= false)
-{
-  // FIXME: test table_list is initialized
-  return build_table_shadow_filename(lpt->thd, buff, bufflen, lpt->table_list->db.str,
-                                     lpt->table_list->table_name.str, backup);
-}
-
-
 /*
   Write the log entry to ensure that the shadow frm file is removed at
   crash.

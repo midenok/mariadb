@@ -761,8 +761,8 @@ struct TABLE_SHARE
     return !referenced_keys.is_empty();
   }
   int fk_write_shadow_frm(THD *thd);
-  bool fk_install_shadow_frm();
-  void fk_drop_shadow_frm();
+  bool fk_install_shadow_frm(THD *thd);
+  void fk_drop_shadow_frm(THD *thd);
   bool fk_resolve_referenced_keys(THD *thd, TABLE_SHARE *from);
 
   Virtual_column_info **check_constraints;
@@ -2574,6 +2574,14 @@ struct TABLE_LIST
     MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, db.str, table_name.str,
                      mdl_type, MDL_TRANSACTION);
   }
+
+#ifndef DBUG_OFF
+  bool inited()
+  {
+    return db.length && db.str && table_name.length && table_name.str &&
+           mdl_request.type != MDL_NOT_INITIALIZED;
+  }
+#endif
 
   TABLE_LIST(const LEX_CSTRING *db_arg,
              const LEX_CSTRING *table_name_arg,

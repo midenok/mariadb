@@ -600,8 +600,8 @@ public:
   mbd::map<TABLE_SHARE *, FK_ref_backup> fk_ref_backup;
   // NB: backup is added only if not exists
   FK_ref_backup* fk_add_backup(TABLE_SHARE *share);
-  void fk_rollback();
-  bool fk_install_frms();
+  void fk_rollback(THD *thd);
+  bool fk_install_frms(THD *thd);
 
 private:
   char new_filename[FN_REFLEN + 1];
