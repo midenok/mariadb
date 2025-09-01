@@ -433,6 +433,11 @@ public:
       || thd->lex->default_used;
   }
 
+  /*
+    FIXME: extend_table_list() is done after open_table and MDL acquire.
+    Look how it relocks the whole list after extend_table_list() and whether
+    it does proper sorting for originally opened table.
+  */
   bool extend_table_list(THD *thd, TABLE_LIST *tables);
 };
 
@@ -498,6 +503,11 @@ public:
                     TABLE_LIST *table_list, bool *need_prelocking) override;
   bool handle_view(THD *thd, Query_tables_list *prelocking_ctx,
                    TABLE_LIST *table_list, bool *need_prelocking) override;
+  virtual bool maybe_need_prelocking(THD *thd, TABLE_LIST *tables) override
+  {
+    TABLE_SHARE *s= tables->table->s;
+    return tables->updating && (s->foreign_keys.elements || s->referenced_keys.elements);
+  }
 };
 
 
