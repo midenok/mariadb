@@ -460,15 +460,14 @@ frm_err:
   return 0;
 }
 
-bool fk_install_shadow_frm(Table_name old_name, Table_name new_name)
+bool fk_install_shadow_frm(THD *thd, Table_name old_name, Table_name new_name)
 {
   char shadow_path[FN_REFLEN + 1];
   char path[FN_REFLEN];
   char shadow_frm_name[FN_REFLEN + 1];
   char frm_name[FN_REFLEN + 1];
   MY_STAT stat_info;
-  // FIXME: current_thd -> thd
-  build_table_shadow_filename(current_thd, shadow_path, sizeof(shadow_path) - 1,
+  build_table_shadow_filename(thd, shadow_path, sizeof(shadow_path) - 1,
                               old_name.db.str, old_name.name.str);
   build_table_filename(path, sizeof(path), new_name.db.str,
                        new_name.name.str, "", 0);
@@ -483,23 +482,22 @@ bool fk_install_shadow_frm(Table_name old_name, Table_name new_name)
   return false;
 }
 
-bool TABLE_SHARE::fk_install_shadow_frm()
+bool TABLE_SHARE::fk_install_shadow_frm(THD *thd)
 {
-  return ::fk_install_shadow_frm({db, table_name}, {db, table_name});
+  return ::fk_install_shadow_frm(thd, {db, table_name}, {db, table_name});
 }
 
-void fk_drop_shadow_frm(Table_name table)
+void fk_drop_shadow_frm(THD *thd, Table_name table)
 {
   char shadow_path[FN_REFLEN+1];
   char shadow_frm_name[FN_REFLEN+1];
-  // FIXME: current_thd -> thd
-  build_table_shadow_filename(current_thd, shadow_path, sizeof(shadow_path) - 1,
+  build_table_shadow_filename(thd, shadow_path, sizeof(shadow_path) - 1,
                               table.db.str, table.name.str);
   strxnmov(shadow_frm_name, sizeof(shadow_frm_name), shadow_path, reg_ext, NullS);
   mysql_file_delete(key_file_frm, shadow_frm_name, MYF(0));
 }
 
-void TABLE_SHARE::fk_drop_shadow_frm()
+void TABLE_SHARE::fk_drop_shadow_frm(THD *thd)
 {
-  ::fk_drop_shadow_frm({db, table_name});
+  ::fk_drop_shadow_frm(thd, {db, table_name});
 }

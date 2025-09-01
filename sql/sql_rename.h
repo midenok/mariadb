@@ -39,7 +39,7 @@ public:
     referenced_keys(src.referenced_keys)
   {}
 
-  void rollback();
+  void rollback(THD *thd);
 };
 
 class FK_rename_backup : public FK_ddl_backup
@@ -50,7 +50,7 @@ public:
     old_name(_old_name), new_name(_new_name) {}
   Table_name old_name;
   Table_name new_name;
-  void rollback();
+  void rollback(THD *thd);
 };
 
 class FK_create_vector: public mbd::vector<FK_ddl_backup> {};

@@ -743,12 +743,11 @@ uint build_table_shadow_filename(THD *thd, char *buff, size_t bufflen,
 }
 
 
-inline
 uint build_table_shadow_filename(char *buff, size_t bufflen,
                                  ALTER_PARTITION_PARAM_TYPE *lpt,
-                                 bool backup= false)
+                                 bool backup)
 {
-  // FIXME: test table_list is initialized
+  DBUG_ASSERT(lpt->table_list->inited());
   return build_table_shadow_filename(lpt->thd, buff, bufflen, lpt->table_list->db.str,
                                      lpt->table_list->table_name.str, backup);
 }
@@ -1720,7 +1719,7 @@ int mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables,
           error= -1;
           for (FK_ddl_backup &bak: shares)
             if (bak.sa.share)
-              bak.rollback();
+              bak.rollback(thd);
           goto err;
 	}
         close_all_tables_for_name(thd, table->table->s,
@@ -1780,7 +1779,7 @@ fk_error:
           error= -1;
           for (FK_ddl_backup &bak: shares)
             if (bak.sa.share)
-              bak.rollback();
+              bak.rollback(thd);
           goto err;
         }
       }
@@ -1830,14 +1829,14 @@ fk_error:
         for (FK_ddl_backup &bak: shares)
         {
           if (bak.sa.share)
-            bak.sa.share->fk_install_shadow_frm();
+            bak.sa.share->fk_install_shadow_frm(thd);
         }
       }
       else
       {
         for (FK_ddl_backup &bak: shares)
           if (bak.sa.share)
-            bak.rollback();
+            bak.rollback(thd);
       }
     }
 
@@ -3044,26 +3043,11 @@ my_bool init_key_part_spec(THD *thd, Alter_info *alter_info,
       DBUG_RETURN(TRUE);
     break;
 
-#if 0
-  FIXME:
-  case Key::FOREIGN_KEY:
-    if (type_handler->Key_part_spec_init_foreign(&kp, *column, file))
-      DBUG_RETURN(TRUE);
-    break;
-#endif
-
   case Key::UNIQUE:
     if (type_handler->Key_part_spec_init_unique(&kp, *column, file,
                                                 is_hash_field_needed))
       DBUG_RETURN(TRUE);
     break;
-
-#if 0
-  FIXME:
-  case Key::IGNORE_KEY:
-    DBUG_ASSERT(0);
-    break;
-#endif
   }
 
   uint key_part_length= type_handler->calc_key_length(*column);
@@ -4003,21 +3987,11 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
 
       case Key::UNIQUE:
       case Key::MULTIPLE:
-#if 0
-      FIXME:
-      case Key::FOREIGN_KEY:
-#endif
         if (key_add_part_check_null(file, key_info, sql_field, column))
           DBUG_RETURN(TRUE);
         if (sql_field->check_vcol_for_key(thd))
           DBUG_RETURN(TRUE);
         break;
-
-#if 0
-      FIXME:
-      case Key::IGNORE_KEY:
-        break;
-#endif
 
       case Key::SPATIAL:
         if (!(sql_field->flags & NOT_NULL_FLAG))
@@ -8803,7 +8777,7 @@ static bool mysql_inplace_alter_table(THD *thd,
                             NULL);
   table_list->table= table= NULL;
 
-  if (alter_ctx->fk_install_frms())
+  if (alter_ctx->fk_install_frms(thd))
     DBUG_RETURN(true);
 
   /*
@@ -8873,7 +8847,7 @@ rollback_restore_lock:
   backup_reset_alter_copy_lock(thd);
 
 rollback_no_restore_lock:
-  alter_ctx->fk_rollback();
+  alter_ctx->fk_rollback(thd);
   table->file->ha_commit_inplace_alter_table(altered_table,
                                              ha_alter_info,
                                              false);
@@ -10840,7 +10814,7 @@ simple_rename_or_index_change(THD *thd, TABLE_LIST *table_list,
                                          &alter_ctx->new_name);
       for (FK_rename_backup &bak: fk_rename_backup)
       {
-        error= fk_install_shadow_frm(bak.old_name, bak.new_name);
+        error= fk_install_shadow_frm(thd, bak.old_name, bak.new_name);
         if (error)
           break;
       }
@@ -10848,7 +10822,7 @@ simple_rename_or_index_change(THD *thd, TABLE_LIST *table_list,
     else
     {
       for (FK_rename_backup &bak: fk_rename_backup)
-        bak.rollback();
+        bak.rollback(thd);
     }
     debug_crash_here("ddl_log_alter_after_rename_triggers");
   }
@@ -12729,7 +12703,7 @@ alter_copy:
 
   debug_crash_here("ddl_log_alter_after_rename_to_backup_log");
 
-  if (alter_ctx.fk_install_frms())
+  if (alter_ctx.fk_install_frms(thd))
     goto err_with_mdl;
 
   // Rename the new table to the correct name.
@@ -12967,7 +12941,7 @@ err_cleanup:
 err_with_mdl:
   ddl_log_complete(&ddl_log_state);
   thd->variables.option_bits= option_bits_save;
-  alter_ctx.fk_rollback();
+  alter_ctx.fk_rollback(thd);
 
   /*
     An error happened while we were holding exclusive name metadata lock
@@ -15029,13 +15003,13 @@ FK_ref_backup* Alter_table_ctx::fk_add_backup(TABLE_SHARE *share)
 }
 
 
-void Alter_table_ctx::fk_rollback()
+void Alter_table_ctx::fk_rollback(THD *thd)
 {
   for (auto &key_val: fk_ref_backup)
   {
     FK_ref_backup *ref_bak= const_cast<FK_ref_backup *>(&key_val.second);
     if (ref_bak->install_shadow)
-      ref_bak->share->fk_drop_shadow_frm();
+      ref_bak->share->fk_drop_shadow_frm(thd);
     ref_bak->rollback();
   }
 }
@@ -15056,13 +15030,13 @@ void Alter_table_ctx::fk_release_locks(THD* thd)
 }
 
 
-bool Alter_table_ctx::fk_install_frms()
+bool Alter_table_ctx::fk_install_frms(THD *thd)
 {
   for (auto &key_val: fk_ref_backup)
   {
     FK_ref_backup *ref_bak= const_cast<FK_ref_backup *>(&key_val.second);
     DBUG_ASSERT(ref_bak->share);
-    if (ref_bak->install_shadow && ref_bak->share->fk_install_shadow_frm())
+    if (ref_bak->install_shadow && ref_bak->share->fk_install_shadow_frm(thd))
       return true;
   }
   return false;
@@ -15396,22 +15370,22 @@ FK_ddl_backup::FK_ddl_backup(Share_acquire&& _sa) :
 
 
 void
-FK_ddl_backup::rollback()
+FK_ddl_backup::rollback(THD *thd)
 {
   DBUG_ASSERT(sa.share);
   sa.share->foreign_keys= foreign_keys;
   sa.share->referenced_keys= referenced_keys;
-  sa.share->fk_drop_shadow_frm();
+  sa.share->fk_drop_shadow_frm(thd);
 }
 
 
 void
-FK_rename_backup::rollback()
+FK_rename_backup::rollback(THD *thd)
 {
   if (sa.share)
-    FK_ddl_backup::rollback();
+    FK_ddl_backup::rollback(thd);
   else
-    fk_drop_shadow_frm(old_name);
+    fk_drop_shadow_frm(thd, old_name);
 }
 
 
