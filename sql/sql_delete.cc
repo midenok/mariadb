@@ -317,6 +317,10 @@ int TABLE::delete_row(bool treat_versioned)
                    || versioned(VERS_TRX_ID)
                    || !vers_end_field()->is_max(
                            vers_end_field()->ptr_in_record(del_buf));
+
+  if ((err= file->extra(HA_EXTRA_REMEMBER_POS)))
+    return err;
+
   if (!delete_row)
   {
     if (replace)
@@ -357,6 +361,8 @@ int TABLE::delete_row(bool treat_versioned)
 
   if (delete_row)
     err= file->ha_delete_row(del_buf);
+
+  (void) file->extra(HA_EXTRA_RESTORE_POS);
 
   return err;
 }

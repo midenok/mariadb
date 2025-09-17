@@ -76,7 +76,9 @@ replace into t1 values (1),(2);
 replace into t1 values (1),(2);
 
 --connection con1
+--error ER_DUP_ENTRY
 replace into t1 values (1),(2);
+drop table t1;
 
 --echo #
 --echo # MDEV-14794 Limitations which the row end as a part of PK imposes due to
