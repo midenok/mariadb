@@ -380,10 +380,7 @@ select * from t1 intersect select * from t2;
 select * from t1 intersect all select * from t2;
 --echo # Default: first INTERSECT ALL, then UNION
 --echo # Oracle: first UNION, then INTERSECT ALL
-# VIEW is stored and executed normal mode (see Sql_mode_save_for_frm_handling)
---disable_view_protocol
 select * from t1 union values (1, 2) intersect all select * from t2;
---enable_view_protocol
 select * from t1 union (values (1, 2) intersect all select * from t2);
 (select * from t1 union values (1, 2)) intersect all select * from t2;
 select * from t1 intersect all select * from t2 union values (1, 2);
