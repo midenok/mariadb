@@ -10365,6 +10365,16 @@ SELECT_LEX_UNIT *LEX::parsed_select_expr_start(SELECT_LEX *s1, SELECT_LEX *s2,
   sel2->first_nested= sel1->first_nested= sel1;
   const bool oracle= (thd->variables.sql_mode & WAS_MODE_ORACLE);
   if (oracle &&
+      /*
+         Recursive CTE must have anchor defined as non-recursive set attached
+         via UNION, such anchor would be lost in wrapping. But in recursive CTE
+         all set operations either distinct or non-distinct
+         (see ER_NOT_SUPPORTED_YET limitation in st_select_lex_unit::prepare()),
+         so explicit prioritization via wrapping is not required.
+
+         Test: compat/oracle.func_concat
+      */
+      !(curr_with_clause && curr_with_clause->with_recursive) &&
       !(sel1= create_priority_nest(sel1, NULL)))
   {
       return NULL;

@@ -1928,6 +1928,8 @@ void st_select_lex_unit::optimize_bag_operation(bool is_outer_distinct)
       CREATE VIEW
       PREPARE ... FROM
       recursive
+
+      FIXME: now this can work with oracle mode
   */
   if ((thd->variables.sql_mode & WAS_MODE_ORACLE) ||
     (thd->lex->context_analysis_only & CONTEXT_ANALYSIS_ONLY_VIEW) ||
