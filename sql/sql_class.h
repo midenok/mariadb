@@ -7848,7 +7848,7 @@ class Sql_mode_save
 class Sql_mode_save_for_frm_handling: public Sql_mode_save
 {
 public:
-  Sql_mode_save_for_frm_handling(THD *thd)
+  Sql_mode_save_for_frm_handling(THD *thd, sql_mode_t more_exclude= 0)
    :Sql_mode_save(thd)
   {
     /*
@@ -7861,7 +7861,6 @@ public:
       * MODE_NO_UNSIGNED_SUBTRACTION  affect execution
       - MODE_NO_DIR_IN_CREATE         affect table creation only
       - MODE_POSTGRESQL               compounded from other modes
-      + MODE_ORACLE                   affects Item creation (e.g for CONCAT)
       - MODE_MSSQL                    compounded from other modes
       - MODE_DB2                      compounded from other modes
       - MODE_MAXDB                    affect only CREATE TABLE parsing
@@ -7878,7 +7877,7 @@ public:
     */
     thd->variables.sql_mode&= ~(MODE_PIPES_AS_CONCAT | MODE_ANSI_QUOTES |
                                 MODE_IGNORE_SPACE | MODE_NO_BACKSLASH_ESCAPES |
-                                MODE_ORACLE | MODE_EMPTY_STRING_IS_NULL);
+                                MODE_EMPTY_STRING_IS_NULL | more_exclude);
   };
 };
 
