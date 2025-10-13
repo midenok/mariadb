@@ -10366,6 +10366,11 @@ SELECT_LEX_UNIT *LEX::parsed_select_expr_start(SELECT_LEX *s1, SELECT_LEX *s2,
     return NULL;
 //   const char *x= dbug_print_select(sel1);
   res->pre_last_parse= sel1;
+  if (oracle)
+  {
+    push_select(sel1);
+    return res;
+  }
   if (oracle && res->add_fake_select_lex(thd))
     return NULL;
 
