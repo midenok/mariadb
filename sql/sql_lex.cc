@@ -6430,47 +6430,32 @@ Name_resolution_context *LEX::pop_context()
 }
 
 
-SELECT_LEX *LEX::create_priority_nest(SELECT_LEX *first_in_nest)
+SELECT_LEX *LEX::create_priority_nest(SELECT_LEX *first_in_nest, SELECT_LEX *attach_to)
 {
   DBUG_ENTER("LEX::create_priority_nest");
   DBUG_ASSERT(first_in_nest->first_nested);
   enum sub_select_type wr_unit_type= first_in_nest->get_linkage();
   bool wr_distinct= first_in_nest->distinct;
-  SELECT_LEX *attach_to= first_in_nest->first_nested;
-  attach_to->cut_next();
+  if (attach_to)
+    attach_to->cut_next();
   SELECT_LEX *wrapper= wrap_select_chain_into_derived(first_in_nest);
   if (wrapper)
   {
     first_in_nest->first_nested= NULL;
     wrapper->set_linkage_and_distinct(wr_unit_type, wr_distinct);
-    wrapper->first_nested= attach_to->first_nested;
-    wrapper->set_master_unit(attach_to->master_unit());
-    attach_to->link_neighbour(wrapper);
+    if (attach_to)
+    {
+      wrapper->first_nested= attach_to->first_nested;
+      wrapper->set_master_unit(attach_to->master_unit());
+      attach_to->link_neighbour(wrapper);
+    }
+    else
+    {
+      wrapper->first_nested= wrapper;
+    }
   }
   DBUG_RETURN(wrapper);
 }
-
-
-SELECT_LEX *LEX::create_priority_nest2(SELECT_LEX *first_in_nest)
-{
-  DBUG_ENTER("LEX::create_priority_nest");
-  DBUG_ASSERT(first_in_nest->first_nested);
-  enum sub_select_type wr_unit_type= first_in_nest->get_linkage();
-  bool wr_distinct= first_in_nest->distinct;
-  SELECT_LEX *attach_to= first_in_nest;
-//   attach_to->cut_next();
-  SELECT_LEX *wrapper= wrap_select_chain_into_derived(first_in_nest);
-  if (wrapper)
-  {
-    first_in_nest->first_nested= NULL;
-    wrapper->set_linkage_and_distinct(wr_unit_type, wr_distinct);
-    wrapper->first_nested= wrapper;
-//     wrapper->set_master_unit(attach_to->master_unit());
-//     attach_to->link_neighbour(wrapper);
-  }
-  DBUG_RETURN(wrapper);
-}
-
 
 
 /**
@@ -10352,8 +10337,6 @@ Item *LEX::create_item_query_expression(THD *thd,
     Item_singlerow_subselect(thd, unit->first_select());
 }
 
-const char *dbug_print_select(SELECT_LEX *sl);
-
 SELECT_LEX_UNIT *LEX::parsed_select_expr_start(SELECT_LEX *s1, SELECT_LEX *s2,
                                                enum sub_select_type unit_type,
                                                bool distinct)
@@ -10381,25 +10364,19 @@ SELECT_LEX_UNIT *LEX::parsed_select_expr_start(SELECT_LEX *s1, SELECT_LEX *s2,
   sel2->set_linkage_and_distinct(unit_type, distinct);
   sel2->first_nested= sel1->first_nested= sel1;
   const bool oracle= thd->variables.sql_mode & MODE_ORACLE;
-  if (oracle)
+  if (oracle &&
+      !(sel1= create_priority_nest(sel1, NULL)))
   {
-    if ((sel1= create_priority_nest2(sel1)) == NULL)
       return NULL;
   }
   res= create_unit(sel1);
   if (res == NULL)
     return NULL;
-//   const char *x= dbug_print_select(sel1);
   res->pre_last_parse= sel1;
   if (oracle)
-  {
     push_select(sel1);
-    return res;
-  }
-  if (oracle && res->add_fake_select_lex(thd))
-    return NULL;
-
-  push_select(res->fake_select_lex);
+  else
+    push_select(res->fake_select_lex);
   return res;
 }
 
@@ -10429,13 +10406,8 @@ SELECT_LEX_UNIT *LEX::parsed_select_expr_cont(SELECT_LEX_UNIT *unit,
     if (first_in_nest->first_nested != first_in_nest)
     {
       /* There is a priority jump starting from first_in_nest */
-      if ((last= create_priority_nest(first_in_nest)) == NULL)
-        return NULL;
-      unit->fix_distinct();
-    }
-    else if (oracle)
-    {
-      if ((last= create_priority_nest2(first_in_nest)) == NULL)
+      if ((last= create_priority_nest(first_in_nest,
+                                      first_in_nest->first_nested)) == NULL)
         return NULL;
       unit->fix_distinct();
     }
@@ -10527,27 +10499,15 @@ LEX::add_primary_to_query_expression_body_ext_parens(
 
 bool LEX::parsed_multi_operand_query_expression_body(SELECT_LEX_UNIT *unit)
 {
-//   const bool oracle= thd->variables.sql_mode & MODE_ORACLE;
   SELECT_LEX *first_in_nest=
     unit->pre_last_parse->next_select()->first_nested;
   if (first_in_nest->first_nested != first_in_nest)
   {
     /* There is a priority jump starting from first_in_nest */
-    if (create_priority_nest(first_in_nest) == NULL)
+    if (create_priority_nest(first_in_nest, first_in_nest->first_nested) == NULL)
       return true;
     unit->fix_distinct();
   }
-#if 0
-  else if (oracle)
-  {
-    for (SELECT_LEX *sl= first_in_nest->next_select(); sl; sl= sl->next_select())
-    {
-      if (create_priority_nest2(first_in_nest) == NULL)
-        return true;
-    }
-    unit->fix_distinct();
-  }
-#endif
   return false;
 }
 

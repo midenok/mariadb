@@ -4765,7 +4765,7 @@ public:
   }
   bool main_select_push(bool service= false);
   bool insert_select_hack(SELECT_LEX *sel);
-  SELECT_LEX *create_priority_nest(SELECT_LEX *first_in_nest);
+  SELECT_LEX *create_priority_nest(SELECT_LEX *first_in_nest, SELECT_LEX *attach_to);
   SELECT_LEX *create_priority_nest2(SELECT_LEX *first_in_nest);
 
   bool set_main_unit(st_select_lex_unit *u)
