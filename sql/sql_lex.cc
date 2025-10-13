@@ -10363,7 +10363,7 @@ SELECT_LEX_UNIT *LEX::parsed_select_expr_start(SELECT_LEX *s1, SELECT_LEX *s2,
   sel1->link_neighbour(sel2);
   sel2->set_linkage_and_distinct(unit_type, distinct);
   sel2->first_nested= sel1->first_nested= sel1;
-  const bool oracle= thd->variables.sql_mode & MODE_ORACLE;
+  const bool oracle= (thd->variables.sql_mode & WAS_MODE_ORACLE);
   if (oracle &&
       !(sel1= create_priority_nest(sel1, NULL)))
   {
@@ -10457,7 +10457,7 @@ LEX::add_primary_to_query_expression_body(SELECT_LEX_UNIT *unit,
 {
   return
     add_primary_to_query_expression_body(unit, sel, unit_type, distinct,
-                                         thd->variables.sql_mode & MODE_ORACLE);
+                                         thd->variables.sql_mode & WAS_MODE_ORACLE);
 }
 
 /**

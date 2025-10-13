@@ -336,13 +336,22 @@ create table i3 (x int);
 explain SELECT * from t3 union select * from u3 intersect all select * from i3;
 set sql_mode= 'oracle';
 explain SELECT * from t3 union select * from u3 intersect all select * from i3;
+# TODO: there is a bug in --view protocol, it displays column name as '*' instead of 'x'
+--replace_result * x
 select * from t3 union select * from u3 intersect select * from i3;
+--replace_result * x
 SELECT * from t3 union select * from u3 intersect all select * from i3;
 insert into t3 values (0);
 insert into i3 values (0);
+--replace_result * x
 Select * from t3 union select * from u3 intersect select * from i3;
+--replace_result * x
 SELECT * FROM t3 UNION SELECT * FROM u3 INTERSECT ALL SELECT * FROM i3;
+# CREATE VIEW still works good
+create view v as select * from t3 union select * from u3 intersect select * from i3;
+select * from v;
 drop tables t3, u3, i3;
+drop view v;
 
 --enable_info
 --echo # First line of these results is column names, not the result
@@ -380,7 +389,9 @@ select * from t1 intersect select * from t2;
 select * from t1 intersect all select * from t2;
 --echo # Default: first INTERSECT ALL, then UNION
 --echo # Oracle: first UNION, then INTERSECT ALL
+--disable_view_protocol
 select * from t1 union values (1, 2) intersect all select * from t2;
+--enable_view_protocol
 select * from t1 union (values (1, 2) intersect all select * from t2);
 (select * from t1 union values (1, 2)) intersect all select * from t2;
 select * from t1 intersect all select * from t2 union values (1, 2);

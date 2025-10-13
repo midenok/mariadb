@@ -1030,19 +1030,24 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 NULL	UNION RESULT	<union2,3>	ALL	NULL	NULL	NULL	NULL	NULL	
 5	INTERSECT	NULL	NULL	NULL	NULL	NULL	NULL	NULL	no matching row in const table
 NULL	INTERSECT RESULT	<intersect4,5>	ALL	NULL	NULL	NULL	NULL	NULL	
-select * from t3 union select * from u3 intersect select * from i3;
+select x from t3 union select x from u3 intersect select x from i3;
 x
-SELECT * from t3 union select * from u3 intersect all select * from i3;
+SELECT x from t3 union select x from u3 intersect all select x from i3;
 x
 insert into t3 values (0);
 insert into i3 values (0);
-Select * from t3 union select * from u3 intersect select * from i3;
+Select x from t3 union select x from u3 intersect select x from i3;
 x
 0
-SELECT * FROM t3 UNION SELECT * FROM u3 INTERSECT ALL SELECT * FROM i3;
+SELECT x FROM t3 UNION SELECT x FROM u3 INTERSECT ALL SELECT x FROM i3;
+x
+0
+create view v as select * from t3 union select * from u3 intersect select * from i3;
+select * from v;
 x
 0
 drop tables t3, u3, i3;
+drop view v;
 # First line of these results is column names, not the result
 # (pay attention to "affected rows")
 values (1, 2) union all values (1, 2);
