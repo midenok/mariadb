@@ -302,6 +302,11 @@ public:
   }
 };
 
-typedef Dynamic_array<Item*> Ref_ptr_array;
+class Ref_ptr_array : public Dynamic_array<Item *>
+{
+public:
+  Ref_ptr_array() : Dynamic_array<Item *> ((PSI_memory_key) PSI_INSTRUMENT_ME, 0, 0)
+  {}
+};
 
 #endif /* SQL_ARRAY_INCLUDED */

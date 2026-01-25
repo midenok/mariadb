@@ -1081,7 +1081,6 @@ private:
 };
 
 typedef class st_select_lex_unit SELECT_LEX_UNIT;
-typedef Bounds_checked_array<Item*> Ref_ptr_array;
 
 
 /**
