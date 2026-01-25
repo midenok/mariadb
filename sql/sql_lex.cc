@@ -3678,7 +3678,7 @@ uint st_select_lex::get_cardinality_of_ref_ptrs_slice(uint order_group_num_arg)
           order_group_num * 2 +
           hidden_bit_fields +
           fields_in_window_functions;
-  return n;
+  return 100;
 }
 
 
