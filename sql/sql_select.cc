@@ -1502,6 +1502,38 @@ JOIN::prepare(TABLE_LIST *tables_init, COND *conds_init, uint og_num,
       select_lex != select_lex->master_unit()->global_parameters())
     real_og_num+= select_lex->order_list.elements;
 
+  for (ORDER *order= select_lex->order_list.first; order; order= order->next)
+  {
+    /* FIXME: check order by alias */
+    uint count;
+    Item *order_item= *order->item;
+    Item *item;
+    /* FIXME: unite with find_order_in_list() (fields_list is fields) */
+    if ((*(order->item))->is_order_clause_position())
+    {
+      if (order->counter_used)
+        count= order->counter; // counter was once resolved
+      else
+        count= (uint) order_item->val_int();
+      if (!count || count > fields_list.elements)
+      {
+        my_error(ER_BAD_FIELD_ERROR, MYF(0),
+                order_item->full_name(), thd_where(thd));
+        return TRUE;
+      }
+      List_iterator_fast<Item> it(fields_list);
+      uint i= 0;
+      while ((item= it++))
+      {
+        if (++i == count)
+          break;
+      }
+      DBUG_ASSERT(i <= fields_list.elements);
+      if (item->with_window_func())
+        real_og_num++;
+    }
+  }
+
   DBUG_ASSERT(select_lex->hidden_bit_fields == 0);
   if (setup_wild(thd, tables_list, fields_list, &all_fields, select_lex, false))
     DBUG_RETURN(-1);
