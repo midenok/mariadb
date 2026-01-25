@@ -1399,6 +1399,11 @@ public:
 
  Item *do_get_copy(THD *thd) const override { return 0; }
 
+  bool count_winfunc_fields_processor(void *arg) override
+  {
+    (*(uint *)arg)+= count_arguments();
+    return false;
+  }
 };
 
 #endif /* ITEM_WINDOWFUNC_INCLUDED */

@@ -1504,7 +1504,6 @@ JOIN::prepare(TABLE_LIST *tables_init, COND *conds_init, uint og_num,
 
   for (ORDER *order= select_lex->order_list.first; order; order= order->next)
   {
-    /* FIXME: check order by alias */
     uint count;
     Item *order_item= *order->item;
     Item *item;
@@ -1529,9 +1528,13 @@ JOIN::prepare(TABLE_LIST *tables_init, COND *conds_init, uint og_num,
           break;
       }
       DBUG_ASSERT(i <= fields_list.elements);
-      if (item->with_window_func())
-        real_og_num++;
     }
+    else
+    {
+      item= *(order->item);
+    }
+    /* with_flags not yet aggregated (setup_fields()) */
+    real_og_num+= item->count_winfunc_fields();
   }
 
   DBUG_ASSERT(select_lex->hidden_bit_fields == 0);

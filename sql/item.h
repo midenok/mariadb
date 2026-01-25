@@ -2229,6 +2229,7 @@ public:
     return type_handler()->charset_for_protocol(this);
   };
 
+  /* FIXME: please document walk() return type */
   virtual bool walk(Item_processor processor, bool walk_subquery, void *arg)
   {
     return (this->*processor)(arg);
@@ -2324,6 +2325,20 @@ public:
     return 0;
   }
   virtual bool subselect_table_finder_processor(void *arg) { return 0; };
+  virtual bool count_winfunc_fields_processor(void *arg) { return 0; }
+  uint count_winfunc_fields()
+  {
+    uint count= 0;
+    walk(&Item::count_winfunc_fields_processor, 0, &count);
+    return count;
+  }
+  virtual bool count_arguments_processor(void *arg) { return 0; }
+  uint count_arguments()
+  {
+    uint count= 0;
+    walk(&Item::count_arguments_processor, 0, &count);
+    return count;
+  }
 
   /* 
     TRUE if the expression depends only on the table indicated by tab_map
@@ -3010,9 +3025,14 @@ public:
     return false;
   }
   inline Item **arguments() const { return args; }
-  inline uint argument_count() const { return arg_count; }
+  uint argument_count() const { return arg_count; }
   inline void remove_arguments() { arg_count=0; }
   Sql_mode_dependency value_depends_on_sql_mode_bit_or() const;
+  bool count_arguments_processor(void *arg)
+  {
+    (*(uint *)arg)+= arg_count;
+    return false;
+  }
 };
 
 
