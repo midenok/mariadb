@@ -11064,24 +11064,6 @@ do_continue:;
     }
     if (parse_engine_part_options(thd, table))
       DBUG_RETURN(true);
-
-    // FIXME: TRX_ID versioning
-    if (table->versioned(VERS_TIMESTAMP) && partition_changed &&
-        (alter_info->partition_flags & ALTER_PARTITION_INFO) &&
-        thd->work_part_info->part_type == VERSIONING_PARTITION &&
-        // FIXME: test fast_alter_partition (see test FIXME)
-        !alter_ctx.fast_alter_partition &&
-        // FIXME: change existing partitions?
-        !table->part_info)
-    {
-      my_timespec_t min_ts, max_ts;
-      if (table->vers_get_history_range(thd, min_ts, max_ts))
-        DBUG_RETURN(true);
-      partition_info *part_info= thd->work_part_info;
-      DBUG_ASSERT(part_info->use_default_num_partitions);
-      part_info->use_default_num_partitions= false;
-      part_info->num_parts= 4;
-    } /* if (need to get history range) */
   }
   /*
     If the old table had partitions and we are doing ALTER TABLE ...

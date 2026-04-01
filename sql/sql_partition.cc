@@ -6141,6 +6141,30 @@ the generated partition syntax in a correct manner.
         }
       }
 
+      // FIXME: TRX_ID versioning
+      if (table->versioned(VERS_TIMESTAMP) && partition_changed &&
+          (alter_info->partition_flags & ALTER_PARTITION_INFO) &&
+          part_info->part_type == VERSIONING_PARTITION &&
+          part_info->vers_info->auto_hist &&
+          // FIXME: test fast_alter_partition (see test FIXME)
+          !*fast_alter_table &&
+          // FIXME: change existing partitions?
+          !table->part_info)
+      {
+        my_timespec_t min_ts, max_ts;
+        Vers_part_info *vers_info= part_info->vers_info;
+        const auto &interval= vers_info->interval;
+        if (table->vers_get_history_range(thd, min_ts, max_ts))
+          DBUG_RETURN(true);
+        if (interval.start)
+        {
+
+        }
+        DBUG_ASSERT(part_info->use_default_num_partitions);
+        part_info->use_default_num_partitions= false;
+        part_info->num_parts= 4;
+      } /* if (need to get history range) */
+
       /*
         Set up partition default_engine_type either from the create_info
         or from the previus table
@@ -6166,7 +6190,7 @@ the generated partition syntax in a correct manner.
         DBUG_ASSERT(create_info->db_type);
         create_info->db_type= partition_hton;
       }
-    }
+    } /* if (thd->work_part_info) */
   }
   DBUG_RETURN(FALSE);
 err:
