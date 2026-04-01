@@ -11072,114 +11072,10 @@ do_continue:;
         // FIXME: test fast_alter_partition (see test FIXME)
         !alter_ctx.fast_alter_partition)
     {
-      // Find best key
-      KEY *key= table->key_info, *best_key= NULL;
-      uint best_idx;
-      const field_index_t end_field_idx= table->vers_end_field()->field_index;
-      for (uint idx= 0; idx < table->s->keys; idx++, key++)
-      {
-        DBUG_ASSERT(key->key_part->fieldnr > 0);
-        if (key->key_part->fieldnr - 1 == end_field_idx &&
-            (!best_key || best_key->key_length > key->key_length))
-        {
-          best_key= key;
-          best_idx= idx;
-        }
-      }
-
-      {
-        int error;
-        my_timespec_t min_ts= MY_TIMESPEC_MAX, max_ts= MY_TIMESPEC_MIN, ts;
-#ifndef DBUG_OFF
-        my_timespec_t min_ts2, max_ts2;
-#endif /* DBUG_OFF */
-        Field *end_field= table->vers_end_field();
-        handler *file= table->file;
-        MY_BITMAP *save_read_set=  table->read_set;
-        MY_BITMAP *save_write_set= table->write_set;
-        DBUG_ASSERT(save_read_set != &table->tmp_set);
-        bitmap_clear_all(&table->tmp_set);
-        table->column_bitmaps_set(&table->tmp_set, &table->tmp_set);
-        bitmap_set_bit(table->read_set, end_field->field_index);
-        file->column_bitmaps_signal();
-        DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, table->s->db.str,
-                                                   table->s->table_name.str, MDL_SHARED_READ));
-        if ((error= file->ha_external_lock(thd, F_RDLCK)))
-          goto end;
-
-        if (best_key)
-        {
-          /* Get range from index */
-          if ((error= file->ha_index_init(best_idx, true)))
-            goto end_unlock;
-
-          if (!(error= file->ha_index_first(table->record[0])))
-          {
-            min_ts.sec= end_field->get_timestamp(&min_ts.usec);
-            if (!(error= file->ha_index_last(table->record[0])))
-            {
-              max_ts.sec= end_field->get_timestamp(&max_ts.usec);
-            }
-          }
-
-          file->ha_index_end();
-          if (error)
-            goto end_unlock;
-
-#ifndef DBUG_OFF
-          min_ts2= min_ts;
-          max_ts2= max_ts;
-          if (DBUG_IF("test_mdev-25529"))
-            goto jump_scan;
-#endif /* DBUG_OFF */
-        }
-        else
-        {
-#ifndef DBUG_OFF
-jump_scan:
-#endif /* DBUG_OFF */
-          /* Get range by scan */
-          // FIXME: push warning index for row_end not found, using slow scan
-          if ((error= file->ha_rnd_init(1)))
-            goto end_unlock;
-
-          /* can_continue_handler_scan() is only for heap (record changed protection) */
-          while (!(error= file->can_continue_handler_scan()) &&
-                !(error= file->ha_rnd_next(table->record[0])))
-          {
-            ts.sec= end_field->get_timestamp(&ts.usec);
-            if (ts == MY_TIMESPEC_MAX)
-              continue;
-            if (ts < min_ts)
-              min_ts= ts;
-            if (ts > max_ts)
-              max_ts= ts;
-          }
-
-          file->ha_rnd_end();
-#ifndef DBUG_OFF
-          if (best_key)
-          {
-            DBUG_ASSERT(DBUG_IF("test_mdev-25529"));
-            DBUG_ASSERT(min_ts == min_ts2);
-            DBUG_ASSERT(max_ts == max_ts2);
-          }
-#endif /* DBUG_OFF */
-        }
-
-        if (error == HA_ERR_END_OF_FILE)
-          error= 0;
-
-end_unlock:
-        file->ha_external_unlock(thd);
-
-end:
-        // FIXME: check and print error
-
-        table->column_bitmaps_set(save_read_set, save_write_set);
-        file->column_bitmaps_signal();
-      }
-    }
+      my_timespec_t min_ts, max_ts;
+      if (table->vers_get_history_range(thd, min_ts, max_ts))
+        DBUG_RETURN(true);
+    } /* if (need to get history range) */
   }
   /*
     If the old table had partitions and we are doing ALTER TABLE ...
@@ -13399,5 +13295,119 @@ bool HA_CREATE_INFO::
             convert_cscl.resolved_to_context(ctx)))
       return true;
   }
+  return false;
+}
+
+
+bool TABLE::vers_get_history_range(THD *thd, my_timespec_t &min_ts,
+                                   my_timespec_t &max_ts)
+{
+  DBUG_ASSERT(versioned(VERS_TIMESTAMP));
+  // Find best key
+  KEY *key= key_info, *best_key= NULL;
+  uint best_idx;
+  Field *end_field= vers_end_field();
+  const field_index_t end_field_idx= end_field->field_index;
+  for (uint idx= 0; idx < s->keys; idx++, key++)
+  {
+    DBUG_ASSERT(key->key_part->fieldnr > 0);
+    if (key->key_part->fieldnr - 1 == end_field_idx &&
+        (!best_key || best_key->key_length > key->key_length))
+    {
+      best_key= key;
+      best_idx= idx;
+    }
+  }
+
+  int error;
+  my_timespec_t ts;
+  min_ts= MY_TIMESPEC_MAX;
+  max_ts= MY_TIMESPEC_MIN;
+#ifndef DBUG_OFF
+  my_timespec_t min_ts2, max_ts2;
+#endif /* DBUG_OFF */
+  MY_BITMAP *save_read_set=  read_set;
+  MY_BITMAP *save_write_set= write_set;
+  DBUG_ASSERT(save_read_set != &tmp_set);
+  bitmap_clear_all(&tmp_set);
+  column_bitmaps_set(&tmp_set, &tmp_set);
+  bitmap_set_bit(read_set, end_field->field_index);
+  file->column_bitmaps_signal();
+  DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, s->db.str,
+                                              s->table_name.str, MDL_SHARED_READ));
+  if ((error= file->ha_external_lock(thd, F_RDLCK)))
+    goto end;
+
+  if (best_key)
+  {
+    /* Get range from index */
+    if ((error= file->ha_index_init(best_idx, true)))
+      goto end_unlock;
+
+    if (!(error= file->ha_index_first(record[0])))
+    {
+      min_ts.sec= end_field->get_timestamp(&min_ts.usec);
+      if (!(error= file->ha_index_last(record[0])))
+      {
+        max_ts.sec= end_field->get_timestamp(&max_ts.usec);
+      }
+    }
+
+    file->ha_index_end();
+    if (error)
+      goto end_unlock;
+
+#ifndef DBUG_OFF
+    min_ts2= min_ts;
+    max_ts2= max_ts;
+    if (DBUG_IF("test_mdev-25529"))
+      goto jump_scan;
+#endif /* DBUG_OFF */
+  }
+  else
+  {
+#ifndef DBUG_OFF
+jump_scan:
+#endif /* DBUG_OFF */
+    /* Get range by scan */
+    // FIXME: push warning index for row_end not found, using slow scan
+    if ((error= file->ha_rnd_init(1)))
+      goto end_unlock;
+
+    /* can_continue_handler_scan() is only for heap (record changed protection) */
+    while (!(error= file->can_continue_handler_scan()) &&
+          !(error= file->ha_rnd_next(record[0])))
+    {
+      ts.sec= end_field->get_timestamp(&ts.usec);
+      if (ts == MY_TIMESPEC_MAX)
+        continue;
+      if (ts < min_ts)
+        min_ts= ts;
+      if (ts > max_ts)
+        max_ts= ts;
+    }
+
+    file->ha_rnd_end();
+#ifndef DBUG_OFF
+    if (best_key)
+    {
+      DBUG_ASSERT(DBUG_IF("test_mdev-25529"));
+      DBUG_ASSERT(min_ts == min_ts2);
+      DBUG_ASSERT(max_ts == max_ts2);
+    }
+#endif /* DBUG_OFF */
+  }
+
+  if (error == HA_ERR_END_OF_FILE)
+    error= 0;
+
+end_unlock:
+  file->ha_external_unlock(thd);
+
+end:
+  // FIXME: check and print error
+
+  column_bitmaps_set(save_read_set, save_write_set);
+  file->column_bitmaps_signal();
   return false;
 }
