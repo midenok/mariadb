@@ -6156,9 +6156,9 @@ the generated partition syntax in a correct manner.
         const auto &interval= vers_info->interval;
         if (table->vers_get_history_range(thd, min_ts, max_ts))
           DBUG_RETURN(true);
-        if (interval.start)
+        if (interval.start > min_ts.sec)
         {
-
+          // FIXME: push warning that user-defined STARTS does not fit existing history
         }
         DBUG_ASSERT(part_info->use_default_num_partitions);
         part_info->use_default_num_partitions= false;
