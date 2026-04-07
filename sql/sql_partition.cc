@@ -6149,49 +6149,51 @@ the generated partition syntax in a correct manner.
       {
         if (*fast_alter_table)
         {
+          // FIXME
           *fast_alter_table= false;
-          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                              WARN_VERS_WRONG_STARTS, ER(WARN_VERS_WRONG_STARTS),
-                              str_interval.cstr(), str_min_ts.cstr(), str_interval2.cstr());
-
         }
         my_timespec_t min_ts, max_ts;
         Vers_part_info *vers_info= part_info->vers_info;
         auto &interval= vers_info->interval;
         if (table->vers_get_history_range(thd, min_ts, max_ts))
           DBUG_RETURN(true);
-        if (max_ts.usec)
+        if (max_ts.sec > 0) /* there is history in the table */
         {
-          max_ts.sec++;
-          max_ts.usec= 0;
-        }
-        DBUG_ASSERT(min_ts.sec <= max_ts.sec);
-        if (vers_info->starts_clause)
-        {
-          if (interval.start > min_ts.sec)
+          if (max_ts.usec)
           {
-            TimestampString str_interval(thd, interval.start);
-            part_info->vers_set_starts(thd, min_ts.sec);
-            TimestampString str_min_ts(thd, min_ts);
-            TimestampString str_interval2(thd, interval.start);
-            push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                                WARN_VERS_WRONG_STARTS, ER(WARN_VERS_WRONG_STARTS),
-                                str_interval.cstr(), str_min_ts.cstr(), str_interval2.cstr());
-
+            max_ts.sec++;
+            max_ts.usec= 0;
           }
-        }
+          DBUG_ASSERT(min_ts.sec <= max_ts.sec);
+          if (vers_info->starts_clause)
+          {
+            if (interval.start > min_ts.sec)
+            {
+              TimestampString str_interval(thd, interval.start);
+              part_info->vers_set_starts(thd, min_ts.sec);
+              TimestampString str_min_ts(thd, min_ts);
+              TimestampString str_interval2(thd, interval.start);
+              push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                                  WARN_VERS_WRONG_STARTS, ER(WARN_VERS_WRONG_STARTS),
+                                  str_interval.cstr(), str_min_ts.cstr(), str_interval2.cstr());
+
+            }
+          }
+          else
+            interval.start= min_ts.sec;
+          part_info->use_default_num_partitions= false;
+          // FIXME: test corner cases when min_ts == max_ts
+          const my_time_t range= max_ts.sec - interval.start;
+          DBUG_ASSERT(range >= 0);
+          const longlong i_sec= interval2sec(&interval.step);
+          DBUG_ASSERT(i_sec > 0);
+          uint hist_parts= range / i_sec;
+          if (hist_parts * i_sec != range)
+            hist_parts++;
+          part_info->num_parts= hist_parts + 1;
+        } /* if (max_ts.sec > 0) */
         else
-          interval.start= min_ts.sec;
-        part_info->use_default_num_partitions= false;
-        // FIXME: test corner cases when min_ts == max_ts
-        const my_time_t range= max_ts.sec - interval.start;
-        DBUG_ASSERT(range >= 0);
-        const longlong i_sec= interval2sec(&interval.step);
-        DBUG_ASSERT(i_sec > 0);
-        uint hist_parts= range / i_sec;
-        if (hist_parts * i_sec != range)
-          hist_parts++;
-        part_info->num_parts= hist_parts + 1;
+          DBUG_ASSERT(max_ts == MY_TIMESPEC_MIN); /* no history in table */
       } /* if (need to get history range) */
 
       /*
