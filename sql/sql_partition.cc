@@ -6162,19 +6162,20 @@ the generated partition syntax in a correct manner.
           max_ts.usec= 0;
         }
         DBUG_ASSERT(min_ts.sec <= max_ts.sec);
-        if (interval.start > min_ts.sec)
+        if (vers_info->starts_clause)
         {
-          TimestampString str_min_ts(thd, min_ts);
-          TimestampString str_interval(thd, interval.start);
-          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                              WARN_VERS_WRONG_STARTS, ER(WARN_VERS_WRONG_STARTS),
-                              str_min_ts.cstr(), str_interval.cstr());
-          interval.start= min_ts.sec;
+          if (interval.start > min_ts.sec)
+          {
+            TimestampString str_min_ts(thd, min_ts);
+            TimestampString str_interval(thd, interval.start);
+            push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                                WARN_VERS_WRONG_STARTS, ER(WARN_VERS_WRONG_STARTS),
+                                str_interval.cstr(), str_min_ts.cstr());
+            interval.start= min_ts.sec;
+          }
         }
-        else if (!interval.start)
-        {
+        else
           interval.start= min_ts.sec;
-        }
         DBUG_ASSERT(part_info->use_default_num_partitions);
         part_info->use_default_num_partitions= false;
         // FIXME: test corner cases when min_ts == max_ts
