@@ -6164,7 +6164,13 @@ the generated partition syntax in a correct manner.
         DBUG_ASSERT(min_ts.sec <= max_ts.sec);
         if (interval.start > min_ts.sec)
         {
-          Temporal_hybrid th_start(thd, interval.start);
+          String str_min_ts, str_interval;
+          const char * cstr_min_ts, *cstr_interval;
+          if (thd->timestamp_to_string(&str_min_ts, 0, min_ts))
+            cstr_min_ts= "ERROR";
+          else
+            cstr_min_ts= str_min_ts.c_ptr_safe();
+          thd->timestamp_to_string(&str_interval, 0, interval.start);
           // FIXME: push dates;
           push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
               WARN_VERS_WRONG_STARTS,
