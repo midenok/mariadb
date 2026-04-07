@@ -62,6 +62,7 @@
 #include "rpl_mi.h"
 #include "rpl_rli.h"
 #include "log.h"
+#include "key.h"
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
@@ -2394,7 +2395,7 @@ void promote_first_timestamp_column(List<Create_field> *column_definitions)
   }
 }
 
-static bool key_cmp(const Key_part_spec &a, const Key_part_spec &b)
+static bool key_eq(const Key_part_spec &a, const Key_part_spec &b)
 {
   return a.length == b.length && a.asc == b.asc &&
          !lex_string_cmp(system_charset_info, &a.field_name, &b.field_name);
@@ -2438,7 +2439,7 @@ static void check_duplicate_key(THD *thd, const Key *key, const KEY *key_info,
     }
 
     if (std::equal(key->columns.begin(), key->columns.end(), k.columns.begin(),
-                   key_cmp))
+                   key_eq))
     {
       push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE, ER_DUP_INDEX,
                           ER_THD(thd, ER_DUP_INDEX), key_info->name.str);
@@ -13328,6 +13329,12 @@ bool TABLE::vers_get_history_range(THD *thd, my_timespec_t &min_ts,
 
   if (best_key)
   {
+    uchar key[MAX_KEY_LENGTH];
+    end_field->set_max();
+    KEY_PART_INFO *key_part= key_info[best_idx].key_part;
+    const uint key_prefix_len= key_part[0].store_length;
+    key_copy(key, record[0], key_info, key_prefix_len);
+
     /* Get range from index */
     if ((error= file->ha_index_init(best_idx, true)))
       goto end_unlock;
@@ -13335,7 +13342,9 @@ bool TABLE::vers_get_history_range(THD *thd, my_timespec_t &min_ts,
     if (!(error= file->ha_index_first(record[0])))
     {
       min_ts.sec= end_field->get_timestamp(&min_ts.usec);
-      if (!(error= file->ha_index_last(record[0])))
+      error= file->ha_index_read_map(record[0], (uchar*) key, (key_part_map) 1,
+                                     HA_READ_BEFORE_KEY);
+      if (!error)
       {
         max_ts.sec= end_field->get_timestamp(&max_ts.usec);
       }
@@ -13354,11 +13363,11 @@ bool TABLE::vers_get_history_range(THD *thd, my_timespec_t &min_ts,
   }
   else
   {
+    // FIXME: push warning index for row_end not found, using slow scan
 #ifndef DBUG_OFF
 jump_scan:
 #endif /* DBUG_OFF */
     /* Get range by scan */
-    // FIXME: push warning index for row_end not found, using slow scan
     if ((error= file->ha_rnd_init(1)))
       goto end_unlock;
 

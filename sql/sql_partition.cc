@@ -6153,16 +6153,39 @@ the generated partition syntax in a correct manner.
       {
         my_timespec_t min_ts, max_ts;
         Vers_part_info *vers_info= part_info->vers_info;
-        const auto &interval= vers_info->interval;
+        auto &interval= vers_info->interval;
         if (table->vers_get_history_range(thd, min_ts, max_ts))
           DBUG_RETURN(true);
+        if (max_ts.usec)
+        {
+          max_ts.sec++;
+          max_ts.usec= 0;
+        }
+        DBUG_ASSERT(min_ts.sec <= max_ts.sec);
         if (interval.start > min_ts.sec)
         {
-          // FIXME: push warning that user-defined STARTS does not fit existing history
+          Temporal_hybrid th_start(thd, interval.start);
+          // FIXME: push dates;
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+              WARN_VERS_WRONG_STARTS,
+              ER(WARN_VERS_WRONG_STARTS));
+          interval.start= min_ts.sec;
+        }
+        else if (!interval.start)
+        {
+          interval.start= min_ts.sec;
         }
         DBUG_ASSERT(part_info->use_default_num_partitions);
         part_info->use_default_num_partitions= false;
-        part_info->num_parts= 4;
+        // FIXME: test corner cases when min_ts == max_ts
+        const my_time_t range= max_ts.sec - interval.start;
+        DBUG_ASSERT(range >= 0);
+        const longlong i_sec= interval2sec(&interval.step);
+        DBUG_ASSERT(i_sec > 0);
+        uint hist_parts= range / i_sec;
+        if (hist_parts * i_sec != range)
+          hist_parts++;
+        part_info->num_parts= hist_parts + 1;
       } /* if (need to get history range) */
 
       /*
