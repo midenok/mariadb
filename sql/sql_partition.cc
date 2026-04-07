@@ -6145,12 +6145,16 @@ the generated partition syntax in a correct manner.
       if (table->versioned(VERS_TIMESTAMP) && partition_changed &&
           (alter_info->partition_flags & ALTER_PARTITION_INFO) &&
           part_info->part_type == VERSIONING_PARTITION &&
-          part_info->vers_info->auto_hist &&
-          // FIXME: test fast_alter_partition (see test FIXME)
-          !*fast_alter_table &&
-          // FIXME: change existing partitions?
-          !table->part_info)
+          part_info->vers_info->auto_hist)
       {
+        if (*fast_alter_table)
+        {
+          *fast_alter_table= false;
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                              WARN_VERS_WRONG_STARTS, ER(WARN_VERS_WRONG_STARTS),
+                              str_interval.cstr(), str_min_ts.cstr(), str_interval2.cstr());
+
+        }
         my_timespec_t min_ts, max_ts;
         Vers_part_info *vers_info= part_info->vers_info;
         auto &interval= vers_info->interval;
@@ -6166,17 +6170,18 @@ the generated partition syntax in a correct manner.
         {
           if (interval.start > min_ts.sec)
           {
-            TimestampString str_min_ts(thd, min_ts);
             TimestampString str_interval(thd, interval.start);
+            part_info->vers_set_starts(thd, min_ts.sec);
+            TimestampString str_min_ts(thd, min_ts);
+            TimestampString str_interval2(thd, interval.start);
             push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
                                 WARN_VERS_WRONG_STARTS, ER(WARN_VERS_WRONG_STARTS),
-                                str_interval.cstr(), str_min_ts.cstr());
-            interval.start= min_ts.sec;
+                                str_interval.cstr(), str_min_ts.cstr(), str_interval2.cstr());
+
           }
         }
         else
           interval.start= min_ts.sec;
-        DBUG_ASSERT(part_info->use_default_num_partitions);
         part_info->use_default_num_partitions= false;
         // FIXME: test corner cases when min_ts == max_ts
         const my_time_t range= max_ts.sec - interval.start;
