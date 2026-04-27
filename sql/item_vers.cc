@@ -192,5 +192,7 @@ Item_func_trt_trx_sees::val_bool()
 
   TR_table trt(thd);
   null_value= trt.query_sees(result, trx_id1, trx_id0);
+  DBUG_PRINT("vers_trx_id", ("query_sees: %llu -> %llu, result: %d, null_value: %d, accept_eq: %d",
+                             trx_id1, trx_id0, result, null_value, accept_eq));
   return result;
 }
