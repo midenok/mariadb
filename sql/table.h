@@ -3551,6 +3551,14 @@ public:
     FIELD_COUNT
   };
 
+  enum index_id_t {
+    IDX_TRX_ID= 0,
+    IDX_COMMIT_ID,
+    IDX_BEGIN_TS,
+    IDX_COMMIT_TS,
+    IDX_COUNT
+  };
+
   enum enabled {NO, MAYBE, YES};
   static enum enabled use_transaction_registry;
 
