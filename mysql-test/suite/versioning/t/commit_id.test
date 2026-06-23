@@ -63,6 +63,7 @@ select
   trt_commit_id(@ts2, true) = trt_commit_id(null, @tx2) as F,
   trt_commit_id(@ts3) = trt_commit_id(null, @tx2) as G,
   trt_commit_id(@ts3, true) is null as H;
+--exit
 
 select
   trt_trx_sees(@tx1, @tx0) as A,
