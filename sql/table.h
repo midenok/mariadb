@@ -3551,6 +3551,14 @@ public:
     FIELD_COUNT
   };
 
+  enum index_id_t {
+    IDX_TRX_ID= 0,
+    IDX_COMMIT_ID,
+    IDX_BEGIN_TS,
+    IDX_COMMIT_TS,
+    IDX_COUNT
+  };
+
   enum enabled {NO, MAYBE, YES};
   static enum enabled use_transaction_registry;
 
@@ -3668,6 +3676,24 @@ public:
   bool operator!= (const TABLE_LIST &subj) const
   {
     return !(*this == subj);
+  }
+  bool is_idx_correct(uint idx, field_index_t fld) const
+  {
+    DBUG_ASSERT(table->s->keys == IDX_COUNT);
+
+    if (table->s->keys <= idx)
+      return false;
+
+    handler *file= table->file;
+    const KEY *key= &table->key_info[idx];
+    if (HA_READ_ORDER == (file->index_flags(idx, 0, false) & (HA_READ_ORDER | HA_ONLY_WHOLE_INDEX)) &&
+        key->key_part->fieldnr - 1 == fld &&
+        !(key->key_part->key_part_flag & HA_REVERSE_SORT))
+    {
+      DBUG_ASSERT(key->key_part->fieldnr - 1 == fld);
+      return true;
+    }
+    return false;
   }
 };
 

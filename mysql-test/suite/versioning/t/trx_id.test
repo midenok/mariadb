@@ -5,10 +5,22 @@ if (!$TEST_VERSIONING_SO)
 --source include/have_innodb.inc
 --source include/have_partition.inc
 --source include/default_charset.inc
+--source include/maybe_debug.inc
 
 --disable_query_log
 --eval install plugin test_versioning soname '$TEST_VERSIONING_SO'
 --enable_query_log
+
+if ($MTR_COMBINATION_SCAN)
+{
+  if (!$have_debug)
+  {
+    --skip Requires debug build
+  }
+  --disable_query_log
+  set debug_dbug= '+d,vers_trt_scan';
+  --enable_query_log
+}
 
 set default_storage_engine= innodb;
 
@@ -573,7 +585,7 @@ SELECT COUNT(*) FROM t FOR SYSTEM_TIME ALL;
 DROP TABLE t;
 SET @@SYSTEM_VERSIONING_ALTER_HISTORY=ERROR;
 
-SELECT count(*) from mysql.transaction_registry where begin_timestamp>=commit_timestamp;
+SELECT count(*) from mysql.transaction_registry where begin_timestamp > commit_timestamp;
 
 --echo # MDEV-18875 Assertion `thd->transaction.stmt.ha_list == __null ||
 --echo # trans == &thd->transaction.stmt' failed or bogus ER_DUP_ENTRY upon
@@ -682,3 +694,11 @@ select * from t2 for system_time as of '2000-01-01 00:00:09';
 select * from t2 for system_time as of '2000-01-01 00:00:10';
 
 drop tables t1, t2;
+
+if ($MTR_COMBINATION_SCAN)
+{
+  # Don't use @old_dbug pattern as truncates command-line --debug=O file!
+  --disable_query_log
+  set debug_dbug= '-d,vers_trt_scan';
+  --enable_query_log
+}
