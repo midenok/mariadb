@@ -10302,11 +10302,11 @@ bool TR_table::query(ulonglong trx_id)
   handler *file= table->file;
 
   uchar search_key[MAX_KEY_LENGTH];
+  SCOPE_VALUE(table->read_set, &table->s->all_set);
 
   if (is_idx_correct(idx, fld) && !DBUG_IF(VERS_TRT_SCAN))
   {
     KEY *key= &table->key_info[idx];
-    MY_BITMAP *old_read_set= table->prepare_for_keyread(idx, &table->tmp_set);
 
     DBUG_ASSERT(thd->mdl_context.is_lock_owner(MDL_key::TABLE, table->s->db.str,
                                                table->s->table_name.str, MDL_SHARED_READ));
@@ -10317,10 +10317,7 @@ bool TR_table::query(ulonglong trx_id)
     key_copy(search_key, table->record[0], key, key_prefix_len);
 
     if ((error= file->ha_index_init(idx, true)))
-    {
-      table->restore_column_maps_after_keyread(old_read_set);
       goto end;
-    }
 
     error= file->ha_index_read_map(table->record[0], (uchar*) search_key,
                                    (key_part_map) 1, HA_READ_KEY_EXACT);
@@ -10334,7 +10331,6 @@ bool TR_table::query(ulonglong trx_id)
     if (!error && error2)
       error= error2;
 
-    table->restore_column_maps_after_keyread(old_read_set);
   }
   else
   {
@@ -10343,7 +10339,6 @@ bool TR_table::query(ulonglong trx_id)
       push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
                           WARN_VERS_TRT_DEFINITION,
                           ER_THD(thd, WARN_VERS_TRT_DEFINITION));
-    SCOPE_VALUE(table->read_set, &table->s->all_set);
     SQL_SELECT_auto select;
     READ_RECORD info;
     List<TABLE_LIST> dummy;
@@ -10503,12 +10498,11 @@ bool TR_table::query(MYSQL_TIME &commit_time, bool backwards)
     if (!error && found)
     {
       /* 2. get full row from PK */
+      SCOPE_VALUE(table->read_set, &table->s->all_set);
       fld= FLD_TRX_ID;
       idx= IDX_TRX_ID;
 
       key= &table->key_info[idx];
-      old_read_set= table->prepare_for_keyread(idx, &table->tmp_set);
-
       DBUG_ASSERT(key->key_part->fieldnr - 1 == fld);
       key_part= key->key_part;
       key_prefix_len= key_part[0].store_length;
@@ -10524,7 +10518,6 @@ bool TR_table::query(MYSQL_TIME &commit_time, bool backwards)
       error2= file->ha_index_end();
       if (!error && error2)
         error= error2;
-      table->restore_column_maps_after_keyread(old_read_set);
     } /* if (!error) */
   }
   else
