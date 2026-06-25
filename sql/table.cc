@@ -10488,8 +10488,8 @@ bool TR_table::query(MYSQL_TIME &commit_time, bool backwards)
     }
 
     const ha_rkey_function find_flag= backwards ? HA_READ_KEY_OR_NEXT : HA_READ_KEY_OR_PREV;
-    error= file->ha_index_read_map(table->record[0], (uchar*) search_key,
-                                   (key_part_map) 1, find_flag);
+    const key_part_map key_map= make_prev_keypart_map(backwards ? 1 : 2);
+    error= file->ha_index_read_map(table->record[0], (uchar*) search_key, key_map, find_flag);
     if (!error)
       found= true;
     else if (error == HA_ERR_END_OF_FILE || error == HA_ERR_KEY_NOT_FOUND)
