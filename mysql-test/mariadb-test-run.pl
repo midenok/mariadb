@@ -240,6 +240,8 @@ our @opt_mysqld_envs;
 
 my $opt_stress;
 my $opt_tail_lines= 20;
+my $opt_tail_log= -1;
+my $opt_tail_warnings= -1;
 
 my $opt_dry_run;
 
@@ -1271,7 +1273,11 @@ sub command_line_setup {
 	     'report-times'             => \$opt_report_times,
 	     'result-file'              => \$opt_resfile,
 	     'stress=s'                 => \$opt_stress,
+	     'tail=i'                   => sub { $opt_tail_lines= $opt_tail_log=
+						  $opt_tail_warnings= $_[1] },
 	     'tail-lines=i'             => \$opt_tail_lines,
+	     'tail-log=i'               => \$opt_tail_log,
+	     'tail-warnings=i'          => \$opt_tail_warnings,
              'dry-run'                  => \$opt_dry_run,
 
              'help|h'                   => \$opt_usage,
@@ -1299,9 +1305,12 @@ sub command_line_setup {
     report_option('verbose', $opt_verbose);
   }
 
-  # Negative values aren't meaningful on integer options
+  # Negative values aren't meaningful on integer options, except the tail-*
+  # options where a negative value means "everything".
+  my %tail_opt= map { $_ => 1 } qw(tail=i tail-lines=i tail-log=i tail-warnings=i);
   foreach(grep(/=i$/, keys %options))
   {
+    next if $tail_opt{$_};
     if (defined ${$options{$_}} &&
         do { no warnings "numeric"; int ${$options{$_}} < 0})
     {
@@ -1309,6 +1318,10 @@ sub command_line_setup {
       die("$v doesn't accept a negative value:");
     }
   }
+
+  # mysqltest caps --tail-lines at 10000 and rejects negatives, so map a
+  # negative ("everything") to that maximum.
+  $opt_tail_lines= 10000 if $opt_tail_lines < 0;
 
   # Find the absolute path to the test directory
   $glob_mysql_test_dir= cwd();
@@ -4392,13 +4405,27 @@ sub extract_server_log ($$) {
 # Return as a single string
 #
 
+# Trim a server error-log excerpt (arrayref of lines) to the last $tail lines:
+#  <0 = all lines, 0 = none, N = last N (prefixed with a snip marker).
+sub tail_lines {
+  my ($lines, $tail)= @_;
+  return () if $tail == 0;
+  return @$lines if $tail < 0 || @$lines <= $tail;
+  my $n= @$lines - $tail;
+  return ("< snip $n lines >\n", @$lines[$n .. $#$lines]);
+}
+
 sub get_log_from_proc ($$) {
   my ($proc, $name)= @_;
   my $srv_log= "";
 
+  return $srv_log if $opt_tail_log == 0;
+
   foreach my $mysqld (all_servers()) {
     if ($mysqld->{proc} eq $proc) {
-      my @srv_lines= extract_server_log($mysqld->if_exist('log-error'), $name);
+      my @srv_lines=
+        tail_lines([extract_server_log($mysqld->if_exist('log-error'), $name)],
+                   $opt_tail_log);
       $srv_log= "\nServer log from this test:\n" .
 	"----------SERVER LOG START-----------\n". join ("", @srv_lines) .
 	"----------SERVER LOG END-------------\n";
@@ -4782,18 +4809,18 @@ sub check_warnings ($) {
 sub check_warnings_post_shutdown {
   my ($server_socket)= @_;
   my $testname_hash= { };
-  my $report= '';
+  my @match_all;
   foreach my $mysqld ( mysqlds())
   {
     my ($testlist, $match_lines)=
         extract_warning_lines($mysqld->value('log-error'), 1);
     $testname_hash->{$_}= 1 for @$testlist;
-    $report.= join('', @$match_lines);
+    push @match_all, @$match_lines;
   }
   my @warning_tests= keys(%$testname_hash);
   if (@warning_tests) {
     my $fake_test= My::Test->new(testnames => \@warning_tests);
-    $fake_test->{'warnings'}= $report;
+    $fake_test->{'warnings'}= join('', tail_lines(\@match_all, $opt_tail_warnings));
     $fake_test->write_test($server_socket, 'WARNINGS');
   }
 }
@@ -6101,8 +6128,17 @@ Misc options
   stress=ARGS           Run stress test, providing options to
                         mysql-stress-test.pl. Options are separated by comma.
   xml-report=<file>     Output jUnit xml file of the results.
-  tail-lines=N          Number of lines of the result to include in a failure
-                        report.
+  tail-lines=N          Number of lines of the mysqltest result to include in
+                        a failure report. 0 disables it, negative includes all
+                        (max 10000); default 20.
+  tail=N                Shortcut to set tail-lines, tail-log and tail-warnings
+                        all to N.
+  tail-log=N            Number of lines of the server error log to include in
+                        a crash report. 0 disables it, negative (default)
+                        includes all.
+  tail-warnings=N       Number of suspicious lines from the server error log to
+                        include in the shutdown-warnings report. 0 disables it,
+                        negative (default) includes all.
 
 Some options that control enabling a feature for normal test runs,
 can be turned off by prepending 'no' to the option, e.g. --notimer.
