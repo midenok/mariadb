@@ -3637,7 +3637,7 @@ drop table t;
 set timestamp=2147483647;
 create table t (x int) with system versioning partition by system_time interval 1 hour auto;
 repair table t;
-Table	Op	Msg_type	Msg_text
+Table	Opr	Msg_type	Msg_text
 test.t	repair	status	OK
 drop table t;
 set timestamp=default;
