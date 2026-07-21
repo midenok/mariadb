@@ -242,7 +242,8 @@ my $opt_stress;
 my $opt_tail_lines= 20;
 my $opt_head_log;
 my $opt_tail_log;
-my $opt_tail_warnings= -1;
+my $opt_head_warnings;
+my $opt_tail_warnings;
 
 my $opt_dry_run;
 
@@ -1279,6 +1280,7 @@ sub command_line_setup {
 	     'tail-lines=i'             => \$opt_tail_lines,
 	     'head-log=i'               => \$opt_head_log,
 	     'tail-log=i'               => \$opt_tail_log,
+	     'head-warnings=i'          => \$opt_head_warnings,
 	     'tail-warnings=i'          => \$opt_tail_warnings,
              'dry-run'                  => \$opt_dry_run,
 
@@ -1310,7 +1312,7 @@ sub command_line_setup {
   # Negative values aren't meaningful on integer options, except the tail-*
   # options where a negative value means "everything".
   my %tail_opt= map { $_ => 1 }
-    qw(tail=i tail-lines=i head-log=i tail-log=i tail-warnings=i);
+    qw(tail=i tail-lines=i head-log=i tail-log=i head-warnings=i tail-warnings=i);
   foreach(grep(/=i$/, keys %options))
   {
     next if $tail_opt{$_};
@@ -1336,6 +1338,16 @@ sub command_line_setup {
   else {
     $opt_head_log= 0;
     $opt_tail_log= -1;
+  }
+
+  # Same for --head-warnings/--tail-warnings on the shutdown-warnings report.
+  if (defined $opt_head_warnings || defined $opt_tail_warnings) {
+    $opt_head_warnings //= 0;
+    $opt_tail_warnings //= 0;
+  }
+  else {
+    $opt_head_warnings= 0;
+    $opt_tail_warnings= -1;
   }
 
   # Find the absolute path to the test directory
@@ -4840,7 +4852,8 @@ sub check_warnings_post_shutdown {
   my @warning_tests= keys(%$testname_hash);
   if (@warning_tests) {
     my $fake_test= My::Test->new(testnames => \@warning_tests);
-    $fake_test->{'warnings'}= join('', splice_lines(\@match_all, 0, $opt_tail_warnings));
+    $fake_test->{'warnings'}=
+      join('', splice_lines(\@match_all, $opt_head_warnings, $opt_tail_warnings));
     $fake_test->write_test($server_socket, 'WARNINGS');
   }
 }
@@ -6159,9 +6172,12 @@ Misc options
                         giving one alone drops the opposite end, giving both
                         keeps both ends with the middle snipped.
   tail-log=N            Like head-log but keeps the last N lines.
-  tail-warnings=N       Number of suspicious lines from the server error log to
-                        include in the shutdown-warnings report. 0 disables it,
-                        negative (default) includes all.
+  head-warnings=N       Keep the first N suspicious lines of the shutdown-
+                        warnings report (0 none, negative all).  With neither
+                        head-warnings nor tail-warnings given the whole report
+                        is kept; giving one alone drops the opposite end,
+                        giving both keeps both ends with the middle snipped.
+  tail-warnings=N       Like head-warnings but keeps the last N lines.
 
 Some options that control enabling a feature for normal test runs,
 can be turned off by prepending 'no' to the option, e.g. --notimer.
