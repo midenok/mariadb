@@ -1,0 +1,47 @@
+# MDEV-30281 - exercise mtr's own --tail-log / --tail-warnings / --tail
+# options by running a child mariadb-test-run.pl on the tail_crash / tail_warn
+# tests next to this one, and observing how the server error-log excerpt in
+# the child's failure report gets trimmed.
+#
+# No .result is recorded - run with --record or just read the output.
+
+--source include/not_windows.inc
+
+# Run the child mtr in a sanitized environment: inheriting the parent's
+# per-run MTR_*/MYSQL* variables breaks path/port resolution (safe_process
+# fails to exec, ports collide).  env -i keeps only what the child needs and
+# lets it recompute the rest; MTR_BUILD_THREAD=auto picks its own free ports.
+--let $CHILD= env -i PATH="$PATH" HOME="$HOME" MTR_BINDIR="$MTR_BINDIR" MTR_BUILD_THREAD=auto perl $MYSQL_TEST_DIR/mariadb-test-run.pl --vardir=$MYSQLTEST_VARDIR/tmp/tail_child --force --max-test-fail=0
+
+--echo #### --tail-log (crash report) ####
+
+--echo # --tail-log=0
+--exec $CHILD --tail-log=0 mtr/tail.tail_crash 2>&1 || true
+
+--echo # --tail-log=5
+--exec $CHILD --tail-log=5 mtr/tail.tail_crash 2>&1 || true
+
+--echo # --tail-log=-1
+--exec $CHILD --tail-log=-1 mtr/tail.tail_crash 2>&1 || true
+
+--echo #### --tail-warnings (shutdown-warnings report) ####
+
+--echo # --tail-warnings=0
+--exec $CHILD --tail-warnings=0 mtr/tail.tail_warn 2>&1 || true
+
+--echo # --tail-warnings=5
+--exec $CHILD --tail-warnings=5 mtr/tail.tail_warn 2>&1 || true
+
+--echo # --tail-warnings=-1
+--exec $CHILD --tail-warnings=-1 mtr/tail.tail_warn 2>&1 || true
+
+--echo #### --tail (shortcut for all three) ####
+
+--echo # --tail=0
+--exec $CHILD --tail=0 mtr/tail.tail_crash 2>&1 || true
+
+--echo # --tail=5
+--exec $CHILD --tail=5 mtr/tail.tail_crash 2>&1 || true
+
+--echo # --tail=-1
+--exec $CHILD --tail=-1 mtr/tail.tail_crash 2>&1 || true
