@@ -11,7 +11,9 @@
 # per-run MTR_*/MYSQL* variables breaks path/port resolution (safe_process
 # fails to exec, ports collide).  env -i keeps only what the child needs and
 # lets it recompute the rest; MTR_BUILD_THREAD=auto picks its own free ports.
---let $CHILD= env -i PATH="$PATH" HOME="$HOME" MTR_BINDIR="$MTR_BINDIR" MTR_BUILD_THREAD=auto perl $MYSQL_TEST_DIR/mariadb-test-run.pl --vardir=$MYSQLTEST_VARDIR/tmp/tail_child --force --max-test-fail=0
+--let $CHILD_ENV= env -i PATH="$PATH" HOME="$HOME" MTR_BINDIR="$MTR_BINDIR" MTR_BUILD_THREAD=auto
+--let $CHILD_OPTS= --force --max-test-fail=0 --print-core=no
+--let $CHILD= $CHILD_ENV perl $MYSQL_TEST_DIR/mariadb-test-run.pl --vardir=$MYSQLTEST_VARDIR/tmp/tail_child $CHILD_OPTS
 
 --echo #### --tail-log (crash report) ####
 
