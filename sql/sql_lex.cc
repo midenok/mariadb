@@ -1212,7 +1212,7 @@ void LEX::start(THD *thd_arg)
   thd= unit.thd= thd_arg;
   stmt_lex= this; // default, should be rewritten for VIEWs And CTEs
 
-  DBUG_ASSERT(!explain || thd_arg->in_sub_stmt);
+  DBUG_ASSERT(!explain);
 
   builtin_select.lex_start(this);
   lex_options= 0;

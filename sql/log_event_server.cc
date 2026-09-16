@@ -1976,9 +1976,14 @@ int Query_log_event::do_apply_event(rpl_group_info *rgi,
   {
     bool is_rb_alter= gtid_flags_extra & Gtid_log_event::FL_ROLLBACK_ALTER_E1;
 
-    thd->set_time(when, when_sec_part);
-    thd->set_query_and_id((char*)query_arg, q_len_arg,
-                          thd->charset(), next_query_id());
+    if (thd->in_sub_stmt)
+      thd->set_query((char*)query_arg, q_len_arg, thd->charset());
+    else
+    {
+      thd->set_time(when, when_sec_part);
+      thd->set_query_and_id((char*)query_arg, q_len_arg,
+                            thd->charset(), next_query_id());
+    }
     thd->variables.pseudo_thread_id= thread_id;		// for temp tables
     DBUG_PRINT("query",("%s", thd->query()));
 
@@ -2203,7 +2208,53 @@ int Query_log_event::do_apply_event(rpl_group_info *rgi,
             */
             thd->variables.sql_log_slow= !MY_TEST(global_system_variables.log_slow_disabled_statements & LOG_SLOW_DISABLE_SLAVE);
           }
-          mysql_parse(thd, thd->query(), thd->query_length(), &parser_state);
+          if (thd->in_sub_stmt)
+          {
+            /*
+              This query event is being applied from a BINLOG statement
+              executed inside a trigger or stored routine. mysql_parse()
+              calls lex_start() + thd->reset_for_next_command(), both of
+              which assume they start a genuinely new top-level statement:
+              reset_for_next_command() even asserts !spcont/!in_sub_stmt
+              and is documented as "not called by substatements of
+              routines". Calling it here would wipe THD state (e.g.
+              thd->transaction.all) that belongs to the still-executing
+              enclosing statement.
+
+              We also must not reuse thd->main_lex the way the general
+              BINLOG-statement code does (see
+              save_restore_context_apply_event()): main_lex belongs to
+              the enclosing top-level statement too, and re-initializing
+              it here would corrupt it. Instead, parse into a private LEX
+              of our own, the same way mysql_make_view() parses embedded
+              SQL text mid-statement without disturbing the caller's LEX.
+
+              Likewise, new Items created while parsing/executing this
+              query would otherwise be chained onto thd->free_list while
+              it is still the enclosing trigger instruction's own
+              (shared, still in-use) item list. Give ourselves a private
+              Query_arena for the duration of the call, and free our own
+              items before handing the (untouched) enclosing arena back,
+              mirroring what mysql_make_view() does with
+              activate_stmt_arena_if_needed()/restore_active_arena().
+            */
+            Query_arena backup_arena;
+            Query_arena query_arena(thd->mem_root,
+                                    Query_arena::STMT_CONVENTIONAL_EXECUTION);
+            thd->set_n_backup_active_arena(&query_arena, &backup_arena);
+
+            LEX *save_lex= thd->lex;
+            thd->lex= new(thd->mem_root) st_lex_local;
+            lex_start(thd);
+            if (!parse_sql(thd, &parser_state, NULL, true))
+              mysql_execute_command(thd);
+            thd->lex= save_lex;
+
+            thd->cleanup_after_query();
+            thd->restore_active_arena(&query_arena, &backup_arena);
+          }
+          else
+            mysql_parse(thd, thd->query(), thd->query_length(), &parser_state);
           /* Finalize server status flags after executing a statement. */
           thd->update_server_status();
           log_slow_statement(thd);
