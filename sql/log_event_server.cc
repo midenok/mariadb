@@ -5901,11 +5901,39 @@ int Rows_log_event::do_apply_event(rpl_group_info *rgi)
 
   /*
     If there is no locks taken, this is the first binrow event seen
-    after the table map events.  We should then lock all the tables
+    after the table map events (FIXME: or in_sub_stmt).  We should then lock all the tables
     used in the transaction and proceed with execution of the actual
     event.
   */
-  if (!thd->lock)
+  if (thd->lock)
+  {
+    if (thd->in_sub_stmt)
+    {
+      /*
+        thd->lock already belongs to the enclosing top-level statement
+        (e.g. the DML that fired the trigger this BINLOG statement runs
+        from) and must not be touched here. We can only reuse tables
+        that the enclosing statement has already opened and locked;
+        anything else is an error, since we cannot open/lock tables of
+        our own in the middle of a sub-statement.
+      */
+      for (TABLE_LIST *tables= rgi->tables_to_lock; tables;
+           tables= tables->next_global)
+      {
+        if (!(tables->table= find_locked_table(thd->open_tables,
+                                                tables->db.str,
+                                                tables->table_name.str)))
+        {
+          my_error(ER_TABLE_NOT_LOCKED, MYF(0), tables->table_name.str);
+          error= ER_TABLE_NOT_LOCKED;
+          thd->is_slave_error= 1;
+          goto err;
+        }
+      }
+      goto locked_tables;
+    }
+  }
+  else
   {
     /*
       Lock_tables() reads the contents of thd->lex, so they must be
@@ -6034,6 +6062,8 @@ int Rows_log_event::do_apply_event(rpl_group_info *rgi)
       /* remove trigger's tables */
       goto err;
     }
+
+locked_tables:
 
     DBUG_EXECUTE_IF("rows_log_event_after_open_table", {
       const char action[]=
