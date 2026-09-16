@@ -188,3 +188,13 @@ BINLOG '123';
 BINLOG '-2079193929';
 --error ER_BASE64_DECODE_ERROR
 BINLOG 'xç↓%~∙D╒ƒ╡';
+
+--echo #
+--echo # MDEV-39074 trans_rollback_stmt(THD *): Assertion `! thd->in_sub_stmt' failed.
+--echo #
+create table t0 (a int);
+create trigger trig_t0_insert after insert on t0 for each row binlog 'enabled';
+--error ER_BASE64_DECODE_ERROR
+insert into t0 set a= 1;
+drop table t0;
+--echo # End of 10.11 tests

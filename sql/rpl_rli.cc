@@ -2408,8 +2408,8 @@ void rpl_group_info::slave_close_thread_tables(THD *thd)
     (e.g. a BINLOG statement executed from a trigger or stored routine):
     thd's open tables, metadata locks and statement transaction belong
     to the enclosing top-level statement and must be left untouched
-    until that statement finishes. Only rpl_group_info-local state
-    (clear_tables_to_lock()) is finalized in that case.
+    until that statement finishes. Only rgi-local state
+    (like clear_tables_to_lock()) is finalized in that case.
   */
   if (thd->in_sub_stmt)
     goto end;

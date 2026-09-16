@@ -6459,21 +6459,24 @@ static int rows_event_stmt_cleanup(rpl_group_info *rgi, THD * thd)
     */
     error= thd->binlog_flush_pending_rows_event(TRUE);
 
-    /*
-      If this event is not in a transaction, the call below will, if some
-      transactional storage engines are involved, commit the statement into
-      them and flush the pending event to binlog.
-      If this event is in a transaction, the call will do nothing, but a
-      Xid_log_event will come next which will, if some transactional engines
-      are involved, commit the transaction and flush the pending event to the
-      binlog.
-      We check for thd->transaction_rollback_request because it is possible
-      there was a deadlock that was ignored by slave-skip-errors. Normally, the
-      deadlock would have been rolled back already.
-    */
-    error|= (int) ((error || thd->transaction_rollback_request)
-                       ? trans_rollback_stmt(thd)
-                       : trans_commit_stmt(thd));
+    if (!thd->in_sub_stmt)
+    {
+      /*
+        If this event is not in a transaction, the call below will, if some
+        transactional storage engines are involved, commit the statement into
+        them and flush the pending event to binlog.
+        If this event is in a transaction, the call will do nothing, but a
+        Xid_log_event will come next which will, if some transactional engines
+        are involved, commit the transaction and flush the pending event to the
+        binlog.
+        We check for thd->transaction_rollback_request because it is possible
+        there was a deadlock that was ignored by slave-skip-errors. Normally, the
+        deadlock would have been rolled back already.
+      */
+      error|= (int) ((error || thd->transaction_rollback_request)
+                        ? trans_rollback_stmt(thd)
+                        : trans_commit_stmt(thd));
+    }
 
     /*
       Now what if this is not a transactional engine? we still need to
