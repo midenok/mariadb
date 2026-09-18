@@ -5921,6 +5921,20 @@ int Rows_log_event::do_apply_event(rpl_group_info *rgi)
   DBUG_ENTER("Rows_log_event::do_apply_event(Relay_log_info*)");
   int error= 0;
   LEX *lex= thd->lex;
+  /*
+    Set and used only when applying this event from a sub-statement
+    (thd->spcont/thd->in_sub_stmt, see below): thd->lex there is
+    main_lex, shared with the enclosing top-level statement via
+    mysql_client_binlog_statement()'s own lex swap, not something of
+    our own to freely mutate. Saved here so it (and the query time,
+    also touched below) can be restored before this function returns,
+    however it returns.
+  */
+  bool saved_lex_and_time= false;
+  LEX *save_lex= NULL;
+  my_time_t save_start_time= 0;
+  ulong save_start_time_sec_part= 0;
+  ulonglong save_start_utime= 0, save_utime_after_lock= 0;
   uint8 new_trg_event_map= get_trg_event_map();
   /*
     If m_table_id == UINT32_MAX, then we have a dummy event that does not
@@ -5978,9 +5992,17 @@ int Rows_log_event::do_apply_event(rpl_group_info *rgi)
       bool found_by_name= table != NULL;
       /*
         Row events always need a write lock (Table_map_log_event builds
-        tables_to_lock with TL_WRITE).
+        tables_to_lock with TL_WRITE). Also skip an instance that is
+        actively in use by (i.e. not idle for, and not already ours
+        from an earlier row event of this same statement) the still
+        running enclosing statement -- reusing it would let us
+        overwrite its record[0]/bitmaps/handler state out from under
+        it, same as normal prelocked-table lookup already avoids doing
+        (sql_base.cc, the table->query_id checks in open_table()).
       */
-      while (table && table->reginfo.lock_type < TL_FIRST_WRITE)
+      while (table &&
+            (table->reginfo.lock_type < TL_FIRST_WRITE ||
+             (table->query_id != 0 && table->query_id != thd->query_id)))
         table= find_locked_table(table->next, tables->db.str,
                                  tables->table_name.str);
       if (!table)
@@ -5992,6 +6014,21 @@ int Rows_log_event::do_apply_event(rpl_group_info *rgi)
       }
       tables->table= table;
     }
+
+    /*
+      thd->lex here is main_lex, shared with the enclosing statement
+      (see the comment on save_lex above): give ourselves a private
+      one instead of mutating it, and save/restore the query time we
+      are about to overwrite with this event's own.
+    */
+    save_lex= thd->lex;
+    thd->lex= new (thd->mem_root) st_lex_local;
+    save_start_time= thd->start_time;
+    save_start_time_sec_part= thd->start_time_sec_part;
+    save_start_utime= thd->start_utime;
+    save_utime_after_lock= thd->utime_after_lock;
+    saved_lex_and_time= true;
+
     thd->set_time(when, when_sec_part);
     thd->lex->set_stmt_row_injection();
     init_option_bits();
@@ -6478,12 +6515,28 @@ locked_tables:
   }
 
   thd->reset_query_timer();
+  if (saved_lex_and_time)
+  {
+    thd->lex= save_lex;
+    thd->start_time= save_start_time;
+    thd->start_time_sec_part= save_start_time_sec_part;
+    thd->start_utime= save_start_utime;
+    thd->utime_after_lock= save_utime_after_lock;
+  }
   DBUG_RETURN(error);
 
 err:
   restore_empty_query_table_list(thd->lex);
   rgi->slave_close_thread_tables(thd);
   thd->reset_query_timer();
+  if (saved_lex_and_time)
+  {
+    thd->lex= save_lex;
+    thd->start_time= save_start_time;
+    thd->start_time_sec_part= save_start_time_sec_part;
+    thd->start_utime= save_start_utime;
+    thd->utime_after_lock= save_utime_after_lock;
+  }
   DBUG_RETURN(error);
 }
 
