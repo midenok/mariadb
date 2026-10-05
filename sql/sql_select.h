@@ -1874,9 +1874,6 @@ private:
     @param save_sum_fields  If true, do not replace Item_sum items in 
                             @c tmp_fields list with Item_field items referring 
                             to fields in temporary table.
-    @param save_blobs       Deep-copy BLOB/TEXT field values
-                            (Copy_field::set()) instead of copying the raw
-                            record representation.
 
     @returns false on success, true on failure
   */
@@ -1884,8 +1881,7 @@ private:
                                   ORDER *tmp_table_group,
                                   bool save_sum_fields,
                                   bool distinct,
-                                  bool keep_row_ordermake,
-                                  bool save_blobs);
+                                  bool keep_row_ordermake);
   /**
     Optimize distinct when used on a subset of the tables.
 
@@ -2532,11 +2528,6 @@ TABLE *create_tmp_table(THD *thd,TMP_TABLE_PARAM *param,List<Item> &fields,
 			ulonglong select_options, ha_rows rows_limit,
                         const LEX_CSTRING *alias, bool do_not_open=FALSE,
                         bool keep_row_order= FALSE);
-class Create_tmp_table;
-TABLE *create_tmp_table(THD *thd, Create_tmp_table &maker,
-                        TMP_TABLE_PARAM *param, List<Item> &fields,
-                        const LEX_CSTRING *alias, bool do_not_open,
-                        bool keep_row_order);
 TABLE *create_tmp_table_for_schema(THD *thd, TMP_TABLE_PARAM *param,
                                    const ST_SCHEMA_TABLE &schema_table,
                                    longlong select_options,

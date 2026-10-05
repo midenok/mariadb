@@ -3875,18 +3875,10 @@ bool JOIN::make_aggr_tables_info()
     keep_row_order= thd->lex->with_rownum && (group_list || order);
     bool save_sum_fields= (group_list && simple_group) ||
                            implicit_grouping_with_window_funcs;
-    /*
-      Window functions require buffering rows past the point where the
-      underlying handler (e.g. InnoDB) may reuse/free a row's BLOB storage
-      (MDEV-29483), so BLOB fields must be deep-copied into this tmp table
-      regardless of save_sum_fields's own (unrelated) Item_sum semantics.
-    */
-    bool save_blobs= save_sum_fields || select_lex->have_window_funcs();
     if (create_postjoin_aggr_table(curr_tab,
                                    &all_fields, tmp_group,
                                    save_sum_fields,
-                                   distinct, keep_row_order,
-                                   save_blobs))
+                                   distinct, keep_row_order))
       DBUG_RETURN(true);
     exec_tmp_table= curr_tab->table;
 
@@ -4017,8 +4009,7 @@ bool JOIN::make_aggr_tables_info()
       ORDER *dummy= NULL; //TODO can use table->group here also
 
       if (create_postjoin_aggr_table(curr_tab, curr_all_fields, dummy, true,
-                                     distinct, keep_row_order,
-                                     true /* save_blobs */))
+                                     distinct, keep_row_order))
 	DBUG_RETURN(true);
 
       if (group_list)
@@ -4290,8 +4281,7 @@ JOIN::create_postjoin_aggr_table(JOIN_TAB *tab, List<Item> *table_fields,
                                  ORDER *table_group,
                                  bool save_sum_fields,
                                  bool distinct,
-                                 bool keep_row_order,
-                                 bool save_blobs)
+                                 bool keep_row_order)
 {
   DBUG_ENTER("JOIN::create_postjoin_aggr_table");
   THD_STAGE_INFO(thd, stage_creating_tmp_table);
@@ -4318,11 +4308,11 @@ JOIN::create_postjoin_aggr_table(JOIN_TAB *tab, List<Item> *table_fields,
   if (tmp_table_keep_current_rowid)
     add_fields_for_current_rowid(tab, table_fields);
   tab->tmp_table_param->skip_create_table= true;
-  Create_tmp_table maker(table_group, distinct, save_sum_fields,
-                         select_options, table_rows_limit, save_blobs);
-  TABLE* table= create_tmp_table(thd, maker, tab->tmp_table_param,
-                                 *table_fields, &empty_clex_str, true,
-                                 keep_row_order);
+  TABLE* table= create_tmp_table(thd, tab->tmp_table_param, *table_fields,
+                                 table_group, distinct,
+                                 save_sum_fields, select_options,
+                                 table_rows_limit,
+                                 &empty_clex_str, true, keep_row_order);
   if (!table)
     DBUG_RETURN(true);
   tmp_table_param.using_outer_summary_function=
@@ -20806,15 +20796,13 @@ setup_tmp_table_column_bitmaps(TABLE *table, uchar *bitmaps, uint field_count)
 Create_tmp_table::Create_tmp_table(ORDER *group, bool distinct,
                                    bool save_sum_fields,
                                    ulonglong select_options,
-                                   ha_rows rows_limit,
-                                   bool save_blobs)
+                                   ha_rows rows_limit)
    :m_alloced_field_count(0),
     m_using_unique_constraint(false),
     m_temp_pool_slot(MY_BIT_NONE),
     m_group(group),
     m_distinct(distinct),
     m_save_sum_fields(save_sum_fields),
-    m_save_blobs(save_blobs),
     m_with_cycle(false),
     m_select_options(select_options),
     m_rows_limit(rows_limit),
@@ -20911,12 +20899,11 @@ TABLE *Create_tmp_table::start(THD *thd,
   key_part_map *const_key_parts;
   /* Treat sum functions as normal ones when loose index scan is used. */
   m_save_sum_fields|= param->precomputed_group_by;
-  m_save_blobs|= param->precomputed_group_by;
   DBUG_ENTER("Create_tmp_table::start");
   DBUG_PRINT("enter",
              ("table_alias: '%s'  distinct: %d  save_sum_fields: %d  "
-              "save_blobs: %d  rows_limit: %lu  group: %d", table_alias->str,
-              (int) m_distinct, (int) m_save_sum_fields, (int) m_save_blobs,
+              "rows_limit: %lu  group: %d", table_alias->str,
+              (int) m_distinct, (int) m_save_sum_fields,
               (ulong) m_rows_limit, MY_TEST(m_group)));
 
   if (use_temp_pool && !(test_flags & TEST_KEEP_TMP_TABLES))
@@ -21486,7 +21473,7 @@ bool Create_tmp_table::finalize(THD *thd,
 
     if (m_from_field[i])
     {						/* Not a table Item */
-      copy->set(field, m_from_field[i], m_save_blobs);
+      copy->set(field, m_from_field[i], m_save_sum_fields);
       copy++;
     }
     length=field->pack_length_in_rec();
@@ -21844,19 +21831,9 @@ TABLE *create_tmp_table(THD *thd, TMP_TABLE_PARAM *param, List<Item> &fields,
                         const LEX_CSTRING *table_alias, bool do_not_open,
                         bool keep_row_order)
 {
+  TABLE *table;
   Create_tmp_table maker(group, distinct, save_sum_fields, select_options,
                          rows_limit);
-  return create_tmp_table(thd, maker, param, fields, table_alias, do_not_open,
-                          keep_row_order);
-}
-
-
-TABLE *create_tmp_table(THD *thd, Create_tmp_table &maker,
-                        TMP_TABLE_PARAM *param, List<Item> &fields,
-                        const LEX_CSTRING *table_alias, bool do_not_open,
-                        bool keep_row_order)
-{
-  TABLE *table;
   if (!(table= maker.start(thd, param, table_alias)) ||
       maker.add_fields(thd, table, param, fields) ||
       maker.finalize(thd, table, param, do_not_open, keep_row_order))
